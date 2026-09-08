@@ -6,10 +6,13 @@ import com.tdt4290group7.backend.plugins.configureRouting
 import com.tdt4290group7.backend.plugins.configureSerialization
 import com.tdt4290group7.backend.plugins.configureStatusPages
 import io.ktor.server.application.Application
-import io.ktor.server.netty.EngineMain
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
 
-fun main(args: Array<String>) {
-    EngineMain.main(args)
+fun main() {
+    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
+    embeddedServer(Netty, port = port, module = Application::module)
+        .start(wait = true)
 }
 
 fun Application.module() {
