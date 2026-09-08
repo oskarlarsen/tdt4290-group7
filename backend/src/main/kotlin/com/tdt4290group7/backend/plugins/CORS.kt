@@ -7,6 +7,12 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.cors.routing.CORS
 
 fun Application.configureCORS() {
+    val allowedOrigins = System.getenv("CORS_ALLOWED_ORIGINS")
+        ?.split(",")
+        ?.map { it.trim() }
+        ?.filter { it.isNotEmpty() }
+        .orEmpty()
+
     install(CORS) {
         allowMethod(HttpMethod.Options)
         allowMethod(HttpMethod.Put)
@@ -14,6 +20,8 @@ fun Application.configureCORS() {
         allowMethod(HttpMethod.Patch)
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
-        anyHost() // TODO: restrict to known origins before deploying
+        allowedOrigins.forEach { host ->
+            allowHost(host, schemes = listOf("http", "https"))
+        }
     }
 }
