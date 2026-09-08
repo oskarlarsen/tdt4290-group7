@@ -9,12 +9,17 @@ import kotlin.test.assertEquals
 
 class ApplicationTest {
     @Test
-    fun testRoot() = testApplication {
+    fun testRootAndHealth() = testApplication {
         application {
             module()
         }
-        val response = client.get("/")
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("Hello World!", response.bodyAsText())
+
+        val rootResponse = client.get("/")
+        assertEquals(HttpStatusCode.OK, rootResponse.status)
+        assertEquals("Hello World!", rootResponse.bodyAsText())
+
+        val healthResponse = client.get("/health")
+        assertEquals(HttpStatusCode.OK, healthResponse.status)
+        assertEquals("""{"status":"UP"}""", healthResponse.bodyAsText())
     }
 }
