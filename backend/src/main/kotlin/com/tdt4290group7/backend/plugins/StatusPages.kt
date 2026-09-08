@@ -9,7 +9,9 @@ import io.ktor.server.response.respondText
 fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            call.respondText(text = "500: ${cause.message}", status = HttpStatusCode.InternalServerError)
+            if (cause is kotlinx.coroutines.CancellationException) throw cause
+            call.application.log.error("Unhandled exception", cause)
+            call.respondText(text = "Internal server error", status = HttpStatusCode.InternalServerError)
         }
     }
 }
