@@ -1,7 +1,7 @@
 FROM gradle:9.7.1-jdk25 AS build
 WORKDIR /app
 COPY . .
-RUN gradle buildFatJar --no-daemon
+RUN ./gradlew buildFatJar --no-daemon
 
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
