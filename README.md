@@ -1,4 +1,4 @@
-# Miljøoppfølging — Frontend
+# Frontend
 
 React + TypeScript + Vite skeleton for the Trondheim kommune environmental
 monitoring dashboard (TDT4290).
