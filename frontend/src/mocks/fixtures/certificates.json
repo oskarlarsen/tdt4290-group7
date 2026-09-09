@@ -1,0 +1,10 @@
+[
+  {
+    "id": "cert-1",
+    "contract": "Avtale 1",
+    "supplier": "Leverandør 1",
+    "name": "ISO 14001",
+    "expiryDate": "2025-03-15",
+    "status": "Gyldig"
+  }
+]
