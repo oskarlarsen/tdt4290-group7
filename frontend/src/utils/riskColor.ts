@@ -1,7 +1,8 @@
 export type RiskLevel = "high" | "medium" | "low";
 
-export function riskColor(level: RiskLevel): "red" | "orange" | "green" {
+// Tertiary is used for compliant status; primary and secondary are reserved for brand elements
+export function riskColor(level: RiskLevel): "red" | "orange" | "tertiary" {
   if (level === "high") return "red";
   if (level === "medium") return "orange";
-  return "green";
+  return "tertiary";
 }

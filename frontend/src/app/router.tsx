@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { RoleRedirect } from "./RoleRedirect";
 import { AdminLayout } from "./AdminLayout";
 import { SupplierLayout } from "./SupplierLayout";
 
@@ -29,6 +30,7 @@ import MyAlerts from "../pages/supplier/MyAlerts";
 import RequiredActions from "../pages/supplier/RequiredActions";
 
 const router = createBrowserRouter([
+  { path: "/", element: <RoleRedirect /> },
   { path: "/login", element: <Login /> },
   { path: "/unauthorized", element: <Unauthorized /> },
   {

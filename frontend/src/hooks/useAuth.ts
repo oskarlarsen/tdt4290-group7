@@ -1,8 +1,11 @@
-type Role = "admin" | "supplier";
-type User = { id: string; name: string; role: Role; supplierId?: string };
+import { useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
 
-// TODO: replace with real auth/session logic (JWT, refresh, etc.)
+// Central access point for auth state used by the rest of the app
 export function useAuth() {
-  const user: User | null = null;
-  return { user, login: async (_email: string, _password: string) => {}, logout: () => {} };
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used inside an <AuthProvider>");
+  }
+  return ctx;
 }
