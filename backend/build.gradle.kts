@@ -38,6 +38,7 @@ dependencies {
     implementation("io.ktor:ktor-server-body-limit")
     implementation("at.favre.lib:bcrypt:0.10.2")
     implementation(libs.logback.classic)
+    implementation(libs.pdfbox)
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation(kotlin("test"))
 }
