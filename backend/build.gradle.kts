@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.plugin.serialization)
     alias(libs.plugins.ktor)
+    application
 }
 
 group = "com.tdt4290group7"
@@ -31,6 +32,7 @@ dependencies {
     implementation("io.ktor:ktor-server-call-logging")
     implementation("io.ktor:ktor-server-status-pages")
     implementation(libs.logback.classic)
+    implementation(libs.pdfbox)
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation(kotlin("test"))
 }
