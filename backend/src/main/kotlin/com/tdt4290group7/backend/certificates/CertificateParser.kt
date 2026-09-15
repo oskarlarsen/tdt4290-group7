@@ -8,10 +8,10 @@ import java.util.Locale
 object CertificateParser {
 
     private val DATE_FORMATS = listOf(
-        DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("dd-MM-yyyy", Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH),
+        DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.ENGLISH),   // 04 July 2025
+        DateTimeFormatter.ofPattern("dd-MM-yyyy", Locale.ENGLISH),     // 22-09-2022
+        DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ENGLISH),     // 22.09.2022
+        DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH),     // 2025-07-04
     )
 
     private val EXPIRY_LABELS = listOf(
