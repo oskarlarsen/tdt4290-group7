@@ -9,7 +9,7 @@ import java.io.File
  * not from any real supplier.
  */
 fun main() {
-    val pdf = File("backend/src/main/resources/test-pdf/test-certificate-iso14001.pdf")
+    val pdf = File("backend/src/main/resources/test-pdf/test-certificate-miljofyrtarn.pdf")
     val text = extractText(pdf)
     val parsed = CertificateParser.parse(text, pdf.name)
 
