@@ -10,6 +10,8 @@ export function getStoredToken(): string | null {
 
 export function storeToken(token: string, rememberMe: boolean) {
   const storage = rememberMe ? localStorage : sessionStorage;
+  const otherStorage = rememberMe ? sessionStorage : localStorage;
+  otherStorage.removeItem(TOKEN_STORAGE_KEY);
   storage.setItem(TOKEN_STORAGE_KEY, token);
 }
 
