@@ -12,7 +12,7 @@ export function ProtectedRoute({ role, children }: Props) {
     return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading…</div>;
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace state={{ from: window.location.pathname + window.location.search + window.location.hash }} />;
   if (user.role !== role) return <Navigate to="/unauthorized" replace />;
 
   return <>{children}</>;

@@ -10,6 +10,8 @@ export function getStoredToken(): string | null {
 
 export function storeToken(token: string, rememberMe: boolean) {
   const storage = rememberMe ? localStorage : sessionStorage;
+  const otherStorage = rememberMe ? sessionStorage : localStorage;
+  otherStorage.removeItem(TOKEN_STORAGE_KEY);
   storage.setItem(TOKEN_STORAGE_KEY, token);
 }
 
@@ -38,5 +40,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   }
 
   if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
