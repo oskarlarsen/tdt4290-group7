@@ -35,7 +35,7 @@ export default function Login() {
       // Route users based on the role returned by the backend
       if (from) {
         navigate(from, { replace: true });
-      } else if (user.role === "admin") {
+      } else if (user.role === "ADMIN") {
         navigate("/admin/dashboard", { replace: true });
       } else {
         navigate("/supplier/dashboard", { replace: true });
