@@ -8,7 +8,6 @@ import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respondText
-import io.ktor.server.application.log
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
