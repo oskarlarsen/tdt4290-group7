@@ -2,6 +2,7 @@ package com.tdt4290group7.backend
 
 import com.tdt4290group7.backend.plugins.configureCORS
 import com.tdt4290group7.backend.plugins.configureMonitoring
+import com.tdt4290group7.backend.plugins.configureRateLimiting
 import com.tdt4290group7.backend.plugins.configureRouting
 import com.tdt4290group7.backend.plugins.configureSecurity
 import com.tdt4290group7.backend.plugins.configureSerialization
@@ -23,6 +24,7 @@ fun Application.module() {
     configureMonitoring()
     configureStatusPages()
     configureSecurity()
+    configureRateLimiting()
     configureRouting()
     configureAuthRoutes()
 }

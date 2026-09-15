@@ -3,6 +3,7 @@ package com.tdt4290group7.backend.routes
 import com.tdt4290group7.backend.auth.JwtConfig
 import com.tdt4290group7.backend.model.toAuthUser
 import com.tdt4290group7.backend.plugins.AUTH_JWT
+import com.tdt4290group7.backend.plugins.LOGIN_RATE_LIMIT
 import com.tdt4290group7.backend.repository.UserRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -10,6 +11,7 @@ import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.post
@@ -41,39 +43,42 @@ data class ErrorResponse(val message: String)
 fun Application.configureAuthRoutes() {
     routing {
         route("/api/auth") {
-            post("/login") {
-                val request = call.receive<LoginRequest>()
-                val email = request.email.trim()
+            // Applies to login and forgot-password: blunt brute-force / enumeration protection.
+            rateLimit(LOGIN_RATE_LIMIT) {
+                post("/login") {
+                    val request = call.receive<LoginRequest>()
+                    val email = request.email.trim()
 
-                if (email.isEmpty() || request.password.isEmpty()) {
-                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("Email and password are required."))
-                    return@post
-                }
+                    if (email.isEmpty() || request.password.isEmpty()) {
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse("Email and password are required."))
+                        return@post
+                    }
 
-                val user = UserRepository.findByEmail(email)
-                // Same generic error whether the account doesn't exist or the password is
-                // wrong, so the endpoint can't be used to enumerate valid accounts.
-                if (user == null || !UserRepository.verifyPassword(user, request.password)) {
-                    call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
-                    return@post
-                }
+                    val user = UserRepository.findByEmail(email)
+                    // Same generic error whether the account doesn't exist or the password is
+                    // wrong, so the endpoint can't be used to enumerate valid accounts.
+                    if (user == null || !UserRepository.verifyPassword(user, request.password)) {
+                        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
+                        return@post
+                    }
 
-                val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
-                call.respond(
-                    LoginResponse(
-                        token = token,
-                        expiresAt = Instant.ofEpochMilli(expiresAt.time).toString(),
-                        user = user.toAuthUser(),
+                    val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
+                    call.respond(
+                        LoginResponse(
+                            token = token,
+                            expiresAt = Instant.ofEpochMilli(expiresAt.time).toString(),
+                            user = user.toAuthUser(),
+                        )
                     )
-                )
-            }
+                }
 
-            post("/forgot-password") {
-                val request = call.receive<ForgotPasswordRequest>()
-                // Always respond the same way regardless of whether the account exists,
-                // so this endpoint can't be used to enumerate registered emails.
-                logger.info("Password reset requested")
-                call.respond(HttpStatusCode.OK)
+                post("/forgot-password") {
+                    val request = call.receive<ForgotPasswordRequest>()
+                    // Always respond the same way regardless of whether the account exists,
+                    // so this endpoint can't be used to enumerate registered emails.
+                    logger.info("Password reset requested")
+                    call.respond(HttpStatusCode.OK)
+                }
             }
 
             authenticate(AUTH_JWT) {
