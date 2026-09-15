@@ -46,18 +46,31 @@ export default function Login() {
   }
 
   async function handleForgotPassword() {
-    if (!email.trim()) {
-      setFormError("Enter your email, then select Forgot password.");
-      return;
-    }
-    setFormError(null);
-    try {
-      await requestPasswordReset(email.trim());
-      setResetMessage("If that account exists, we've sent password reset instructions.");
-    } catch {
-      setResetMessage("Couldn't send reset instructions right now. Please try again.");
-    }
+  const value = email.trim();
+
+  if (!value) {
+    setFormError("Enter your email address first, then select Forgot password.");
+    return;
   }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    setFormError("Please enter a valid email address to reset your password.");
+    return;
+  }
+
+  setFormError(null);
+
+  try {
+    await requestPasswordReset(value);
+    setResetMessage(
+      "If that account exists, we've sent password reset instructions."
+    );
+  } catch {
+    setResetMessage(
+      "Couldn't send reset instructions right now. Please try again."
+    );
+  }
+}
 
   const displayError = formError ?? authError;
 
