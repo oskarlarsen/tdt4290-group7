@@ -47,7 +47,7 @@ export default function Login() {
 
   async function handleForgotPassword() {
     if (!email.trim()) {
-      setFormError("Enter your email or username first, then select Forgot password.");
+      setFormError("Enter your email, then select Forgot password.");
       return;
     }
     setFormError(null);
