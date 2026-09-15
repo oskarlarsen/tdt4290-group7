@@ -11,7 +11,11 @@ fun Application.configureCORS() {
         ?.split(",")
         ?.map { it.trim() }
         ?.filter { it.isNotEmpty() }
-        .orEmpty()
+        // Falls back to the default Vite dev server origin so `npm run dev` works against
+        // a locally running backend without extra setup; set CORS_ALLOWED_ORIGINS explicitly
+        // everywhere else (e.g. Docker, staging, production).
+        ?.takeIf { it.isNotEmpty() }
+        ?: listOf("localhost:5173")
 
     install(CORS) {
         allowMethod(HttpMethod.Options)
