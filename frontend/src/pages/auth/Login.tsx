@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { User, Lock, Eye, EyeOff, Info, Loader2 } from "lucide-react";
-import { useAuth } from "../../hooks/useAuth";
-import { requestPasswordReset } from "../../api/auth";
+import { User, Lock, Eye, EyeOff, Info, Loader2, KeyRound} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { requestPasswordReset, resetPassword } from "@/api/auth";
 
 export default function Login() {
   const { login, status, error: authError } = useAuth();
@@ -15,6 +15,12 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Password reset flow
+  const [resetRequested, setResetRequested] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   const isLoading = status === "loading";
 
@@ -46,31 +52,53 @@ export default function Login() {
   }
 
   async function handleForgotPassword() {
-  const value = email.trim();
+    const value = email.trim();
 
-  if (!value) {
-    setFormError("Enter your email address first, then select Forgot password.");
-    return;
+    if (!value) {
+      setFormError("Enter your email address first, then select Forgot password.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setFormError("Please enter a valid email address to reset your password.");
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await requestPasswordReset(value);
+      setResetMessage(
+        "If that account exists, we've sent password reset instructions."
+      );
+      setResetRequested(true)
+    } catch {
+      setFormError("Couldn't send reset instructions right now. Please try again.");
+    }
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    setFormError("Please enter a valid email address to reset your password.");
-    return;
-  }
+  async function handleResetPassword(e: FormEvent) {
+      e.preventDefault();
+      setFormError(null);
 
-  setFormError(null);
+      if (!resetToken.trim() || newPassword.length < 8) {
+        setFormError("Enter the reset code and a new password of at leas 8 characters.");
+        return;
+      }
 
-  try {
-    await requestPasswordReset(value);
-    setResetMessage(
-      "If that account exists, we've sent password reset instructions."
-    );
-  } catch {
-    setResetMessage(
-      "Couldn't send reset instructions right now. Please try again."
-    );
+    setResetLoading(true);
+    try {
+      await resetPassword({ token: resetToken.trim(), newPassword });
+      setResetRequested(false);
+      setResetToken("");
+      setNewPassword("");
+      setResetMessage("Password updated. Sign in with your new password.");
+    } catch {
+      setFormError("Invalid or expired reset code. Request a new one.");
+    } finally {
+      setResetLoading(false);
+    }
   }
-}
 
   const displayError = formError ?? authError;
 
@@ -90,97 +118,184 @@ export default function Login() {
           Municipal Environmental Monitoring System
         </p>
 
-        <form onSubmit={handleSubmit} noValidate>
-          {/* Email / Username */}
-          <div className="mb-1">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-800 mb-1.5">
-              Email or Username
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="email"
-                type="text"
-                autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="advisor.hansen@kommune.no"
-                disabled={isLoading}
-                className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
-              />
-            </div>
-          </div>
-          <p className="text-xs font-normal text-gray-400 mb-5">
-            Single sign-in for municipal advisors &amp; registered suppliers
-          </p>
+        {resetRequested ? (
+            <form onSubmit={handleResetPassword} noValidate>
+              <h2 className="text-center text-base font-semibold text-gray-900 mb-1">
+                Reset your password
+              </h2>
+              <p className="text-center text-xs font-normal text-gray-500 mb-5">
+                Enter the reset code you received and choose a new password (minimum 8 characters).
+              </p>
 
-          {/* Password */}
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-800">
-              Password
-            </label>
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-sm font-medium text-secondary-700 hover:text-secondary-700"
-            >
-              Forgot password?
-            </button>
-          </div>
-          <div className="relative mb-4">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              disabled={isLoading}
-              className="w-full rounded-lg border border-gray-200 pl-10 pr-10 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
+              {/* Reset code */}
+              <div className="mb-4">
+                <label htmlFor="reset-code" className="block text-sm font-medium text-gray-800 mb-1.5">
+                  Reset code
+                </label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                      id="reset-code"
+                      type="text"
+                      autoComplete="one-time-code"
+                      value={resetToken}
+                      onChange={(e) => setResetToken(e.target.value)}
+                      placeholder="Paste the reset code"
+                      disabled={resetLoading}
+                      className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
+                  />
+                </div>
+              </div>
 
-          {/* Remember me */}
-          <label className="flex items-center gap-2 mb-5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-primary-700 focus:ring-primary-700/30"
-            />
-            <span className="text-sm font-normal text-gray-700">Remember this workstation for 30 days</span>
-          </label>
+              {/* New password */}
+              <div className="mb-4">
+                <label htmlFor="new-password" className="block text-sm font-medium text-gray-800 mb-1.5">
+                  New password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      disabled={resetLoading}
+                      className="w-full rounded-lg border border-gray-200 pl-10 pr-10 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
+                  />
+                  <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-          {(displayError || resetMessage) && (
-            <div
-              role="status"
-              className={`mb-4 rounded-lg px-3 py-2 text-sm font-normal ${
-                displayError ? "bg-red-50 text-red-700" : "bg-tertiary-50 text-primary-700"
-              }`}
-            >
-              {displayError ?? resetMessage}
-            </div>
-          )}
+              {(displayError || resetMessage) && (
+                  <div
+                      role="status"
+                      className={`mb-4 rounded-lg px-3 py-2 text-sm font-normal ${
+                          displayError ? "bg-red-50 text-red-700" : "bg-tertiary-50 text-primary-700"
+                      }`}
+                  >
+                    {displayError ?? resetMessage}
+                  </div>
+              )}
 
-          {/* Sign in */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-900 hover:bg-primary-700 text-white font-semibold py-2.5 text-sm transition-colors disabled:opacity-70"
-          >
-            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isLoading ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
+              <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-900 hover:bg-primary-700 text-white font-semibold py-2.5 text-sm transition-colors disabled:opacity-70"
+              >
+                {resetLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {resetLoading ? "Updating…" : "Update password"}
+              </button>
+
+              <button
+                  type="button"
+                  onClick={() => setResetRequested(false)}
+                  className="mt-3 w-full text-center text-sm font-medium text-secondary-700 hover:text-secondary-700"
+              >
+                Back to sign in
+              </button>
+            </form>
+        ) : (
+            <form onSubmit={handleSubmit} noValidate>
+              {/* Email / Username */}
+              <div className="mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-800 mb-1.5">
+                  Email or Username
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                      id="email"
+                      type="text"
+                      autoComplete="username"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="advisor.hansen@kommune.no"
+                      disabled={isLoading}
+                      className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
+                  />
+                </div>
+              </div>
+              <p className="text-xs font-normal text-gray-400 mb-5">
+                Single sign-in for municipal advisors &amp; registered suppliers
+              </p>
+
+              {/* Password */}
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-800">
+                  Password
+                </label>
+                <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-sm font-medium text-secondary-700 hover:text-secondary-700"
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <div className="relative mb-4">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    disabled={isLoading}
+                    className="w-full rounded-lg border border-gray-200 pl-10 pr-10 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {/* Remember me */}
+              <label className="flex items-center gap-2 mb-5 cursor-pointer select-none">
+                <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-700 focus:ring-primary-700/30"
+                />
+                <span className="text-sm font-normal text-gray-700">Remember this workstation for 30 days</span>
+              </label>
+
+              {(displayError || resetMessage) && (
+                  <div
+                      role="status"
+                      className={`mb-4 rounded-lg px-3 py-2 text-sm font-normal ${
+                          displayError ? "bg-red-50 text-red-700" : "bg-tertiary-50 text-primary-700"
+                      }`}
+                  >
+                    {displayError ?? resetMessage}
+                  </div>
+              )}
+
+              {/* Sign in */}
+              <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-900 hover:bg-primary-700 text-white font-semibold py-2.5 text-sm transition-colors disabled:opacity-70"
+              >
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isLoading ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+        )}
 
         {/* Info box */}
         <div className="mt-6 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3 flex gap-2">

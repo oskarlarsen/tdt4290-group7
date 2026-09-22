@@ -4,6 +4,7 @@ import com.tdt4290group7.backend.auth.JwtConfig
 import com.tdt4290group7.backend.model.toAuthUser
 import com.tdt4290group7.backend.plugins.AUTH_JWT
 import com.tdt4290group7.backend.plugins.LOGIN_RATE_LIMIT
+import com.tdt4290group7.backend.repository.PasswordResetTokenStore
 import com.tdt4290group7.backend.repository.UserRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -36,6 +37,9 @@ data class LoginResponse(
 
 @Serializable
 data class ForgotPasswordRequest(val email: String)
+
+@Serializable
+data class ResetPasswordRequest(val token: String, val newPassword: String)
 
 @Serializable
 data class ErrorResponse(val message: String)
@@ -74,9 +78,43 @@ fun Application.configureAuthRoutes() {
 
                 post("/forgot-password") {
                     val request = call.receive<ForgotPasswordRequest>()
+                    val user = UserRepository.findByEmail(request.email)
+                    if (user != null) {
+                        val token = PasswordResetTokenStore.create(user.id)
+                        logger.warn(
+                            "DEV-ONLY: password reset token for ${user.email}: $token (valid 15 min)"
+                        )
+                    }
                     // Always respond the same way regardless of whether the account exists,
                     // so this endpoint can't be used to enumerate registered emails.
-                    logger.info("Password reset requested")
+                    call.respond(HttpStatusCode.OK)
+                }
+
+                post("/reset-password") {
+                    val request = call.receive<ResetPasswordRequest>()
+
+                    if (request.newPassword.length < 8) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ErrorResponse("New Password must be at least 8 characters.")
+                        )
+                        return@post
+                    }
+
+                    // Single-use: the token is consumed even if the user lookup fails.
+                    val user = PasswordResetTokenStore.consume(request.token.trim())
+                        ?.let(UserRepository::findById)
+
+                    if (user == null) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ErrorResponse("Invalid or expired reset token.")
+                        )
+                        return@post
+                    }
+
+                    UserRepository.updatePassword(user, request.newPassword)
+                    logger.info("Password reset completed for user ${user.id}")
                     call.respond(HttpStatusCode.OK)
                 }
             }

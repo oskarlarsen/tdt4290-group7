@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { LoginRequest, LoginResponse, AuthUser } from "../types/auth";
+import type { LoginRequest, LoginResponse, AuthUser } from "@/types/auth";
 
 // Backend response determines the user's role and redirect target
 export function login(payload: LoginRequest): Promise<LoginResponse> {
@@ -22,5 +22,15 @@ export function requestPasswordReset(email: string): Promise<void> {
   return apiFetch<void>("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(payload: {
+  token: string;
+  newPassword: string;
+}): Promise<void> {
+  return apiFetch<void>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(payload)
   });
 }

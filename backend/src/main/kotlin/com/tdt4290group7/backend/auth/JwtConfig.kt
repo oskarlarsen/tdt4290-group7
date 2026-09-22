@@ -15,13 +15,8 @@ object JwtConfig {
     const val REALM = "tdt4290-api"
     const val CLAIM_USER_ID = "uid"
 
-    private val secret: String = System.getenv("JWT_SECRET") ?: run {
-        logger.warn(
-            "JWT_SECRET is not set. Falling back to an insecure development-only secret. " +
-                "Set JWT_SECRET in production."
-        )
-        "insecure-development-secret-change-me"
-    }
+    private val secret: String = System.getenv("JWT_SECRET")?.takeIf { it.isNotBlank() }
+        ?: error("JWT_SECRET must be set")
 
     val algorithm: Algorithm = Algorithm.HMAC256(secret)
 

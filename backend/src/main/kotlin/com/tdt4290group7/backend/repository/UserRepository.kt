@@ -4,6 +4,7 @@ import at.favre.lib.crypto.bcrypt.BCrypt
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import org.slf4j.LoggerFactory
 
 /**
@@ -14,12 +15,14 @@ import org.slf4j.LoggerFactory
 object UserRepository {
     private val logger = LoggerFactory.getLogger(UserRepository::class.java)
 
-    private val usersById: Map<String, User>
-    private val usersByEmail: Map<String, User>
+    private val usersById: ConcurrentHashMap<String, User>()
+    private val usersByEmail: ConcurrentHashMap<String, User>()
+
+    val count: Int get() = usersById.size
 
     init {
-        val adminPassword = envOrInsecureDefault("SEED_ADMIN_PASSWORD", "admin-dev-only")
-        val supplierPassword = envOrInsecureDefault("SEED_SUPPLIER_PASSWORD", "supplier-dev-only")
+        val adminPassword = requireSeedPassword("SEED_ADMIN_PASSWORD")
+        val supplierPassword = requireSeedPassword("SEED_SUPPLIER_PASSWORD")
 
         val seeded = listOf(
             User(
@@ -39,15 +42,19 @@ object UserRepository {
             ),
         )
 
-        usersById = seeded.associateBy { it.id }
-        usersByEmail = seeded.associateBy { it.email.lowercase() }
+        seeded.forEach {
+            usersById[it.id] = it
+            usersByEmail[it.email.lowercase()] = it
+        }
     }
 
-    private fun envOrInsecureDefault(envVar: String, default: String): String {
+    private fun requireSeedPassword(envVar: String): String {
         val value = System.getenv(envVar)
         if (value.isNullOrBlank()) {
-            logger.warn("$envVar is not set. Using an insecure development-only password. Set $envVar in production.")
-            return default
+            val message = "$envVar is not set. Refusing to start: seed accounts would have " +
+                    "credentials published in source control. Set $envVar and restart."
+            logger.error(message)
+            throw IllegalStateException(message)
         }
         return value
     }
@@ -60,4 +67,10 @@ object UserRepository {
 
     fun verifyPassword(user: User, password: String): Boolean =
         BCrypt.verifyer().verify(password.toCharArray(), user.passwordHash).verified
+
+    fun updatePassword(user: User, newPassword: String) {
+        val updated = user.copy(passwordHash = hash(newPassword))
+        usersById[updated.id] = updated
+        usersByEmail[updated.email.lowercase()] = updated
+    }
 }
