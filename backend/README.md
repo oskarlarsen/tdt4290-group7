@@ -110,8 +110,16 @@ docker build -t ktor-backend .
 Run the container:
 
 ```bash
-docker run -p 8080:8080 ktor-backend
+docker run -p 8080:8080 \
+  -e JWT_SECRET="$(openssl rand -base64 48)" \
+  -e SEED_ADMIN_PASSWORD=<choose one> \
+  -e SEED_SUPPLIER_PASSWORD=<choose one> \
+  ktor-backend
 ```
+
+The container runs as an unprivileged `app` user. `docker compose` additionally
+runs it with a read-only filesystem, no Linux capabilities and
+`no-new-privileges`.
 
 Verify:
 
