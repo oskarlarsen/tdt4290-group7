@@ -55,7 +55,8 @@ Endpoints (all under `/api/auth`):
 - `POST /logout` — requires `Authorization: Bearer <token>`
 - `GET /me` — requires `Authorization: Bearer <token>`, returns the current user
 - `POST /forgot-password` — `{ email }`, always responds `200` (no account enumeration)
-- `POST /reset-password` — `{ token, newPassword }`, token is single-use and valid for 15 minutes
+- `POST /reset-password` — `{ token, newPassword }`, token is single-use and valid for 15 minutes;
+  a successful reset invalidates every JWT previously issued to that user
 
 There is no email delivery yet. To test the reset flow locally, set
 `ALLOW_DEV_PASSWORD_RESET_LOG=true` and the reset token is written to the
