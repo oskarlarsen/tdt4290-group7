@@ -72,7 +72,8 @@ frontend and the API must be served from the same site (e.g. `localhost:3000` an
 not in `CORS_ALLOWED_ORIGINS` are rejected with `403`.
 
 `/login` and `/forgot-password` are rate-limited to 10 requests/minute per
-client IP.
+client IP. Behind a load balancer or ingress, set `TRUSTED_PROXY_HOPS` so the
+limit applies per real client instead of to everyone at once.
 
 On top of that, each account is locked after 5 consecutive failed logins: first
 for 30 seconds, doubling with every further failure up to 15 minutes. While
@@ -95,6 +96,7 @@ Relevant environment variables:
 | `SEED_SUPPLIER_PASSWORD`    | none — required, startup fails if unset | Password for the seeded supplier account  |
 | `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens (local dev only) |
 | `AUTH_COOKIE_SECURE`        | `true`                                  | Set `false` only if a local browser drops Secure cookies on `http://localhost` (Safari) |
+| `TRUSTED_PROXY_HOPS`        | `0`                                     | Number of proxies in front of the backend; client IPs for rate limiting are then read from `X-Forwarded-For`. Keep `0` if clients connect directly, or the header can be spoofed |
 | `CORS_ALLOWED_ORIGINS`      | `localhost:5173`                        | Comma-separated `host:port` origins allowed to call the API |
 
 ## Run locally with Docker
