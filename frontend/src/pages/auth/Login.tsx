@@ -3,6 +3,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { User, Lock, Eye, EyeOff, Info, Loader2, KeyRound} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { requestPasswordReset, resetPassword } from "@/api/auth";
+import { ApiError } from "@/api/client";
+
+// Mirrors the backend's PasswordPolicy.MIN_LENGTH
+const MIN_PASSWORD_LENGTH = 12;
 
 export default function Login() {
   const { login, status, error: authError } = useAuth();
@@ -81,8 +85,8 @@ export default function Login() {
       e.preventDefault();
       setFormError(null);
 
-      if (!resetToken.trim() || newPassword.length < 8) {
-        setFormError("Enter the reset code and a new password of at leas 8 characters.");
+      if (!resetToken.trim() || newPassword.length < MIN_PASSWORD_LENGTH) {
+        setFormError(`Enter the reset code and a new password of at least ${MIN_PASSWORD_LENGTH} characters.`);
         return;
       }
 
@@ -93,8 +97,13 @@ export default function Login() {
       setResetToken("");
       setNewPassword("");
       setResetMessage("Password updated. Sign in with your new password.");
-    } catch {
-      setFormError("Invalid or expired reset code. Request a new one.");
+    } catch (err) {
+      // 400s carry a user-facing reason (password rule or bad/expired code)
+      setFormError(
+        err instanceof ApiError && err.status === 400
+          ? err.message
+          : "Couldn't reset your password right now. Please try again."
+      );
     } finally {
       setResetLoading(false);
     }
@@ -124,7 +133,7 @@ export default function Login() {
                 Reset your password
               </h2>
               <p className="text-center text-xs font-normal text-gray-500 mb-5">
-                Enter the reset code you received and choose a new password (minimum 8 characters).
+                Enter the reset code you received and choose a new password (minimum {MIN_PASSWORD_LENGTH} characters).
               </p>
 
               {/* Reset code */}
@@ -160,7 +169,7 @@ export default function Login() {
                       autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="At least 8 characters"
+                      placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                       disabled={resetLoading}
                       className="w-full rounded-lg border border-gray-200 pl-10 pr-10 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
                   />

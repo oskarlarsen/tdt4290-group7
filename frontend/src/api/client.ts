@@ -13,6 +13,16 @@ try {
   // Storage can be unavailable (e.g. blocked site data); nothing to clean up then.
 }
 
+/** Non-2xx response; `message` is the backend's user-facing message when it sent one. */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 type ApiFetchOptions = {
   /** Set false when a 401 is an expected answer rather than a lost session (e.g. login, startup check). */
   notifySessionExpired?: boolean;
@@ -39,7 +49,11 @@ export async function apiFetch<T>(
     throw new Error("Session expired");
   }
 
-  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
+    const message = typeof body?.message === "string" ? body.message : `API error ${res.status}`;
+    throw new ApiError(res.status, message);
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }

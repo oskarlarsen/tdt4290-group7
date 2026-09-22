@@ -1,6 +1,7 @@
 package com.tdt4290group7.backend.repository
 
 import at.favre.lib.crypto.bcrypt.BCrypt
+import com.tdt4290group7.backend.auth.PasswordPolicy
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
 import java.util.UUID
@@ -65,8 +66,10 @@ object UserRepository {
 
     fun findById(id: String): User? = usersById[id]
 
+    // bcrypt throws on inputs over 72 bytes; no stored password can be that long, so it's a mismatch.
     fun verifyPassword(user: User, password: String): Boolean =
-        BCrypt.verifyer().verify(password.toCharArray(), user.passwordHash).verified
+        !PasswordPolicy.exceedsBcryptLimit(password) &&
+            BCrypt.verifyer().verify(password.toCharArray(), user.passwordHash).verified
 
     /** Sets a new password and bumps [User.tokenVersion], so every previously issued JWT stops working. */
     fun updatePassword(user: User, newPassword: String) {

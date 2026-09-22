@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-import { SESSION_EXPIRED_EVENT } from "../api/client";
+import { ApiError, SESSION_EXPIRED_EVENT } from "../api/client";
 import type { AuthUser, LoginRequest } from "../types/auth";
 
 type AuthStatus = "idle" | "loading" | "authenticated" | "unauthenticated" | "error";
@@ -66,9 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setStatus("error");
       setError(
-        err instanceof Error
-          ? "Couldn't sign in. Check your email/username and password and try again."
-          : "Something went wrong. Please try again."
+        // Account temporarily locked after repeated failures; the backend says for how long
+        err instanceof ApiError && err.status === 429
+          ? err.message
+          : err instanceof Error
+            ? "Couldn't sign in. Check your email/username and password and try again."
+            : "Something went wrong. Please try again."
       );
       throw err;
     }

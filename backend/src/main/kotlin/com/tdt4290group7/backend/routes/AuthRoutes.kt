@@ -2,11 +2,14 @@ package com.tdt4290group7.backend.routes
 
 import com.tdt4290group7.backend.auth.AuthCookie
 import com.tdt4290group7.backend.auth.JwtConfig
+import com.tdt4290group7.backend.auth.LoginAttemptTracker
+import com.tdt4290group7.backend.auth.PasswordPolicy
 import com.tdt4290group7.backend.model.toAuthUser
 import com.tdt4290group7.backend.plugins.AUTH_JWT
 import com.tdt4290group7.backend.plugins.LOGIN_RATE_LIMIT
 import com.tdt4290group7.backend.repository.PasswordResetTokenStore
 import com.tdt4290group7.backend.repository.UserRepository
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
@@ -15,6 +18,7 @@ import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.post
 import io.ktor.server.routing.get
@@ -70,13 +74,31 @@ fun Application.configureAuthRoutes() {
                         return@post
                     }
 
+                    // Checked before the password, so a locked account gives no signal about
+                    // whether a guess was right.
+                    LoginAttemptTracker.lockedFor(email)?.let { remaining ->
+                        val seconds = maxOf(1, remaining.toSeconds() + if (remaining.toNanosPart() > 0) 1 else 0)
+                        val minutes = (seconds + 59) / 60
+                        call.response.header(HttpHeaders.RetryAfter, seconds.toString())
+                        call.respond(
+                            HttpStatusCode.TooManyRequests,
+                            ErrorResponse(
+                                "Too many failed sign-in attempts. Try again in " +
+                                    if (minutes <= 1) "a minute." else "$minutes minutes."
+                            )
+                        )
+                        return@post
+                    }
+
                     val user = UserRepository.findByEmail(email)
                     // Same generic error whether the account doesn't exist or the password is
                     // wrong, so the endpoint can't be used to enumerate valid accounts.
                     if (user == null || !UserRepository.verifyPassword(user, request.password)) {
+                        LoginAttemptTracker.recordFailure(email)
                         call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
                         return@post
                     }
+                    LoginAttemptTracker.recordSuccess(email)
 
                     val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
                     // Without "remember me" the cookie lasts until the browser closes (the JWT
@@ -111,11 +133,10 @@ fun Application.configureAuthRoutes() {
                 post("/reset-password") {
                     val request = call.receive<ResetPasswordRequest>()
 
-                    if (request.newPassword.length < 8) {
-                        call.respond(
-                            HttpStatusCode.BadRequest,
-                            ErrorResponse("New Password must be at least 8 characters.")
-                        )
+                    // Validated before the single-use token is spent, so a rejected password
+                    // doesn't force the user to request a new token.
+                    PasswordPolicy.violation(request.newPassword)?.let { reason ->
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(reason))
                         return@post
                     }
 
@@ -126,12 +147,14 @@ fun Application.configureAuthRoutes() {
                     if (user == null) {
                         call.respond(
                             HttpStatusCode.BadRequest,
-                            ErrorResponse("Invalid or expired reset token.")
+                            ErrorResponse("Invalid or expired reset code. Request a new one.")
                         )
                         return@post
                     }
 
                     UserRepository.updatePassword(user, request.newPassword)
+                    // The account owner proved control of it, so lift any brute-force lock.
+                    LoginAttemptTracker.recordSuccess(user.email)
                     logger.info("Password reset completed for user ${user.id}")
                     call.respond(HttpStatusCode.OK)
                 }
