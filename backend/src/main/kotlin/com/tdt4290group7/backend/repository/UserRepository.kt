@@ -15,8 +15,8 @@ import org.slf4j.LoggerFactory
 object UserRepository {
     private val logger = LoggerFactory.getLogger(UserRepository::class.java)
 
-    private val usersById: ConcurrentHashMap<String, User>()
-    private val usersByEmail: ConcurrentHashMap<String, User>()
+    private val usersById = ConcurrentHashMap<String, User>()
+    private val usersByEmail = ConcurrentHashMap<String, User>()
 
     val count: Int get() = usersById.size
 
