@@ -30,6 +30,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cors")
     implementation("io.ktor:ktor-server-call-logging")
     implementation("io.ktor:ktor-server-status-pages")
+    implementation("org.xerial:sqlite-jdbc:3.53.4.0")
     implementation(libs.logback.classic)
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation(kotlin("test"))
