@@ -51,9 +51,11 @@ either is missing or blank.
 
 Endpoints (all under `/api/auth`):
 
-- `POST /login` — `{ email, password, rememberMe }` → `{ token, expiresAt, user }`
-- `POST /logout` — requires `Authorization: Bearer <token>`
-- `GET /me` — requires `Authorization: Bearer <token>`, returns the current user
+- `POST /login` — `{ email, password, rememberMe }` → `{ expiresAt, user }`, and sets the
+  `auth_token` cookie (HttpOnly, SameSite=Strict, Secure, path `/api`). With `rememberMe` the
+  cookie lasts 30 days; otherwise it is a session cookie.
+- `POST /logout` — clears the `auth_token` cookie
+- `GET /me` — requires the `auth_token` cookie, returns the current user
 - `POST /forgot-password` — `{ email }`, always responds `200` (no account enumeration)
 - `POST /reset-password` — `{ token, newPassword }`, token is single-use and valid for 15 minutes;
   a successful reset invalidates every JWT previously issued to that user
@@ -62,6 +64,12 @@ There is no email delivery yet. To test the reset flow locally, set
 `ALLOW_DEV_PASSWORD_RESET_LOG=true` and the reset token is written to the
 backend log. Never enable this anywhere else: anyone who can read the logs can
 take over any account.
+
+The JWT is only ever sent as that HttpOnly cookie, so page scripts can't read it;
+`Authorization` headers are ignored. Because the cookie is `SameSite=Strict`, the
+frontend and the API must be served from the same site (e.g. `localhost:3000` and
+`localhost:8080`, or `app.example.no` and `api.example.no`). Requests from origins
+not in `CORS_ALLOWED_ORIGINS` are rejected with `403`.
 
 `/login` and `/forgot-password` are rate-limited to 10 requests/minute per
 client IP.
@@ -76,6 +84,7 @@ Relevant environment variables:
 | `SEED_ADMIN_PASSWORD`       | none — required, startup fails if unset | Password for the seeded admin account     |
 | `SEED_SUPPLIER_PASSWORD`    | none — required, startup fails if unset | Password for the seeded supplier account  |
 | `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens (local dev only) |
+| `AUTH_COOKIE_SECURE`        | `true`                                  | Set `false` only if a local browser drops Secure cookies on `http://localhost` (Safari) |
 | `CORS_ALLOWED_ORIGINS`      | `localhost:5173`                        | Comma-separated `host:port` origins allowed to call the API |
 
 ## Run locally with Docker
