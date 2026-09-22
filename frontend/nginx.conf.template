@@ -1,0 +1,24 @@
+# Rendered by the nginx image at container start: ${API_ORIGIN} is substituted from the
+# environment (only defined variables are replaced, so nginx's own $vars are left alone).
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Security headers. `always` so they're also sent on error responses.
+    # The CSP is the main XSS backstop: the auth token lives in web storage, so injected
+    # script must not be able to run or send it anywhere but the API.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${API_ORIGIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    # Ignored by browsers over plain http; takes effect once this is served over https.
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # Single-page app: let the router handle unknown paths.
+    location / {
+        try_files $uri /index.html;
+    }
+}
