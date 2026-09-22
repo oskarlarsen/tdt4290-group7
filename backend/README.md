@@ -74,6 +74,16 @@ not in `CORS_ALLOWED_ORIGINS` are rejected with `403`.
 `/login` and `/forgot-password` are rate-limited to 10 requests/minute per
 client IP.
 
+On top of that, each account is locked after 5 consecutive failed logins: first
+for 30 seconds, doubling with every further failure up to 15 minutes. While
+locked, `/login` answers `429` with a `Retry-After` header without checking the
+password. The lock is keyed on the submitted email, so unknown emails behave the
+same and it can't be used to discover accounts. A successful login or password
+reset clears it. Failures older than an hour are forgotten.
+
+New passwords (via `/reset-password`) must be 12–72 bytes long; there are no
+character-class rules, following NIST SP 800-63B.
+
 Relevant environment variables:
 
 | Variable                 | Default                                 | Purpose                                   |
