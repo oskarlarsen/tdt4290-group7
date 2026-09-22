@@ -11,6 +11,14 @@ services:
       SEED_SUPPLIER_PASSWORD: ${SEED_SUPPLIER_PASSWORD:?Set SEED_SUPPLIER_PASSWORD in your .env file (see .env.example)}
       ALLOW_DEV_PASSWORD_RESET_LOG: ${ALLOW_DEV_PASSWORD_RESET_LOG:-false}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+    # Hardening: no privilege escalation, no Linux capabilities, read-only filesystem.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp # JVM scratch files (e.g. hsperfdata)
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 5s
@@ -26,7 +34,17 @@ services:
       # Must match the origin of VITE_API_BASE_URL, or the CSP blocks API calls.
       API_ORIGIN: ${API_ORIGIN:-http://localhost:8080}
     ports:
-      - "3000:80"
+      - "3000:8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    # Owned by the nginx user (uid 101), since tmpfs mounts default to root.
+    tmpfs:
+      - /tmp:uid=101,gid=101 # nginx pid file and temp files
+      - /var/cache/nginx:uid=101,gid=101
+      - /etc/nginx/conf.d:uid=101,gid=101 # default.conf is rendered here from the template at startup
     depends_on:
       backend:
         condition: service_healthy

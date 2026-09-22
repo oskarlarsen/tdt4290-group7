@@ -1,7 +1,7 @@
 # Rendered by the nginx image at container start: ${API_ORIGIN} is substituted from the
 # environment (only defined variables are replaced, so nginx's own $vars are left alone).
 server {
-    listen 80;
+    listen 8080;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
