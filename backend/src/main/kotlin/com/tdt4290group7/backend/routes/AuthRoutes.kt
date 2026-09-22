@@ -1,5 +1,6 @@
 package com.tdt4290group7.backend.routes
 
+import com.tdt4290group7.backend.auth.AuthCookie
 import com.tdt4290group7.backend.auth.JwtConfig
 import com.tdt4290group7.backend.model.toAuthUser
 import com.tdt4290group7.backend.plugins.AUTH_JWT
@@ -34,7 +35,7 @@ data class LoginRequest(val email: String, val password: String, val rememberMe:
 
 @Serializable
 data class LoginResponse(
-    val token: String,
+    // The token itself is only sent as an HttpOnly cookie, never in the body.
     val expiresAt: String,
     val user: com.tdt4290group7.backend.model.AuthUser,
 )
@@ -78,9 +79,11 @@ fun Application.configureAuthRoutes() {
                     }
 
                     val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
+                    // Without "remember me" the cookie lasts until the browser closes (the JWT
+                    // itself still expires after a day).
+                    AuthCookie.set(call, token, if (request.rememberMe) JwtConfig.longLivedMillis / 1000 else null)
                     call.respond(
                         LoginResponse(
-                            token = token,
                             expiresAt = Instant.ofEpochMilli(expiresAt.time).toString(),
                             user = user.toAuthUser(),
                         )
@@ -147,12 +150,14 @@ fun Application.configureAuthRoutes() {
 
                     call.respond(user.toAuthUser())
                 }
+            }
 
-                post("/logout") {
-                    // Tokens are stateless JWTs with no server-side session, so there is
-                    // nothing to invalidate server-side; the client discards the token.
-                    call.respond(HttpStatusCode.OK)
-                }
+            // Outside `authenticate` so an expired or invalid cookie can still be cleared.
+            post("/logout") {
+                // The JWT is stateless, so clearing the cookie is all logout does; a copied
+                // token stays valid until it expires or the password is changed.
+                AuthCookie.clear(call)
+                call.respond(HttpStatusCode.OK)
             }
         }
     }

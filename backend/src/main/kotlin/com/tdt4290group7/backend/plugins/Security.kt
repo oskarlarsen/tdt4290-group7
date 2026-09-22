@@ -1,8 +1,10 @@
 package com.tdt4290group7.backend.plugins
 
 import com.auth0.jwt.JWT
+import com.tdt4290group7.backend.auth.AuthCookie
 import com.tdt4290group7.backend.auth.JwtConfig
 import com.tdt4290group7.backend.repository.UserRepository
+import io.ktor.http.auth.HttpAuthHeader
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -15,6 +17,12 @@ fun Application.configureSecurity() {
     install(Authentication) {
         jwt(AUTH_JWT) {
             realm = JwtConfig.REALM
+            // The token comes only from the HttpOnly cookie; Authorization headers are ignored.
+            authHeader { call ->
+                call.request.cookies[AuthCookie.NAME]
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { HttpAuthHeader.Single("Bearer", it) }
+            }
             verifier(
                 JWT.require(JwtConfig.algorithm)
                     .withIssuer(JwtConfig.issuer)

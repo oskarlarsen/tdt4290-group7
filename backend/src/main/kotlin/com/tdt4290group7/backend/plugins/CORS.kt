@@ -22,8 +22,10 @@ fun Application.configureCORS() {
         allowMethod(HttpMethod.Put)
         allowMethod(HttpMethod.Delete)
         allowMethod(HttpMethod.Patch)
-        allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
+        // Lets the browser send the HttpOnly auth cookie on cross-origin API calls. Requests
+        // from origins outside the allowlist are rejected with 403, which also blocks CSRF.
+        allowCredentials = true
         allowedOrigins.forEach { host ->
             allowHost(host, schemes = listOf("http", "https"))
         }

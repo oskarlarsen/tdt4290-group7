@@ -7,8 +7,8 @@ server {
     index index.html;
 
     # Security headers. `always` so they're also sent on error responses.
-    # The CSP is the main XSS backstop: the auth token lives in web storage, so injected
-    # script must not be able to run or send it anywhere but the API.
+    # The CSP is the main XSS backstop: the auth cookie is HttpOnly, but injected script could
+    # still make authenticated API calls, so it must not be able to run at all.
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${API_ORIGIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;

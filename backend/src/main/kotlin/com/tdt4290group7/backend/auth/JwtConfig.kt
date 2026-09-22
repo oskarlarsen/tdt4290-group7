@@ -22,7 +22,7 @@ object JwtConfig {
     val algorithm: Algorithm = Algorithm.HMAC256(secret)
 
     private val shortLivedMillis = 24L * 60 * 60 * 1000 // 1 day
-    private val longLivedMillis = 30L * 24 * 60 * 60 * 1000 // 30 days
+    val longLivedMillis = 30L * 24 * 60 * 60 * 1000 // 30 days
 
     fun generateToken(user: User, rememberMe: Boolean): Pair<String, Date> {
         val expiresAt = Date(System.currentTimeMillis() + if (rememberMe) longLivedMillis else shortLivedMillis)

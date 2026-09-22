@@ -15,9 +15,8 @@ export type LoginRequest = {
   rememberMe: boolean;
 };
 
-// Backend response containing the JWT and user role
+// Backend response with the user role; the JWT itself is set as an HttpOnly cookie
 export type LoginResponse = {
-  token: string;
-  expiresAt: string; 
+  expiresAt: string;
   user: AuthUser;
 };

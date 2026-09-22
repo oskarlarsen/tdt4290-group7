@@ -1,41 +1,41 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-const TOKEN_STORAGE_KEY = "auth_token";
 
 // Notify AuthContext when the session becomes invalid
 export const SESSION_EXPIRED_EVENT = "auth:session-expired";
 
-export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_STORAGE_KEY) ?? sessionStorage.getItem(TOKEN_STORAGE_KEY);
+// The session token lives in an HttpOnly cookie set by the backend, so scripts never see it.
+// Earlier versions kept it in web storage; remove any leftover copy so it can't be stolen.
+const LEGACY_TOKEN_STORAGE_KEY = "auth_token";
+try {
+  localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
+} catch {
+  // Storage can be unavailable (e.g. blocked site data); nothing to clean up then.
 }
 
-export function storeToken(token: string, rememberMe: boolean) {
-  const storage = rememberMe ? localStorage : sessionStorage;
-  const otherStorage = rememberMe ? sessionStorage : localStorage;
-  otherStorage.removeItem(TOKEN_STORAGE_KEY);
-  storage.setItem(TOKEN_STORAGE_KEY, token);
-}
+type ApiFetchOptions = {
+  /** Set false when a 401 is an expected answer rather than a lost session (e.g. login, startup check). */
+  notifySessionExpired?: boolean;
+};
 
-export function clearStoredToken() {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-}
-
-export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getStoredToken();
-
+export async function apiFetch<T>(
+  path: string,
+  options?: RequestInit,
+  { notifySessionExpired = true }: ApiFetchOptions = {}
+): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
+    // Send the auth cookie to the API, which may be on another origin
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
 
   if (res.status === 401) {
     // Handle an invalid or expired session reported by the backend
-    clearStoredToken();
-    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    if (notifySessionExpired) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     throw new Error("Session expired");
   }
 

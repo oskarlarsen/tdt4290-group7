@@ -7,12 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-import {
-  getStoredToken,
-  storeToken,
-  clearStoredToken,
-  SESSION_EXPIRED_EVENT,
-} from "../api/client";
+import { SESSION_EXPIRED_EVENT } from "../api/client";
 import type { AuthUser, LoginRequest } from "../types/auth";
 
 type AuthStatus = "idle" | "loading" | "authenticated" | "unauthenticated" | "error";
@@ -35,15 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Restore the session from a stored token when the app starts
+  // Restore the session from the HttpOnly auth cookie when the app starts
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      setStatus("unauthenticated");
-      setIsInitializing(false);
-      return;
-    }
-
     authApi
       .getCurrentUser()
       .then((currentUser) => {
@@ -51,7 +39,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("authenticated");
       })
       .catch(() => {
-        clearStoredToken();
         setStatus("unauthenticated");
       })
       .finally(() => setIsInitializing(false));
@@ -73,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await authApi.login(payload);
-      storeToken(response.token, payload.rememberMe);
       setUser(response.user);
       setStatus("authenticated");
       return response.user;
@@ -92,7 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      clearStoredToken();
       setUser(null);
       setStatus("unauthenticated");
     }
