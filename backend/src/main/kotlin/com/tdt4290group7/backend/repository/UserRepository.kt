@@ -68,9 +68,12 @@ object UserRepository {
     fun verifyPassword(user: User, password: String): Boolean =
         BCrypt.verifyer().verify(password.toCharArray(), user.passwordHash).verified
 
+    /** Sets a new password and bumps [User.tokenVersion], so every previously issued JWT stops working. */
     fun updatePassword(user: User, newPassword: String) {
-        val updated = user.copy(passwordHash = hash(newPassword))
-        usersById[updated.id] = updated
+        val newHash = hash(newPassword)
+        val updated = usersById.computeIfPresent(user.id) { _, current ->
+            current.copy(passwordHash = newHash, tokenVersion = current.tokenVersion + 1)
+        } ?: return
         usersByEmail[updated.email.lowercase()] = updated
     }
 }

@@ -14,6 +14,7 @@ object JwtConfig {
     val audience: String = System.getenv("JWT_AUDIENCE") ?: "tdt4290-frontend"
     const val REALM = "tdt4290-api"
     const val CLAIM_USER_ID = "uid"
+    const val CLAIM_TOKEN_VERSION = "tv"
 
     private val secret: String = System.getenv("JWT_SECRET")?.takeIf { it.isNotBlank() }
         ?: error("JWT_SECRET must be set")
@@ -29,10 +30,13 @@ object JwtConfig {
             .withIssuer(issuer)
             .withAudience(audience)
             .withClaim(CLAIM_USER_ID, user.id)
+            .withClaim(CLAIM_TOKEN_VERSION, user.tokenVersion)
             .withExpiresAt(expiresAt)
             .sign(algorithm)
         return token to expiresAt
     }
 
     fun userId(payload: Payload): String? = payload.getClaim(CLAIM_USER_ID).asString()
+
+    fun tokenVersion(payload: Payload): Int? = payload.getClaim(CLAIM_TOKEN_VERSION).asInt()
 }

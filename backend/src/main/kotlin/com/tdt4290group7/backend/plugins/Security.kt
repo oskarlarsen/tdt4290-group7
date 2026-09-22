@@ -24,7 +24,9 @@ fun Application.configureSecurity() {
             validate { credential ->
                 val userId = JwtConfig.userId(credential.payload)
                 val user = userId?.let { UserRepository.findById(it) }
-                if (user != null) JWTPrincipal(credential.payload) else null
+                // Reject tokens issued before the user's last password change.
+                val current = user != null && JwtConfig.tokenVersion(credential.payload) == user.tokenVersion
+                if (current) JWTPrincipal(credential.payload) else null
             }
         }
     }
