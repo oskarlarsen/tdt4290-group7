@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 /**
  * In-memory, seeded user store. There is no database yet, so accounts are fixed at startup.
  * Seed passwords are read from env vars so real credentials never live in source control;
- * insecure defaults are used only for local development, and that fact is logged loudly.
+ * startup fails if any of them is missing.
  */
 object UserRepository {
     private val logger = LoggerFactory.getLogger(UserRepository::class.java)

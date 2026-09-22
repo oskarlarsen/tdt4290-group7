@@ -46,8 +46,8 @@ in-memory at startup:
 | `advisor.hansen@kommune.no`     | ADMIN    | `SEED_ADMIN_PASSWORD`     |
 | `supplier@nordvik.no`           | SUPPLIER | `SEED_SUPPLIER_PASSWORD`  |
 
-If a seed password env var isn't set, an insecure development-only default is
-used and a warning is logged — set both explicitly outside local dev.
+Both seed password env vars are required: the backend refuses to start if
+either is missing or blank.
 
 Endpoints (all under `/api/auth`):
 
@@ -61,13 +61,13 @@ client IP.
 
 Relevant environment variables:
 
-| Variable                 | Default (dev only)                     | Purpose                                   |
+| Variable                 | Default                                 | Purpose                                   |
 | ------------------------- | --------------------------------------- | ------------------------------------------ |
-| `JWT_SECRET`               | insecure fallback, logged loudly        | Signs and verifies JWTs                   |
+| `JWT_SECRET`               | none — required, startup fails if unset | Signs and verifies JWTs                   |
 | `JWT_ISSUER`                | `tdt4290-backend`                       | JWT `iss` claim                           |
 | `JWT_AUDIENCE`              | `tdt4290-frontend`                      | JWT `aud` claim                           |
-| `SEED_ADMIN_PASSWORD`       | insecure fallback, logged loudly        | Password for the seeded admin account     |
-| `SEED_SUPPLIER_PASSWORD`    | insecure fallback, logged loudly        | Password for the seeded supplier account  |
+| `SEED_ADMIN_PASSWORD`       | none — required, startup fails if unset | Password for the seeded admin account     |
+| `SEED_SUPPLIER_PASSWORD`    | none — required, startup fails if unset | Password for the seeded supplier account  |
 | `CORS_ALLOWED_ORIGINS`      | `localhost:5173`                        | Comma-separated `host:port` origins allowed to call the API |
 
 ## Run locally with Docker
