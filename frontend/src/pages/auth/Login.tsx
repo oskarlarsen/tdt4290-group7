@@ -25,7 +25,7 @@ export default function Login() {
   const isLoading = status === "loading";
 
   // Preserve the original destination when redirecting to login
-  const from = (location.state as { from?: string } | null)?.from;
+  const from = safeRedirectPath((location.state as { from?: unknown } | null)?.from);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -310,4 +310,18 @@ export default function Login() {
       </div>
     </div>
   );
+}
+// Only allow redirects back into this app. Rejects protocol-relative ("//evil.com") and
+// backslash ("/\evil.com") forms that browsers treat as another origin.
+function safeRedirectPath(value: unknown): string | null {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return null;
+  }
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin) return null;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return null;
+  }
 }
