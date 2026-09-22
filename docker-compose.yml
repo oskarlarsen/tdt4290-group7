@@ -9,6 +9,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your .env file (see .env.example)}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in your .env file (see .env.example)}
       SEED_SUPPLIER_PASSWORD: ${SEED_SUPPLIER_PASSWORD:?Set SEED_SUPPLIER_PASSWORD in your .env file (see .env.example)}
+      ALLOW_DEV_PASSWORD_RESET_LOG: ${ALLOW_DEV_PASSWORD_RESET_LOG:-false}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 5s

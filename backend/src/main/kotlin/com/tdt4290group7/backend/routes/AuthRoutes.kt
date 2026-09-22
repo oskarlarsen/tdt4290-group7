@@ -25,6 +25,10 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("AuthRoutes")
 
+// There is no email delivery yet, so the only way to get a reset token is to log it. That hands
+// account takeover to anyone who can read the logs, so it must be explicitly opted into.
+private val logResetTokens: Boolean = System.getenv("ALLOW_DEV_PASSWORD_RESET_LOG") == "true"
+
 @Serializable
 data class LoginRequest(val email: String, val password: String, val rememberMe: Boolean = false)
 
@@ -45,6 +49,13 @@ data class ResetPasswordRequest(val token: String, val newPassword: String)
 data class ErrorResponse(val message: String)
 
 fun Application.configureAuthRoutes() {
+    if (logResetTokens) {
+        logger.warn(
+            "ALLOW_DEV_PASSWORD_RESET_LOG=true: password reset tokens will be written to the log. " +
+                "Never enable this outside local development."
+        )
+    }
+
     routing {
         route("/api/auth") {
             // Applies to login and forgot-password: blunt brute-force / enumeration protection.
@@ -81,9 +92,13 @@ fun Application.configureAuthRoutes() {
                     val user = UserRepository.findByEmail(request.email)
                     if (user != null) {
                         val token = PasswordResetTokenStore.create(user.id)
-                        logger.warn(
-                            "DEV-ONLY: password reset token for ${user.email}: $token (valid 15 min)"
-                        )
+                        if (logResetTokens) {
+                            logger.warn(
+                                "DEV-ONLY: password reset token for ${user.email}: $token (valid 15 min)"
+                            )
+                        } else {
+                            logger.info("Password reset requested for user ${user.id}; no delivery channel configured")
+                        }
                     }
                     // Always respond the same way regardless of whether the account exists,
                     // so this endpoint can't be used to enumerate registered emails.

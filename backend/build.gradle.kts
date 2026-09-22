@@ -38,3 +38,10 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation(kotlin("test"))
 }
+
+tasks.test {
+    // The app refuses to start without these; tests get throwaway values that never ship.
+    environment("JWT_SECRET", "test-only-jwt-secret")
+    environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
+    environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
+}
