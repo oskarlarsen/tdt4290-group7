@@ -1,5 +1,6 @@
 package com.tdt4290group7.backend
 
+import com.tdt4290group7.backend.plugins.configureBodyLimit
 import com.tdt4290group7.backend.plugins.configureCORS
 import com.tdt4290group7.backend.plugins.configureMonitoring
 import com.tdt4290group7.backend.plugins.configureRateLimiting
@@ -29,6 +30,7 @@ fun Application.module() {
     configureCORS()
     configureMonitoring()
     configureStatusPages()
+    configureBodyLimit()
     configureSecurity()
     configureRateLimiting()
     configureRouting()
