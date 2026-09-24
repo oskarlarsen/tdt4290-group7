@@ -97,7 +97,7 @@ Relevant environment variables:
 | `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens (local dev only) |
 | `AUTH_COOKIE_SECURE`        | `true`                                  | Set `false` only if a local browser drops Secure cookies on `http://localhost` (Safari) |
 | `TRUSTED_PROXY_HOPS`        | `0`                                     | Number of proxies in front of the backend; client IPs for rate limiting are then read from `X-Forwarded-For`. Keep `0` if clients connect directly, or the header can be spoofed |
-| `CORS_ALLOWED_ORIGINS`      | `localhost:5173`                        | Comma-separated `host:port` origins allowed to call the API |
+| `CORS_ALLOWED_ORIGINS`      | `http://localhost:5173`                 | Comma-separated full origins (`scheme://host[:port]`) allowed to call the API. Each allows only its own scheme; use `https://` outside local dev |
 
 ## Run locally with Docker
 
