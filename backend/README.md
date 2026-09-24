@@ -61,9 +61,10 @@ Endpoints (all under `/api/auth`):
   a successful reset invalidates every JWT previously issued to that user
 
 There is no email delivery yet. To test the reset flow locally, set
-`ALLOW_DEV_PASSWORD_RESET_LOG=true` and the reset token is written to the
-backend log. Never enable this anywhere else: anyone who can read the logs can
-take over any account.
+`APP_ENV=dev` and `ALLOW_DEV_PASSWORD_RESET_LOG=true`, and the reset
+token is written to the backend log. Anyone who can read the logs can take over
+any account, so the backend refuses to start with this flag unless
+`APP_ENV=dev`.
 
 The JWT is only ever sent as that HttpOnly cookie, so page scripts can't read it;
 `Authorization` headers are ignored. Because the cookie is `SameSite=Strict`, the
@@ -94,7 +95,8 @@ Relevant environment variables:
 | `JWT_AUDIENCE`              | `tdt4290-frontend`                      | JWT `aud` claim                           |
 | `SEED_ADMIN_PASSWORD`       | none — required, startup fails if unset | Password for the seeded admin account     |
 | `SEED_SUPPLIER_PASSWORD`    | none — required, startup fails if unset | Password for the seeded supplier account  |
-| `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens (local dev only) |
+| `APP_ENV`                   | `prod`                                  | `dev` or `prod`; dev-only features refuse to start in `prod` |
+| `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens; requires `APP_ENV=dev` |
 | `AUTH_COOKIE_SECURE`        | `true`                                  | Set `false` only if a local browser drops Secure cookies on `http://localhost` (Safari) |
 | `TRUSTED_PROXY_HOPS`        | `0`                                     | Number of proxies in front of the backend; client IPs for rate limiting are then read from `X-Forwarded-For`. Keep `0` if clients connect directly, or the header can be spoofed |
 | `CORS_ALLOWED_ORIGINS`      | `http://localhost:5173`                 | Comma-separated full origins (`scheme://host[:port]`) allowed to call the API. Each allows only its own scheme; use `https://` outside local dev |
