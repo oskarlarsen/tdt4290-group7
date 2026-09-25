@@ -57,14 +57,25 @@ object UserRepository {
 
     private fun hash(password: String): String = BCrypt.withDefaults().hashToString(12, password.toCharArray())
 
+    // Checked against when the email is unknown, so a failed login costs one bcrypt verification
+    // either way. Otherwise unknown emails answer ~100x faster, revealing which accounts exist.
+    private val dummyPasswordHash: String = hash(UUID.randomUUID().toString())
+
     fun findByEmail(email: String): User? = usersByEmail[email.trim().lowercase()]
 
     fun findById(id: String): User? = usersById[id]
 
+    /** The user with this email and password, or null. Takes the same time whether or not the email exists. */
+    fun authenticate(email: String, password: String): User? {
+        val user = findByEmail(email)
+        val matches = verifyPassword(user?.passwordHash ?: dummyPasswordHash, password)
+        return user?.takeIf { matches }
+    }
+
     // bcrypt throws on inputs over 72 bytes; no stored password can be that long, so it's a mismatch.
-    fun verifyPassword(user: User, password: String): Boolean =
+    private fun verifyPassword(passwordHash: String, password: String): Boolean =
         !PasswordPolicy.exceedsBcryptLimit(password) &&
-            BCrypt.verifyer().verify(password.toCharArray(), user.passwordHash).verified
+            BCrypt.verifyer().verify(password.toCharArray(), passwordHash).verified
 
     /** Sets a new password and bumps [User.tokenVersion], so every previously issued JWT stops working. */
     fun updatePassword(user: User, newPassword: String) {

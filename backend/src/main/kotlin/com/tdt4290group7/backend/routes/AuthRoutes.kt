@@ -90,10 +90,10 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                         return@post
                     }
 
-                    val user = UserRepository.findByEmail(email)
-                    // Same generic error whether the account doesn't exist or the password is
-                    // wrong, so the endpoint can't be used to enumerate valid accounts.
-                    if (user == null || !UserRepository.verifyPassword(user, request.password)) {
+                    // Same generic error, and the same response time, whether the account doesn't
+                    // exist or the password is wrong, so the endpoint can't enumerate accounts.
+                    val user = UserRepository.authenticate(email, request.password)
+                    if (user == null) {
                         LoginAttemptTracker.recordFailure(email)
                         call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
                         return@post
