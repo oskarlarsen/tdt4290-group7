@@ -3,11 +3,9 @@ package com.tdt4290group7.backend.auth
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.Payload
+import com.tdt4290group7.backend.config.requireSecret
 import com.tdt4290group7.backend.model.User
 import java.util.Date
-import org.slf4j.LoggerFactory
-
-private val logger = LoggerFactory.getLogger("JwtConfig")
 
 object JwtConfig {
     val issuer: String = System.getenv("JWT_ISSUER") ?: "tdt4290-backend"
@@ -16,8 +14,7 @@ object JwtConfig {
     const val CLAIM_USER_ID = "uid"
     const val CLAIM_TOKEN_VERSION = "tv"
 
-    private val secret: String = System.getenv("JWT_SECRET")?.takeIf { it.isNotBlank() }
-        ?: error("JWT_SECRET must be set")
+    private val secret: String = requireSecret("JWT_SECRET", System.getenv("JWT_SECRET"))
 
     val algorithm: Algorithm = Algorithm.HMAC256(secret)
 

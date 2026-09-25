@@ -2,6 +2,7 @@ package com.tdt4290group7.backend.repository
 
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.tdt4290group7.backend.auth.PasswordPolicy
+import com.tdt4290group7.backend.config.requireSecret
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
 import java.util.UUID
@@ -49,16 +50,10 @@ object UserRepository {
         }
     }
 
-    private fun requireSeedPassword(envVar: String): String {
-        val value = System.getenv(envVar)
-        if (value.isNullOrBlank()) {
-            val message = "$envVar is not set. Refusing to start: seed accounts would have " +
-                    "credentials published in source control. Set $envVar and restart."
-            logger.error(message)
-            throw IllegalStateException(message)
-        }
-        return value
-    }
+    private fun requireSeedPassword(envVar: String): String =
+        runCatching { requireSecret(envVar, System.getenv(envVar)) }
+            .onFailure { logger.error(it.message) }
+            .getOrThrow()
 
     private fun hash(password: String): String = BCrypt.withDefaults().hashToString(12, password.toCharArray())
 
