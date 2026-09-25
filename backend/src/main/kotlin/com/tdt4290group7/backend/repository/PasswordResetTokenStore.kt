@@ -22,7 +22,10 @@ object PasswordResetTokenStore {
     fun create(userId: String): String {
         val bytes = ByteArray(32).also(random::nextBytes)
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-        tokens[sha256(token)] = userId to Instant.now().plusSeconds(TTL_MINUTES * 60)
+        val now = Instant.now()
+        val expiresAt = now.plusSeconds(TTL_MINUTES * 60)
+        tokens.entries.removeIf { (_, value) -> !value.second.isAfter(now) }
+        tokens[sha256(token)] = userId to expiresAt
         return token
     }
 
