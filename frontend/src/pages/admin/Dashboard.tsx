@@ -42,9 +42,7 @@ export default function Dashboard() {
     });
   }, 1000);
 
-  // Runs when pendingUndoId changes to a new alert (replacing the
-  // toast) AND when the component unmounts — one cleanup path covers
-  // both cases, so there's no separate timer to keep in sync.
+  // Clear the previous undo timer when the toast changes or the component unmounts
   return () => clearInterval(interval);
 }, [pendingUndoId]);
 
@@ -151,7 +149,7 @@ export default function Dashboard() {
   <button
     onClick={() => resync.mutate()}
     disabled={resync.isPending}
-    className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+    className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 hover:border-neutral-300 active:scale-95 active:bg-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:opacity-50 disabled:active:scale-100"
   >
     <RefreshCw className={`h-3 w-3 ${resync.isPending ? "animate-spin" : ""}`} />
     {resync.isPending ? "Syncing…" : "Sync now"}
