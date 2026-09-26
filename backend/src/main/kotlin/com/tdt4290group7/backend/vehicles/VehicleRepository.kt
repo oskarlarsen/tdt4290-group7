@@ -12,23 +12,19 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 interface VehicleStore {
-    fun insertImport(request: VehicleImportRequest): VehicleImportResponse
-    fun findImport(id: String): VehicleImportResponse?
-    fun rowsForImport(id: String): List<StoredVehicleRow>
-    fun insertApprovedImport(request: ApprovedVehicleImportRequest): ApprovedVehicleImportResponse
-    fun findApprovedImport(id: String): ApprovedVehicleImportResponse?
-    fun approvedRowsForImport(id: String): List<StoredApprovedVehicleRow>
-    fun saveComparison(comparison: VehicleComparisonResponse)
-    fun findComparison(id: String): VehicleComparisonResponse?
-    fun saveCheckRun(run: VehicleCheckRunResponse, snapshots: List<RegistrySnapshot>)
-    fun latestCheckRun(importId: String): VehicleCheckRunResponse?
-    fun findSnapshot(id: String): RegistrySnapshot?
+    fun findOrCreateVehicle(registrationNumber: String, now: Instant): Vehicle
+    fun appendTripRows(request: AppendTripRowsRequest, now: Instant): AppendTripRowsResponse
+    fun tripRowsForVehicle(vehicleId: String): List<StoredTripRow>
+    fun upsertApprovals(request: UpsertApprovalsRequest, now: Instant): UpsertApprovalsResponse
+    fun approvalForVehicle(vehicleId: String): StoredApproval?
+    fun revokeApproval(registrationNumber: String, now: Instant): StoredApproval?
+    fun latestSnapshot(vehicleId: String): RegistrySnapshot?
+    fun saveCheck(check: VehicleCheckResponse, newSnapshot: RegistrySnapshot?)
+    fun findCheck(id: String): VehicleCheckResponse?
 }
-
 class VehicleRepository(databasePath: Path) : VehicleStore {
     private val databaseUrl: String
-    // Legacy development rows may still contain the former per-trip "approved" field.
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = false }
 
     init {
         val path = databasePath.toAbsolutePath().normalize()
@@ -37,65 +33,50 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         connection().use { db ->
             db.createStatement().use { statement ->
                 statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS vehicle_imports (
+                    """CREATE TABLE IF NOT EXISTS suppliers (
                         id TEXT PRIMARY KEY,
-                        source_name TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )""",
+                )
+                statement.executeUpdate(
+                    """CREATE TABLE IF NOT EXISTS vehicles (
+                        id TEXT PRIMARY KEY,
+                        normalized_registration_number TEXT NOT NULL UNIQUE,
+                        supplier_id TEXT REFERENCES suppliers(id),
+                        created_at TEXT NOT NULL
+                    )""",
+                )
+                statement.executeUpdate(
+                    """CREATE TABLE IF NOT EXISTS trip_rows (
+                        id TEXT PRIMARY KEY,
+                        vehicle_id TEXT NOT NULL REFERENCES vehicles(id),
+                        source_name TEXT,
                         created_at TEXT NOT NULL,
-                        row_count INTEGER NOT NULL,
-                        distinct_vehicle_count INTEGER NOT NULL
+                        data_json TEXT NOT NULL
                     )""",
                 )
+                statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_trip_rows_vehicle ON trip_rows(vehicle_id)")
                 statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS vehicle_rows (
+                    """CREATE TABLE IF NOT EXISTS vehicle_approvals (
                         id TEXT PRIMARY KEY,
-                        import_id TEXT NOT NULL REFERENCES vehicle_imports(id),
-                        row_number INTEGER NOT NULL,
-                        normalized_registration_number TEXT NOT NULL,
-                        approved INTEGER NOT NULL,
-                        data_json TEXT NOT NULL,
-                        UNIQUE(import_id, row_number)
-                    )""",
-                )
-                statement.executeUpdate(
-                    "CREATE INDEX IF NOT EXISTS idx_vehicle_rows_import_plate ON vehicle_rows(import_id, normalized_registration_number)",
-                )
-                statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS approved_vehicle_imports (
-                        id TEXT PRIMARY KEY,
-                        source_name TEXT NOT NULL,
+                        vehicle_id TEXT NOT NULL REFERENCES vehicles(id),
+                        source_name TEXT,
+                        start_date TEXT,
+                        expiry_date TEXT,
                         created_at TEXT NOT NULL,
-                        row_count INTEGER NOT NULL,
-                        distinct_vehicle_count INTEGER NOT NULL
+                        updated_at TEXT NOT NULL,
+                        revoked_at TEXT,
+                        data_json TEXT NOT NULL
                     )""",
                 )
                 statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS approved_vehicle_rows (
-                        id TEXT PRIMARY KEY,
-                        import_id TEXT NOT NULL REFERENCES approved_vehicle_imports(id),
-                        row_number INTEGER NOT NULL,
-                        normalized_registration_number TEXT NOT NULL,
-                        data_json TEXT NOT NULL,
-                        UNIQUE(import_id, row_number)
-                    )""",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_one_unrevoked_approval ON vehicle_approvals(vehicle_id) WHERE revoked_at IS NULL",
                 )
                 statement.executeUpdate(
-                    "CREATE INDEX IF NOT EXISTS idx_approved_rows_import_plate ON approved_vehicle_rows(import_id, normalized_registration_number)",
-                )
-                statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS vehicle_comparisons (
+                    """CREATE TABLE IF NOT EXISTS svv_snapshots (
                         id TEXT PRIMARY KEY,
-                        trip_import_id TEXT NOT NULL REFERENCES vehicle_imports(id),
-                        approved_import_id TEXT NOT NULL REFERENCES approved_vehicle_imports(id),
-                        created_at TEXT NOT NULL,
-                        compared_vehicle_count INTEGER NOT NULL,
-                        unapproved_vehicle_count INTEGER NOT NULL,
-                        results_json TEXT NOT NULL
-                    )""",
-                )
-                statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS registry_snapshots (
-                        id TEXT PRIMARY KEY,
-                        normalized_registration_number TEXT NOT NULL,
+                        vehicle_id TEXT NOT NULL REFERENCES vehicles(id),
                         fetched_at TEXT NOT NULL,
                         source TEXT NOT NULL,
                         registration_status TEXT,
@@ -103,23 +84,20 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                     )""",
                 )
                 statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS vehicle_check_runs (
+                    "CREATE INDEX IF NOT EXISTS idx_svv_snapshots_vehicle_time ON svv_snapshots(vehicle_id, fetched_at DESC)",
+                )
+                statement.executeUpdate(
+                    """CREATE TABLE IF NOT EXISTS vehicle_checks (
                         id TEXT PRIMARY KEY,
-                        import_id TEXT NOT NULL REFERENCES vehicle_imports(id),
-                        started_at TEXT NOT NULL,
-                        completed_at TEXT NOT NULL,
-                        checked_count INTEGER NOT NULL,
-                        deviation_count INTEGER NOT NULL,
-                        unavailable_count INTEGER NOT NULL
+                        vehicle_id TEXT NOT NULL REFERENCES vehicles(id),
+                        approval_id TEXT REFERENCES vehicle_approvals(id),
+                        snapshot_id TEXT REFERENCES svv_snapshots(id),
+                        checked_at TEXT NOT NULL,
+                        data_json TEXT NOT NULL
                     )""",
                 )
                 statement.executeUpdate(
-                    """CREATE TABLE IF NOT EXISTS vehicle_check_results (
-                        run_id TEXT NOT NULL REFERENCES vehicle_check_runs(id),
-                        normalized_registration_number TEXT NOT NULL,
-                        data_json TEXT NOT NULL,
-                        PRIMARY KEY(run_id, normalized_registration_number)
-                    )""",
+                    "CREATE INDEX IF NOT EXISTS idx_vehicle_checks_vehicle_time ON vehicle_checks(vehicle_id, checked_at DESC)",
                 )
             }
         }
@@ -132,133 +110,37 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }
     }
 
-    override fun insertImport(request: VehicleImportRequest): VehicleImportResponse {
-        validateImport(request.sourceName, request.rows.size)
-        val plates = validatePlates(request.rows.map { it.registrationNumber })
-        val response = VehicleImportResponse(
-            id = UUID.randomUUID().toString(),
-            sourceName = request.sourceName.trim(),
-            createdAt = Instant.now().toString(),
-            rowCount = request.rows.size,
-            distinctVehicleCount = plates.distinct().size,
-        )
+    override fun findOrCreateVehicle(registrationNumber: String, now: Instant): Vehicle = connection().use { db ->
+        findOrCreateVehicle(db, validatedPlate(registrationNumber), now)
+    }
+
+    override fun appendTripRows(request: AppendTripRowsRequest, now: Instant): AppendTripRowsResponse {
+        validateBatch(request.rows.size)
+        val sourceName = request.sourceName?.trim()?.takeIf(String::isNotEmpty)
+        val plates = request.rows.mapIndexed { index, row -> validatedPlate(row.registrationNumber, "rows[$index]") }
+        val stored = mutableListOf<StoredTripRow>()
         connection().use { db ->
             db.autoCommit = false
             try {
                 db.prepareStatement(
-                    "INSERT INTO vehicle_imports (id, source_name, created_at, row_count, distinct_vehicle_count) VALUES (?, ?, ?, ?, ?)",
-                ).use { statement ->
-                    statement.setString(1, response.id)
-                    statement.setString(2, response.sourceName)
-                    statement.setString(3, response.createdAt)
-                    statement.setInt(4, response.rowCount)
-                    statement.setInt(5, response.distinctVehicleCount)
-                    statement.executeUpdate()
-                }
-                db.prepareStatement(
-                    "INSERT INTO vehicle_rows (id, import_id, row_number, normalized_registration_number, approved, data_json) VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO trip_rows (id, vehicle_id, source_name, created_at, data_json) VALUES (?, ?, ?, ?, ?)",
                 ).use { statement ->
                     request.rows.forEachIndexed { index, row ->
-                        statement.setString(1, UUID.randomUUID().toString())
-                        statement.setString(2, response.id)
-                        statement.setInt(3, index + 1)
-                        statement.setString(4, plates[index])
-                        // Retained schema column for existing SQLite databases; approval is list-based.
-                        statement.setInt(5, 0)
-                        statement.setString(6, json.encodeToString(row))
-                        statement.addBatch()
-                    }
-                    statement.executeBatch()
-                }
-                db.commit()
-            } catch (cause: Exception) {
-                db.rollback()
-                throw cause
-            }
-        }
-        return response
-    }
-
-    override fun findImport(id: String): VehicleImportResponse? = connection().use { db ->
-        db.prepareStatement(
-            "SELECT id, source_name, created_at, row_count, distinct_vehicle_count FROM vehicle_imports WHERE id = ?",
-        ).use { statement ->
-            statement.setString(1, id)
-            statement.executeQuery().use { rows ->
-                if (!rows.next()) return@use null
-                VehicleImportResponse(
-                    id = rows.getString("id"),
-                    sourceName = rows.getString("source_name"),
-                    createdAt = rows.getString("created_at"),
-                    rowCount = rows.getInt("row_count"),
-                    distinctVehicleCount = rows.getInt("distinct_vehicle_count"),
-                )
-            }
-        }
-    }
-
-    override fun rowsForImport(id: String): List<StoredVehicleRow> = connection().use { db ->
-        db.prepareStatement(
-            "SELECT id, import_id, row_number, normalized_registration_number, data_json FROM vehicle_rows WHERE import_id = ? ORDER BY row_number",
-        ).use { statement ->
-            statement.setString(1, id)
-            statement.executeQuery().use { rows ->
-                buildList {
-                    while (rows.next()) {
-                        add(
-                            StoredVehicleRow(
-                                id = rows.getString("id"),
-                                importId = rows.getString("import_id"),
-                                rowNumber = rows.getInt("row_number"),
-                                normalizedRegistrationNumber = rows.getString("normalized_registration_number"),
-                                data = json.decodeFromString<VehicleRowInput>(rows.getString("data_json")),
-                            ),
+                        val vehicle = findOrCreateVehicle(db, plates[index], now)
+                        val storedRow = StoredTripRow(
+                            id = UUID.randomUUID().toString(),
+                            vehicleId = vehicle.id,
+                            sourceName = sourceName,
+                            createdAt = now.toString(),
+                            data = row,
                         )
-                    }
-                }
-            }
-        }
-    }
-
-    override fun insertApprovedImport(request: ApprovedVehicleImportRequest): ApprovedVehicleImportResponse {
-        validateImport(request.sourceName, request.rows.size)
-        val plates = validatePlates(request.rows.map { it.registrationNumber })
-        request.rows.forEachIndexed { index, row ->
-            listOf("startDate" to row.startDate, "endDate" to row.endDate).forEach { (field, value) ->
-                if (value != null) try {
-                    LocalDate.parse(value)
-                } catch (_: DateTimeParseException) {
-                    throw IllegalArgumentException("rows[$index].$field must be an ISO date (yyyy-MM-dd)")
-                }
-            }
-        }
-        val response = ApprovedVehicleImportResponse(
-            UUID.randomUUID().toString(), request.sourceName.trim(), Instant.now().toString(),
-            request.rows.size, plates.distinct().size,
-        )
-        connection().use { db ->
-            db.autoCommit = false
-            try {
-                db.prepareStatement(
-                    "INSERT INTO approved_vehicle_imports VALUES (?, ?, ?, ?, ?)",
-                ).use { statement ->
-                    statement.setString(1, response.id)
-                    statement.setString(2, response.sourceName)
-                    statement.setString(3, response.createdAt)
-                    statement.setInt(4, response.rowCount)
-                    statement.setInt(5, response.distinctVehicleCount)
-                    statement.executeUpdate()
-                }
-                db.prepareStatement(
-                    "INSERT INTO approved_vehicle_rows VALUES (?, ?, ?, ?, ?)",
-                ).use { statement ->
-                    request.rows.forEachIndexed { index, row ->
-                        statement.setString(1, UUID.randomUUID().toString())
-                        statement.setString(2, response.id)
-                        statement.setInt(3, index + 1)
-                        statement.setString(4, plates[index])
+                        statement.setString(1, storedRow.id)
+                        statement.setString(2, storedRow.vehicleId)
+                        statement.setString(3, storedRow.sourceName)
+                        statement.setString(4, storedRow.createdAt)
                         statement.setString(5, json.encodeToString(row))
                         statement.addBatch()
+                        stored += storedRow
                     }
                     statement.executeBatch()
                 }
@@ -268,32 +150,21 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 throw cause
             }
         }
-        return response
+        return AppendTripRowsResponse(now.toString(), stored.size, plates.distinct().size, stored)
     }
 
-    override fun findApprovedImport(id: String): ApprovedVehicleImportResponse? = connection().use { db ->
-        db.prepareStatement("SELECT * FROM approved_vehicle_imports WHERE id = ?").use { statement ->
-            statement.setString(1, id)
-            statement.executeQuery().use { rows ->
-                if (!rows.next()) return@use null
-                ApprovedVehicleImportResponse(
-                    rows.getString("id"), rows.getString("source_name"), rows.getString("created_at"),
-                    rows.getInt("row_count"), rows.getInt("distinct_vehicle_count"),
-                )
-            }
-        }
-    }
-
-    override fun approvedRowsForImport(id: String): List<StoredApprovedVehicleRow> = connection().use { db ->
-        db.prepareStatement("SELECT * FROM approved_vehicle_rows WHERE import_id = ? ORDER BY row_number").use { statement ->
-            statement.setString(1, id)
+    override fun tripRowsForVehicle(vehicleId: String): List<StoredTripRow> = connection().use { db ->
+        db.prepareStatement("SELECT * FROM trip_rows WHERE vehicle_id = ? ORDER BY created_at, id").use { statement ->
+            statement.setString(1, vehicleId)
             statement.executeQuery().use { rows ->
                 buildList {
                     while (rows.next()) add(
-                        StoredApprovedVehicleRow(
-                            rows.getString("id"), rows.getString("import_id"), rows.getInt("row_number"),
-                            rows.getString("normalized_registration_number"),
-                            json.decodeFromString<ApprovedVehicleRowInput>(rows.getString("data_json")),
+                        StoredTripRow(
+                            id = rows.getString("id"),
+                            vehicleId = rows.getString("vehicle_id"),
+                            sourceName = rows.getString("source_name"),
+                            createdAt = rows.getString("created_at"),
+                            data = json.decodeFromString<TripRowInput>(rows.getString("data_json")),
                         ),
                     )
                 }
@@ -301,91 +172,30 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }
     }
 
-    override fun saveComparison(comparison: VehicleComparisonResponse) {
-        connection().use { db ->
-            db.prepareStatement("INSERT INTO vehicle_comparisons VALUES (?, ?, ?, ?, ?, ?, ?)").use { statement ->
-                statement.setString(1, comparison.id)
-                statement.setString(2, comparison.tripImportId)
-                statement.setString(3, comparison.approvedImportId)
-                statement.setString(4, comparison.createdAt)
-                statement.setInt(5, comparison.comparedVehicleCount)
-                statement.setInt(6, comparison.unapprovedVehicleCount)
-                statement.setString(7, json.encodeToString(comparison.results))
-                statement.executeUpdate()
-            }
+    override fun upsertApprovals(request: UpsertApprovalsRequest, now: Instant): UpsertApprovalsResponse {
+        validateBatch(request.approvals.size)
+        val sourceName = request.sourceName?.trim()?.takeIf(String::isNotEmpty)
+        val plates = request.approvals.mapIndexed { index, approval ->
+            validateApprovalDates(approval, index)
+            validatedPlate(approval.registrationNumber, "approvals[$index]")
         }
-    }
-
-    override fun findComparison(id: String): VehicleComparisonResponse? = connection().use { db ->
-        db.prepareStatement("SELECT * FROM vehicle_comparisons WHERE id = ?").use { statement ->
-            statement.setString(1, id)
-            statement.executeQuery().use { rows ->
-                if (!rows.next()) return@use null
-                VehicleComparisonResponse(
-                    rows.getString("id"), rows.getString("trip_import_id"), rows.getString("approved_import_id"),
-                    rows.getString("created_at"), rows.getInt("compared_vehicle_count"),
-                    rows.getInt("unapproved_vehicle_count"),
-                    json.decodeFromString<List<VehicleComparisonResult>>(rows.getString("results_json")),
-                )
-            }
-        }
-    }
-
-    private fun validateImport(sourceName: String, rowCount: Int) {
-        require(sourceName.isNotBlank()) { "sourceName is required" }
-        require(rowCount > 0) { "rows must not be empty" }
-        require(rowCount <= 10_000) { "imports are limited to 10000 rows" }
-    }
-
-    private fun validatePlates(registrationNumbers: List<String>): List<String> =
-        registrationNumbers.mapIndexed { index, number ->
-            normalizeRegistrationNumber(number).also { plate ->
-                require(plate.matches(Regex("[A-Z0-9]{2,7}"))) {
-                    "rows[$index].registrationNumber must be a 2-7 character Norwegian plate"
-                }
-            }
-        }
-
-    override fun saveCheckRun(run: VehicleCheckRunResponse, snapshots: List<RegistrySnapshot>) {
+        val stored = mutableListOf<StoredApproval>()
         connection().use { db ->
             db.autoCommit = false
             try {
-                db.prepareStatement(
-                    "INSERT INTO registry_snapshots (id, normalized_registration_number, fetched_at, source, registration_status, data_json) VALUES (?, ?, ?, ?, ?, ?)",
-                ).use { statement ->
-                    snapshots.forEach { snapshot ->
-                        statement.setString(1, snapshot.id)
-                        statement.setString(2, snapshot.normalizedRegistrationNumber)
-                        statement.setString(3, snapshot.fetchedAt)
-                        statement.setString(4, snapshot.source)
-                        statement.setString(5, snapshot.registrationStatus)
-                        statement.setString(6, json.encodeToString(snapshot.data))
-                        statement.addBatch()
+                request.approvals.forEachIndexed { index, approval ->
+                    val vehicle = findOrCreateVehicle(db, plates[index], now)
+                    val existing = unrevokedApproval(db, vehicle.id)
+                    val record = if (existing == null) {
+                        StoredApproval(
+                            id = UUID.randomUUID().toString(), vehicleId = vehicle.id, sourceName = sourceName,
+                            createdAt = now.toString(), updatedAt = now.toString(), data = approval,
+                        ).also { insertApproval(db, it) }
+                    } else {
+                        existing.copy(sourceName = sourceName, updatedAt = now.toString(), data = approval)
+                            .also { updateApproval(db, it) }
                     }
-                    statement.executeBatch()
-                }
-                db.prepareStatement(
-                    "INSERT INTO vehicle_check_runs (id, import_id, started_at, completed_at, checked_count, deviation_count, unavailable_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                ).use { statement ->
-                    statement.setString(1, run.id)
-                    statement.setString(2, run.importId)
-                    statement.setString(3, run.startedAt)
-                    statement.setString(4, run.completedAt)
-                    statement.setInt(5, run.checkedCount)
-                    statement.setInt(6, run.deviationCount)
-                    statement.setInt(7, run.unavailableCount)
-                    statement.executeUpdate()
-                }
-                db.prepareStatement(
-                    "INSERT INTO vehicle_check_results (run_id, normalized_registration_number, data_json) VALUES (?, ?, ?)",
-                ).use { statement ->
-                    run.results.forEach { result ->
-                        statement.setString(1, run.id)
-                        statement.setString(2, result.normalizedRegistrationNumber)
-                        statement.setString(3, json.encodeToString(result))
-                        statement.addBatch()
-                    }
-                    statement.executeBatch()
+                    stored += record
                 }
                 db.commit()
             } catch (cause: Exception) {
@@ -393,50 +203,44 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 throw cause
             }
         }
+        return UpsertApprovalsResponse(now.toString(), stored.size, stored)
     }
 
-    override fun latestCheckRun(importId: String): VehicleCheckRunResponse? = connection().use { db ->
+    override fun approvalForVehicle(vehicleId: String): StoredApproval? = connection().use { db ->
         db.prepareStatement(
-            "SELECT * FROM vehicle_check_runs WHERE import_id = ? ORDER BY completed_at DESC LIMIT 1",
+            """SELECT * FROM vehicle_approvals WHERE vehicle_id = ?
+                ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, updated_at DESC LIMIT 1""",
         ).use { statement ->
-            statement.setString(1, importId)
-            statement.executeQuery().use { runs ->
-                if (!runs.next()) return@use null
-                val runId = runs.getString("id")
-                val results = db.prepareStatement(
-                    "SELECT data_json FROM vehicle_check_results WHERE run_id = ? ORDER BY normalized_registration_number",
-                ).use { resultStatement ->
-                    resultStatement.setString(1, runId)
-                    resultStatement.executeQuery().use { resultRows ->
-                        buildList {
-                            while (resultRows.next()) {
-                                add(json.decodeFromString<VehicleCheckResult>(resultRows.getString("data_json")))
-                            }
-                        }
-                    }
-                }
-                VehicleCheckRunResponse(
-                    id = runId,
-                    importId = importId,
-                    startedAt = runs.getString("started_at"),
-                    completedAt = runs.getString("completed_at"),
-                    checkedCount = runs.getInt("checked_count"),
-                    deviationCount = runs.getInt("deviation_count"),
-                    unavailableCount = runs.getInt("unavailable_count"),
-                    results = results,
-                )
-            }
+            statement.setString(1, vehicleId)
+            statement.executeQuery().use { rows -> if (rows.next()) approvalFrom(rows) else null }
         }
     }
 
-    override fun findSnapshot(id: String): RegistrySnapshot? = connection().use { db ->
-        db.prepareStatement("SELECT * FROM registry_snapshots WHERE id = ?").use { statement ->
-            statement.setString(1, id)
+    override fun revokeApproval(registrationNumber: String, now: Instant): StoredApproval? = connection().use { db ->
+        val plate = validatedPlate(registrationNumber)
+        val vehicle = findVehicle(db, plate) ?: return@use null
+        val approval = unrevokedApproval(db, vehicle.id) ?: return@use null
+        db.prepareStatement(
+            "UPDATE vehicle_approvals SET revoked_at = ?, updated_at = ? WHERE id = ? AND revoked_at IS NULL",
+        ).use { statement ->
+            statement.setString(1, now.toString())
+            statement.setString(2, now.toString())
+            statement.setString(3, approval.id)
+            statement.executeUpdate()
+        }
+        approval.copy(updatedAt = now.toString(), revokedAt = now.toString())
+    }
+
+    override fun latestSnapshot(vehicleId: String): RegistrySnapshot? = connection().use { db ->
+        db.prepareStatement(
+            "SELECT * FROM svv_snapshots WHERE vehicle_id = ? ORDER BY fetched_at DESC LIMIT 1",
+        ).use { statement ->
+            statement.setString(1, vehicleId)
             statement.executeQuery().use { rows ->
                 if (!rows.next()) return@use null
                 RegistrySnapshot(
                     id = rows.getString("id"),
-                    normalizedRegistrationNumber = rows.getString("normalized_registration_number"),
+                    vehicleId = rows.getString("vehicle_id"),
                     fetchedAt = rows.getString("fetched_at"),
                     source = rows.getString("source"),
                     registrationStatus = rows.getString("registration_status"),
@@ -445,4 +249,160 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             }
         }
     }
+
+    override fun saveCheck(check: VehicleCheckResponse, newSnapshot: RegistrySnapshot?) {
+        connection().use { db ->
+            db.autoCommit = false
+            try {
+                if (newSnapshot != null) {
+                    db.prepareStatement(
+                        """INSERT INTO svv_snapshots
+                            (id, vehicle_id, fetched_at, source, registration_status, data_json)
+                            VALUES (?, ?, ?, ?, ?, ?)""",
+                    ).use { statement ->
+                        statement.setString(1, newSnapshot.id)
+                        statement.setString(2, newSnapshot.vehicleId)
+                        statement.setString(3, newSnapshot.fetchedAt)
+                        statement.setString(4, newSnapshot.source)
+                        statement.setString(5, newSnapshot.registrationStatus)
+                        statement.setString(6, json.encodeToString(newSnapshot.data))
+                        statement.executeUpdate()
+                    }
+                }
+                db.prepareStatement(
+                    """INSERT INTO vehicle_checks
+                        (id, vehicle_id, approval_id, snapshot_id, checked_at, data_json)
+                        VALUES (?, ?, ?, ?, ?, ?)""",
+                ).use { statement ->
+                    statement.setString(1, check.id)
+                    statement.setString(2, check.vehicle.id)
+                    statement.setString(3, check.approval?.id)
+                    statement.setString(4, check.registry.snapshotId)
+                    statement.setString(5, check.checkedAt)
+                    statement.setString(6, json.encodeToString(check))
+                    statement.executeUpdate()
+                }
+                db.commit()
+            } catch (cause: Exception) {
+                db.rollback()
+                throw cause
+            }
+        }
+    }
+
+    override fun findCheck(id: String): VehicleCheckResponse? = connection().use { db ->
+        db.prepareStatement("SELECT data_json FROM vehicle_checks WHERE id = ?").use { statement ->
+            statement.setString(1, id)
+            statement.executeQuery().use { rows ->
+                if (rows.next()) json.decodeFromString<VehicleCheckResponse>(rows.getString("data_json")) else null
+            }
+        }
+    }
+
+    private fun findOrCreateVehicle(db: Connection, plate: String, now: Instant): Vehicle {
+        findVehicle(db, plate)?.let { return it }
+        val vehicle = Vehicle(UUID.randomUUID().toString(), plate, createdAt = now.toString())
+        db.prepareStatement(
+            "INSERT OR IGNORE INTO vehicles (id, normalized_registration_number, supplier_id, created_at) VALUES (?, ?, NULL, ?)",
+        ).use { statement ->
+            statement.setString(1, vehicle.id)
+            statement.setString(2, vehicle.normalizedRegistrationNumber)
+            statement.setString(3, vehicle.createdAt)
+            statement.executeUpdate()
+        }
+        return findVehicle(db, plate) ?: error("Vehicle insert did not create or find $plate")
+    }
+
+    private fun findVehicle(db: Connection, plate: String): Vehicle? = db.prepareStatement(
+        "SELECT * FROM vehicles WHERE normalized_registration_number = ?",
+    ).use { statement ->
+        statement.setString(1, plate)
+        statement.executeQuery().use { rows ->
+            if (!rows.next()) return@use null
+            Vehicle(
+                id = rows.getString("id"),
+                normalizedRegistrationNumber = rows.getString("normalized_registration_number"),
+                supplierId = rows.getString("supplier_id"),
+                createdAt = rows.getString("created_at"),
+            )
+        }
+    }
+
+    private fun unrevokedApproval(db: Connection, vehicleId: String): StoredApproval? = db.prepareStatement(
+        "SELECT * FROM vehicle_approvals WHERE vehicle_id = ? AND revoked_at IS NULL LIMIT 1",
+    ).use { statement ->
+        statement.setString(1, vehicleId)
+        statement.executeQuery().use { rows -> if (rows.next()) approvalFrom(rows) else null }
+    }
+
+    private fun approvalFrom(rows: java.sql.ResultSet) = StoredApproval(
+        id = rows.getString("id"),
+        vehicleId = rows.getString("vehicle_id"),
+        sourceName = rows.getString("source_name"),
+        createdAt = rows.getString("created_at"),
+        updatedAt = rows.getString("updated_at"),
+        revokedAt = rows.getString("revoked_at"),
+        data = json.decodeFromString<ApprovalInput>(rows.getString("data_json")),
+    )
+
+    private fun insertApproval(db: Connection, approval: StoredApproval) {
+        db.prepareStatement(
+            """INSERT INTO vehicle_approvals
+                (id, vehicle_id, source_name, start_date, expiry_date, created_at, updated_at, revoked_at, data_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)""",
+        ).use { statement ->
+            statement.setString(1, approval.id)
+            statement.setString(2, approval.vehicleId)
+            statement.setString(3, approval.sourceName)
+            statement.setString(4, approval.data.startDate)
+            statement.setString(5, approval.data.expiryDate)
+            statement.setString(6, approval.createdAt)
+            statement.setString(7, approval.updatedAt)
+            statement.setString(8, json.encodeToString(approval.data))
+            statement.executeUpdate()
+        }
+    }
+
+    private fun updateApproval(db: Connection, approval: StoredApproval) {
+        db.prepareStatement(
+            """UPDATE vehicle_approvals SET source_name = ?, start_date = ?, expiry_date = ?,
+                updated_at = ?, data_json = ? WHERE id = ? AND revoked_at IS NULL""",
+        ).use { statement ->
+            statement.setString(1, approval.sourceName)
+            statement.setString(2, approval.data.startDate)
+            statement.setString(3, approval.data.expiryDate)
+            statement.setString(4, approval.updatedAt)
+            statement.setString(5, json.encodeToString(approval.data))
+            statement.setString(6, approval.id)
+            statement.executeUpdate()
+        }
+    }
+
+    private fun validateBatch(size: Int) {
+        require(size > 0) { "rows must not be empty" }
+        require(size <= 10_000) { "requests are limited to 10000 rows" }
+    }
+
+    private fun validateApprovalDates(approval: ApprovalInput, index: Int) {
+        val dates = listOf("startDate" to approval.startDate, "expiryDate" to approval.expiryDate)
+        dates.forEach { (field, value) ->
+            if (value != null) try {
+                LocalDate.parse(value)
+            } catch (_: DateTimeParseException) {
+                throw IllegalArgumentException("approvals[$index].$field must be an ISO date (yyyy-MM-dd)")
+            }
+        }
+        if (approval.startDate != null && approval.expiryDate != null) {
+            require(!LocalDate.parse(approval.expiryDate).isBefore(LocalDate.parse(approval.startDate))) {
+                "approvals[$index].expiryDate must not be before startDate"
+            }
+        }
+    }
+
+    private fun validatedPlate(value: String, field: String = "registrationNumber"): String =
+        normalizeRegistrationNumber(value).also { plate ->
+            require(plate.matches(Regex("[A-Z0-9]{2,7}"))) {
+                "$field must be a 2-7 character Norwegian registration number"
+            }
+        }
 }

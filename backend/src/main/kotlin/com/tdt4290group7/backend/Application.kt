@@ -16,6 +16,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import java.nio.file.Path
+import java.time.Duration
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
@@ -29,6 +30,7 @@ fun Application.module(
         Path.of(System.getenv("VEHICLE_DB_PATH") ?: "data/vehicles.db"),
     ),
     registry: VehicleRegistryClient? = svvApiKey()?.let(::VegvesenVehicleRegistryClient),
+    cacheTtl: Duration = Duration.ofDays(svvCacheTtlDays()),
 ) {
     configureSerialization()
     configureCORS()
@@ -36,6 +38,6 @@ fun Application.module(
     configureStatusPages()
     configureSecurity()
     configureRateLimiting()
-    configureRouting(repository, registry)
+    configureRouting(repository, registry, cacheTtl)
     configureAuthRoutes()
 }

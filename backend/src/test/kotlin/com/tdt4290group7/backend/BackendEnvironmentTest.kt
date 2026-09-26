@@ -14,8 +14,11 @@ class BackendEnvironmentTest {
         Files.createDirectories(path.parent)
         Files.writeString(path, "# local development key\nSVV_API_KEY=local-test-key\n")
 
-        assertEquals("local-test-key", svvApiKey(emptyMap(), path))
-        assertEquals("deployed-test-key", svvApiKey(mapOf("SVV_API_KEY" to "deployed-test-key"), path))
+        assertEquals("local-test-key", backendSetting("SVV_API_KEY", emptyMap(), path))
+        assertEquals(
+            "deployed-test-key",
+            backendSetting("SVV_API_KEY", mapOf("SVV_API_KEY" to "deployed-test-key"), path),
+        )
     }
 
     @Test
@@ -24,7 +27,7 @@ class BackendEnvironmentTest {
         Files.createDirectories(path.parent)
         Files.writeString(path, "SVV_API_KEY=\n")
 
-        assertNull(svvApiKey(emptyMap(), path))
-        assertNull(svvApiKey(emptyMap(), path.resolveSibling("missing.env")))
+        assertNull(backendSetting("SVV_API_KEY", emptyMap(), path))
+        assertNull(backendSetting("SVV_API_KEY", emptyMap(), path.resolveSibling("missing.env")))
     }
 }

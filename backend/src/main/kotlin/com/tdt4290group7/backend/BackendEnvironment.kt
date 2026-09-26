@@ -4,17 +4,18 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /** Process environment wins; local .env is a development-only fallback. */
-internal fun svvApiKey(
+internal fun backendSetting(
+    name: String,
     environment: Map<String, String> = System.getenv(),
     envFile: Path = Path.of(".env"),
 ): String? {
-    environment["SVV_API_KEY"]?.trim()?.takeIf(String::isNotEmpty)?.let { return it }
+    environment[name]?.trim()?.takeIf(String::isNotEmpty)?.let { return it }
     if (!Files.isRegularFile(envFile)) return null
 
     val rawValue = Files.readAllLines(envFile)
         .map(String::trim)
         .filter { it.isNotEmpty() && !it.startsWith("#") }
-        .lastOrNull { it.substringBefore('=').trim() == "SVV_API_KEY" }
+        .lastOrNull { it.substringBefore('=').trim() == name }
         ?.substringAfter('=')
         ?.trim()
         ?: return null
@@ -25,3 +26,10 @@ internal fun svvApiKey(
     }
     return value.takeIf(String::isNotBlank)
 }
+
+internal fun svvApiKey(): String? = backendSetting("SVV_API_KEY")
+
+internal fun svvCacheTtlDays(): Long = backendSetting("SVV_CACHE_TTL_DAYS")
+    ?.toLongOrNull()
+    ?.takeIf { it > 0 }
+    ?: 14

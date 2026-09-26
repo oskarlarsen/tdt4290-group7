@@ -8,9 +8,18 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** One imported row, not one unique vehicle. Repeated plates retain their separate statistics. */
 @Serializable
-data class VehicleRowInput(
+data class Vehicle(
+    val id: String,
+    val normalizedRegistrationNumber: String,
+    /** Reserved for the future supplier model. Vehicles may currently have no supplier. */
+    val supplierId: String? = null,
+    val createdAt: String,
+)
+
+/** One statistics row, not one unique vehicle. Repeated plates remain separate rows. */
+@Serializable
+data class TripRowInput(
     val registrationNumber: String,
     val fuel: String? = null,
     val make: String? = null,
@@ -34,93 +43,75 @@ data class VehicleRowInput(
 )
 
 @Serializable
-data class VehicleImportRequest(
-    val sourceName: String,
-    val rows: List<VehicleRowInput>,
+data class AppendTripRowsRequest(
+    val sourceName: String? = null,
+    val rows: List<TripRowInput>,
 )
 
 @Serializable
-data class VehicleImportResponse(
+data class StoredTripRow(
     val id: String,
-    val sourceName: String,
+    val vehicleId: String,
+    val sourceName: String? = null,
+    val createdAt: String,
+    val data: TripRowInput,
+)
+
+@Serializable
+data class AppendTripRowsResponse(
     val createdAt: String,
     val rowCount: Int,
     val distinctVehicleCount: Int,
+    val rows: List<StoredTripRow>,
 )
 
 @Serializable
-data class StoredVehicleRow(
-    val id: String,
-    val importId: String,
-    val rowNumber: Int,
-    val normalizedRegistrationNumber: String,
-    val data: VehicleRowInput,
-)
-
-/** One row in the separately supplied approved-vehicle list. */
-@Serializable
-data class ApprovedVehicleRowInput(
+data class ApprovalInput(
     val registrationNumber: String,
     val fuelTechnology: String? = null,
     val usedThroughoutPeriod: Boolean? = null,
-    /** ISO-8601 date (yyyy-MM-dd), when supplied by the frontend. */
+    /** Missing means effective immediately. */
     val startDate: String? = null,
-    val endDate: String? = null,
-    /** Spreadsheet section, retained as supplied; not used as a compliance rule. */
+    /** Missing means approved indefinitely, until manually revoked. */
+    val expiryDate: String? = null,
     val vehicleGroup: String? = null,
     val additionalFields: Map<String, String> = emptyMap(),
 )
 
 @Serializable
-data class ApprovedVehicleImportRequest(
-    val sourceName: String,
-    val rows: List<ApprovedVehicleRowInput>,
+data class UpsertApprovalsRequest(
+    val sourceName: String? = null,
+    val approvals: List<ApprovalInput>,
 )
 
 @Serializable
-data class StoredApprovedVehicleRow(
+data class StoredApproval(
     val id: String,
-    val importId: String,
-    val rowNumber: Int,
-    val normalizedRegistrationNumber: String,
-    val data: ApprovedVehicleRowInput,
-)
-
-@Serializable
-data class ApprovedVehicleImportResponse(
-    val id: String,
-    val sourceName: String,
+    val vehicleId: String,
+    val sourceName: String? = null,
     val createdAt: String,
-    val rowCount: Int,
-    val distinctVehicleCount: Int,
+    val updatedAt: String,
+    val revokedAt: String? = null,
+    val data: ApprovalInput,
 )
 
 @Serializable
-data class VehicleComparisonRequest(val tripImportId: String, val approvedImportId: String)
-
-@Serializable
-enum class ApprovalMatch { ON_APPROVED_LIST, NOT_ON_APPROVED_LIST }
-
-@Serializable
-data class VehicleComparisonResult(
-    val normalizedRegistrationNumber: String,
-    val tripRowIds: List<String>,
-    val approvedRowIds: List<String>,
-    val approvalMatch: ApprovalMatch,
+data class UpsertApprovalsResponse(
+    val updatedAt: String,
+    val approvalCount: Int,
+    val approvals: List<StoredApproval>,
 )
 
 @Serializable
-data class VehicleComparisonResponse(
-    val id: String,
-    val tripImportId: String,
-    val approvedImportId: String,
-    val createdAt: String,
-    val comparedVehicleCount: Int,
-    val unapprovedVehicleCount: Int,
-    val results: List<VehicleComparisonResult>,
+enum class ApprovalStatus { ACTIVE, NOT_YET_ACTIVE, EXPIRED, REVOKED, NOT_APPROVED }
+
+@Serializable
+data class VehicleCheckRequest(
+    val registrationNumber: String,
+    val forceRefresh: Boolean = false,
 )
 
-/** A lossless, application-owned tree, not a persisted third-party JSON document. */
+/** A lossless, application-owned tree containing every field returned by SVV. */
 @Serializable
 sealed interface RegistryValue {
     @Serializable
@@ -167,44 +158,64 @@ fun RegistryValue.text(): String? = (this as? RegistryValue.StringValue)?.value
 @Serializable
 data class RegistrySnapshot(
     val id: String,
-    val normalizedRegistrationNumber: String,
+    val vehicleId: String,
     val fetchedAt: String,
     val source: String,
-    val registrationStatus: String?,
+    val registrationStatus: String? = null,
     val data: RegistryValue,
 )
 
 @Serializable
-enum class LookupOutcome { FOUND, NOT_FOUND, INVALID_RESPONSE, ACCESS_DENIED, QUOTA_EXHAUSTED, TEMPORARILY_UNAVAILABLE }
+enum class LookupOutcome {
+    FOUND, NOT_FOUND, INVALID_RESPONSE, ACCESS_DENIED, QUOTA_EXHAUSTED,
+    TEMPORARILY_UNAVAILABLE, NOT_CONFIGURED,
+}
 
 @Serializable
-enum class VehicleDeviation { DEREGISTERED, EXPORTED, SCRAPPED, UNREGISTERED, UNKNOWN_REGISTRATION_STATUS }
+enum class VehicleDeviation {
+    NOT_ON_APPROVED_LIST,
+    APPROVAL_NOT_YET_ACTIVE,
+    APPROVAL_EXPIRED,
+    APPROVAL_REVOKED,
+    DEREGISTERED,
+    EXPORTED,
+    SCRAPPED,
+    UNREGISTERED,
+    UNKNOWN_REGISTRATION_STATUS,
+}
 
 @Serializable
 enum class UsageProhibitionState { ACTIVE, FUTURE, NONE, UNKNOWN }
 
 @Serializable
-data class VehicleCheckResult(
-    val normalizedRegistrationNumber: String,
-    val checkedAt: String,
+enum class RegistryDataSource { LIVE, CACHE, STALE_CACHE, UNAVAILABLE }
+
+@Serializable
+data class RegistryCheckResult(
+    val dataSource: RegistryDataSource,
     val lookupOutcome: LookupOutcome,
+    val fetchedAt: String? = null,
     val registrationStatus: String? = null,
+    /** Complete SVV response, whether it came from live lookup or a saved snapshot. */
+    val data: RegistryValue? = null,
     /** Public Enkeltoppslag cannot establish whether a bruksforbud exists. */
     val usageProhibitionState: UsageProhibitionState = UsageProhibitionState.UNKNOWN,
     val deviations: List<VehicleDeviation> = emptyList(),
-    val registrySnapshotId: String? = null,
+    val snapshotId: String? = null,
+    /** Present when a refresh failed and stale cached data was returned instead. */
+    val refreshFailure: LookupOutcome? = null,
 )
 
 @Serializable
-data class VehicleCheckRunResponse(
+data class VehicleCheckResponse(
     val id: String,
-    val importId: String,
-    val startedAt: String,
-    val completedAt: String,
-    val checkedCount: Int,
-    val deviationCount: Int,
-    val unavailableCount: Int,
-    val results: List<VehicleCheckResult>,
+    val checkedAt: String,
+    val vehicle: Vehicle,
+    val approvalStatus: ApprovalStatus,
+    val approval: StoredApproval? = null,
+    val tripRows: List<StoredTripRow>,
+    val registry: RegistryCheckResult,
+    val deviations: List<VehicleDeviation>,
 )
 
 fun normalizeRegistrationNumber(value: String): String =
