@@ -135,6 +135,13 @@ export default function Dashboard() {
     recentAlerts,
   } = data;
 
+  const prioritizedSuppliersRequiringAttention = suppliersRequiringAttention
+    .filter((supplier) => supplier.risk === "high" || supplier.risk === "medium")
+    .sort((a, b) => {
+      if (a.risk === b.risk) return 0;
+      return a.risk === "high" ? -1 : 1;
+    });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -247,13 +254,13 @@ export default function Dashboard() {
           </div>
 
           <TopRiskSuppliersTable
-            suppliers={suppliersRequiringAttention}
+            suppliers={prioritizedSuppliersRequiringAttention}
           />
 
           {/* Bottom footer */}
           <div className="-mx-4 -mb-4 mt-auto flex items-center justify-between rounded-b-xl bg-neutral-50 px-4 py-3">
             <p className="text-xs text-neutral-500">
-              Showing {suppliersRequiringAttention.length} of{" "}
+              Showing {prioritizedSuppliersRequiringAttention.length} of{" "}
               {riskClassification.high.count +
                 riskClassification.medium.count}{" "}
               suppliers requiring attention this period

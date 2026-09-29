@@ -62,6 +62,8 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
   }
 
   const roleLabel = user.role === "ADMIN" ? "Municipal Admin" : "Supplier";
+  const userName = user.name?.trim() || "";
+  const displayName = userName || (user.role === "ADMIN" ? "Admin" : "Supplier");
 
   return (
     <div className="relative" ref={ref}>
@@ -71,11 +73,11 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
         className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-neutral-50"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-900 text-xs font-semibold text-white">
-          {initials(user.name)}
+          {initials(userName)}
         </span>
         {variant === "full" && (
           <span className="flex flex-col items-center justify-center text-center">
-            <span className="block text-sm font-medium text-neutral-900">{user.name}</span>
+            <span className="block text-sm font-medium text-neutral-900">{displayName}</span>
             <span className="block text-xs text-neutral-400">{roleLabel}</span>
           </span>
         )}
@@ -88,7 +90,7 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
           className="fixed z-50 max-h-[calc(100vh-1rem)] w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-neutral-100 bg-white p-1 shadow-card"
         >
           <div className="border-b border-neutral-100 px-3 py-2">
-            <div className="text-sm font-medium text-neutral-900">{user.name}</div>
+            <div className="text-sm font-medium text-neutral-900">{displayName}</div>
             <div className="text-xs text-neutral-400">{user.email}</div>
             <div className="mt-1 inline-block rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-neutral-500">
               {roleLabel}
