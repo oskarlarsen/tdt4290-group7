@@ -4,14 +4,12 @@ import type { RiskClassification, TopRiskSupplier, RecentAlert } from "../types/
 import { formatSyncTime } from "../utils/formatSyncTime";
 import type { Notification, NotificationSeverity } from "../types/notification";
 
+// Keep modeled suppliers separate from the remaining portfolio counts.
+// Changes to a modeled supplier's risk automatically update the related dashboard numbers.
+// The remaining suppliers are represented by aggregate counts until the real supplier API is available.
+// TODO: Replace the aggregate data with the full supplier list from the backend.
 
-// Supplier risk classification 
-// TODO: Add the full supplier list when the real endpoint is available
-const TOTAL_MONITORED_SUPPLIERS = 151;
-const BULK_HIGH_RISK_UNLISTED = 4; // + 3 modeled high below = 7 total
-const BULK_MEDIUM_RISK_UNLISTED = 25; // + 1 modeled medium below = 26 total
-
-const highRiskSuppliers: TopRiskSupplier[] = [
+const MODELED_SUPPLIERS: TopRiskSupplier[] = [
   { id: "sup-a", displayName: "Supplier A", orgId: "NO 924 812 443 MVA", primaryContract: "Skolerute 2023-2026", risk: "high", mainIssue: "3 Euro-5 non-compliant heavy vehicles", issueCategory: "VEHICLE_DEVIATION" },
   { id: "sup-b", displayName: "Supplier B", orgId: "NO 811 693 219 MVA", primaryContract: "Kommunalt Avfall 24", risk: "high", mainIssue: "ISO 14001 expired 14 days ago", issueCategory: "CERTIFICATE_EXPIRY" },
   { id: "sup-c", displayName: "Supplier C", orgId: "NO 994 204 117 MVA", primaryContract: "Skolebygg Rehabilitering", risk: "medium", mainIssue: "Biogas share dropped below 80%", issueCategory: "FUEL_DEVIATION" },
@@ -19,24 +17,36 @@ const highRiskSuppliers: TopRiskSupplier[] = [
   { id: "sup-e", displayName: "Supplier E", orgId: "NO 882 381 920 MVA", primaryContract: "Kommunale Byggeplasser", risk: "compliant", mainIssue: "Q4 chemical audit documentation missing" },
 ];
 
-export function getTopRiskSuppliers(): TopRiskSupplier[] {
-  return highRiskSuppliers;
+const UNMODELED_PORTFOLIO_AGGREGATE = {
+  totalSuppliers: 151,
+  high: 4,
+  medium: 25,
+};
+
+function getModeledRiskCounts() {
+  return {
+    high: MODELED_SUPPLIERS.filter((s) => s.risk === "high").length,
+    medium: MODELED_SUPPLIERS.filter((s) => s.risk === "medium").length,
+  };
 }
 
-// Show suppliers with high or medium risk, regardless of alert status
+export function getTopRiskSuppliers(): TopRiskSupplier[] {
+  return MODELED_SUPPLIERS;
+}
+
+// Use the same supplier data and risk filter as the classification bar to keep both in sync
 export function getSuppliersRequiringAttention(): TopRiskSupplier[] {
-  return highRiskSuppliers.filter((s) => s.risk === "high" || s.risk === "medium");
+  return MODELED_SUPPLIERS.filter((s) => s.risk === "high" || s.risk === "medium");
 }
 
 export function getRiskClassification(): RiskClassification {
-  const modeledHigh = highRiskSuppliers.filter((s) => s.risk === "high").length;
-  const modeledMedium = highRiskSuppliers.filter((s) => s.risk === "medium").length;
+  const modeled = getModeledRiskCounts();
 
-  const high = modeledHigh + BULK_HIGH_RISK_UNLISTED;
-  const medium = modeledMedium + BULK_MEDIUM_RISK_UNLISTED;
-  const compliant = TOTAL_MONITORED_SUPPLIERS - high - medium;
+  const high = modeled.high + UNMODELED_PORTFOLIO_AGGREGATE.high;
+  const medium = modeled.medium + UNMODELED_PORTFOLIO_AGGREGATE.medium;
+  const compliant = UNMODELED_PORTFOLIO_AGGREGATE.totalSuppliers - high - medium;
 
-  const pct = (n: number) => Math.round((n / TOTAL_MONITORED_SUPPLIERS) * 100);
+  const pct = (n: number) => Math.round((n / UNMODELED_PORTFOLIO_AGGREGATE.totalSuppliers) * 100);
   return {
     compliant: { count: compliant, percent: pct(compliant) },
     medium: { count: medium, percent: pct(medium) },
@@ -45,7 +55,7 @@ export function getRiskClassification(): RiskClassification {
 }
 
 export function getMonitoredSupplierCount(): number {
-  return TOTAL_MONITORED_SUPPLIERS;
+  return UNMODELED_PORTFOLIO_AGGREGATE.totalSuppliers;
 }
 
 // Recent alerts 
@@ -122,7 +132,7 @@ export function resyncNow(): string {
 }
 
 export function getRiskLogRows() {
-  return highRiskSuppliers.map((s) => ({
+  return MODELED_SUPPLIERS.map((s) => ({
     Supplier: s.displayName,
     "Org ID": s.orgId,
     Contract: s.primaryContract,
@@ -133,7 +143,7 @@ export function getRiskLogRows() {
 
 // Derive notifications from the current supplier data instead of storing a separate list
 function buildNotifications(): Omit<Notification, "read">[] {
-  const risky = highRiskSuppliers.filter((s) => s.risk !== "compliant" && s.issueCategory);
+  const risky = MODELED_SUPPLIERS.filter((s) => s.risk !== "compliant" && s.issueCategory);
 
   const riskNotifications: Omit<Notification, "read">[] = risky.map((s) => ({
     id: `notif-risk-${s.id}`,
