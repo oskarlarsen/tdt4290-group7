@@ -9,10 +9,12 @@ export function AlertCard({
   alert,
   onDismiss,
   onInvestigate,
+  isDismissing,
 }: {
   alert: RecentAlert;
   onDismiss?: (id: string) => void;
   onInvestigate?: (id: string) => void;
+  isDismissing?: boolean;
 }) {
   return (
     <div className="border-t border-neutral-100 py-3 first:border-t-0 first:pt-0">
@@ -26,17 +28,24 @@ export function AlertCard({
       </div>
       <div className="mt-1.5 text-sm font-medium text-neutral-900">{alert.title}</div>
       <p className="mt-0.5 text-sm text-neutral-500">{alert.description}</p>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <button
-          // TODO: Replace the local callback with the alerts API when available
+          type="button"
+          aria-label={isDismissing ? "Dismissing alert" : "Dismiss alert"}
           onClick={() => onDismiss?.(alert.id)}
-          className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+          disabled={isDismissing || !onDismiss}
+          className="inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-900/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Dismiss
+          {isDismissing ? "Dismissing…" : "Dismiss"}
         </button>
         {alert.supplierId && (
-          <button onClick={() => onInvestigate?.(alert.id)} className="rounded-lg bg-primary-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700">
-            Investigate
+          <button
+            type="button"
+            onClick={() => onInvestigate?.(alert.id)}
+            className="inline-flex items-center justify-center rounded-lg bg-primary-900 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!onInvestigate}
+          >
+            View Details
           </button>
         )}
       </div>

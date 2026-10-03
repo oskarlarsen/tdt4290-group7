@@ -46,11 +46,28 @@ export type RecentAlert = {
   supplierId?: string;
 };
 
+export type IssueCategoryBreakdown = {
+  vehicleDeviation: number;
+  certificateExpiry: number;
+  fuelDeviation: number;
+  // All three counts are based on the same supplier total
+  modeledSupplierCount: number;
+};
+
 export type DashboardSummary = {
   lastSyncedAt: string;
   kpis: DashboardKpis;
   riskClassification: RiskClassification;
   topRiskSuppliers: TopRiskSupplier[];
   suppliersRequiringAttention: TopRiskSupplier[];
+  issueCategoryBreakdown: IssueCategoryBreakdown;
   recentAlerts: RecentAlert[];
+};
+
+export type SupplierNote = {
+  id: string;
+  supplierId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
 };

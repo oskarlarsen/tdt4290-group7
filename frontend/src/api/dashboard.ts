@@ -23,6 +23,7 @@ export function getDashboardSummary(): Promise<DashboardSummary> {
       riskClassification,
       topRiskSuppliers: db.getTopRiskSuppliers(),
       suppliersRequiringAttention: db.getSuppliersRequiringAttention(),
+      issueCategoryBreakdown: db.getIssueCategoryBreakdown(),
       recentAlerts: db.getActiveAlerts(),
     });
   }
