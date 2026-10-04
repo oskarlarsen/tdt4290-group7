@@ -116,6 +116,11 @@ export default function Dashboard() {
     );
   }, [user, data]);
 
+  useEffect(() => {
+    if (!data || isError) return;
+    setAttentionPage(0);
+  }, [attentionFilter, data, isError]);
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-400">
@@ -134,10 +139,6 @@ export default function Dashboard() {
   }
 
   const { kpis, riskClassification, suppliersRequiringAttention, issueCategoryBreakdown, recentAlerts } = data;
-
-  useEffect(() => {
-    setAttentionPage(0);
-  }, [attentionFilter, data]);
 
   const riskPriority: Record<string, number> = {
     high: 0,
