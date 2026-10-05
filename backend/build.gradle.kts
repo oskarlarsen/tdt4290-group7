@@ -15,6 +15,13 @@ application {
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
+tasks.register<JavaExec>("runCertificateParser") {
+    group = "application"
+    description = "Extract and parse a certificate PDF"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.tdt4290group7.backend.certificates.CertificateParserRunnerKt")
+}
+
 repositories {
     mavenCentral()
 }
