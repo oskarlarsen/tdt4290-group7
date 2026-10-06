@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job names are the status checks required by .github/rulesets/protect-main.json.
+  frontend:
+    name: Frontend build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # React refuses to start when these differ, which a build alone does not catch
+      - name: Check react and react-dom versions match
+        run: |
+          node -e "
+            const version = name => require(name + '/package.json').version
+            const react = version('react'), dom = version('react-dom')
+            if (react !== dom) {
+              console.error('react ' + react + ' and react-dom ' + dom + ' differ')
+              process.exit(1)
+            }
+          "
+      - name: Type-check and build
+        run: npm run build
+      - name: Test
+        run: npx vitest run
+
+  backend:
+    name: Backend test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - run: ./gradlew test
