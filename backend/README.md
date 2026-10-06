@@ -72,7 +72,7 @@ These settings apply to that PowerShell session and its child processes. Postman
 
 The key must never be sent to our API, placed in frontend configuration, or committed. `.env` is ignored by Git and excluded from the Docker context. `.env.example` contains no secret.
 
-JWT authentication is available for the auth routes documented below. Vehicle routes are still unauthenticated and have no role/supplier access restrictions. CORS does not provide authorization. Keep vehicle endpoints within the intended development environment.
+JWT authentication is available for the auth routes documented below. Vehicle routes are still unauthenticated and have no role/supplier access restrictions. CORS does not provide authorization. The standalone default host and Compose's published backend port are bound to loopback for local development. Local processes can still access these endpoints; authentication and authorization must be implemented before deployment or exposure to other machines.
 
 ### Docker
 

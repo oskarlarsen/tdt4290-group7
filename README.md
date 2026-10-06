@@ -50,7 +50,7 @@ The backend runs without an SVV key: local data remains usable, but a registry l
 
 Keep the SVV key in the ignored `backend/.env`, never in frontend settings or request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
 
-The backend includes JWT authentication for `/api/auth/me` and `/api/auth/logout`. Vehicle endpoints remain unauthenticated. The default host is loopback for local development. Consult the backend guide before exposing it elsewhere.
+The backend includes JWT authentication for `/api/auth/me` and `/api/auth/logout`. Vehicle endpoints remain unauthenticated. The default host and Compose's published backend port are bound to loopback for local development. Authentication and authorization for vehicle endpoints are pending separate work; implement them before deploying or exposing the backend to other machines.
 
 ## Run the full stack with Docker
 
