@@ -29,7 +29,10 @@ internal fun backendSetting(
 
 internal fun svvApiKey(): String? = backendSetting("SVV_API_KEY")
 
-internal fun svvCacheTtlDays(): Long = backendSetting("SVV_CACHE_TTL_DAYS")
+// Duration.ofDays converts days to seconds using a checked multiplication.
+private const val MAX_CACHE_TTL_DAYS = Long.MAX_VALUE / 86_400
+
+internal fun svvCacheTtlDays(value: String? = backendSetting("SVV_CACHE_TTL_DAYS")): Long = value
     ?.toLongOrNull()
-    ?.takeIf { it > 0 }
+    ?.takeIf { it in 1..MAX_CACHE_TTL_DAYS }
     ?: 14

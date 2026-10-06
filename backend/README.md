@@ -51,7 +51,7 @@ Tests do not start a persistent Postman server. Keep the run terminal open; stop
 | `PORT` | `8080` | Process environment | HTTP port |
 | `CORS_ALLOWED_ORIGINS` | `localhost:5173` | Process environment | Comma-separated frontend hosts/ports, e.g. `localhost:5173,127.0.0.1:5173`; omit schemes and paths |
 
-Only the two `SVV_` settings are read from `.env` by the application. Nonblank process values take precedence. Blank process values fall back to `.env` and do not disable a key already there. Invalid, zero, or negative TTL values fall back to 14. Restart after configuration changes.
+Only the two `SVV_` settings are read from `.env` by the application. Nonblank process values take precedence. Blank process values fall back to `.env` and do not disable a key already there. Invalid, zero, negative, or TTL values too large to represent as a duration fall back to 14. Restart after configuration changes.
 
 Example local `.env`:
 
