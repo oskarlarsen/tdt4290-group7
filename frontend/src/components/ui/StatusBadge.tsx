@@ -9,7 +9,7 @@ const COLORS: Record<Status, string> = {
 
 export function StatusBadge({ status, label }: { status: Status; label: string }) {
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium ${COLORS[status]}`}>
+    <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs font-mono font-medium ${COLORS[status]}`}>
       {label}
     </span>
   );

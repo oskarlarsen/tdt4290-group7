@@ -36,7 +36,10 @@ export function getTopRiskSuppliers(): TopRiskSupplier[] {
 
 // Use the same supplier data and risk filter as the classification bar to keep both in sync
 export function getSuppliersRequiringAttention(): TopRiskSupplier[] {
-  return MODELED_SUPPLIERS.filter((s) => s.risk === "high" || s.risk === "medium");
+  return MODELED_SUPPLIERS.filter((s) => s.risk === "high" || s.risk === "medium").sort((a, b) => {
+    if (a.risk === b.risk) return 0;
+    return a.risk === "high" ? -1 : 1;
+  });
 }
 
 export function getRiskClassification(): RiskClassification {
@@ -188,4 +191,59 @@ export function markNotificationAsRead(userId: string, id: string): void {
 export function markAllNotificationsAsRead(userId: string): void {
   const readSet = readSetFor(userId);
   buildNotifications().forEach((n) => readSet.add(n.id));
+}
+
+export function getIssueCategoryBreakdown() {
+  return {
+    vehicleDeviation: MODELED_SUPPLIERS.filter((s) => s.issueCategory === "VEHICLE_DEVIATION").length,
+    certificateExpiry: MODELED_SUPPLIERS.filter((s) => s.issueCategory === "CERTIFICATE_EXPIRY").length,
+    fuelDeviation: MODELED_SUPPLIERS.filter((s) => s.issueCategory === "FUEL_DEVIATION").length,
+    modeledSupplierCount: MODELED_SUPPLIERS.length,
+  };
+}
+
+import type { SupplierNote } from "../types/dashboard";
+
+const NOTES_STORAGE_KEY = "supplier_issue_notes";
+
+function readStoredNotes(): SupplierNote[] {
+  try {
+    const stored = localStorage.getItem(NOTES_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? (parsed as SupplierNote[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredNotes(notes: SupplierNote[]) {
+  try {
+    localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+  } catch {
+    // Keep the app usable if storage is unavailable.
+  }
+}
+
+let supplierNotes: SupplierNote[] = readStoredNotes();
+
+// TODO(backend): becomes real POST/GET /admin/suppliers/:id/notes
+// TODO: Resolve authorName from the authenticated session when the backend is available
+export function getNotesForSupplier(supplierId: string): SupplierNote[] {
+  return supplierNotes
+    .filter((n) => n.supplierId === supplierId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function addSupplierNote(supplierId: string, authorName: string, text: string): SupplierNote {
+  const note: SupplierNote = {
+    id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    supplierId,
+    authorName,
+    text,
+    createdAt: new Date().toISOString(),
+  };
+  supplierNotes = [...supplierNotes, note];
+  writeStoredNotes(supplierNotes);
+  return note;
 }

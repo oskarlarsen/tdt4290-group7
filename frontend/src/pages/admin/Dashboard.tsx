@@ -1,3 +1,4 @@
+import { useSupplierReviewStatus } from "../../hooks/useSupplierReviewStatus";
 import { useNavigate } from "react-router-dom";
 import { Users, ShieldAlert, Bell, CheckCircle2, Loader2, Download, RefreshCw } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
@@ -6,6 +7,7 @@ import { formatSyncTime } from "../../utils/formatSyncTime";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { QuickActions } from "../../components/ui/QuickActions";
 import { RiskClassificationBar } from "../../components/risk/RiskClassificationBar";
+import { IssueCategoryPanel } from "../../components/risk/IssueCategoryPanel";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { AlertCard } from "../../components/alerts/AlertCard";
 import { useEffect, useRef, useState } from "react";
@@ -16,6 +18,7 @@ import { toCsv, downloadCsv } from "../../utils/csv";
 export default function Dashboard() {
   const { user, lastActiveAt } = useAuth();
   const navigate = useNavigate();
+  const { getStatus, setStatus } = useSupplierReviewStatus();
 
   const emailedOnce = useRef(false);
 
@@ -27,6 +30,11 @@ export default function Dashboard() {
   // Undo state for dismissed alerts
   const [pendingUndoId, setPendingUndoId] = useState<string | null>(null);
   const [undoSeconds, setUndoSeconds] = useState(0);
+  const [attentionFilter, setAttentionFilter] = useState<"all" | "high" | "medium">("all");
+  const [attentionPage, setAttentionPage] = useState(0);
+
+  // Limit rows only for the Dashboard widget; the Suppliers page shows the full list
+  const ATTENTION_WIDGET_VISIBLE_LIMIT = 3;
 
   // Clean up the Undo timer if the component unmounts
   useEffect(() => {
@@ -45,6 +53,7 @@ export default function Dashboard() {
   // Clear the previous undo timer when the toast changes or the component unmounts
   return () => clearInterval(interval);
 }, [pendingUndoId]);
+
 
   function handleDismissAlert(id: string) {
   dismissAlert.mutate(
@@ -80,11 +89,7 @@ export default function Dashboard() {
     if (!alert?.supplierId) return;
 
     // Pass the alert context so Supplier Details can open on the relevant issue
-    navigate(`/admin/suppliers/${alert.supplierId}`, {
-      state: {
-        fromAlertId: alert.id,
-      },
-    });
+    navigate(`/admin/suppliers?supplierId=${alert.supplierId}`);
   }
 
   // DEV DEMO ONLY — verifies the email flow with the signed-in admin and alert data
@@ -111,6 +116,11 @@ export default function Dashboard() {
     );
   }, [user, data]);
 
+  useEffect(() => {
+    if (!data || isError) return;
+    setAttentionPage(0);
+  }, [attentionFilter, data, isError]);
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-400">
@@ -128,12 +138,44 @@ export default function Dashboard() {
     );
   }
 
-  const {
-    kpis,
-    riskClassification,
-    suppliersRequiringAttention,
-    recentAlerts,
-  } = data;
+  const { kpis, riskClassification, suppliersRequiringAttention, issueCategoryBreakdown, recentAlerts } = data;
+
+  const riskPriority: Record<string, number> = {
+    high: 0,
+    medium: 1,
+    compliant: 2,
+  };
+
+  const prioritizedSuppliersRequiringAttention = [...suppliersRequiringAttention].sort((a, b) => {
+    const priorityDifference = (riskPriority[a.risk] ?? 999) - (riskPriority[b.risk] ?? 999);
+    return priorityDifference === 0 ? 0 : priorityDifference;
+  });
+
+  const filteredAttentionSuppliers = prioritizedSuppliersRequiringAttention.filter((supplier) => {
+    if (attentionFilter === "all") return true;
+    if (attentionFilter === "high") return supplier.risk === "high";
+    return supplier.risk === "medium";
+  });
+
+  // "Review complete" only removes the supplier from this admin-triage view; risk data remains unchanged
+  const activeAttentionSuppliers = filteredAttentionSuppliers.filter(
+    (s) => getStatus(s.id) !== "resolved"
+  );
+  const maxAttentionPages = Math.max(1, Math.ceil(activeAttentionSuppliers.length / ATTENTION_WIDGET_VISIBLE_LIMIT));
+  const safeAttentionPage = Math.min(attentionPage, maxAttentionPages - 1);
+  const startAttentionIndex = safeAttentionPage * ATTENTION_WIDGET_VISIBLE_LIMIT;
+  const shownAttentionSuppliers = activeAttentionSuppliers.slice(
+    startAttentionIndex,
+    startAttentionIndex + ATTENTION_WIDGET_VISIBLE_LIMIT
+  );
+  const hasMoreAttentionSuppliers = safeAttentionPage < maxAttentionPages - 1;
+  const hasPreviousAttentionSuppliers = safeAttentionPage > 0;
+  const emptyAttentionMessage =
+    attentionFilter === "all"
+      ? "No suppliers requiring attention."
+      : attentionFilter === "high"
+        ? "No high-risk suppliers requiring attention."
+        : "No medium-risk suppliers requiring attention.";
 
   return (
     <div className="space-y-6">
@@ -234,39 +276,99 @@ export default function Dashboard() {
         <RiskClassificationBar data={riskClassification} />
       </section>
 
+      <IssueCategoryPanel data={issueCategoryBreakdown} />
+
       {/* Suppliers requiring attention + recent alerts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Suppliers requiring attention */}
-        <section className="flex h-full flex-col rounded-xl border border-neutral-100 bg-white p-4 lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="self-start rounded-xl border border-neutral-100 bg-white p-4 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="font-headline text-base font-semibold text-neutral-900">
                 Suppliers requiring attention
               </h2>
             </div>
+
+            <label className="flex items-center gap-2 text-xs text-neutral-600">
+              <span className="font-medium text-neutral-700">Risk:</span>
+              <select
+                value={attentionFilter}
+                onChange={(event) => setAttentionFilter(event.target.value as "all" | "high" | "medium")}
+                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+                aria-label="Filter suppliers by risk level"
+              >
+                <option value="all">All</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+              </select>
+            </label>
           </div>
 
-          <TopRiskSuppliersTable
-            suppliers={suppliersRequiringAttention}
-          />
+          {shownAttentionSuppliers.length === 0 ? (
+            <div className="py-8 text-center text-sm text-neutral-500">{emptyAttentionMessage}</div>
+          ) : (
+            <TopRiskSuppliersTable
+              suppliers={shownAttentionSuppliers}
+              actionLabel="View Details"
+              getReviewStatus={getStatus}
+              onSelect={(supplier) => navigate(`/admin/suppliers?supplierId=${supplier.id}`)}
+              onMarkReviewComplete={(supplier) => setStatus(supplier.id, "resolved")}
+            />
+          )}
 
           {/* Bottom footer */}
-          <div className="-mx-4 -mb-4 mt-auto flex items-center justify-between rounded-b-xl bg-neutral-50 px-4 py-3">
-            <p className="text-xs text-neutral-500">
-              Showing {suppliersRequiringAttention.length} of{" "}
-              {riskClassification.high.count +
-                riskClassification.medium.count}{" "}
-              suppliers requiring attention this period
-            </p>
+          {shownAttentionSuppliers.length > 0 && (
+            <div className="-mx-4 -mb-4 mt-3 rounded-b-xl bg-neutral-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-neutral-500">
+                  Showing {shownAttentionSuppliers.length} of {activeAttentionSuppliers.length}{" "}
+                  suppliers requiring attention
+                  {hasMoreAttentionSuppliers && (
+                    <>
+                      {" · "}
+                      <button
+                        onClick={() => navigate("/admin/suppliers")}
+                        className="font-medium text-secondary-700 hover:text-secondary-800"
+                      >
+                        View all suppliers
+                      </button>
+                    </>
+                  )}
+                </p>
 
-            <button
-              onClick={handleDownloadRiskLog}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-900"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Download full risk log (CSV)
-            </button>
-          </div>
+                <button
+                  onClick={handleDownloadRiskLog}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-900"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download full risk log (CSV)
+                </button>
+              </div>
+
+              {(hasPreviousAttentionSuppliers || hasMoreAttentionSuppliers) && (
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  {hasPreviousAttentionSuppliers && (
+                    <button
+                      type="button"
+                      onClick={() => setAttentionPage((page) => Math.max(0, page - 1))}
+                      className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                    >
+                      Previous
+                    </button>
+                  )}
+                  {hasMoreAttentionSuppliers && (
+                    <button
+                      type="button"
+                      onClick={() => setAttentionPage((page) => Math.min(maxAttentionPages - 1, page + 1))}
+                      className="inline-flex items-center justify-center rounded-lg bg-primary-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+                    >
+                      Next
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Recent alerts */}
