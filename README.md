@@ -1,4 +1,4 @@
-# TDT4290 Group 7 — Environmental monitoring dashboard
+# TDT4290 Group 7 — Environmental Monitoring & Contract Compliance
 
 TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens vegvesen (SVV).
 
