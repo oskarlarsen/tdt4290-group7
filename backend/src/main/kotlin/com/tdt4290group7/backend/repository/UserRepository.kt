@@ -1,25 +1,30 @@
 package com.tdt4290group7.backend.repository
 
 import at.favre.lib.crypto.bcrypt.BCrypt
+import com.tdt4290group7.backend.auth.PasswordPolicy
+import com.tdt4290group7.backend.config.requireSecret
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import org.slf4j.LoggerFactory
 
 /**
  * In-memory, seeded user store. There is no database yet, so accounts are fixed at startup.
  * Seed passwords are read from env vars so real credentials never live in source control;
- * insecure defaults are used only for local development, and that fact is logged loudly.
+ * startup fails if any of them is missing.
  */
 object UserRepository {
     private val logger = LoggerFactory.getLogger(UserRepository::class.java)
 
-    private val usersById: Map<String, User>
-    private val usersByEmail: Map<String, User>
+    private val usersById = ConcurrentHashMap<String, User>()
+    private val usersByEmail = ConcurrentHashMap<String, User>()
+
+    val count: Int get() = usersById.size
 
     init {
-        val adminPassword = envOrInsecureDefault("SEED_ADMIN_PASSWORD", "admin-dev-only")
-        val supplierPassword = envOrInsecureDefault("SEED_SUPPLIER_PASSWORD", "supplier-dev-only")
+        val adminPassword = requireSeedPassword("SEED_ADMIN_PASSWORD")
+        val supplierPassword = requireSeedPassword("SEED_SUPPLIER_PASSWORD")
 
         val seeded = listOf(
             User(
@@ -39,25 +44,45 @@ object UserRepository {
             ),
         )
 
-        usersById = seeded.associateBy { it.id }
-        usersByEmail = seeded.associateBy { it.email.lowercase() }
+        seeded.forEach {
+            usersById[it.id] = it
+            usersByEmail[it.email.lowercase()] = it
+        }
     }
 
-    private fun envOrInsecureDefault(envVar: String, default: String): String {
-        val value = System.getenv(envVar)
-        if (value.isNullOrBlank()) {
-            logger.warn("$envVar is not set. Using an insecure development-only password. Set $envVar in production.")
-            return default
-        }
-        return value
-    }
+    private fun requireSeedPassword(envVar: String): String =
+        runCatching { requireSecret(envVar, System.getenv(envVar)) }
+            .onFailure { logger.error(it.message) }
+            .getOrThrow()
 
     private fun hash(password: String): String = BCrypt.withDefaults().hashToString(12, password.toCharArray())
+
+    // Checked against when the email is unknown, so a failed login costs one bcrypt verification
+    // either way. Otherwise unknown emails answer ~100x faster, revealing which accounts exist.
+    private val dummyPasswordHash: String = hash(UUID.randomUUID().toString())
 
     fun findByEmail(email: String): User? = usersByEmail[email.trim().lowercase()]
 
     fun findById(id: String): User? = usersById[id]
 
-    fun verifyPassword(user: User, password: String): Boolean =
-        BCrypt.verifyer().verify(password.toCharArray(), user.passwordHash).verified
+    /** The user with this email and password, or null. Takes the same time whether or not the email exists. */
+    fun authenticate(email: String, password: String): User? {
+        val user = findByEmail(email)
+        val matches = verifyPassword(user?.passwordHash ?: dummyPasswordHash, password)
+        return user?.takeIf { matches }
+    }
+
+    // bcrypt throws on inputs over 72 bytes; no stored password can be that long, so it's a mismatch.
+    private fun verifyPassword(passwordHash: String, password: String): Boolean =
+        !PasswordPolicy.exceedsBcryptLimit(password) &&
+            BCrypt.verifyer().verify(password.toCharArray(), passwordHash).verified
+
+    /** Sets a new password and bumps [User.tokenVersion], so every previously issued JWT stops working. */
+    fun updatePassword(user: User, newPassword: String) {
+        val newHash = hash(newPassword)
+        val updated = usersById.computeIfPresent(user.id) { _, current ->
+            current.copy(passwordHash = newHash, tokenVersion = current.tokenVersion + 1)
+        } ?: return
+        usersByEmail[updated.email.lowercase()] = updated
+    }
 }

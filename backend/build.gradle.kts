@@ -33,8 +33,17 @@ dependencies {
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("io.ktor:ktor-server-rate-limit")
+    implementation("io.ktor:ktor-server-forwarded-header")
+    implementation("io.ktor:ktor-server-body-limit")
     implementation("at.favre.lib:bcrypt:0.10.2")
     implementation(libs.logback.classic)
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    // The app refuses to start without these; tests get throwaway values that never ship.
+    environment("JWT_SECRET", "test-only-jwt-secret")
+    environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
+    environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
 }

@@ -23,17 +23,13 @@ const MOCK_USERS: Record<string, { password: string; user: AuthUser }> = {
   },
 };
 
-// Include the user data needed to restore the mock session after refresh
-function tokenFor(email: string) {
-  return `mock-token.${btoa(email)}`;
-}
+// Stands in for the backend's session cookie; holds only the mock user's email, never a token
+const MOCK_SESSION_KEY = "mock_session_email";
 
-function userFromToken(token: string): AuthUser | null {
-  const [, encoded] = token.split("mock-token.");
-  if (!encoded) return null;
+function userFromSession(): AuthUser | null {
   try {
-    const email = atob(encoded);
-    return MOCK_USERS[email]?.user ?? null;
+    const email = sessionStorage.getItem(MOCK_SESSION_KEY);
+    return email ? (MOCK_USERS[email]?.user ?? null) : null;
   } catch {
     return null;
   }
@@ -47,21 +43,21 @@ export async function mockLogin({ email, password }: LoginRequest): Promise<Logi
     throw new Error("Invalid email/username or password");
   }
 
+  sessionStorage.setItem(MOCK_SESSION_KEY, email.toLowerCase());
   return {
-    token: tokenFor(email.toLowerCase()),
     expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     user: entry.user,
   };
 }
 
-export async function mockGetCurrentUser(token: string): Promise<AuthUser> {
-  const user = userFromToken(token);
-  if (!user) throw new Error("Session expired");
+export async function mockGetCurrentUser(): Promise<AuthUser> {
+  const user = userFromSession();
+  if (!user) throw new Error("No session");
   return user;
 }
 
 export async function mockLogout(): Promise<void> {
-  return;
+  sessionStorage.removeItem(MOCK_SESSION_KEY);
 }
 
 export async function mockRequestPasswordReset(_email: string): Promise<void> {

@@ -24,7 +24,7 @@ npm run dev
 
 The frontend's `.env` points at `VITE_API_BASE_URL` (defaults to
 `http://localhost:8080/api`), and the backend accepts requests from
-`localhost:5173` by default — no extra config needed for local dev.
+`http://localhost:5173` by default, so no extra CORS config is needed for local dev. Set `JWT_SECRET`, `SEED_ADMIN_PASSWORD`, and `SEED_SUPPLIER_PASSWORD` before starting the backend.
 
 ## Run the full stack with Docker
 

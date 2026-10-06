@@ -46,29 +46,60 @@ in-memory at startup:
 | `advisor.hansen@kommune.no`     | ADMIN    | `SEED_ADMIN_PASSWORD`     |
 | `supplier@nordvik.no`           | SUPPLIER | `SEED_SUPPLIER_PASSWORD`  |
 
-If a seed password env var isn't set, an insecure development-only default is
-used and a warning is logged — set both explicitly outside local dev.
+Both seed password env vars are required: the backend refuses to start if
+either is missing or blank.
 
 Endpoints (all under `/api/auth`):
 
-- `POST /login` — `{ email, password, rememberMe }` → `{ token, expiresAt, user }`
-- `POST /logout` — requires `Authorization: Bearer <token>`
-- `GET /me` — requires `Authorization: Bearer <token>`, returns the current user
+- `POST /login` — `{ email, password, rememberMe }` → `{ expiresAt, user }`, and sets the
+  `auth_token` cookie (HttpOnly, SameSite=Strict, Secure, path `/api`). With `rememberMe` the
+  cookie lasts 30 days; otherwise it is a session cookie.
+- `POST /logout` — clears the `auth_token` cookie
+- `GET /me` — requires the `auth_token` cookie, returns the current user
 - `POST /forgot-password` — `{ email }`, always responds `200` (no account enumeration)
+- `POST /reset-password` — `{ token, newPassword }`, token is single-use and valid for 15 minutes;
+  a successful reset invalidates every JWT previously issued to that user
+
+There is no email delivery yet. To test the reset flow locally, set
+`APP_ENV=dev` and `ALLOW_DEV_PASSWORD_RESET_LOG=true`, and the reset
+token is written to the backend log. Anyone who can read the logs can take over
+any account, so the backend refuses to start with this flag unless
+`APP_ENV=dev`.
+
+The JWT is only ever sent as that HttpOnly cookie, so page scripts can't read it;
+`Authorization` headers are ignored. Because the cookie is `SameSite=Strict`, the
+frontend and the API must be served from the same site (e.g. `localhost:3000` and
+`localhost:8080`, or `app.example.no` and `api.example.no`). Requests from origins
+not in `CORS_ALLOWED_ORIGINS` are rejected with `403`.
 
 `/login` and `/forgot-password` are rate-limited to 10 requests/minute per
-client IP.
+client IP. Behind a load balancer or ingress, set `TRUSTED_PROXY_HOPS` so the
+limit applies per real client instead of to everyone at once.
+
+On top of that, each account is locked after 5 consecutive failed logins: first
+for 30 seconds, doubling with every further failure up to 15 minutes. While
+locked, `/login` answers `429` with a `Retry-After` header without checking the
+password. The lock is keyed on the submitted email, so unknown emails behave the
+same and it can't be used to discover accounts. A successful login or password
+reset clears it. Failures older than an hour are forgotten.
+
+New passwords (via `/reset-password`) must be 12–72 bytes long; there are no
+character-class rules, following NIST SP 800-63B.
 
 Relevant environment variables:
 
-| Variable                 | Default (dev only)                     | Purpose                                   |
+| Variable                 | Default                                 | Purpose                                   |
 | ------------------------- | --------------------------------------- | ------------------------------------------ |
-| `JWT_SECRET`               | insecure fallback, logged loudly        | Signs and verifies JWTs                   |
+| `JWT_SECRET`               | none — required, startup fails if unset | Signs and verifies JWTs                   |
 | `JWT_ISSUER`                | `tdt4290-backend`                       | JWT `iss` claim                           |
 | `JWT_AUDIENCE`              | `tdt4290-frontend`                      | JWT `aud` claim                           |
-| `SEED_ADMIN_PASSWORD`       | insecure fallback, logged loudly        | Password for the seeded admin account     |
-| `SEED_SUPPLIER_PASSWORD`    | insecure fallback, logged loudly        | Password for the seeded supplier account  |
-| `CORS_ALLOWED_ORIGINS`      | `localhost:5173`                        | Comma-separated `host:port` origins allowed to call the API |
+| `SEED_ADMIN_PASSWORD`       | none — required, startup fails if unset | Password for the seeded admin account     |
+| `SEED_SUPPLIER_PASSWORD`    | none — required, startup fails if unset | Password for the seeded supplier account  |
+| `APP_ENV`                   | `prod`                                  | `dev` or `prod`; dev-only features refuse to start in `prod` |
+| `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens; requires `APP_ENV=dev` |
+| `AUTH_COOKIE_SECURE`        | `true`                                  | Set `false` only if a local browser drops Secure cookies on `http://localhost` (Safari) |
+| `TRUSTED_PROXY_HOPS`        | `0`                                     | Number of proxies in front of the backend; client IPs for rate limiting are then read from `X-Forwarded-For`. Keep `0` if clients connect directly, or the header can be spoofed |
+| `CORS_ALLOWED_ORIGINS`      | `http://localhost:5173`                 | Comma-separated full origins (`scheme://host[:port]`) allowed to call the API. Each allows only its own scheme; use `https://` outside local dev |
 
 ## Run locally with Docker
 
@@ -81,8 +112,16 @@ docker build -t ktor-backend .
 Run the container:
 
 ```bash
-docker run -p 8080:8080 ktor-backend
+docker run -p 8080:8080 \
+  -e JWT_SECRET="$(openssl rand -base64 48)" \
+  -e SEED_ADMIN_PASSWORD=<choose one> \
+  -e SEED_SUPPLIER_PASSWORD=<choose one> \
+  ktor-backend
 ```
+
+The container runs as an unprivileged `app` user. `docker compose` additionally
+runs it with a read-only filesystem, no Linux capabilities and
+`no-new-privileges`.
 
 Verify:
 
