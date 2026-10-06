@@ -1,13 +1,16 @@
 package com.tdt4290group7.backend
 
 import com.tdt4290group7.backend.vehicles.VehicleRepository
+import io.ktor.client.request.cookie
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.headers
+import io.ktor.http.parseServerSetCookieHeader
 import io.ktor.server.testing.testApplication
 import java.nio.file.Path
 import java.sql.Connection
@@ -21,8 +24,35 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class ApplicationTest {
+    @Test
+    fun cookieAuthenticationAndVehicleRoutesCoexist() = testApplication {
+        application { module(testRepository(), null, Duration.ofDays(14)) }
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/auth/me").status)
+
+        val login = postJson(
+            "/api/auth/login",
+            """{"email":"advisor.hansen@kommune.no","password":"test-only-admin-password"}""",
+        )
+        assertEquals(HttpStatusCode.OK, login.status)
+        val authCookie = parseServerSetCookieHeader(login.headers.getAll(HttpHeaders.SetCookie)!!.single())
+        assertEquals("auth_token", authCookie.name)
+        assertEquals(HttpStatusCode.OK, client.get("/api/auth/me") {
+            cookie(authCookie.name, authCookie.value)
+        }.status)
+        assertEquals(HttpStatusCode.Created,
+            postJson("/api/vehicle-checks", """{"registrationNumber":"AB12345"}""").status,
+        )
+
+        val logout = client.post("/api/auth/logout") {
+            cookie(authCookie.name, authCookie.value)
+        }
+        assertEquals(HttpStatusCode.OK, logout.status)
+        assertTrue(logout.headers.getAll(HttpHeaders.SetCookie)!!.single().contains("Max-Age=0"))
+    }
+
     @Test
     fun busyVehicleWriteReturns503WithoutPersistingAnyBatchRows() = testApplication {
         val path = Path.of("build", "test-data", "${UUID.randomUUID()}.db")
@@ -168,7 +198,7 @@ class ApplicationTest {
 
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.postJson(path: String, body: String) =
         client.post(path) {
-            headers { append(HttpHeaders.ContentType, "application/json") }
+            contentType(ContentType.Application.Json)
             setBody(body)
         }
 

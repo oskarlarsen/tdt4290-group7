@@ -8,5 +8,8 @@ import org.slf4j.event.Level
 fun Application.configureMonitoring() {
     install(CallLogging) {
         level = Level.INFO
+        // Colors need jansi's native library, which can't load from the read-only container's
+        // noexec /tmp; plain output is also easier to read in log aggregators.
+        disableDefaultColors()
     }
 }

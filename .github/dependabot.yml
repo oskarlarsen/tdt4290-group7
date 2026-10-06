@@ -1,0 +1,40 @@
+# Keeps pinned dependencies patched. Base images and actions are pinned by digest/SHA
+# (see the Dockerfiles and workflows), so without these PRs they would never get security fixes.
+version: 2
+updates:
+  # Base images in backend/Dockerfile and frontend/Dockerfile: bumps tag and digest together.
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+    groups:
+      docker-images:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    # One PR for all minor/patch bumps; major versions get their own PR since they can break.
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Reads backend/gradle/libs.versions.toml and build.gradle.kts.
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

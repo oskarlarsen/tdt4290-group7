@@ -8,9 +8,9 @@ import {
 } from "react";
 import * as authApi from "../api/auth";
 import {
-  getStoredToken,
-  storeToken,
-  clearStoredToken,
+  ApiError,
+  getStoredLastActive,
+  recordLastActive,
   SESSION_EXPIRED_EVENT,
 } from "../api/client";
 import type { AuthUser, LoginRequest } from "../types/auth";
@@ -23,6 +23,7 @@ type AuthContextValue = {
   error: string | null;
   /** True only during the initial "is there a valid session already?" check. */
   isInitializing: boolean;
+  lastActiveAt: string | null;
   login: (payload: LoginRequest) => Promise<AuthUser>;
   logout: () => Promise<void>;
 };
@@ -34,28 +35,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
 
-  // Restore the session from a stored token when the app starts
+  // Restore the session from the HttpOnly auth cookie when the app starts
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      setStatus("unauthenticated");
-      setIsInitializing(false);
-      return;
-    }
-
     authApi
       .getCurrentUser()
       .then((currentUser) => {
         setUser(currentUser);
         setStatus("authenticated");
+        setLastActiveAt(getStoredLastActive(currentUser.id));
       })
       .catch(() => {
-        clearStoredToken();
         setStatus("unauthenticated");
       })
       .finally(() => setIsInitializing(false));
   }, []);
+
+  // Record real interaction while authenticated, rather than render/load time.
+  useEffect(() => {
+    if (status !== "authenticated" || !user) return;
+    const userId = user.id;
+
+    function handleActivity() {
+      setLastActiveAt(recordLastActive(userId));
+    }
+
+    window.addEventListener("pointerdown", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    return () => {
+      window.removeEventListener("pointerdown", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+    };
+  }, [status, user]);
 
   // Handle invalid sessions centrally when the backend returns 401
   useEffect(() => {
@@ -73,16 +85,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await authApi.login(payload);
-      storeToken(response.token, payload.rememberMe);
+      // Completing a login is an actual application usage event.
+      setLastActiveAt(recordLastActive(response.user.id));
       setUser(response.user);
       setStatus("authenticated");
       return response.user;
     } catch (err) {
       setStatus("error");
       setError(
-        err instanceof Error
-          ? "Couldn't sign in. Check your email/username and password and try again."
-          : "Something went wrong. Please try again."
+        // Account temporarily locked after repeated failures; the backend says for how long
+        err instanceof ApiError && err.status === 429
+          ? err.message
+          : err instanceof Error
+            ? "Couldn't sign in. Check your email/username and password and try again."
+            : "Something went wrong. Please try again."
       );
       throw err;
     }
@@ -92,15 +108,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      clearStoredToken();
       setUser(null);
+      setLastActiveAt(null);
       setStatus("unauthenticated");
     }
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, error, isInitializing, login, logout }),
-    [user, status, error, isInitializing, login, logout]
+    () => ({ user, status, error, isInitializing, lastActiveAt, login, logout }),
+    [user, status, error, isInitializing, lastActiveAt, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

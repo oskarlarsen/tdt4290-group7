@@ -37,6 +37,10 @@ From `backend/` in PowerShell:
 Copy-Item .env.example .env
 # Edit .env locally; do not overwrite an existing configured file.
 .\gradlew.bat test
+# Required process settings; choose private local values before running.
+$env:JWT_SECRET = "<choose a random signing secret>"
+$env:SEED_ADMIN_PASSWORD = "<choose an admin password>"
+$env:SEED_SUPPLIER_PASSWORD = "<choose a supplier password>"
 .\gradlew.bat run
 ```
 
@@ -49,7 +53,7 @@ Tests do not start a persistent Postman server. Keep the run terminal open; stop
 | `VEHICLE_DB_PATH` | `data/vehicles.db` | Process environment | SQLite path; relative paths use the server working directory |
 | `HOST` | `127.0.0.1` | Process environment | Listening interface |
 | `PORT` | `8080` | Process environment | HTTP port |
-| `CORS_ALLOWED_ORIGINS` | `localhost:5173` | Process environment | Comma-separated frontend hosts/ports, e.g. `localhost:5173,127.0.0.1:5173`; omit schemes and paths |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Process environment | Comma-separated full frontend origins, e.g. `http://localhost:5173,http://127.0.0.1:5173`; include schemes and omit paths |
 
 Only the two `SVV_` settings are read from `.env` by the application. Nonblank process values take precedence. Blank process values fall back to `.env` and do not disable a key already there. Invalid, zero, negative, or TTL values too large to represent as a duration fall back to 14. Restart after configuration changes.
 
@@ -64,7 +68,7 @@ For isolated manual testing:
 
 ```powershell
 $env:VEHICLE_DB_PATH = "data/manual-test.db"
-$env:CORS_ALLOWED_ORIGINS = "localhost:5173"
+$env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
 .\gradlew.bat run
 ```
 
@@ -80,42 +84,78 @@ From `backend/`:
 
 ```powershell
 docker build -t ktor-backend .
-docker run --env-file .env -p 127.0.0.1:8080:8080 -v vehicle-backend-data:/app/data ktor-backend
+docker run --env-file .env -e JWT_SECRET -e SEED_ADMIN_PASSWORD -e SEED_SUPPLIER_PASSWORD -p 127.0.0.1:8080:8080 -v vehicle-backend-data:/app/data ktor-backend
 ```
 
-The key is supplied at runtime. The named volume preserves SQLite across container replacement. The container listens on `0.0.0.0`; this command publishes only on the host loopback interface.
+The key and required authentication settings are supplied at runtime; the command above forwards the three process settings from the current shell. The named volume preserves SQLite across container replacement. The image initializes a new data volume for the unprivileged `app` user. Existing volumes created by an older root-running image may need an ownership migration before startup; do not delete stored vehicle data. Compose keeps the root filesystem read-only, with only the data volume and JVM scratch directory writable, and retains its capability and privilege restrictions. The container listens on `0.0.0.0`; this command publishes only on the host loopback interface.
 
 For the full stack, use the [root README](../README.md#run-the-full-stack-with-docker). Compose reads the root `.env`, requires JWT/seed-password settings, passes optional SVV settings, and mounts persistent vehicle storage. Standalone auth settings must be process environment variables; the application does not load them from `backend/.env`.
 
 ## Authentication
 
-Vehicle records use SQLite, but the separate authentication user store is currently in memory. These demo users are seeded at startup:
+Vehicle records use SQLite, but the separate authentication user store is currently in memory. These demo accounts are seeded at startup:
 
-| Email | Role | Password environment variable |
-|---|---|---|
-| `advisor.hansen@kommune.no` | `ADMIN` | `SEED_ADMIN_PASSWORD` |
-| `supplier@nordvik.no` | `SUPPLIER` | `SEED_SUPPLIER_PASSWORD` |
+| Email                          | Role     | Password env var         |
+| ------------------------------- | -------- | ------------------------- |
+| `advisor.hansen@kommune.no`     | ADMIN    | `SEED_ADMIN_PASSWORD`     |
+| `supplier@nordvik.no`           | SUPPLIER | `SEED_SUPPLIER_PASSWORD`  |
 
-User IDs are regenerated on restart, so old JWTs stop identifying these users after a backend restart. The seeded supplier identifier is not automatically linked to the vehicle database's supplier table.
+Both seed password env vars are required: the backend refuses to start if
+either is missing or blank.
 
-| Process setting | Default / meaning |
-|---|---|
-| `JWT_SECRET` | Insecure development fallback with warning; explicitly set outside local development |
-| `JWT_ISSUER` | `tdt4290-backend` |
-| `JWT_AUDIENCE` | `tdt4290-frontend` |
-| `SEED_ADMIN_PASSWORD` | Insecure development fallback with warning |
-| `SEED_SUPPLIER_PASSWORD` | Insecure development fallback with warning |
+Endpoints (all under `/api/auth`):
 
-The following routes are separate from the vehicle API:
+- `POST /login` — `{ email, password, rememberMe }` → `{ expiresAt, user }`, and sets the
+  `auth_token` cookie (HttpOnly, SameSite=Strict, Secure, path `/api`). With `rememberMe` the
+  cookie lasts 30 days; otherwise it is a session cookie.
+- `POST /logout` — clears the `auth_token` cookie
+- `GET /me` — requires the `auth_token` cookie, returns the current user
+- `POST /forgot-password` — `{ email }`, always responds `200` (no account enumeration)
+- `POST /reset-password` — `{ token, newPassword }`, token is single-use and valid for 15 minutes;
+  a successful reset invalidates every JWT previously issued to that user
 
-| Method and route | Request | Response / behavior |
-|---|---|---|
-| `POST /api/auth/login` | JSON strings `email`, `password`; optional boolean `rememberMe` (false) | 200 with `token`, `expiresAt`, `user`; empty credentials 400; invalid credentials 401 |
-| `GET /api/auth/me` | `Authorization: Bearer <token>` | 200 with current public user; missing/invalid token 401 |
-| `POST /api/auth/logout` | Bearer token, no body | 200; client must discard token; token is not invalidated server-side |
-| `POST /api/auth/forgot-password` | JSON string `email` | 200 regardless of account existence; currently no email/reset flow is implemented |
+There is no email delivery yet. To test the reset flow locally, set
+`APP_ENV=dev` and `ALLOW_DEV_PASSWORD_RESET_LOG=true`, and the reset
+token is written to the backend log. Anyone who can read the logs can take over
+any account, so the backend refuses to start with this flag unless
+`APP_ENV=dev`.
 
-Public user fields are `id`, `name`, `email`, `role`, and optional `supplierId`; password hashes are not returned. Tokens expire after one day, or 30 days with `rememberMe: true`. Login and forgot-password share the configured limit of 10 requests/minute per client IP; exceeding it returns 429.
+The JWT is only ever sent as that HttpOnly cookie, so page scripts can't read it;
+`Authorization` headers are ignored. Because the cookie is `SameSite=Strict`, the
+frontend and the API must be served from the same site (e.g. `localhost:3000` and
+`localhost:8080`, or `app.example.no` and `api.example.no`). Requests from origins
+not in `CORS_ALLOWED_ORIGINS` are rejected with `403`.
+
+`/login`, `/forgot-password`, and `/reset-password` are rate-limited to 10 requests/minute per
+client IP. Behind a load balancer or ingress, set `TRUSTED_PROXY_HOPS` so the
+limit applies per real client instead of to everyone at once.
+
+On top of that, each account is locked after 5 consecutive failed logins: first
+for 30 seconds, doubling with every further failure up to 15 minutes. While
+locked, `/login` answers `429` with a `Retry-After` header without checking the
+password. The lock is keyed on the submitted email, so unknown emails behave the
+same and it can't be used to discover accounts. A successful login or password
+reset clears it. Failures older than an hour are forgotten.
+
+New passwords (via `/reset-password`) must be 12–72 bytes long; there are no
+character-class rules, following NIST SP 800-63B.
+
+Relevant environment variables:
+
+| Variable                 | Default                                 | Purpose                                   |
+| ------------------------- | --------------------------------------- | ------------------------------------------ |
+| `JWT_SECRET`               | none — required, startup fails if unset | Signs and verifies JWTs                   |
+| `JWT_ISSUER`                | `tdt4290-backend`                       | JWT `iss` claim                           |
+| `JWT_AUDIENCE`              | `tdt4290-frontend`                      | JWT `aud` claim                           |
+| `SEED_ADMIN_PASSWORD`       | none — required, startup fails if unset | Password for the seeded admin account     |
+| `SEED_SUPPLIER_PASSWORD`    | none — required, startup fails if unset | Password for the seeded supplier account  |
+| `APP_ENV`                   | `prod`                                  | `dev` or `prod`; dev-only features refuse to start in `prod` |
+| `ALLOW_DEV_PASSWORD_RESET_LOG` | `false`                            | Log password reset tokens; requires `APP_ENV=dev` |
+| `AUTH_COOKIE_SECURE`        | `true`                                  | Set `false` only if a local browser drops Secure cookies on `http://localhost` (Safari) |
+| `TRUSTED_PROXY_HOPS`        | `0`                                     | Number of proxies in front of the backend; client IPs for rate limiting are then read from `X-Forwarded-For`. Keep `0` if clients connect directly, or the header can be spoofed |
+| `CORS_ALLOWED_ORIGINS`      | `http://localhost:5173`                 | Comma-separated full origins (`scheme://host[:port]`) allowed to call the API. Each allows only its own scheme; use `https://` outside local dev |
+
+User IDs are regenerated on restart, so old JWTs stop identifying these users after a backend restart. The seeded supplier identifier is not automatically linked to the vehicle database's supplier table. Public user fields are `id`, `name`, `email`, `role`, and optional `supplierId`; password hashes are not returned. Tokens expire after one day, or 30 days with `rememberMe: true`.
 
 Handled auth credential errors use `{"message":"..."}`, whereas handled vehicle errors use `{"error":"..."}`. Auth bodies use Ktor request decoding; the vehicle-specific validation/error rules below should not be assumed for auth decoding failures.
 
@@ -129,9 +169,11 @@ Postman login example (set a local `adminPassword` variable matching the backend
 }
 ```
 
-Save the returned token in a local `token` variable. For `/me` and `/logout`, select Postman Authorization → Bearer Token and enter `{{token}}`. Vehicle tests continue to use No Auth. Do not share credentials or tokens with agents.
+Postman's cookie jar retains the `auth_token` cookie from login and sends it to `/api/auth/me`; logout clears it. Do not configure a Bearer token: Authorization headers are ignored. Vehicle tests continue to use No Auth. Do not share credentials or tokens with agents.
 
 ## Shared request rules
+
+`POST /api/trip-rows` and `POST /api/vehicle-approvals` accept bodies up to 4 MiB; every other route, including authentication, is limited to 16 KiB. The batch row limit is independent of the byte limit. Split larger uploads into smaller batches. Bodies over the route limit return 413 with plain text `Request body too large`, including uploads without Content-Length.
 
 For vehicle routes, send JSON POST bodies with `Content-Type: application/json`. No Authorization header is required. There are no defined query parameters; plates belong in bodies or the revocation path.
 

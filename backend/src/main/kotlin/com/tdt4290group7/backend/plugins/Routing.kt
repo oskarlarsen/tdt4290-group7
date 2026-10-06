@@ -10,6 +10,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.application.log
+import io.ktor.server.application.install
+import io.ktor.server.plugins.bodylimit.RequestBodyLimit
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -63,6 +65,10 @@ fun Application.configureRouting(
                 response.rowCount, response.distinctVehicleCount,
             )
             call.respond(HttpStatusCode.Created, response)
+        }.apply {
+            install(RequestBodyLimit) {
+                bodyLimit { MAX_VEHICLE_BATCH_BODY_BYTES }
+            }
         }
 
         /** Upserts the unrevoked approval for each plate; omitted plates are not affected. */
@@ -81,6 +87,10 @@ fun Application.configureRouting(
             }
             call.application.log.info("vehicle_approvals_upserted approvals={}", response.approvalCount)
             call.respond(HttpStatusCode.Created, response)
+        }.apply {
+            install(RequestBodyLimit) {
+                bodyLimit { MAX_VEHICLE_BATCH_BODY_BYTES }
+            }
         }
 
         /** Revocation retains history. A later approval submission creates a new approval row. */
