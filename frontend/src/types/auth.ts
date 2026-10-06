@@ -5,7 +5,7 @@ export type AuthUser = {
   name: string;
   email: string;
   role: Role;
-  // Supplier data is scoped here instead of using an ID from the frontend
+  // Present only for SUPPLIER users
   supplierId?: string;
 };
 
