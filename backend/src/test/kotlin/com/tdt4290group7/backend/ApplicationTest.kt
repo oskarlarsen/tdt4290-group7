@@ -10,6 +10,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headers
 import io.ktor.server.testing.testApplication
 import java.nio.file.Path
+import java.sql.Connection
+import java.sql.DriverManager
 import java.time.Duration
 import java.util.UUID
 import kotlinx.serialization.json.Json
@@ -21,6 +23,61 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class ApplicationTest {
+    @Test
+    fun busyVehicleWriteReturns503WithoutPersistingAnyBatchRows() = testApplication {
+        val path = Path.of("build", "test-data", "${UUID.randomUUID()}.db")
+        val repository = VehicleRepository(path)
+        application { module(repository, null, Duration.ofDays(14)) }
+        startApplication()
+        val body = """{"approvals":[{"registrationNumber":"AB12345"},{"registrationNumber":"CD12345"}]}"""
+
+        databaseConnection(path).use { blocker ->
+            blocker.createStatement().use { it.execute("BEGIN IMMEDIATE") }
+            try {
+                val response = postJson("/api/vehicle-approvals", body)
+                assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+                assertEquals(
+                    """{"error":"Vehicle database is busy; try again later"}""",
+                    response.bodyAsText(),
+                )
+            } finally {
+                blocker.createStatement().use { it.execute("ROLLBACK") }
+            }
+        }
+        databaseConnection(path).use { db ->
+            assertEquals(0, countRows(db, "vehicles"))
+            assertEquals(0, countRows(db, "vehicle_approvals"))
+        }
+        assertEquals(HttpStatusCode.Created, postJson("/api/vehicle-approvals", body).status)
+    }
+
+    @Test
+    fun otherSqlFailuresReturn500AndRollBackEarlierBatchWrites() = testApplication {
+        val path = Path.of("build", "test-data", "${UUID.randomUUID()}.db")
+        val repository = VehicleRepository(path)
+        databaseConnection(path).use { db ->
+            db.createStatement().use { statement ->
+                statement.executeUpdate(
+                    """CREATE TRIGGER reject_second_synthetic_approval BEFORE INSERT ON vehicle_approvals
+                        WHEN NEW.vehicle_id = (SELECT id FROM vehicles WHERE normalized_registration_number = 'CD12345')
+                        BEGIN SELECT RAISE(ABORT, 'synthetic test failure'); END""",
+                )
+            }
+        }
+        application { module(repository, null, Duration.ofDays(14)) }
+
+        val response = postJson(
+            "/api/vehicle-approvals",
+            """{"approvals":[{"registrationNumber":"AB12345"},{"registrationNumber":"CD12345"}]}""",
+        )
+        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        assertEquals("Internal server error", response.bodyAsText())
+        databaseConnection(path).use { db ->
+            assertEquals(0, countRows(db, "vehicles"))
+            assertEquals(0, countRows(db, "vehicle_approvals"))
+        }
+    }
+
     @Test
     fun rootAndHealth() = testApplication {
         application { module(testRepository(), null, Duration.ofDays(14)) }
@@ -116,4 +173,14 @@ class ApplicationTest {
         }
 
     private fun testRepository() = VehicleRepository(Path.of("build", "test-data", "${UUID.randomUUID()}.db"))
+
+    private fun databaseConnection(path: Path): Connection =
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}")
+
+    private fun countRows(db: Connection, table: String): Int = db.createStatement().use { statement ->
+        statement.executeQuery("SELECT COUNT(*) FROM $table").use { rows ->
+            check(rows.next())
+            rows.getInt(1)
+        }
+    }
 }

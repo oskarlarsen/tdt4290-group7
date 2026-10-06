@@ -142,7 +142,7 @@ For vehicle routes, send JSON POST bodies with `Content-Type: application/json`.
 - `additionalFields` is an object of string values, defaulting to an empty object.
 - Plates are uppercased; whitespace and hyphens are removed. Synthetic `AB 12345`, `ab12345`, and `AB-12345` identify one vehicle.
 - Normalized plates must have 2–7 characters from A–Z/0–9. This is syntax validation, not proof of SVV recognition.
-- Batches contain 1–10,000 entries. An invalid entry rejects the batch. Statistics/approval writes are transactional.
+- Batches contain 1–10,000 entries. An invalid entry rejects the batch. Statistics/approval writes are transactional. Vehicle writes reserve SQLite's writer lock before reading; concurrent writes wait up to five seconds for a lock. A failed batch is rolled back in full.
 - Dates use `yyyy-MM-dd`. Empty strings are invalid dates. Expiry cannot precede start.
 - Generated IDs are UUID strings. Timestamps are UTC instants; approval is evaluated using today's date in Europe/Oslo.
 
@@ -162,7 +162,7 @@ Responses may omit optional null/default-valued fields. Consumers should not req
 
 Health does not verify SVV credentials, connectivity, or approval.
 
-Validation failures return 400, normally with `{"error":"..."}`. Missing saved checks or unrevoked approvals return 404. Unhandled errors return 500 with plain text `Internal server error`.
+Validation failures return 400, normally with `{"error":"..."}`. Missing saved checks or unrevoked approvals return 404. Vehicle write lock timeouts return 503 with `{"error":"Vehicle database is busy; try again later"}`. Other unhandled errors return 500 with plain text `Internal server error`.
 
 A saved check returns 201 even if SVV fails. An external `ACCESS_DENIED` outcome does not change our response to HTTP 401. Approval replacements also return 201.
 
