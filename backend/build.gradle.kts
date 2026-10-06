@@ -38,6 +38,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cors")
     implementation("io.ktor:ktor-server-call-logging")
     implementation("io.ktor:ktor-server-status-pages")
+    implementation("org.xerial:sqlite-jdbc:3.53.4.0")
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("io.ktor:ktor-server-rate-limit")
@@ -55,4 +56,6 @@ tasks.test {
     environment("JWT_SECRET", "test-only-jwt-secret")
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
     environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
+    // Auth tests now initialize the vehicle store too; keep them away from local vehicle data.
+    environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles.db").get().asFile.absolutePath)
 }

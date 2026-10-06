@@ -1,6 +1,7 @@
 package com.tdt4290group7.backend.plugins
 
 import com.tdt4290group7.backend.module
+import com.tdt4290group7.backend.vehicles.VehicleRepository
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -8,10 +9,70 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
+import java.nio.file.Path
+import java.time.Duration
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class BodyLimitTest {
+    private fun vehicleStatusFor(path: String, body: String, chunked: Boolean = false): HttpStatusCode {
+        var status = HttpStatusCode.OK
+        testApplication {
+            application {
+                module(
+                    VehicleRepository(Path.of("build", "test-data", "${UUID.randomUUID()}.db")),
+                    null,
+                    Duration.ofDays(14),
+                )
+            }
+            status = client.post(path) {
+                contentType(ContentType.Application.Json)
+                if (chunked) setBody(ByteReadChannel(body.toByteArray())) else setBody(body)
+            }.status
+        }
+        return status
+    }
+
+    @Test
+    fun `vehicle batches can exceed the small request limit`() {
+        val padding = "a".repeat(MAX_REQUEST_BODY_BYTES.toInt())
+        for (chunked in listOf(false, true)) {
+            assertEquals(HttpStatusCode.Created, vehicleStatusFor(
+                "/api/trip-rows",
+                """{"rows":[{"registrationNumber":"AB12345","comment":"$padding"}]}""",
+                chunked,
+            ))
+            assertEquals(HttpStatusCode.Created, vehicleStatusFor(
+                "/api/vehicle-approvals",
+                """{"sourceName":"$padding","approvals":[{"registrationNumber":"AB12345"}]}""",
+                chunked,
+            ))
+        }
+    }
+
+    @Test
+    fun `vehicle batches reject oversized bodies including chunked uploads`() {
+        val padding = "a".repeat(MAX_VEHICLE_BATCH_BODY_BYTES.toInt())
+        for (chunked in listOf(false, true)) {
+            for (path in listOf("/api/trip-rows", "/api/vehicle-approvals")) {
+                assertEquals(HttpStatusCode.PayloadTooLarge,
+                    vehicleStatusFor(path, """{"sourceName":"$padding"}""", chunked),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `single vehicle routes retain the small request limit`() {
+        val padding = "a".repeat(MAX_REQUEST_BODY_BYTES.toInt())
+        for (path in listOf("/api/vehicle-checks", "/api/vehicle-approvals/AB12345/revoke")) {
+            assertEquals(HttpStatusCode.PayloadTooLarge,
+                vehicleStatusFor(path, """{"registrationNumber":"$padding"}"""),
+            )
+        }
+    }
+
     private fun statusFor(body: String, chunked: Boolean = false): HttpStatusCode {
         var status = HttpStatusCode.OK
         testApplication {
