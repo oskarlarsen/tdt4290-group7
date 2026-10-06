@@ -19,7 +19,7 @@ What it enforces on `main`:
 - Approval must come after the last push (`require_last_push_approval`), and new commits dismiss
   earlier approvals.
 - All review conversations resolved before merge.
-- The `validate` check (Gradle wrapper validation) must pass on an up-to-date branch.
+- The `validate` (Gradle wrapper validation), `Frontend build and test` and `Backend test` (CI) checks must pass on an up-to-date branch.
 - No bypass actors, so admins follow the same rules.
 
 When adding a new required CI job, add its job name to `required_status_checks` in the JSON.
