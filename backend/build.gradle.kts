@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.plugin.serialization)
     alias(libs.plugins.ktor)
+    application
 }
 
 group = "com.tdt4290group7"
@@ -12,6 +13,13 @@ application {
 
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+}
+
+tasks.register<JavaExec>("runCertificateParser") {
+    group = "application"
+    description = "Extract and parse a certificate PDF"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.tdt4290group7.backend.certificates.CertificateParserRunnerKt")
 }
 
 repositories {
@@ -37,6 +45,7 @@ dependencies {
     implementation("io.ktor:ktor-server-body-limit")
     implementation("at.favre.lib:bcrypt:0.10.2")
     implementation(libs.logback.classic)
+    implementation(libs.pdfbox)
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation(kotlin("test"))
 }
