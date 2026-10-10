@@ -1,4 +1,6 @@
-export type RiskCategory = "high" | "medium" | "compliant";
+import type { RiskCategory } from "./risk";
+export type { RiskCategory } from "./risk";
+
 export type AlertSeverity = "high" | "medium";
 export type AlertStatus = "ACTIVE" | "DISMISSED";
 export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "FUEL_DEVIATION";

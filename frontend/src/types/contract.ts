@@ -1,5 +1,4 @@
 import type { RiskCategory } from "./risk";
-import type { ContractStatus, DerivedContract } from "../types/contract";
 
 export type ContractStatus = "Active" | "Expiring Soon" | "Expired";
 
