@@ -66,8 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
 
+    const userId = user.id;
+
     function handleActivity() {
-      setLastActiveAt(recordLastActive(user.id));
+      setLastActiveAt(recordLastActive(userId));
     }
 
     window.addEventListener("pointerdown", handleActivity);

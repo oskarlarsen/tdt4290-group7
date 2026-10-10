@@ -3,6 +3,7 @@
 import type { RiskClassification, TopRiskSupplier, RecentAlert } from "../types/dashboard";
 import { formatSyncTime } from "../utils/formatSyncTime";
 import type { Notification, NotificationSeverity } from "../types/notification";
+import type { ContractStatus, DerivedContract } from "../types/contract";
 
 // Keep modeled suppliers separate from the remaining portfolio counts.
 // Changes to a modeled supplier's risk automatically update the related dashboard numbers.
@@ -246,4 +247,79 @@ export function addSupplierNote(supplierId: string, authorName: string, text: st
   supplierNotes = [...supplierNotes, note];
   writeStoredNotes(supplierNotes);
   return note;
+}
+
+// Fictional normalized demo points only; these are not real municipal measurements.
+const MOCK_CONTRACT_DETAILS: Record<
+  string,
+  {
+    status: ContractStatus;
+    startDate: string;
+    endDate: string;
+    documentUrl: string | null;
+    environmentalGoal: number;
+    environmentalActual: number;
+  }
+> = {
+  "sup-a": {
+    status: "Active",
+    startDate: "2023-08-01",
+    endDate: "2026-07-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 62,
+  },
+  "sup-b": {
+    status: "Expiring Soon",
+    startDate: "2024-01-01",
+    endDate: "2025-12-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 68,
+  },
+  "sup-c": {
+    status: "Active",
+    startDate: "2023-03-15",
+    endDate: "2027-03-14",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 82,
+  },
+  "sup-d": {
+    status: "Expiring Soon",
+    startDate: "2022-11-01",
+    endDate: "2025-10-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 65,
+  },
+  "sup-e": {
+    status: "Active",
+    startDate: "2024-06-01",
+    endDate: "2028-05-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 100,
+  },
+};
+
+export function getDerivedContracts(): DerivedContract[] {
+  return MODELED_SUPPLIERS.map((s) => {
+    const mock = MOCK_CONTRACT_DETAILS[s.id];
+    return {
+      id: s.id,
+      contractName: s.primaryContract,
+      supplierId: s.id,
+      supplierName: s.displayName,
+      supplierOrgId: s.orgId,
+      risk: s.risk,
+      mainIssue: s.mainIssue,
+      status: mock.status,
+      startDate: mock.startDate,
+      endDate: mock.endDate,
+      documentUrl: mock.documentUrl,
+      environmentalGoal: mock.environmentalGoal,
+      environmentalActual: mock.environmentalActual,
+    };
+  });
 }
