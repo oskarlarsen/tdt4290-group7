@@ -57,8 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (status !== "authenticated" || !user) return;
     const userId = user.id;
 
-    const userId = user.id;
-
     function handleActivity() {
       setLastActiveAt(recordLastActive(userId));
     }
