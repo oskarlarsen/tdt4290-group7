@@ -1,4 +1,6 @@
-export type RiskCategory = "high" | "medium" | "compliant";
+import type { RiskCategory } from "./risk";
+export type { RiskCategory } from "./risk";
+
 export type AlertSeverity = "high" | "medium";
 export type AlertStatus = "ACTIVE" | "DISMISSED";
 export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "FUEL_DEVIATION";
@@ -19,6 +21,18 @@ export type RiskClassification = {
   compliant: { count: number; percent: number };
   medium: { count: number; percent: number };
   high: { count: number; percent: number };
+};
+
+export type UnmodeledSupplierAggregate = {
+  totalSuppliers: number;
+  highRiskSuppliers: number;
+  mediumRiskSuppliers: number;
+};
+
+export type SupplierPortfolioSummary = {
+  monitoredSuppliers: number;
+  renewedThisMonthCount: number;
+  riskClassification: RiskClassification;
 };
 
 export type TopRiskSupplier = {

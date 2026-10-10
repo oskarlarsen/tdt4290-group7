@@ -5,7 +5,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useDashboardSummary, useDismissAlert, useRestoreAlert, useResyncDashboard, } from "../../hooks/useDashboardSummary";
 import { formatSyncTime } from "../../utils/formatSyncTime";
 import { KpiCard } from "../../components/ui/KpiCard";
-import { QuickActions } from "../../components/ui/QuickActions";
+import { DashboardExportButton, QuickActions } from "../../components/ui/QuickActions";
 import { RiskClassificationBar } from "../../components/risk/RiskClassificationBar";
 import { IssueCategoryPanel } from "../../components/risk/IssueCategoryPanel";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
@@ -178,10 +178,11 @@ export default function Dashboard() {
         : "No medium-risk suppliers requiring attention.";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 p-4">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="rounded-xl border border-[#e7e9e7] bg-white px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.02)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
           <div className="flex items-center gap-2">
   {lastActiveAt && (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-mono text-neutral-500">
@@ -210,6 +211,10 @@ export default function Dashboard() {
               : ""}
             .
           </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 pt-1">
+            <DashboardExportButton data={data} />
+          </div>
         </div>
       </div>
 

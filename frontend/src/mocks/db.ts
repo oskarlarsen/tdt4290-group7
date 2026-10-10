@@ -1,12 +1,13 @@
 // TODO: Add the dismissAlert mutation when the Dismiss button is connected
 
-import type { RiskClassification, TopRiskSupplier, RecentAlert } from "../types/dashboard";
+import type { TopRiskSupplier, RecentAlert } from "../types/dashboard";
+import { buildSupplierPortfolioSummary } from "./supplierSummary";
 import { formatSyncTime } from "../utils/formatSyncTime";
 import type { Notification, NotificationSeverity } from "../types/notification";
+import type { ContractStatus, DerivedContract } from "../types/contract";
 
-// Keep modeled suppliers separate from the remaining portfolio counts.
-// Changes to a modeled supplier's risk automatically update the related dashboard numbers.
-// The remaining suppliers are represented by aggregate counts until the real supplier API is available.
+// Keep modeled suppliers separate from aggregate data for suppliers without mock records.
+// Changes to a modeled supplier's risk or record count update the portfolio summary automatically.
 // TODO: Replace the aggregate data with the full supplier list from the backend.
 
 const MODELED_SUPPLIERS: TopRiskSupplier[] = [
@@ -17,17 +18,22 @@ const MODELED_SUPPLIERS: TopRiskSupplier[] = [
   { id: "sup-e", displayName: "Supplier E", orgId: "NO 882 381 920 MVA", primaryContract: "Kommunale Byggeplasser", risk: "compliant", mainIssue: "Q4 chemical audit documentation missing" },
 ];
 
-const UNMODELED_PORTFOLIO_AGGREGATE = {
-  totalSuppliers: 151,
-  high: 4,
-  medium: 25,
+const UNMODELED_SUPPLIER_AGGREGATE = {
+  totalSuppliers: 146,
+  highRiskSuppliers: 4,
+  mediumRiskSuppliers: 25,
 };
 
-function getModeledRiskCounts() {
-  return {
-    high: MODELED_SUPPLIERS.filter((s) => s.risk === "high").length,
-    medium: MODELED_SUPPLIERS.filter((s) => s.risk === "medium").length,
-  };
+const SUPPLIER_DEMO_METRICS = {
+  renewedThisMonthCount: 4,
+};
+
+export function getSupplierPortfolioSummary() {
+  return buildSupplierPortfolioSummary(
+    MODELED_SUPPLIERS,
+    UNMODELED_SUPPLIER_AGGREGATE,
+    SUPPLIER_DEMO_METRICS.renewedThisMonthCount
+  );
 }
 
 export function getTopRiskSuppliers(): TopRiskSupplier[] {
@@ -40,25 +46,6 @@ export function getSuppliersRequiringAttention(): TopRiskSupplier[] {
     if (a.risk === b.risk) return 0;
     return a.risk === "high" ? -1 : 1;
   });
-}
-
-export function getRiskClassification(): RiskClassification {
-  const modeled = getModeledRiskCounts();
-
-  const high = modeled.high + UNMODELED_PORTFOLIO_AGGREGATE.high;
-  const medium = modeled.medium + UNMODELED_PORTFOLIO_AGGREGATE.medium;
-  const compliant = UNMODELED_PORTFOLIO_AGGREGATE.totalSuppliers - high - medium;
-
-  const pct = (n: number) => Math.round((n / UNMODELED_PORTFOLIO_AGGREGATE.totalSuppliers) * 100);
-  return {
-    compliant: { count: compliant, percent: pct(compliant) },
-    medium: { count: medium, percent: pct(medium) },
-    high: { count: high, percent: pct(high) },
-  };
-}
-
-export function getMonitoredSupplierCount(): number {
-  return UNMODELED_PORTFOLIO_AGGREGATE.totalSuppliers;
 }
 
 // Recent alerts 
@@ -246,4 +233,79 @@ export function addSupplierNote(supplierId: string, authorName: string, text: st
   supplierNotes = [...supplierNotes, note];
   writeStoredNotes(supplierNotes);
   return note;
+}
+
+// Fictional normalized demo points only; these are not real municipal measurements.
+const MOCK_CONTRACT_DETAILS: Record<
+  string,
+  {
+    status: ContractStatus;
+    startDate: string;
+    endDate: string;
+    documentUrl: string | null;
+    environmentalGoal: number;
+    environmentalActual: number;
+  }
+> = {
+  "sup-a": {
+    status: "Active",
+    startDate: "2023-08-01",
+    endDate: "2026-07-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 62,
+  },
+  "sup-b": {
+    status: "Expiring Soon",
+    startDate: "2024-01-01",
+    endDate: "2025-12-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 68,
+  },
+  "sup-c": {
+    status: "Active",
+    startDate: "2023-03-15",
+    endDate: "2027-03-14",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 82,
+  },
+  "sup-d": {
+    status: "Expiring Soon",
+    startDate: "2022-11-01",
+    endDate: "2025-10-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 65,
+  },
+  "sup-e": {
+    status: "Active",
+    startDate: "2024-06-01",
+    endDate: "2028-05-31",
+    documentUrl: "/documents/mock-contract.pdf",
+    environmentalGoal: 100,
+    environmentalActual: 100,
+  },
+};
+
+export function getDerivedContracts(): DerivedContract[] {
+  return MODELED_SUPPLIERS.map((s) => {
+    const mock = MOCK_CONTRACT_DETAILS[s.id];
+    return {
+      id: s.id,
+      contractName: s.primaryContract,
+      supplierId: s.id,
+      supplierName: s.displayName,
+      supplierOrgId: s.orgId,
+      risk: s.risk,
+      mainIssue: s.mainIssue,
+      status: mock.status,
+      startDate: mock.startDate,
+      endDate: mock.endDate,
+      documentUrl: mock.documentUrl,
+      environmentalGoal: mock.environmentalGoal,
+      environmentalActual: mock.environmentalActual,
+    };
+  });
 }
