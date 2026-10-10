@@ -11,6 +11,7 @@ type Props = {
   noteTone?: Tone;
   icon?: ReactNode;
   iconClassName?: string;
+  valueClassName?: string;
 };
 
 const NOTE_TONE_CLASSES: Record<Tone, string> = {
@@ -19,7 +20,16 @@ const NOTE_TONE_CLASSES: Record<Tone, string> = {
   success: "text-tertiary-700",
 };
 
-export function KpiCard({ label, value, sublabel, note, noteTone = "neutral", icon, iconClassName }: Props) {
+export function KpiCard({
+  label,
+  value,
+  sublabel,
+  note,
+  noteTone = "neutral",
+  icon,
+  iconClassName,
+  valueClassName,
+}: Props) {
   return (
     <div className="rounded-xl border border-neutral-100 bg-white p-4">
       <div className="flex items-start justify-between">
@@ -29,7 +39,9 @@ export function KpiCard({ label, value, sublabel, note, noteTone = "neutral", ic
         )}
       </div>
       <div className="mt-1 flex items-baseline gap-1.5">
-        <span className="text-2xl font-headline font-semibold text-neutral-900">{value}</span>
+        <span className={`text-2xl font-headline font-semibold ${valueClassName ?? "text-neutral-900"}`}>
+          {value}
+        </span>
         {sublabel && <span className="text-xs text-neutral-400">{sublabel}</span>}
       </div>
       {note && <div className={`mt-1 text-xs font-medium ${NOTE_TONE_CLASSES[noteTone]}`}>{note}</div>}

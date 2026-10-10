@@ -21,6 +21,18 @@ export type RiskClassification = {
   high: { count: number; percent: number };
 };
 
+export type UnmodeledSupplierAggregate = {
+  totalSuppliers: number;
+  highRiskSuppliers: number;
+  mediumRiskSuppliers: number;
+};
+
+export type SupplierPortfolioSummary = {
+  monitoredSuppliers: number;
+  renewedThisMonthCount: number;
+  riskClassification: RiskClassification;
+};
+
 export type TopRiskSupplier = {
   id: string;
   // Keep supplier names anonymous on the overview; show full details on the supplier pages

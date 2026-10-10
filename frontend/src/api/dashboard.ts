@@ -7,17 +7,18 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 // TODO: Replace mock data with the dashboard summary endpoint when available
 export function getDashboardSummary(): Promise<DashboardSummary> {
   if (USE_MOCKS) {
-    const riskClassification = db.getRiskClassification();
+    const supplierSummary = db.getSupplierPortfolioSummary();
+    const { riskClassification } = supplierSummary;
     return Promise.resolve({
       lastSyncedAt: db.getLastSyncedAt(),
       kpis: {
-        totalSuppliers: 142,
-        totalSuppliersDeltaThisMonth: 4,
+        totalSuppliers: supplierSummary.monitoredSuppliers,
+        totalSuppliersDeltaThisMonth: supplierSummary.renewedThisMonthCount,
         highRiskSuppliers: riskClassification.high.count,
-        monitoredSuppliers: db.getMonitoredSupplierCount(),
+        monitoredSuppliers: supplierSummary.monitoredSuppliers,
         activeAlerts: db.getActiveAlertsCount(),
         alertsBySeverity: db.getAlertsBySeverity(),
-        complianceRatePercent: riskClassification.compliant.percent + 0.2,
+        complianceRatePercent: riskClassification.compliant.percent,
         complianceTargetPercent: 95,
       },
       riskClassification,
