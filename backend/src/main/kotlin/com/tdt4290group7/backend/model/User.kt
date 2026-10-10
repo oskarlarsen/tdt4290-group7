@@ -15,6 +15,8 @@ data class User(
     val passwordHash: String,
     val role: Role,
     val supplierId: String? = null,
+    // Embedded in every JWT; bumping it (e.g. on password change) invalidates all issued tokens.
+    val tokenVersion: Int = 0,
 )
 
 /** Public-facing user shape returned to the frontend. */

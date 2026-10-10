@@ -1,34 +1,87 @@
-# Environmental Monitoring & Contract Compliance
+# TDT4290 Group 7 — Environmental Monitoring & Contract Compliance
 
-Municipal environmental monitoring dashboard for Trondheim kommune (TDT4290).
+TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens vegvesen (SVV).
 
-React + TypeScript + Vite frontend for the Trondheim kommune environmental
-monitoring and contract compliance system.
+## Repository layout
 
-Monitors supplier compliance across vehicle registrations, environmental
-certificates, and fuel/energy usage, and gives municipal admins a
-risk-ranked overview with alerting.
+- `frontend/`: React + TypeScript + Vite dashboard.
+- `backend/`: Ktor HTTP API, SQLite storage, and SVV integration.
 
-## Getting started
+See [the backend guide](backend/README.md) for endpoint parameters, responses, database relationships, configuration, request flow, logging, and step-by-step Postman testing.
 
-```bash
-npm install
-cp .env.example .env
+## Frontend setup
+
+From the repository root in PowerShell:
+
+```powershell
 cd frontend
+npm install
+Copy-Item .env.example .env
 npm run dev
 ```
 
-The app runs at `http://localhost:5173`.
+Do not overwrite an existing configured `.env`. Other commands: `npm run build`, `npm test`, and `npm run preview`.
 
-## Environment variables
+The example frontend configuration enables mocks and points at `http://localhost:4000/api`. To use the backend, disable mocks and set `VITE_API_BASE_URL` to match the backend address (normally `http://localhost:8080/api`). The backend permits the Vite origin `http://localhost:5173` by default. Authentication routes use cookies; vehicle routes are documented in the backend guide.
+
+## Backend setup
+
+Install JDK 21. From the repository root:
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+# Edit .env locally if live SVV requests are needed.
+.\gradlew.bat test
+# Required process settings; choose private local values before running.
+$env:JWT_SECRET = "<choose a random signing secret>"
+$env:SEED_ADMIN_PASSWORD = "<choose an admin password>"
+$env:SEED_SUPPLIER_PASSWORD = "<choose a supplier password>"
+.\gradlew.bat run
+```
+
+Keep the server terminal open. In another terminal:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/health
+```
+
+Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
+
+The backend runs without an SVV key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
+
+## Local data and credentials
+
+Keep the SVV key in the ignored `backend/.env`, never in frontend settings or request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
+
+The backend includes cookie-based JWT authentication and clears the cookie on logout. Vehicle endpoints remain unauthenticated. The default host and Compose's published backend port are bound to loopback for local development. Authentication and authorization for vehicle endpoints are pending separate work; implement them before deploying or exposing the backend to other machines.
+
+## Run the full stack with Docker
+
+From the repository root:
+
+```powershell
+Copy-Item .env.example .env
+# Set JWT_SECRET, SEED_ADMIN_PASSWORD, and SEED_SUPPLIER_PASSWORD locally.
+docker compose up --build
+```
+
+Do not overwrite an existing configured `.env`. Compose requires those three values. The root `.env` configures Compose; `backend/.env` configures standalone SVV lookup. They are separate files. Optional root SVV settings are passed to the backend by Compose.
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8080`
+
+Compose retains SQLite in the `vehicle-backend-data` named volume. Authentication demo users are in memory and recreated on restart, unlike vehicle data. See [authentication](backend/README.md#authentication) for endpoints and account configuration.
+
+## Frontend environment variables
 
 | Variable | Purpose |
 |---|---|
 | `VITE_API_BASE_URL` | Base URL for the real backend API (e.g. `http://localhost:4000/api`) |
 | `VITE_USE_MOCKS` | Set to `true` to run entirely against the built-in mock data layer, with no backend required |
 
-**The project currently has no real backend** — keep `VITE_USE_MOCKS=true`
-in `.env` to run it at all. See [Mock data architecture](#mock-data-architecture)
+Set `VITE_USE_MOCKS=true` in `frontend/.env` to run the frontend without the
+backend. See [Mock data architecture](#mock-data-architecture)
 below for how this is structured.
 
 ## Test accounts (mock login)

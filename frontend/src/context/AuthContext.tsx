@@ -8,9 +8,7 @@ import {
 } from "react";
 import * as authApi from "../api/auth";
 import {
-  getStoredToken,
-  storeToken,
-  clearStoredToken,
+  ApiError,
   getStoredLastActive,
   recordLastActive,
   SESSION_EXPIRED_EVENT,
@@ -39,15 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
 
-  // Restore the session from a stored token when the app starts
+  // Restore the session from the HttpOnly auth cookie when the app starts
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      setStatus("unauthenticated");
-      setIsInitializing(false);
-      return;
-    }
-
     authApi
       .getCurrentUser()
       .then((currentUser) => {
@@ -56,7 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLastActiveAt(getStoredLastActive(currentUser.id));
       })
       .catch(() => {
-        clearStoredToken();
         setStatus("unauthenticated");
       })
       .finally(() => setIsInitializing(false));
@@ -65,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Record real interaction while authenticated, rather than render/load time.
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
+    const userId = user.id;
 
     const userId = user.id;
 
@@ -96,7 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await authApi.login(payload);
-      storeToken(response.token, payload.rememberMe);
       // Completing a login is an actual application usage event.
       setLastActiveAt(recordLastActive(response.user.id));
       setUser(response.user);
@@ -105,9 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setStatus("error");
       setError(
-        err instanceof Error
-          ? "Couldn't sign in. Check your email/username and password and try again."
-          : "Something went wrong. Please try again."
+        // Account temporarily locked after repeated failures; the backend says for how long
+        err instanceof ApiError && err.status === 429
+          ? err.message
+          : err instanceof Error
+            ? "Couldn't sign in. Check your email/username and password and try again."
+            : "Something went wrong. Please try again."
       );
       throw err;
     }
@@ -117,7 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      clearStoredToken();
       setUser(null);
       setLastActiveAt(null);
       setStatus("unauthenticated");

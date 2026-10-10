@@ -1,2 +1,7 @@
+AGENTS.md
 .env
+backend/data/
+bin/
 .DS_Store
+.idea/
+*.iml
