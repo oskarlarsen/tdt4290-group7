@@ -89,7 +89,7 @@ class ApplicationTest {
             db.createStatement().use { statement ->
                 statement.executeUpdate(
                     """CREATE TRIGGER reject_second_synthetic_approval BEFORE INSERT ON vehicle_approvals
-                        WHEN NEW.vehicle_id = (SELECT id FROM vehicles WHERE normalized_registration_number = 'CD12345')
+                        WHEN NEW.registration_number = 'CD12345'
                         BEGIN SELECT RAISE(ABORT, 'synthetic test failure'); END""",
                 )
             }
@@ -125,8 +125,8 @@ class ApplicationTest {
         val trips = postJson(
             "/api/trip-rows",
             """{"sourceName":"trip-sheet","rows":[
-                {"registrationNumber":"AB 12345","tripCount":"3","totalTripKm":"45.5"},
-                {"registrationNumber":"AB12345","tripCount":"7","totalTripKm":"62"}
+                {"registrationNumber":"AB 12345","periodStart":"2026-01-01","periodEnd":"2026-01-31","tripCount":3,"totalTripKm":45.5},
+                {"registrationNumber":"AB12345","periodStart":"2026-01-01","periodEnd":"2026-01-31","tripCount":7,"totalTripKm":62}
             ]}""",
         )
         assertEquals(HttpStatusCode.Created, trips.status)
@@ -150,7 +150,7 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.Created, check.status)
         val checked = Json.parseToJsonElement(check.bodyAsText()).jsonObject
         assertEquals("AB12345", checked.getValue("vehicle").jsonObject
-            .getValue("normalizedRegistrationNumber").jsonPrimitive.content)
+            .getValue("registrationNumber").jsonPrimitive.content)
         assertEquals("ACTIVE", checked.getValue("approvalStatus").jsonPrimitive.content)
         assertEquals(2, checked.getValue("tripRows").jsonArray.size)
         assertEquals("UNAVAILABLE", checked.getValue("registry").jsonObject
@@ -201,6 +201,43 @@ class ApplicationTest {
             contentType(ContentType.Application.Json)
             setBody(body)
         }
+
+    @Test
+    fun strictTripContractReturnsNumericReadOnlyEstimateAndRejectsLegacyFieldsAtomically() = testApplication {
+        val path = Path.of("build", "test-data", UUID.randomUUID().toString() + ".db")
+        val repository = VehicleRepository(path)
+        application { module(repository, null, Duration.ofDays(14)) }
+        val valid = """{"registrationNumber":"AB12345","periodStart":"2026-01-01",
+            "periodEnd":"2026-01-31","fuelTechnology":"Diesel","co2GramsPerKm":123.456789,
+            "totalTripKm":1000,"totalKmNoxRegistered":1000,"totalNoxRegisteredGrams":25.67,
+            "averageConsumptionLitresPerKm":0.08,"fuelConsumedLitres":80}"""
+        listOf(
+            """{"registrationNumber":"CD12345"}""",
+            valid.replace("2026-01-31", "2026-02-30"),
+            valid.replace("123.456789", """"123.456789""""),
+            valid.replace("1000", "-1"),
+            valid.replace("fuelTechnology", "fuel"),
+            valid.dropLast(1) + ""","additionalFields":{}}""",
+            valid.dropLast(1) + ""","estimatedCo2Kg":123}""",
+            valid.dropLast(1) + ""","tripCount":"3"}""",
+            valid.dropLast(1) + ""","co2Registered":"true"}""",
+        ).forEach { invalid ->
+            assertEquals(HttpStatusCode.BadRequest, postJson("/api/trip-rows", """{"rows":[$valid,$invalid]}""").status)
+        }
+        assertTrue(repository.tripRowsForVehicle("AB12345").isEmpty())
+        val response = postJson("/api/trip-rows", """{"rows":[$valid]}""")
+        assertEquals(HttpStatusCode.Created, response.status)
+        val row = Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("rows").jsonArray.single().jsonObject
+        val estimate = row.getValue("estimatedCo2Kg").jsonPrimitive
+        assertEquals(false, estimate.isString)
+        assertEquals("123.456789", estimate.content)
+        val check = postJson("/api/vehicle-checks", """{"registrationNumber":"AB12345"}""")
+        val checked = Json.parseToJsonElement(check.bodyAsText()).jsonObject
+        assertEquals(false, "id" in checked.getValue("vehicle").jsonObject)
+        assertEquals("AB12345", checked.getValue("vehicle").jsonObject.getValue("registrationNumber").jsonPrimitive.content)
+        val id = checked.getValue("id").jsonPrimitive.content
+        assertEquals(checked, Json.parseToJsonElement(client.get("/api/vehicle-checks/$id").bodyAsText()).jsonObject)
+    }
 
     private fun testRepository() = VehicleRepository(Path.of("build", "test-data", "${UUID.randomUUID()}.db"))
 

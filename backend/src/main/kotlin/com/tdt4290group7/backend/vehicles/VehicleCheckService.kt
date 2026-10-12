@@ -20,15 +20,15 @@ class VehicleCheckService(
     suspend fun check(request: VehicleCheckRequest): VehicleCheckResponse {
         val now = Instant.now(clock)
         val vehicle = repository.findOrCreateVehicle(request.registrationNumber, now)
-        val approval = repository.approvalForVehicle(vehicle.id)
+        val approval = repository.approvalForVehicle(vehicle.registrationNumber)
         val approvalStatus = approvalStatus(approval, LocalDate.now(clock))
-        val tripRows = repository.tripRowsForVehicle(vehicle.id)
-        val cached = repository.latestSnapshot(vehicle.id)
+        val tripRows = repository.tripRowsForVehicle(vehicle.registrationNumber)
+        val cached = repository.latestSnapshot(vehicle.registrationNumber)
         val (registryResult, newSnapshot) = registryResult(vehicle, cached, request.forceRefresh, now)
         val deviations = (approvalDeviations(approvalStatus) + registryResult.deviations).distinct()
         val response = VehicleCheckResponse(
             id = UUID.randomUUID().toString(),
-            checkedAt = now.toString(),
+            checkedAt = now.storageTimestamp(),
             vehicle = vehicle,
             approvalStatus = approvalStatus,
             approval = approval,
@@ -50,17 +50,16 @@ class VehicleCheckService(
             return resultFromSnapshot(cached, RegistryDataSource.CACHE) to null
         }
 
-        val lookup = registry?.lookup(vehicle.normalizedRegistrationNumber)
+        val lookup = registry?.lookup(vehicle.registrationNumber)
             ?: RegistryLookup.Failed(LookupOutcome.NOT_CONFIGURED)
         return when (lookup) {
             is RegistryLookup.Found -> {
-                val status = lookup.data.registrationStatus()
+                require(lookup.data.registrationNumber == vehicle.registrationNumber) { "Registry vehicle mismatch" }
                 val snapshot = RegistrySnapshot(
                     id = UUID.randomUUID().toString(),
-                    vehicleId = vehicle.id,
-                    fetchedAt = now.toString(),
+                    registrationNumber = vehicle.registrationNumber,
+                    fetchedAt = now.storageTimestamp(),
                     source = "STATENS_VEGVESEN_ENKELTOPPSLAG",
-                    registrationStatus = status,
                     data = lookup.data,
                 )
                 resultFromSnapshot(snapshot, RegistryDataSource.LIVE) to snapshot
@@ -89,9 +88,9 @@ class VehicleCheckService(
         dataSource = source,
         lookupOutcome = LookupOutcome.FOUND,
         fetchedAt = snapshot.fetchedAt,
-        registrationStatus = snapshot.registrationStatus,
+        registrationStatus = snapshot.data.registrationStatus,
         data = snapshot.data,
-        deviations = deviationsForRegistrationStatus(snapshot.registrationStatus),
+        deviations = deviationsForRegistrationStatus(snapshot.data.registrationStatus),
         snapshotId = snapshot.id,
         refreshFailure = refreshFailure,
     )

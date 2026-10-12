@@ -36,8 +36,8 @@ class VehicleRepositoryTest {
 
                 val records = responses.map { it.approvals.single() }
                 assertEquals(1, records.map { it.id }.distinct().size)
-                assertEquals(1, records.map { it.vehicleId }.distinct().size)
-                val stored = repositories.first().approvalForVehicle(records.first().vehicleId)!!
+                assertEquals(1, records.map { it.registrationNumber }.distinct().size)
+                val stored = repositories.first().approvalForVehicle(records.first().registrationNumber)!!
                 assertTrue(stored.data.fuelTechnology in records.map { it.data.fuelTechnology })
             }
         }
@@ -55,8 +55,8 @@ class VehicleRepositoryTest {
             {
                 repository.appendTripRows(
                     AppendTripRowsRequest(rows = listOf(
-                        TripRowInput("AB 12345", tripCount = "$index"),
-                        TripRowInput("ab-12345", tripCount = "$index"),
+                        TripRowInput("AB 12345", "2026-01-01", "2026-01-31", tripCount = index),
+                        TripRowInput("ab-12345", "2026-01-01", "2026-01-31", tripCount = index),
                     )),
                     Instant.now(),
                 )
@@ -64,12 +64,12 @@ class VehicleRepositoryTest {
         })
 
         assertTrue(responses.all { it.rowCount == 2 && it.distinctVehicleCount == 1 })
-        val vehicleIds = responses.flatMap { it.rows }.map { it.vehicleId }.distinct()
+        val vehicleIds = responses.flatMap { it.rows }.map { it.registrationNumber }.distinct()
         assertEquals(1, vehicleIds.size)
         val stored = repositories.first().tripRowsForVehicle(vehicleIds.single())
         assertEquals(16, stored.size)
         assertEquals(16, stored.map { it.id }.distinct().size)
-        assertEquals((0..7).associate { "$it" to 2 }, stored.groupingBy { requireNotNull(it.data.tripCount) }.eachCount())
+        assertEquals((0..7).associate { it to 2 }, stored.groupingBy { requireNotNull(it.data.tripCount) }.eachCount())
         connection(path).use { db -> assertEquals(1, count(db, "vehicles")) }
     }
 

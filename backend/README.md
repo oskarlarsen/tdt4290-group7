@@ -2,7 +2,7 @@
 
 This Kotlin/Ktor service accepts JSON containing vehicle statistics and approvals, stores them in SQLite, and checks one registration number against local approval data and Statens vegvesen (SVV).
 
-A statistics row may cover several jobs or days. It is not assumed to be one dated trip. Approval is separate: submitting statistics never approves a vehicle. All examples here are synthetic. Agents must not inspect confidential datasets, real vehicle responses, or logs containing them.
+A statistics row covers a mandatory reporting period and may represent several jobs or days, not one individual trip. Approval is separate: submitting statistics never approves a vehicle. All examples here are synthetic. Agents must not inspect confidential datasets, real vehicle responses, or logs containing them.
 
 ## Request flow
 
@@ -24,7 +24,7 @@ flowchart TD
     E -- No --> G[Backend calls SVV]
     F --> H[Evaluate local approval and registry status]
     G --> H
-    H --> I[Save combined check and return result]
+    H --> I[Save relational check evidence and return result]
 ```
 
 ## Run and configure
@@ -173,322 +173,289 @@ Postman's cookie jar retains the `auth_token` cookie from login and sends it to 
 
 ## Shared request rules
 
-`POST /api/trip-rows` and `POST /api/vehicle-approvals` accept bodies up to 4 MiB; every other route, including authentication, is limited to 16 KiB. The batch row limit is independent of the byte limit. Split larger uploads into smaller batches. Bodies over the route limit return 413 with plain text `Request body too large`, including uploads without Content-Length.
+Vehicle POST bodies use Content-Type: application/json. There are no query parameters; vehicle routes currently require no Authorization header.
 
-For vehicle routes, send JSON POST bodies with `Content-Type: application/json`. No Authorization header is required. There are no defined query parameters; plates belong in bodies or the revocation path.
-
-- Names are case-sensitive; unknown fields are rejected.
-- Required fields cannot be omitted or null. Optional nullable fields may be omitted or null.
-- Booleans use unquoted `true`/`false`.
-- Statistics amounts and counts are strings, e.g. `"45.5"`, not JSON numbers. Values are preserved without numerical validation or aggregation.
-- `additionalFields` is an object of string values, defaulting to an empty object.
-- Plates are uppercased; whitespace and hyphens are removed. Synthetic `AB 12345`, `ab12345`, and `AB-12345` identify one vehicle.
-- Normalized plates must have 2–7 characters from A–Z/0–9. This is syntax validation, not proof of SVV recognition.
-- Batches contain 1–10,000 entries. An invalid entry rejects the batch. Statistics/approval writes are transactional. Vehicle writes reserve SQLite's writer lock before reading; concurrent writes wait up to five seconds for a lock. A failed batch is rolled back in full.
-- Dates use `yyyy-MM-dd`. Empty strings are invalid dates. Expiry cannot precede start.
-- Generated IDs are UUID strings. Timestamps are UTC instants; approval is evaluated using today's date in Europe/Oslo.
-
-Responses may omit optional null/default-valued fields. Consumers should not require every optional property to appear.
+- Unknown fields are rejected, including additionalFields, legacy aliases, and user-supplied estimatedCo2Kg.
+- Text must be quoted JSON text. Booleans must be unquoted true/false. Amounts must be JSON numbers, not quoted strings. tripCount is a non-negative 32-bit integer.
+- Required fields cannot be missing or null. Optional fields may be omitted/null. Missing is not zero or false.
+- Amounts are non-negative exact decimals: at most 18 fractional places after removing insignificant trailing zeroes, and an unscaled integer between 0 and 9223372036854775807. Unsupported values are rejected, never rounded.
+- Plates are uppercased, with whitespace/hyphens removed, then must contain 2–7 A–Z/0–9 characters. This validates syntax, not registry recognition.
+- Trip rows require periodStart and periodEnd: valid YYYY-MM-DD dates with start <= end. Both boundaries are inclusive. Single-day periods are allowed.
+- Batches contain 1–10,000 entries. One invalid entry rejects the entire batch. BEGIN IMMEDIATE reserves SQLite's writer before reading, waits up to five seconds for contention, and rolls back failed writes atomically.
+- The normalized registration number is the vehicle primary key. Other record IDs are UUID strings. Generated timestamps are UTC with nine fractional digits. Approval is evaluated as of today in Europe/Oslo, not the statistics period.
+- Optional/default response fields can be omitted. estimatedCo2Kg is always returned on stored statistics rows, as a number or null.
+- fuelTechnology always means fuel technology, but belongs to a separate supplier, approval or registry observation. Broader categories such as Fossil are not silently changed into specific fuels such as Diesel.
 
 ## Routes and HTTP statuses
 
 | Method and route | Purpose | Success |
 |---|---|---|
-| `GET /health` | Liveness response `{"status":"UP"}` | 200 |
-| `GET /` | Text `Hello World!` | 200 |
-| `POST /api/trip-rows` | Append statistics | 201 |
-| `POST /api/vehicle-approvals` | Add/replace approvals | 201 |
-| `POST /api/vehicle-approvals/{registrationNumber}/revoke` | Revoke one approval | 200 |
-| `POST /api/vehicle-checks` | Create/save a combined check | 201 |
-| `GET /api/vehicle-checks/{id}` | Read an original saved check | 200 |
+| GET /health | Liveness: {"status":"UP"} | 200 |
+| GET / | Text greeting | 200 |
+| POST /api/trip-rows | Append reporting-period statistics | 201 |
+| POST /api/vehicle-approvals | Add/replace submitted approvals | 201 |
+| POST /api/vehicle-approvals/{registrationNumber}/revoke | Revoke one approval | 200 |
+| POST /api/vehicle-checks | Save a check for one plate | 201 |
+| GET /api/vehicle-checks/{id} | Retrieve original saved evidence | 200 |
 
-Health does not verify SVV credentials, connectivity, or approval.
+Malformed JSON, unknown fields, wrong types and invalid values return 400 with an error object. Missing saved checks/unrevoked approvals return 404. SQLite contention returns 503 with {"error":"Vehicle database is busy; try again later"}. Other unhandled errors return 500 with "Internal server error".
 
-Validation failures return 400, normally with `{"error":"..."}`. Missing saved checks or unrevoked approvals return 404. Vehicle write lock timeouts return 503 with `{"error":"Vehicle database is busy; try again later"}`. Other unhandled errors return 500 with plain text `Internal server error`.
-
-A saved check returns 201 even if SVV fails. An external `ACCESS_DENIED` outcome does not change our response to HTTP 401. Approval replacements also return 201.
+An SVV failure does not prevent saving a check: POST still returns 201. Inspect registry lookup metadata, not just HTTP status. Health does not verify SVV configuration/connectivity.
 
 ## Append statistics
 
-```http
-POST /api/trip-rows
-Content-Type: application/json
+POST /api/trip-rows, Body → raw → JSON:
 
+~~~json
 {
-  "sourceName": "synthetic-statistics",
+  "sourceName": "synthetic-trip-sheet",
   "rows": [
-    { "registrationNumber": "AB 12345", "fuel": "Diesel", "tripCount": "3", "totalTripKm": "45.5" },
-    { "registrationNumber": "AB12345", "assignmentNumber": "EXAMPLE-2", "tripCount": "7" }
+    {
+      "registrationNumber": "AB 12345",
+      "periodStart": "2026-01-01",
+      "periodEnd": "2026-01-31",
+      "fuelTechnology": "Diesel",
+      "co2Registered": true,
+      "co2GramsPerKm": 123.456,
+      "medianCo2": 120.25,
+      "totalTripKm": 1000,
+      "totalKmNoxRegistered": 1000,
+      "totalNoxRegisteredGrams": 25.67,
+      "averageConsumptionLitresPerKm": 0.08,
+      "fuelConsumedLitres": 80,
+      "tripCount": 3
+    },
+    {
+      "registrationNumber": "AB12345",
+      "periodStart": "2026-01-01",
+      "periodEnd": "2026-01-31",
+      "assignmentNumber": "EXAMPLE-2",
+      "tripCount": 7
+    }
   ]
 }
-```
+~~~
 
-`rows` is required. `sourceName` is an optional descriptive label, trimmed on storage; blank labels become null. It is not an import ID or filter used for checks.
-
-Each row requires `registrationNumber`. All other fields are optional:
-
-| Field | Type | Source column / meaning |
+| Field | JSON type | Meaning |
 |---|---|---|
-| `fuel` | String | Drivstoff / Type drivstoff |
-| `make` | String | Bilmerke |
-| `vehicleType` | String | Biltype |
-| `model` | String | Bilmodell |
-| `co2Registered` | Boolean | Submitted CO₂-emitting/registered flag; stored without policy interpretation |
-| `co2GramsPerKm` | String | CO2g/km |
-| `medianCo2` | String | Median CO2; source definition is not established |
-| `totalTripKm` | String | Tot km tur |
-| `totalKmCo2Registered` | String | Tot km co2 registrert |
-| `totalKmCo2NotRegistered` | String | Tot km co2 ikke registrert |
-| `kmFuelNotRegistered` | String | Km drivstoff ikke registrert |
-| `totalKmFuelRegistered` | String | Tot km drivstoff registrert |
-| `tripCount` | String | #turer |
-| `assignmentNumber` | String | Oppdrag nr. |
-| `averageConsumptionLitresPerKm` | String | Gjennomsnittlig forbruk L/km |
-| `kmPerBus` | String | Km per buss |
-| `fuelConsumptionLitresPerBus` | String | Drivstofforbruk L per buss |
-| `comment` | String | Kommentar |
-| `additionalFields` | Object of strings | Extra columns retained without interpretation |
+| registrationNumber | Required string | Regnr / Registreringsnr. |
+| periodStart, periodEnd | Required date strings | Reporting-period boundaries; not individual journey dates |
+| fuelTechnology | Optional string | Supplier Drivstoff / Type drivstoff |
+| make, vehicleType, model | Optional strings | Bilmerke, Biltype, Bilmodell |
+| co2Registered | Optional boolean | Supplier marks the vehicle as CO₂-emitting |
+| co2GramsPerKm | Optional number | Supplier emission rate, g/km |
+| medianCo2 | Optional number | Stored source value; meaning/unit are not inferred |
+| totalTripKm | Optional number | Unified distance, km; includes former km per buss |
+| totalKmCo2Registered, totalKmCo2NotRegistered | Optional numbers | Supplier CO₂ coverage distances, km |
+| kmFuelNotRegistered, totalKmFuelRegistered | Optional numbers | Supplier fuel-data coverage distances, km |
+| totalKmNoxRegistered | Optional number | Distance covered by reported NOx mass, km |
+| totalNoxRegisteredGrams | Optional number | Supplier NOx mass over that distance, grams |
+| tripCount | Optional integer | #turer |
+| assignmentNumber | Optional string | Oppdrag nr. |
+| averageConsumptionLitresPerKm | Optional number | Average consumption, L/km; not L/100 km |
+| fuelConsumedLitres | Optional number | Total litres; replaces fuelConsumptionLitresPerBus |
+| comment | Optional string | Supplier comment |
 
-There is no trip date or approval flag. Source-specific meanings are not inferred.
+sourceName is an optional batch label, not an import ID or supplier identifier. Trip rows have no approval flag.
 
-The response contains `createdAt`, `rowCount`, `distinctVehicleCount`, and `rows`. Each stored row contains `id`, `vehicleId`, optional `sourceName`, `createdAt`, and submitted `data`.
+Response: createdAt, rowCount, distinctVehicleCount, rows. Stored rows contain id, registrationNumber, optional sourceName, createdAt, data and read-only estimatedCo2Kg. Stored plates are normalized. Repeated submissions append more rows, including identical/overlapping periods. No deduplication or summation occurs. Retrieval sorts creation time then UUID; batch input order need not be retained.
 
-The example appends two rows for one vehicle. Repeating it appends two more. No deduplication or summation occurs. Retrieval orders by creation time then UUID, so rows from one submission need not retain input order.
+### Estimated CO₂
+
+estimatedCo2Kg = supplier totalTripKm × supplier co2GramsPerKm / 1000.
+
+The first example row returns 123.456 kg. Exact decimal arithmetic is used. The result is computed, not independently editable or stored. If either operand is missing it returns null. co2Registered=false does not supply a zero rate; SVV values are not substituted. This is a nominal supplier-based estimate, not measured actual or lifecycle emissions. Estimates may have more precision than individual inputs.
+
+The supplier NOx mass and distance are related, but no NOx-rate calculation or comparison is implemented. Supplier grams and SVV mg/km are different quantities.
 
 ## Add or replace approvals
 
-```http
-POST /api/vehicle-approvals
-Content-Type: application/json
+POST /api/vehicle-approvals:
 
+~~~json
 {
-  "sourceName": "synthetic-approvals",
+  "sourceName": "synthetic-approved-sheet",
   "approvals": [
     {
       "registrationNumber": "AB12345",
-      "fuelTechnology": "Elektrisk/Hydrogen",
+      "fuelTechnology": "Fossil",
       "usedThroughoutPeriod": true,
+      "startDate": "2026-01-01",
+      "expiryDate": "2026-12-31",
       "vehicleGroup": "example group"
     }
   ]
 }
-```
+~~~
 
-`approvals` is required. Optional `sourceName` has the same label semantics as statistics.
+registrationNumber is required; all other row fields and sourceName are optional. usedThroughoutPeriod is boolean. Dates must be YYYY-MM-DD. Missing startDate means immediately effective; missing expiryDate means indefinite until revoked. Expiry equal to today is active.
 
-| Approval field | Type | Meaning |
-|---|---|---|
-| `registrationNumber` | String | Required vehicle identifier |
-| `fuelTechnology` | String | Optional submitted fuel technology |
-| `usedThroughoutPeriod` | Boolean | Optional sheet answer; does not override dates |
-| `startDate` | String/null | Optional ISO date; absent/null means effective immediately |
-| `expiryDate` | String/null | Optional ISO date; absent/null means indefinite until revocation |
-| `vehicleGroup` | String | Optional category |
-| `additionalFields` | Object of strings | Optional extra source data |
+At most one unrevoked approval exists per plate. Submitting creates one if absent, otherwise fully replaces its submitted fields, including future/expired records. Omitted optional fields are cleared. Omitted vehicles are untouched. Repeated plates are processed in order, with the final entry winning. approvalCount counts entries, not distinct vehicles.
 
-There is at most one unrevoked approval per vehicle. A submission adds one if absent, or replaces the existing unrevoked record's data, including an expired/future record.
-
-**Updates are full replacements.** Omitting an existing expiry date deliberately removes it and makes approval indefinite. Other omitted optional fields are cleared too. Omitting `sourceName` clears the label. ID/creation time remain; update time changes.
-
-Omitted vehicles are untouched. Repeated normalized plates in a batch are processed in order; the last entry determines final stored data. `approvalCount` counts entries, not distinct vehicles.
-
-The response contains `updatedAt`, `approvalCount`, and `approvals`. Stored approvals contain `id`, `vehicleId`, optional `sourceName`, creation/update times, optional `revokedAt`, and `data`.
-
-Revoked records are retained. Reapproval creates a new ID. Ordinary edits do not preserve every previous approval version; saved checks retain their original approval data.
+Response: updatedAt, approvalCount, approvals. Stored records have id, registrationNumber, optional sourceName, createdAt, updatedAt, optional revokedAt and data. Ordinary approval edits do not create versions; checks freeze the original evaluated details.
 
 ### Approval evaluation
 
-Evaluation uses today in Europe/Oslo, not historical dates for the statistics.
-
-| Condition | Status | Local deviation |
+| Situation as of today in Europe/Oslo | approvalStatus | Deviation |
 |---|---|---|
-| No record | `NOT_APPROVED` | `NOT_ON_APPROVED_LIST` |
-| Selected record revoked | `REVOKED` | `APPROVAL_REVOKED` |
-| Start later than today | `NOT_YET_ACTIVE` | `APPROVAL_NOT_YET_ACTIVE` |
-| Expiry earlier than today | `EXPIRED` | `APPROVAL_EXPIRED` |
-| Otherwise | `ACTIVE` | None |
+| No record | NOT_APPROVED | NOT_ON_APPROVED_LIST |
+| Revoked | REVOKED | APPROVAL_REVOKED |
+| Future start | NOT_YET_ACTIVE | APPROVAL_NOT_YET_ACTIVE |
+| Expiry before today | EXPIRED | APPROVAL_EXPIRED |
+| Otherwise | ACTIVE | None |
 
-Start/expiry are inclusive. Missing expiry means indefinite; do not send `"infinite"`. Fuel technology, category, and period flag are stored but do not generate deviations.
+Statistics period dates do not change these rules or establish a past registry state.
 
 ### Revoke manually
 
-```http
-POST /api/vehicle-approvals/AB12345/revoke
-```
-
-The plate is a path parameter. No body is needed. Returns the approval with revocation/update timestamps. An unrevoked expired/future approval can also be revoked. No unrevoked record, including repeat revocation, returns 404. Statistics, snapshots, and saved checks remain.
+POST /api/vehicle-approvals/AB12345/revoke, no body. Returns the revoked record (200), or 404 if no unrevoked approval exists. Reapproval creates a new ID, retaining the revoked record.
 
 ## Check one vehicle
 
-```http
-POST /api/vehicle-checks
-Content-Type: application/json
+POST /api/vehicle-checks:
 
+~~~json
 { "registrationNumber": "AB12345", "forceRefresh": false }
-```
+~~~
 
-`registrationNumber` is required. Boolean `forceRefresh` defaults to false; true bypasses cache reuse and attempts SVV when configured.
+registrationNumber is required. forceRefresh is an optional boolean, default false. Unknown plates are created with supplierId=null and no approval; no statistics import is required.
 
-An unknown plate creates a local vehicle with null supplier and no approval, and is still checked against SVV. No prior statistics submission is needed.
-
-Each POST creates a new saved check. Local approval and statistics are reread even if registry data is cached.
-
-| Combined response field | Meaning |
+| Response field | Meaning |
 |---|---|
-| `id` | Saved check UUID |
-| `checkedAt` | Time check began |
-| `vehicle` | Local ID, normalized plate, nullable supplier ID, creation time |
-| `approvalStatus` | Current local approval evaluation |
-| `approval` | Selected stored approval, if any |
-| `tripRows` | All statistics rows for this vehicle, or empty list |
-| `registry` | Registry data, origin, outcome, and findings |
-| `deviations` | Distinct combined local and registry findings |
+| id, checkedAt | Historical check ID and time |
+| vehicle | registrationNumber, optional supplierId, createdAt; no surrogate vehicle ID |
+| approvalStatus, approval | Status and approval evidence evaluated at check time |
+| tripRows | Statistics included at the time, with individual estimates |
+| registry | Selected SVV facts and lookup metadata |
+| deviations | Combined approval and registration findings |
 
-Statistics are not aggregated or compared with SVV fuel/CO₂ data. A check does not itself prove a vehicle was in operation.
+### Selected registry data
 
-### Registry fields
+registry includes dataSource, lookupOutcome, optional fetchedAt/registrationStatus/data/snapshotId/refreshFailure, usageProhibitionState and registry deviations.
 
-| Field | Meaning |
-|---|---|
-| `dataSource` | `LIVE`, `CACHE`, `STALE_CACHE`, or `UNAVAILABLE` |
-| `lookupOutcome` | Usable registry data found, or lookup failure |
-| `fetchedAt` | Snapshot timestamp, unchanged on reuse |
-| `registrationStatus` | Extracted registration code, when available |
-| `data` | Complete parsed SVV response in the generic model explained below |
-| `usageProhibitionState` | Currently always `UNKNOWN` |
-| `deviations` | Registration findings from the snapshot |
-| `snapshotId` | Successful snapshot used |
-| `refreshFailure` | Failure from an attempted refresh when prior data is returned |
+registry.data is a typed object, not raw JSON or the old generic tree:
 
-An empty combined deviation list does not prove all checks passed. An approved vehicle can have no deviations while SVV is unavailable. Inspect registry origin/outcome/failure as well.
+~~~json
+{
+  "registrationNumber": "AB12345",
+  "registrationStatus": "REGISTRERT",
+  "make": "Synthetic Make",
+  "model": "Synthetic Model",
+  "vehicleCategory": { "code": "M1", "name": "Personbil" },
+  "hybridCategory": { "code": "IKKE_HYBRID" },
+  "euroClass": { "code": "6", "name": "Euro 6" },
+  "fuels": [
+    {
+      "fuelTechnology": { "code": "2", "name": "Diesel" },
+      "measurements": [
+        {
+          "measurementMethod": { "code": "WLTP" },
+          "co2GramsPerKm": 123.456789,
+          "noxMgPerKm": 12.34567
+        }
+      ]
+    }
+  ]
+}
+~~~
+
+Whitelist: registration identity/status, make/model, vehicle/hybrid category, Euro class, fuel code/name, measurement method code/name, combined-driving CO₂ g/km and NOx mg/km. Missing values remain unknown, never zero. Multiple measurements retain their fuel/method association; no preferred measurement is selected. Multiple make/model names are joined with "; ".
+
+Technical data is projected from godkjenning.tekniskGodkjenning.tekniskeData. Environmental fuel groups carry forbrukOgUtslipp measurements. Engine fuel codes absent from environmental groups are included without invented measurements; grouping matches code equality only. kjoretoyId.kjennemerke must match the requested plate.
+
+Unselected fields are discarded before persistence or response construction. Raw HTTP bodies are transient, never logged/saved. VIN, inspection/first-registration dates, filter/particle details, registered fuel consumption, electric consumption/range, weight, seats, noise and administrative/mechanical details are not retained.
+
+No fuel/CO₂/NOx/Euro comparison rules are implemented yet. Differing supplier/SVV CO₂ is the agreed future deviation rule; measurement selection/comparison remain deferred. Empty deviations do not prove complete verification. Enkeltoppslag cannot establish bruksforbud; usageProhibitionState remains UNKNOWN.
 
 ### Cache and fallback
 
-```mermaid
-flowchart TD
-    A[Latest successful snapshot] --> B{forceRefresh?}
-    B -- No --> C{Age within configured TTL?}
-    C -- Yes --> D[CACHE and FOUND]
-    C -- No --> E[Attempt lookup]
-    B -- Yes --> E
-    E --> F{Success?}
-    F -- Yes --> G[Save snapshot: LIVE and FOUND]
-    F -- No --> H{Previous snapshot exists?}
-    H -- Yes --> I[STALE_CACHE and FOUND plus refreshFailure]
-    H -- No --> J[UNAVAILABLE plus failed lookupOutcome]
-    D --> K[Save combined check]
-    G --> K
-    I --> K
-    J --> K
-```
+SVV_CACHE_TTL_DAYS defaults to 14. Age equal to TTL is fresh; future timestamps are not fresh. Reuse never changes fetchedAt.
 
-A snapshot is fresh when elapsed age is nonnegative and no greater than the configured duration, including exactly 14 days by default. Its timestamp is captured when the check starts. Failed lookups are not snapshots and are not cached. No automatic retries or background refreshes occur.
+| Situation | Result |
+|---|---|
+| Fresh snapshot and forceRefresh=false | CACHE; no external request |
+| No fresh snapshot or forceRefresh=true | Attempt backend-to-SVV request |
+| Successful lookup | LIVE; new immutable selected-field snapshot |
+| Failed lookup with previous success | STALE_CACHE, plus refreshFailure |
+| Failed lookup without previous success | UNAVAILABLE, with lookupOutcome |
 
-A forced request cannot make an external call without a configured key and does not guarantee fresh data.
-
-**Every failed refresh uses a previous successful snapshot when available.** This includes `NOT_FOUND`, `ACCESS_DENIED`, and `NOT_CONFIGURED`, even if a forced refresh failed while the snapshot was within TTL. There is no maximum fallback age.
-
-Fallback returns `STALE_CACHE`, with `lookupOutcome: FOUND` describing the stored data and `refreshFailure` describing the new failure. Registry deviations come from that earlier observation, not a newly confirmed status. Local approval evaluation remains current.
+All failed-refresh outcomes, including NOT_FOUND/ACCESS_DENIED, follow this fallback. Forced refresh attempts a request; it does not guarantee fresh data on failure. Failed responses are never cached. Stale fallback has no maximum age. Freshness and indefinite history retention are independent.
 
 ### External lookup and outcomes
 
-The backend URL-encodes the normalized plate and sends:
+The backend requests GET https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata?kjennemerke=<plate> with SVV-Authorization: Apikey <private-key>. Connection timeout: 10 seconds; request timeout: 20 seconds. Frontend/Postman neither supplies nor receives this key.
 
-```text
-GET https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata?kjennemerke=<plate>
-SVV-Authorization: Apikey <private-key>
-Accept: application/json
-```
-
-Connection timeout: 10 seconds. Request timeout: 20 seconds. Clients call our backend with the plate; they do not receive or supply the SVV key.
-
-These are this implementation's response mappings, not a complete external API specification:
-
-| External result | Outcome |
+| SVV response | lookupOutcome |
 |---|---|
-| 200, valid JSON, exactly one entry in `kjoretoydataListe` | `FOUND` |
-| Empty list or 404 | `NOT_FOUND` |
-| 401/403 | `ACCESS_DENIED` |
-| 422/429 | `QUOTA_EXHAUSTED` |
-| 500/502/503/504, I/O error, timeout, interruption | `TEMPORARILY_UNAVAILABLE` |
-| Malformed/unexpected JSON, missing list, multiple entries, other status | `INVALID_RESPONSE` |
-| Client absent because no key is configured | `NOT_CONFIGURED` |
+| 200, one matching vehicle with valid selected fields | FOUND |
+| Empty vehicle list or 404 | NOT_FOUND |
+| 401/403 | ACCESS_DENIED |
+| 422/429 | QUOTA_EXHAUSTED |
+| 500/502/503/504 or network failure | TEMPORARILY_UNAVAILABLE |
+| Malformed/unexpected data, wrong plate, invalid selected number, multiple vehicles, other status | INVALID_RESPONSE |
+| Backend has no configured client | NOT_CONFIGURED |
 
-Raw external failure bodies are not exposed. A successful snapshot can still have an unknown registration code.
-
-| SVV registration code | Deviation |
-|---|---|
-| `REGISTRERT` | None |
-| `AVREGISTRERT` | `DEREGISTERED` |
-| `UTFORT` | `EXPORTED` |
-| `VRAKET` | `SCRAPPED` |
-| `UREGISTRERT` | `UNREGISTERED` |
-| Missing/other in a successful snapshot | `UNKNOWN_REGISTRATION_STATUS` |
-
-The extracted original path is `kjoretoydataListe[0].registrering.registreringsstatus.kodeVerdi`. A failed lookup without a snapshot reports its outcome, not a fabricated registration deviation.
-
-This integration cannot establish bruksforbud; `usageProhibitionState: UNKNOWN` does not mean no prohibition exists.
+Registration codes REGISTRERT/AVREGISTRERT/UTFORT/VRAKET/UREGISTRERT produce respectively no finding/DEREGISTERED/EXPORTED/SCRAPPED/UNREGISTERED. Missing/other codes in a successful snapshot produce UNKNOWN_REGISTRATION_STATUS. Failed uncached lookups do not fabricate registration findings.
 
 ## Read a saved check
 
-```http
-GET /api/vehicle-checks/<check-id>
-```
+GET /api/vehicle-checks/<check-id> uses the check's top-level UUID, not the plate. It returns original evidence without calling SVV or reevaluating approval. Later approval replacement/revocation, statistics imports or registry refreshes do not modify it. Unknown IDs return 404.
 
-Use the POST response's top-level ID, not the plate or vehicle ID. Returns the original saved response, without calling SVV or reevaluating approval. Later approval/statistics changes do not modify it. Unknown IDs return 404.
+## Relational database and history
 
-## Database and JSON storage
+Schema version 2 uses SQLite STRICT tables, foreign keys on each connection, explicit columns, constrained booleans/statuses, validated dates and exact quantities. There are no data_json columns or arbitrary attribute maps.
 
-Tables are created automatically. Foreign keys are enabled on each connection. IDs/timestamps are text.
+| Table | Purpose |
+|---|---|
+| suppliers | Reserved identity/name; no supplier-management API |
+| vehicles | registration_number primary key, nullable supplier_id FK, created_at |
+| trip_rows | Vehicle FK, required period, explicit supplier statistics |
+| vehicle_approvals | Vehicle FK, approval observations, dates and revocation |
+| svv_snapshots | Vehicle FK, fetch metadata and selected SVV identity/status/classification |
+| svv_snapshot_fuels | Snapshot FK, fuel_index and fuel technology code/name |
+| svv_emission_measurements | Composite fuel FK, measurement_index, method, CO₂ and NOx |
+| vehicle_checks | Vehicle/approval/snapshot FKs, result metadata and frozen approval/vehicle evidence |
+| vehicle_check_trip_rows | Check-to-statistics links, vehicle consistency and original response order |
+| vehicle_check_deviations | Check FK, finding code, origin and response order |
 
-```mermaid
+~~~mermaid
 erDiagram
     SUPPLIERS o|--o{ VEHICLES : supplies
-    VEHICLES ||--o{ TRIP_ROWS : has
-    VEHICLES ||--o{ VEHICLE_APPROVALS : has_history
-    VEHICLES ||--o{ SVV_SNAPSHOTS : has
-    VEHICLES ||--o{ VEHICLE_CHECKS : checked_by
-    VEHICLE_APPROVALS o|--o{ VEHICLE_CHECKS : evaluated_as
-    SVV_SNAPSHOTS o|--o{ VEHICLE_CHECKS : used_by
-```
+    VEHICLES ||--o{ TRIP_ROWS : reports
+    VEHICLES ||--o{ VEHICLE_APPROVALS : approves
+    VEHICLES ||--o{ SVV_SNAPSHOTS : looked_up
+    SVV_SNAPSHOTS ||--o{ SVV_SNAPSHOT_FUELS : contains
+    SVV_SNAPSHOT_FUELS ||--o{ SVV_EMISSION_MEASUREMENTS : measured
+    VEHICLES ||--o{ VEHICLE_CHECKS : checked
+    VEHICLE_APPROVALS o|--o{ VEHICLE_CHECKS : evaluated
+    SVV_SNAPSHOTS o|--o{ VEHICLE_CHECKS : used
+    VEHICLE_CHECKS ||--o{ VEHICLE_CHECK_TRIP_ROWS : includes
+    TRIP_ROWS ||--o{ VEHICLE_CHECK_TRIP_ROWS : referenced
+    VEHICLE_CHECKS ||--o{ VEHICLE_CHECK_DEVIATIONS : found
+~~~
 
-| Table | Contents |
-|---|---|
-| `suppliers` | ID, name, creation time; reserved for later |
-| `vehicles` | Unique normalized plate, ID, nullable supplier FK, creation time |
-| `trip_rows` | Vehicle FK, label/time, submitted data in `data_json` |
-| `vehicle_approvals` | Vehicle FK, label, dates/timestamps, approval data in `data_json` |
-| `svv_snapshots` | Vehicle FK, fetch time/source, extracted registration status, complete response model in `data_json` |
-| `vehicle_checks` | Vehicle and optional approval/snapshot FKs, check time, whole response in `data_json` |
+registration_number and fuel_technology have consistent meanings/names, while observations remain source-specific. Composite foreign keys prevent a check from linking another vehicle's approval, snapshot or statistics.
 
-No API creates suppliers or assigns supplier IDs yet. At most one unrevoked approval exists per vehicle.
+Each numeric quantity has <name>_unscaled and <name>_scale INTEGER columns. Value = unscaled × 10^(-scale): 123.456 becomes 123456 and 3. Both must be null together or present together. Insignificant zeroes/exponent notation may be canonicalized; numerical value is exact. JSON numbers are decoded into BigDecimal without Double conversion.
 
-### How complete SVV data is stored
+History shares immutable snapshots/statistics. Named approval_* columns deliberately freeze the evaluated approval because the current record can change. Supplier/creation metadata is also frozen for original retrieval. Supporting tables preserve membership/order and the origin of findings. UPDATE triggers protect historical tables; referenced deletions are blocked by foreign keys. Complete field/constraint definitions are in VehicleSchema.kt; tripDecimalColumns lists the supplier quantity columns.
 
-The complete payload is stored as JSON text in SQLite `svv_snapshots.data_json`, not as individual SQL columns for every SVV field. Fetch metadata and extracted registration status also have separate columns.
+History is retained indefinitely by explicit product decision. There is no 90-day window, automatic cleanup or deletion/retention API. Cache TTL controls refreshes, not deletion. Growth/pagination and final privacy, access-control and deletion requirements remain future work, not a claim of complete GDPR compliance.
 
-The original response is parsed into our own generic `RegistryValue` model: objects, arrays, strings, numbers, booleans, and nulls. That model is serialized for storage and returned as `registry.data`. It preserves parsed fields/values, but is not the original HTTP response string and has no named Kotlin property for every SVV business field.
+### Development reset and incompatibility
 
-Original synthetic JSON:
+This intentionally breaks the old vehicle-ID/JSON mock schema and API, with no migration. Startup refuses a legacy schema rather than deleting/converting it. Earlier databases were confirmed mock-only. Never reset unverified data.
 
-```json
-{ "exampleField": 12 }
-```
+For the confirmed mock default database only, stop the backend and run from backend/:
 
-Stored/returned representation:
+~~~powershell
+Remove-Item -LiteralPath data/vehicles.db
+~~~
 
-```json
-{
-  "type": "object",
-  "fields": {
-    "exampleField": { "type": "number", "value": "12" }
-  }
-}
-```
+If vehicles.db-wal, vehicles.db-shm or vehicles.db-journal exist, remove those exact files only while the backend is stopped. Do not delete an entire directory or Docker volume. Startup creates the empty new schema. Custom VEHICLE_DB_PATH databases and Docker volumes require their own explicitly authorised reset; none is automatic.
 
-Objects use `fields`, arrays use `items`, primitive values use `value`, and nodes have a `type` discriminator. Numbers are strings to retain their representation. Consumers must account for this wrapper.
+Clients must adopt mandatory period dates, numeric quantities, fuelTechnology/fuelConsumedLitres/totalTripKm, registrationNumber rather than vehicleId, and typed registry.data. Old fuel/kmPerBus/fuelConsumptionLitresPerBus/additionalFields names and quoted quantities are rejected.
 
-Saved checks also contain whole response JSON, including approval, statistics, and SVV model. This supports historical retrieval but duplicates data as checks accumulate. No retention/cleanup policy is implemented.
 
 ## Logging
 

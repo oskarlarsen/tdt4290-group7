@@ -40,7 +40,7 @@ class BodyLimitTest {
         for (chunked in listOf(false, true)) {
             assertEquals(HttpStatusCode.Created, vehicleStatusFor(
                 "/api/trip-rows",
-                """{"rows":[{"registrationNumber":"AB12345","comment":"$padding"}]}""",
+                """{"rows":[{"registrationNumber":"AB12345","periodStart":"2026-01-01","periodEnd":"2026-01-31","comment":"$padding"}]}""",
                 chunked,
             ))
             assertEquals(HttpStatusCode.Created, vehicleStatusFor(

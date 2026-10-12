@@ -1,8 +1,8 @@
 package com.tdt4290group7.backend.plugins
 
-import com.tdt4290group7.backend.vehicles.AppendTripRowsRequest
-import com.tdt4290group7.backend.vehicles.UpsertApprovalsRequest
-import com.tdt4290group7.backend.vehicles.VehicleCheckRequest
+import com.tdt4290group7.backend.vehicles.decodeTripRowsRequest
+import com.tdt4290group7.backend.vehicles.decodeApprovalsRequest
+import com.tdt4290group7.backend.vehicles.decodeVehicleCheckRequest
 import com.tdt4290group7.backend.vehicles.VehicleCheckService
 import com.tdt4290group7.backend.vehicles.VehicleRegistryClient
 import com.tdt4290group7.backend.vehicles.VehicleStore
@@ -22,7 +22,6 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 
 @Serializable
 data class HealthStatus(val status: String = "UP")
@@ -35,7 +34,6 @@ fun Application.configureRouting(
     registry: VehicleRegistryClient?,
     cacheTtl: Duration,
 ) {
-    val json = Json { ignoreUnknownKeys = false }
     val checks = VehicleCheckService(repository, registry, cacheTtl)
     routing {
         get("/health") {
@@ -49,7 +47,7 @@ fun Application.configureRouting(
         /** Each submitted statistics row is appended, including repeated registration numbers. */
         post("/api/trip-rows") {
             val request = try {
-                json.decodeFromString<AppendTripRowsRequest>(call.receiveText())
+                decodeTripRowsRequest(call.receiveText())
             } catch (_: SerializationException) {
                 call.respond(HttpStatusCode.BadRequest, ApiError("Invalid trip rows JSON"))
                 return@post
@@ -74,7 +72,7 @@ fun Application.configureRouting(
         /** Upserts the unrevoked approval for each plate; omitted plates are not affected. */
         post("/api/vehicle-approvals") {
             val request = try {
-                json.decodeFromString<UpsertApprovalsRequest>(call.receiveText())
+                decodeApprovalsRequest(call.receiveText())
             } catch (_: SerializationException) {
                 call.respond(HttpStatusCode.BadRequest, ApiError("Invalid approvals JSON"))
                 return@post
@@ -113,7 +111,7 @@ fun Application.configureRouting(
          */
         post("/api/vehicle-checks") {
             val request = try {
-                json.decodeFromString<VehicleCheckRequest>(call.receiveText())
+                decodeVehicleCheckRequest(call.receiveText())
             } catch (_: SerializationException) {
                 call.respond(HttpStatusCode.BadRequest, ApiError("Invalid vehicle check JSON"))
                 return@post

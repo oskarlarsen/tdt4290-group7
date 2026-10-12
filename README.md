@@ -50,6 +50,8 @@ Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
 
 The backend runs without an SVV key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
 
+Vehicle storage now uses strict relational tables, registration numbers as vehicle primary keys, exact decimal quantities, mandatory statistics periods, and selected SVV fields only. Check history is retained indefinitely; the 14-day SVV cache setting controls freshness, not retention. This intentionally breaks the earlier JSON-backed mock schema/API. See the [vehicle API guide](backend/README.md#shared-request-rules) and [mock-only reset instructions](backend/README.md#development-reset-and-incompatibility) before using an older database.
+
 ## Local data and credentials
 
 Keep the SVV key in the ignored `backend/.env`, never in frontend settings or request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
