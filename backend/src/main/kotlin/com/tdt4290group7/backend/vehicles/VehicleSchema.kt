@@ -70,10 +70,13 @@ internal val vehicleSchemaStatements = listOf(
         CHECK (CASE WHEN fuel_technology IN ('5','6','NOT_APPLICABLE') THEN
           average_consumption_litres_per_km_unscaled IS NULL AND fuel_consumed_litres_unscaled IS NULL
           ELSE average_consumption_litres_per_km_unscaled IS NOT NULL AND fuel_consumed_litres_unscaled IS NOT NULL END),
+        CHECK (fuel_technology NOT IN ('5','6') OR (co2_registered = 0
+          AND co2_grams_per_km_unscaled = 0 AND median_co2_unscaled = 0 AND total_nox_registered_grams_unscaled = 0)),
         CHECK (period_start <= period_end),
         UNIQUE (id, registration_number)
     ) STRICT""",
     "CREATE INDEX IF NOT EXISTS idx_trip_rows_vehicle ON trip_rows(registration_number, created_at, id)",
+    "CREATE INDEX IF NOT EXISTS idx_trip_rows_time ON trip_rows(created_at DESC)",
     """CREATE TABLE IF NOT EXISTS vehicle_approvals (
         id TEXT PRIMARY KEY,
         registration_number TEXT NOT NULL REFERENCES vehicles(registration_number),

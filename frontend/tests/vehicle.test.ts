@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DECIMAL_FIELDS, checkLabel, decimalLiteral, parseVehicleJson, statisticsBody, validDate, validPlate } from "../src/utils/vehicle";
+import { DECIMAL_FIELDS, checkLabel, decimalLiteral, parseVehicleJson, statisticsBody, validDate, validPlate, estimatedCo2Preview, statisticsSaveMessage } from "../src/utils/vehicle";
+import { fuelGroups, categoryGroup } from "../src/utils/vehicleCatalog";
 import type { CheckSummary } from "../src/types/vehicle";
 
 const values: Record<string, string> = {
@@ -8,6 +9,38 @@ const values: Record<string, string> = {
   co2Registered: "false", tripCount: "0", ...Object.fromEntries(DECIMAL_FIELDS.map(([key]) => [key, "0"])),
 };
 describe("vehicle input and safe status presentation", () => {
+  it("previews exact calculated CO₂ without floating point rounding or an editable payload field", () => {
+    expect(estimatedCo2Preview("1000", "123.456")).toBe("123.456");
+    expect(estimatedCo2Preview("0.1", "0.2")).toBe("0.00002");
+    expect(estimatedCo2Preview("1", "123.456789012345678")).toBe("0.123456789012345678");
+    expect(estimatedCo2Preview("123.45", "0")).toBe("0");
+    expect(estimatedCo2Preview("", "123")).toBe("");
+    expect(estimatedCo2Preview("invalid", "123")).toBe("");
+    expect(JSON.parse(statisticsBody({ ...values, estimatedCo2Kg: "999" })).rows[0].estimatedCo2Kg).toBeUndefined();
+  });
+  it("groups G categories and gas variants while keeping CNG and LNG distinct", () => {
+    expect(categoryGroup("M1G")).toBe("M1"); expect(categoryGroup("N3G")).toBe("N3");
+    expect(fuelGroups("16")).toEqual(["12"]); expect(fuelGroups("19")).toEqual(["13"]);
+    expect(fuelGroups("22")).toEqual(["13", "21"]);
+    for (const vehicleCategory of ["M1G", "N3G"])
+      expect(() => statisticsBody({ ...values, vehicleCategory })).toThrow();
+    for (const fuelTechnology of ["15", "16", "17", "18", "19", "20", "22"])
+      expect(() => statisticsBody({ ...values, fuelTechnology })).toThrow();
+  });
+  it("rejects nonzero locked emissions instead of silently rewriting API input", () => {
+    const electric = { ...values, fuelTechnology: "5", averageConsumptionLitresPerKm: "", fuelConsumedLitres: "" };
+    expect(() => statisticsBody(electric)).not.toThrow();
+    for (const field of ["co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams"])
+      expect(() => statisticsBody({ ...electric, [field]: "1" })).toThrow();
+    expect(() => statisticsBody({ ...electric, co2Registered: "true" })).toThrow();
+  });
+  it("clearly separates saved statistics from incomplete or failed automatic verification", () => {
+    const check: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", approvalStatus: "NOT_APPROVED", lookupOutcome: "NOT_CONFIGURED", dataSource: "UNAVAILABLE", deviations: ["NOT_ON_APPROVED_LIST"] };
+    const result = { createdAt: "synthetic", rowCount: 1, distinctVehicleCount: 1, rows: [], checks: [{ registrationNumber: "AB12345", check }] };
+    expect(statisticsSaveMessage(result, "AB12345")).toContain("SVV verification incomplete");
+    expect(statisticsSaveMessage({ ...result, checks: [{ registrationNumber: "AB12345", error: "Saved; retry check only" }] }, "AB12345")).toBe("Saved; retry check only");
+    expect(statisticsSaveMessage({ ...result, checks: [] }, "AB12345")).toContain("do not resubmit");
+  });
   it("preserves exact numeric literals and omitted values when posting a single row", () => {
     const body = statisticsBody({ ...values, co2GramsPerKm: "123.456789012345678", totalTripKm: "000.00", co2Registered: "false", tripCount: "02", comment: 'text with \"co2GramsPerKm\":999' });
     expect(body).toContain('"co2GramsPerKm":123.456789012345678');

@@ -14,30 +14,17 @@ export const FUEL_TECHNOLOGIES = {
   "12": "LPG",
   "13": "CNG",
   "14": "Methanol",
-  "15": "Ethanol",
-  "16": "LPG A",
-  "17": "LPG B",
-  "18": "CNG 20",
-  "19": "CNG 25",
-  "20": "Compressed air",
   "21": "LNG",
-  "22": "CNG and LNG",
   "NOT_APPLICABLE": "Not applicable - unpowered trailer",
 } as const;
 
 export const VEHICLE_CATEGORIES = {
   "M1": "Passenger car",
-  "M1G": "Off-road passenger car",
   "M2": "Bus, maximum permitted weight up to 5,000 kg",
-  "M2G": "Off-road bus, up to 5,000 kg",
   "M3": "Bus, maximum permitted weight over 5,000 kg",
-  "M3G": "Off-road bus, over 5,000 kg",
   "N1": "Van, maximum permitted weight up to 3,500 kg",
-  "N1G": "Off-road van, up to 3,500 kg",
   "N2": "Truck, maximum permitted weight over 3,500 to 12,000 kg",
-  "N2G": "Off-road truck, over 3,500 to 12,000 kg",
   "N3": "Truck, maximum permitted weight over 12,000 kg",
-  "N3G": "Off-road truck, over 12,000 kg",
   "O1": "Trailer, maximum permitted weight up to 750 kg",
   "O2": "Trailer, over 750 to 3,500 kg",
   "O3": "Trailer, over 3,500 to 10,000 kg",
@@ -110,6 +97,16 @@ export type BodyType = keyof typeof BODY_TYPES;
 
 export function isTrailer(category: string): boolean { return ["O1", "O2", "O3", "O4"].includes(category); }
 export function usesLitres(fuel: string): boolean { return !["5", "6", "NOT_APPLICABLE"].includes(fuel); }
+export function locksEmissionsToZero(fuel: string): boolean { return ["5", "6"].includes(fuel); }
+export const LOCKED_EMISSION_FIELDS = ["co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams"] as const;
+export function fuelGroups(code: string): string[] {
+  if (["16", "17"].includes(code)) return ["12"];
+  if (["18", "19"].includes(code)) return ["13"];
+  return code === "22" ? ["13", "21"] : [code];
+}
+export function categoryGroup(code: string): string {
+  return ["M1G", "M2G", "M3G", "N1G", "N2G", "N3G"].includes(code) ? code.slice(0, -1) : code;
+}
 export function catalogLabel(catalog: Readonly<Record<string, string>>, code?: string | null): string {
   if (!code) return "Not provided";
   if (code === "NOT_APPLICABLE") return catalog[code];

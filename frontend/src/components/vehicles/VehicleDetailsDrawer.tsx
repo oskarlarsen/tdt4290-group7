@@ -76,14 +76,14 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
         {tab === "Statistics" && <div className="space-y-3">
           <p className="text-sm text-neutral-600">Supplier observations—not approval requirements or SVV measurements. Blank values are not treated as zero. Rows are append-only.</p>
           {!data.tripRows.length && <p className="rounded-lg bg-neutral-50 p-4 text-sm">No statistics yet. Use Add statistics to enter a reporting period.</p>}
-          {data.tripRows.map(row => <details key={row.id} className="rounded-lg border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">{row.data.periodStart} – {row.data.periodEnd} · {row.data.totalTripKm ?? "Unknown"} km · Estimated CO₂: {row.estimatedCo2Kg ?? "Not available"} kg</summary>
+          {data.tripRows.map(row => <details key={row.id} className="rounded-lg border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">{row.data.periodStart} – {row.data.periodEnd} · {row.data.totalTripKm} km · Total CO₂ (calculated): {row.estimatedCo2Kg} kg</summary>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               {[["Source", row.sourceName], ["Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology)], ["Make", row.data.make], ["Model", row.data.model],
                 ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory)], ["Body type", catalogLabel(BODY_TYPES, row.data.bodyType)],
                 ["Registered as CO₂-emitting", row.data.co2Registered == null ? "Not provided" : row.data.co2Registered ? "Yes" : "No"],
                 ...DECIMAL_FIELDS.map(([key, label]) => [label, ["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !usesLitres(row.data.fuelTechnology) ? "Not applicable" : row.data[key]]), ["Job/trip count", row.data.tripCount], ["Assignment number", row.data.assignmentNumber], ["Comment", row.data.comment], ["Added", timestamp(row.createdAt)]].map(([label, value]) => <div key={String(label)}><dt className="text-neutral-500">{label}</dt><dd className="break-words">{value ?? "Not provided"}</dd></div>)}
             </dl>
-            <p className="mt-3 text-xs text-neutral-500">Estimated CO₂ = supplier total distance × supplier CO₂ g/km ÷ 1000. Missing inputs produce no estimate.</p>
+            <p className="mt-3 text-xs text-neutral-500">Total CO₂ (calculated) = supplier total distance × supplier CO₂ g/km ÷ 1000. This read-only value is an estimate, not measured emissions.</p>
           </details>)}
         </div>}
         {tab === "Check result" && <>

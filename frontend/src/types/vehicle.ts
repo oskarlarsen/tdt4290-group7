@@ -47,3 +47,6 @@ export type VehicleOverview = { vehicle: Vehicle; approvalStatus: ApprovalStatus
 export type VehicleList = { items: VehicleOverview[]; total: number; page: number; pageSize: number; approvalAsOf: string };
 export type VehicleDetails = VehicleOverview & { approvalAsOf: string; tripRows: TripRow[]; latestSnapshot?: Snapshot | null };
 export type CheckHistory = { items: CheckSummary[]; total: number; page: number; pageSize: number };
+export type StatisticsList = { items: TripRow[]; total: number; page: number; pageSize: number };
+export type StatisticsSave = { createdAt: string; rowCount: number; distinctVehicleCount: number; rows: TripRow[];
+  checks: { registrationNumber: string; check?: CheckSummary | null; error?: string | null }[] };

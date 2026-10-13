@@ -3,10 +3,10 @@ import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
 import { ApiError } from "../../api/client";
 import type { StoredApproval, TripRow } from "../../types/vehicle";
-import { DECIMAL_FIELDS, statisticsBody, validDate, validPlate } from "../../utils/vehicle";
+import { DECIMAL_FIELDS, statisticsBody, validDate, validPlate, estimatedCo2Preview, statisticsSaveMessage } from "../../utils/vehicle";
 import { VehicleDialog, Field, ErrorNotice, inputClass, buttonClass, primaryClass, checkboxClass } from "./VehicleDialog";
 import { CatalogSelect, RegistrationNumberInput } from "./VehicleInputs";
-import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres } from "../../utils/vehicleCatalog";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, locksEmissionsToZero, LOCKED_EMISSION_FIELDS } from "../../utils/vehicleCatalog";
 
 type Props = { plate?: string; onClose: () => void; onSaved: (plate: string, message: string) => void };
 
@@ -28,6 +28,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
   const busy = preparing || save.isPending;
   const overlapping = rows.some(row => values.periodStart && values.periodEnd && row.data.periodStart <= values.periodEnd && row.data.periodEnd >= values.periodStart);
   const litresApplicable = usesLitres(values.fuelTechnology ?? "");
+  const emissionsLocked = locksEmissionsToZero(values.fuelTechnology ?? "");
   function change(key: string, value: string) {
     const next = { ...values, [key]: value };
     if (key === "vehicleCategory") {
@@ -38,6 +39,15 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
       if ((values.averageConsumptionLitresPerKm || values.fuelConsumedLitres) &&
         !window.confirm("This selection makes litres not applicable. Clear the litres values you entered?")) return;
       next.averageConsumptionLitresPerKm = ""; next.fuelConsumedLitres = "";
+    }
+    if (locksEmissionsToZero(next.fuelTechnology ?? "")) {
+      if (!emissionsLocked && (values.co2Registered === "true" || LOCKED_EMISSION_FIELDS.some(field => values[field] && !/^0+(?:\.0+)?$/.test(values[field]))) &&
+          !window.confirm("Electric/hydrogen reporting locks CO₂ and NOx values to zero. Replace the emission values you entered?")) return;
+      next.co2Registered = "false";
+      for (const field of LOCKED_EMISSION_FIELDS) next[field] = "0";
+    } else if (emissionsLocked) {
+      next.co2Registered = "";
+      for (const field of LOCKED_EMISSION_FIELDS) next[field] = "";
     }
     setValues(next); setDirty(true); setError(undefined); setOverlapAccepted(false);
     if (key === "registrationNumber") setRows([]);
@@ -52,8 +62,8 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
       setRows(currentRows);
       const hasOverlap = currentRows.some(row => row.data.periodStart <= values.periodEnd && row.data.periodEnd >= values.periodStart);
       if (hasOverlap && !overlapAccepted) throw new Error("Confirm that you intend to append an overlapping reporting period.");
-      await save.mutateAsync(body);
-      onSaved(validPlate(values.registrationNumber), "Statistics appended. No approval or new check was created.");
+      const result = await save.mutateAsync(body);
+      onSaved(validPlate(values.registrationNumber), statisticsSaveMessage(result, validPlate(values.registrationNumber)));
     } catch (cause) { setError(cause); } finally { setPreparing(false); }
   }
   return <VehicleDialog title="Add vehicle statistics" onClose={close} busy={busy}>
@@ -67,8 +77,9 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
         <Field label="Reported vehicle category *"><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory ?? ""} onChange={value => change("vehicleCategory", value)} /></Field>
         <Field label="Reported fuel technology *"><CatalogSelect catalog={FUEL_TECHNOLOGIES} value={values.fuelTechnology ?? ""} disabled={isTrailer(values.vehicleCategory ?? "")} notApplicable={isTrailer(values.vehicleCategory ?? "")} onChange={value => change("fuelTechnology", value)} /></Field>
         <Field label="Reported body type *"><CatalogSelect catalog={BODY_TYPES} value={values.bodyType ?? ""} onChange={value => change("bodyType", value)} /></Field>
-        <Field label="Registered as CO₂-emitting *"><select required className={inputClass} value={values.co2Registered} onChange={e => change("co2Registered", e.target.value)}><option value="" disabled>Select Yes or No</option><option value="true">Yes</option><option value="false">No</option></select></Field>
-        {DECIMAL_FIELDS.slice(0, 2).map(([key, label]) => <Field key={key} label={`${label} *`}><input required inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
+        <Field label="Registered as CO₂-emitting *"><select required disabled={emissionsLocked} className={inputClass} value={values.co2Registered} onChange={e => change("co2Registered", e.target.value)}><option value="" disabled>Select Yes or No</option><option value="true">Yes</option><option value="false">No</option></select></Field>
+        {DECIMAL_FIELDS.slice(0, 2).map(([key, label]) => <Field key={key} label={`${label} *`}><input required readOnly={emissionsLocked && key === "co2GramsPerKm"} inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
+        <Field label="Total CO₂ (kg, calculated)"><input readOnly aria-label="Total CO₂ (kg, calculated)" className={inputClass} value={estimatedCo2Preview(values.totalTripKm ?? "", values.co2GramsPerKm ?? "")} placeholder="Enter distance and CO₂ rate" /><span className="mt-1 block text-xs text-neutral-500">Estimate = total distance × supplier CO₂ g/km ÷ 1000. Calculated again by the backend; never submitted as an input.</span></Field>
       </fieldset>
       <section className="rounded-lg border border-neutral-100 p-4"><h3 className="text-sm font-medium text-neutral-900">Required statistics</h3>
         <fieldset disabled={busy} className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -77,17 +88,18 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
           <Field label="Job/trip count *"><input required inputMode="numeric" className={inputClass} value={values.tripCount ?? ""} onChange={e => change("tripCount", e.target.value)} /></Field>
           {DECIMAL_FIELDS.slice(2).map(([key, label]) => {
             const disabled = ["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !litresApplicable;
-            return <Field key={key} label={`${label}${disabled ? " (not applicable)" : " *"}`}><input required={!disabled} disabled={disabled} placeholder={disabled ? "Not applicable" : undefined} inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>;
+            const locked = emissionsLocked && (LOCKED_EMISSION_FIELDS as readonly string[]).includes(key);
+            return <Field key={key} label={`${label}${disabled ? " (not applicable)" : locked ? " (fixed at zero)" : " *"}`}><input required={!disabled} readOnly={locked} disabled={disabled} placeholder={disabled ? "Not applicable" : undefined} inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>;
           })}
           <div className="sm:col-span-2"><Field label="Comment (optional)"><textarea className={inputClass} value={values.comment ?? ""} onChange={e => change("comment", e.target.value)} /></Field></div>
         </fieldset>
         <p className="mt-3 text-xs text-neutral-500">NOx grams relate to the NOx-covered distance. Median CO₂ is stored as reported; its interpretation is not assumed.</p>
       </section>
-      <p className="text-xs text-neutral-500">Statistics are required; enter zero only when that is the reported value. Litres are not applicable for electric/hydrogen vehicles or unpowered trailers. Use a decimal point, e.g. 12.34. Estimated CO₂ is calculated from total distance × supplier CO₂ / 1000, never entered manually. NOx warnings are not implemented yet.</p>
+      <p className="text-xs text-neutral-500">Saving appends statistics and automatically checks approval and SVV, reusing recent registry data. Electric/hydrogen emission values are fixed at zero by the reporting convention; coverage distances remain required and editable. Litres are not applicable for electric/hydrogen vehicles or unpowered trailers. Use a decimal point, e.g. 12.34. NOx warnings are not implemented yet.</p>
       {overlapping && <label className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><input type="checkbox" className={checkboxClass} disabled={busy} checked={overlapAccepted} onChange={e => setOverlapAccepted(e.target.checked)} />This period overlaps existing statistics. I intend to append another row.</label>}
       <ErrorNotice error={error} />
       {!!error && <p className="text-xs text-neutral-600">If the connection failed after sending, close this form and inspect the vehicle’s statistics before resubmitting: the row may already have been saved.</p>}
-      <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy || (overlapping && !overlapAccepted)}>{busy ? "Saving…" : "Append statistics"}</button></footer>
+      <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy || (overlapping && !overlapAccepted)}>{busy ? "Saving and checking…" : "Save and check"}</button></footer>
     </form>
   </VehicleDialog>;
 }
@@ -151,16 +163,4 @@ export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { ap
       <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy}>{busy ? "Saving…" : "Save approval"}</button></footer>
     </form>
   </VehicleDialog>;
-}
-
-export function CheckForm({ onClose, onSaved }: Props) {
-  const [plate, setPlate] = useState(""); const [force, setForce] = useState(false); const [error, setError] = useState<unknown>();
-  const check = useMutation({ mutationFn: () => api.runCheck(validPlate(plate), force), retry: false });
-  async function submit(event: FormEvent) { event.preventDefault(); setError(undefined); try { const result = await check.mutateAsync(); onSaved(result.vehicle.registrationNumber, "Check saved. Open Check result to inspect the findings and SVV availability."); } catch (cause) { setError(cause); } }
-  return <VehicleDialog title="Check a registration number" onClose={onClose} busy={check.isPending}><form onSubmit={submit} className="space-y-4">
-    <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">Checks local approval and SVV. An unknown plate will be added to the vehicle list, without approval or statistics.</p>
-    <Field label="Registration number *"><RegistrationNumberInput autoFocus disabled={check.isPending} value={plate} onChange={setPlate} /></Field>
-    <label className="flex gap-2 text-sm text-neutral-700"><input type="checkbox" className={checkboxClass} disabled={check.isPending} checked={force} onChange={e => setForce(e.target.checked)} />Force new SVV lookup instead of using recent cached data</label>
-    <ErrorNotice error={error} /><footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={check.isPending} onClick={onClose}>Cancel</button><button className={primaryClass} disabled={check.isPending}>{check.isPending ? "Checking…" : "Run check"}</button></footer>
-  </form></VehicleDialog>;
 }

@@ -6,7 +6,7 @@ import java.math.BigDecimal
 fun syntheticTrip(
     registrationNumber: String = "AB12345", periodStart: String = "2026-01-01", periodEnd: String = "2026-01-31",
     fuelTechnology: FuelTechnology = FuelTechnology.DIESEL, make: String = "Synthetic make",
-    bodyType: BodyType = BodyType.AA, model: String = "Synthetic model", co2Registered: Boolean = true,
+    bodyType: BodyType = BodyType.AA, model: String = "Synthetic model", co2Registered: Boolean = !fuelTechnology.locksEmissionsToZero,
     co2GramsPerKm: BigDecimal = BigDecimal.ZERO, medianCo2: BigDecimal = BigDecimal.ZERO,
     totalTripKm: BigDecimal = BigDecimal.ZERO, totalKmCo2Registered: BigDecimal = BigDecimal.ZERO,
     totalKmCo2NotRegistered: BigDecimal = BigDecimal.ZERO, kmFuelNotRegistered: BigDecimal = BigDecimal.ZERO,

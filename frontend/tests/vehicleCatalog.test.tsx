@@ -16,7 +16,9 @@ describe("official vehicle catalogues and required form inputs", () => {
     const bodies = kotlin.slice(kotlin.indexOf("enum class BodyType"), kotlin.indexOf("internal fun fuelCode"));
     for (const [source, catalog] of [[categories, VEHICLE_CATEGORIES], [bodies, BODY_TYPES]] as const)
       expect(catalog).toEqual(Object.fromEntries([...source.matchAll(/\b([A-Z][A-Z0-9_]*)\("([^"]+)"\)/g)].map(match => [match[1], match[2]])));
-    expect(Object.keys(fuels).filter(code => /^\d+$/.test(code))).toHaveLength(22);
+    expect(Object.keys(fuels).filter(code => /^\d+$/.test(code))).toHaveLength(15);
+    expect(fuels["21"]).toBe("LNG"); expect(fuels["22"]).toBeUndefined();
+    expect(Object.keys(VEHICLE_CATEGORIES).some(code => code.endsWith("G"))).toBe(false);
   });
 
   it("shows code plus English label and an explicitly local trailer sentinel", () => {
@@ -40,6 +42,8 @@ describe("official vehicle catalogues and required form inputs", () => {
     expect(html).toContain("Required statistics"); expect(html).not.toContain("Additional statistics (optional)");
     expect(html).toContain("Comment (optional)"); expect(html).toContain("Assignment number / reference (optional)");
     expect(html).toContain("Reported vehicle category *"); expect(html).toContain("Reported body type *");
+    expect(html).toContain('aria-label="Total CO₂ (kg, calculated)"'); expect(html).toContain('readonly=""');
+    expect(html).toContain("Save and check");
     expect(html).not.toContain("Not provided</option>");
     expect((html.match(/required=""/g) ?? []).length).toBe(21);
   });

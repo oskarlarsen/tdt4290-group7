@@ -13,6 +13,57 @@ class VehicleInputRulesTest {
     private fun path() = Path.of("build", "test-data", "rules-${UUID.randomUUID()}.db")
 
     @Test
+    fun electricAndHydrogenRequireFixedZeroEmissionValues() {
+        val repository = VehicleRepository(path())
+        for (fuel in listOf(FuelTechnology.ELECTRIC, FuelTechnology.HYDROGEN)) {
+            val valid = syntheticTrip(fuelTechnology = fuel)
+            repository.appendTripRows(AppendTripRowsRequest(rows = listOf(valid)), now)
+            for (invalid in listOf(valid.copy(co2Registered = true), valid.copy(co2GramsPerKm = BigDecimal.ONE),
+                valid.copy(medianCo2 = BigDecimal.ONE), valid.copy(totalNoxRegisteredGrams = BigDecimal.ONE)))
+                assertFailsWith<IllegalArgumentException> { repository.appendTripRows(AppendTripRowsRequest(rows = listOf(invalid)), now) }
+        }
+    }
+
+    @Test
+    fun simplifiedGroupsPreserveOriginalRegistryCodes() {
+        assertEquals(setOf("12"), fuelGroups("16")); assertEquals(setOf("12"), fuelGroups("17"))
+        assertEquals(setOf("13"), fuelGroups("18")); assertEquals(setOf("13"), fuelGroups("19"))
+        assertEquals(setOf("13", "21"), fuelGroups("22"))
+        assertEquals("N3", categoryGroup("N3G")); assertEquals("O1", categoryGroup("O1"))
+        assertEquals("N3G", categoryCode("N3G").code)
+        assertEquals("22", fuelCode("22").code)
+        assertEquals("Ethanol", fuelCode("15").name)
+    }
+
+    @Test
+    fun versionThreeIsRebuiltOnlyWhenEveryTableIsEmpty() {
+        val emptyPath = path()
+        VehicleRepository(emptyPath)
+        fun markVersionThree(path: Path) = DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.execute("PRAGMA user_version=3") }
+        }
+        markVersionThree(emptyPath)
+        VehicleRepository(emptyPath)
+        DriverManager.getConnection("jdbc:sqlite:${emptyPath.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(4, rows.getInt(1)) } }
+        }
+        val populatedPath = path()
+        val repository = VehicleRepository(populatedPath)
+        repository.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip())), now)
+        markVersionThree(populatedPath)
+        assertFailsWith<IllegalStateException> { VehicleRepository(populatedPath) }
+        assertEquals(1, repository.tripRowsForVehicle("AB12345").size)
+        // Empty vehicles are not enough: a supplier-only database must also be preserved.
+        val supplierPath = path()
+        VehicleRepository(supplierPath)
+        DriverManager.getConnection("jdbc:sqlite:${supplierPath.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.execute("INSERT INTO suppliers VALUES('synthetic','Synthetic','2026-01-01T00:00:00Z')") }
+        }
+        markVersionThree(supplierPath)
+        assertFailsWith<IllegalStateException> { VehicleRepository(supplierPath) }
+    }
+
+    @Test
     fun ordinaryPlateRulesAcceptFourAndFiveDigitsWithoutGuessing() {
         val repository = VehicleRepository(path())
         assertEquals("AB1234", repository.findOrCreateVehicle(" ab-1234 ", now).registrationNumber)

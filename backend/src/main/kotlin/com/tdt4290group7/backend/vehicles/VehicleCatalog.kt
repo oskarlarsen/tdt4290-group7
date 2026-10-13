@@ -20,30 +20,25 @@ enum class FuelTechnology(val code: String, val label: String) {
     @SerialName("12") LPG("12", "LPG"),
     @SerialName("13") CNG("13", "CNG"),
     @SerialName("14") METHANOL("14", "Methanol"),
-    @SerialName("15") ETHANOL("15", "Ethanol"),
-    @SerialName("16") LPG_A("16", "LPG A"),
-    @SerialName("17") LPG_B("17", "LPG B"),
-    @SerialName("18") CNG_20("18", "CNG 20"),
-    @SerialName("19") CNG_25("19", "CNG 25"),
-    @SerialName("20") COMPRESSED_AIR("20", "Compressed air"),
     @SerialName("21") LNG("21", "LNG"),
-    @SerialName("22") CNG_AND_LNG("22", "CNG and LNG"),
     /** Local sentinel: deliberately not presented as an official SVV code. */
     NOT_APPLICABLE("NOT_APPLICABLE", "Not applicable - unpowered trailer");
 
     val usesLitres: Boolean get() = this !in listOf(ELECTRIC, HYDROGEN, NOT_APPLICABLE)
+    /** Application reporting convention, not a claim about every hydrogen powertrain. */
+    val locksEmissionsToZero: Boolean get() = this in listOf(ELECTRIC, HYDROGEN)
     companion object { fun fromCode(code: String) = entries.first { it.code == code } }
 }
 
 /** Input scope: cars, buses, goods vehicles and trailers. SVV observations remain open-ended. */
 @Serializable
 enum class VehicleCategory(val label: String) {
-    M1("Passenger car"), M1G("Off-road passenger car"),
-    M2("Bus, maximum permitted weight up to 5,000 kg"), M2G("Off-road bus, up to 5,000 kg"),
-    M3("Bus, maximum permitted weight over 5,000 kg"), M3G("Off-road bus, over 5,000 kg"),
-    N1("Van, maximum permitted weight up to 3,500 kg"), N1G("Off-road van, up to 3,500 kg"),
-    N2("Truck, maximum permitted weight over 3,500 to 12,000 kg"), N2G("Off-road truck, over 3,500 to 12,000 kg"),
-    N3("Truck, maximum permitted weight over 12,000 kg"), N3G("Off-road truck, over 12,000 kg"),
+    M1("Passenger car"),
+    M2("Bus, maximum permitted weight up to 5,000 kg"),
+    M3("Bus, maximum permitted weight over 5,000 kg"),
+    N1("Van, maximum permitted weight up to 3,500 kg"),
+    N2("Truck, maximum permitted weight over 3,500 to 12,000 kg"),
+    N3("Truck, maximum permitted weight over 12,000 kg"),
     O1("Trailer, maximum permitted weight up to 750 kg"), O2("Trailer, over 750 to 3,500 kg"),
     O3("Trailer, over 3,500 to 10,000 kg"), O4("Trailer, over 10,000 kg");
 
@@ -74,6 +69,19 @@ enum class BodyType(val label: String) {
     SM("Goods vehicle for interchangeable equipment"), VELTEBOYLE("Rollover protection bar");
 }
 
-internal fun fuelCode(code: String) = RegistryCode(code, FuelTechnology.entries.find { it.code == code }?.label)
-internal fun categoryCode(code: String) = RegistryCode(code, VehicleCategory.entries.find { it.name == code }?.label)
+/** Comparison groups never overwrite the original SVV observation. */
+internal fun fuelGroups(code: String): Set<String> = when (code) {
+    "16", "17" -> setOf("12")
+    "18", "19" -> setOf("13")
+    "22" -> setOf("13", "21")
+    else -> setOf(code)
+}
+internal fun categoryGroup(code: String): String =
+    if (code in setOf("M1G", "M2G", "M3G", "N1G", "N2G", "N3G")) code.dropLast(1) else code
+internal fun fuelCode(code: String) = RegistryCode(code,
+    FuelTechnology.entries.find { it.code == code }?.label ?: when (code) {
+        "15" -> "Ethanol"; "16" -> "LPG A"; "17" -> "LPG B"; "18" -> "CNG 20"
+        "19" -> "CNG 25"; "20" -> "Compressed air"; "22" -> "CNG and LNG"; else -> null
+    })
+internal fun categoryCode(code: String) = RegistryCode(code, VehicleCategory.entries.find { it.name == categoryGroup(code) }?.label)
 internal fun bodyCode(code: String) = RegistryCode(code, BodyType.entries.find { it.name == code }?.label)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { appendStatistics, getCheck, getVehicles, runCheck, saveApproval } from "../src/api/vehicles";
+import { appendStatistics, getCheck, getVehicles, getStatistics, runCheck, saveApproval } from "../src/api/vehicles";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("real vehicle API client", () => {
@@ -17,7 +17,7 @@ describe("real vehicle API client", () => {
     expect(fetch.mock.calls[1][0]).toContain("/vehicle-checks/synthetic-id");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
-  it("sends individual statistics unchanged and only explicitly requested checks", async () => {
+  it("sends one statistics POST without duplicating the backend's automatic check", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetch);
     const body = '{"rows":[{"registrationNumber":"AB10001","totalTripKm":1.23456789012345678}]}';
     await appendStatistics(body);
@@ -26,6 +26,12 @@ describe("real vehicle API client", () => {
     fetch.mockResolvedValue(new Response("{}"));
     await runCheck("AB10001", true);
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ registrationNumber: "AB10001", forceRefresh: true });
+  });
+  it("uses a paginated GET for the statistics directory without running checks", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('{"items":[],"total":0,"page":2,"pageSize":25}')); vi.stubGlobal("fetch", fetch);
+    await getStatistics("AB10001", 2);
+    expect(fetch.mock.calls[0][0]).toContain("/trip-rows?search=AB10001&page=2&pageSize=25");
+    expect(fetch.mock.calls[0][1].method).toBeUndefined(); expect(fetch).toHaveBeenCalledTimes(1);
   });
   it("sends all intended approval fields, including cleared expiry", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetch);

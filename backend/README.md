@@ -8,7 +8,7 @@ A statistics row covers a mandatory reporting period and may represent several j
 
 1. Submit usage statistics through `POST /api/trip-rows`.
 2. Submit approved vehicles through `POST /api/vehicle-approvals`.
-3. Check one plate through `POST /api/vehicle-checks`.
+3. Saving statistics automatically checks each submitted plate. Use `POST /api/vehicle-checks` to recheck a vehicle or force a refresh separately.
 4. The backend reads local approval/statistics, reuses a recent snapshot or calls SVV, then saves and returns a combined result.
 
 There are no import IDs to pair or suppliers to select. The API accepts JSON, not PDF/spreadsheet uploads. Convert source columns into the fields below before submitting.
@@ -109,10 +109,11 @@ The admin frontend draft uses real vehicle endpoints even if login mocks are ena
 | `GET /api/vehicles` | `search`: optional partial registration number, case/space/hyphen normalized, up to 7 letters/digits. `approvalStatus`: optional `ACTIVE`, `NOT_YET_ACTIVE`, `EXPIRED`, `REVOKED`, or `NOT_APPROVED`. `page`: positive integer, default 1. `pageSize`: 1–100, default 25. Returns `items`, `total`, `page`, `pageSize`, and `approvalAsOf`. Stable registration-number order. |
 | `GET /api/vehicles/{registrationNumber}` | Returns current vehicle/approval, `approvalStatus`, `approvalAsOf`, all stored reporting rows newest first, latest selected SVV snapshot and latest saved check summary. Unknown plate: 404, without inserting it. |
 | `GET /api/vehicles/{registrationNumber}/checks` | `page`: positive integer, default 1. `pageSize`: 1–100, default 10. Returns newest-first saved check summaries with `items`, `total`, `page`, and `pageSize`. Unknown vehicle: 404; known vehicle with no checks: empty items. |
+| `GET /api/trip-rows` | `search`: optional normalized partial plate, up to 7 alphanumeric characters. `page`: positive integer, default 1. `pageSize`: 1–100, default 25. Returns `items`, `total`, `page`, `pageSize`, newest creation time first, then insertion order for ties. Repeated plates/periods stay separate. |
 
 Malformed parameters return 400. Out-of-range pages return empty items, not an error. Approval is evaluated on the current Oslo date (including the expiry date). Each read uses a single SQLite read transaction; its totals and items share one database snapshot. The summary's approval and deviations describe the **time of that check**, whereas the overview/details approval describes **today**. `dataSource` likewise describes how SVV data was obtained when that check ran; use `checkedAt` and `fetchedAt` to judge age.
 
-Use the existing `GET /api/vehicle-checks/{id}` for original check evidence. Opening the frontend or selecting history does not create checks. Only the explicit Run check action posts `/api/vehicle-checks`; `forceRefresh` remains optional. The details API currently returns all reporting rows for one vehicle; paginated statistics and batch actions are deferred. List/history paging bounds database work, but pagination is not a cross-request frozen snapshot if records change between pages.
+Use the existing `GET /api/vehicle-checks/{id}` for original check evidence. Opening the frontend, statistics rows or history does not create checks. Saving statistics automatically invokes the check service after appending; explicit Run check in vehicle details posts `/api/vehicle-checks`, with optional `forceRefresh`. The details API still returns all reporting rows for one vehicle, while the statistics directory uses the paginated global endpoint. Batch UI actions are deferred. Pagination is not a cross-request frozen snapshot if records change between pages.
 
 These routes retain the existing unauthenticated vehicle-route policy. The frontend's admin route guard is not server-side authorization; do not expose the draft beyond local development until backend access controls are implemented.
 
@@ -224,18 +225,17 @@ Fuel/category/body-type dropdowns display official codes alongside application-o
 | `"9"` | Other fuel | `"10"` | Biodiesel |
 | `"11"` | Biogasoline | `"12"` | LPG |
 | `"13"` | CNG | `"14"` | Methanol |
-| `"15"` | Ethanol | `"16"` | LPG A |
-| `"17"` | LPG B | `"18"` | CNG 20 |
-| `"19"` | CNG 25 | `"20"` | Compressed air |
-| `"21"` | LNG | `"22"` | CNG and LNG |
+| `"21"` | LNG | | |
 
-These are the complete [SVV fuel codes](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=DRIVSTOFFTYPE). Gasoline hybrid and diesel hybrid remain separate; no separate hybridCategory or isHybrid field is accepted or retained. The fuel codes do not establish whether a hybrid is plug-in/non-plug-in or which fuel was actually used during a period.
+This is the simplified manual input subset of [SVV fuel codes](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=DRIVSTOFFTYPE): 1–14 and 21. CNG (`13`) and LNG (`21`) are separate choices. LPG A/B (`16`/`17`) group with LPG (`12`); CNG 20/25 (`18`/`19`) group with CNG (`13`); combined CNG/LNG (`22`) represents both groups, not a separate manual option. Grouping helpers are available but no new comparison rules are enabled. The structured SVV observation always preserves the original code; ethanol (`15`) and compressed air (`20`) are never falsely relabelled as another fuel. Gasoline/diesel hybrids remain separate; no hybridCategory/isHybrid is retained. Codes do not establish plug-in status or fuel actually used during a period.
 
-`vehicleCategory` replaces approval `vehicleGroup` and is also required on trip rows. Submitted categories are `M1`, `M1G`, `M2`, `M2G`, `M3`, `M3G`, `N1`, `N1G`, `N2`, `N2G`, `N3`, `N3G`, `O1`, `O2`, `O3`, `O4`: passenger cars, buses, vans, trucks, their off-road variants and trailers. This is not the former approval sheet's 7.5-tonne grouping. See [SVV technical categories](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=TEKNISKKODE) and `VehicleCatalog.kt` / `vehicleCatalog.ts` for the code/English-label definitions.
+`vehicleCategory` replaces approval `vehicleGroup` and is required on trip rows. Submitted categories are `M1`, `M2`, `M3`, `N1`, `N2`, `N3`, `O1`, `O2`, `O3`, `O4`: passenger cars, buses, vans, trucks and trailers. G variants are merged into their base category for application grouping (`M1G` → `M1`, etc.), but original SVV codes remain in the structured observation. This is not the former approval sheet's 7.5-tonne grouping. See [SVV technical categories](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=TEKNISKKODE) and `VehicleCatalog.kt` / `vehicleCatalog.ts`.
 
 `bodyType` replaces ambiguous trip-row `vehicleType` and represents body style, not technical category: e.g. `AA` Sedan, `AB` Hatchback, `AC` Station wagon, `AD` Coupe, `AE` Convertible. The complete [SVV body-type catalogue](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=KAROSSERITYPE) is supported, including bus/truck/trailer bodies. Do not automatically reinterpret an old spreadsheet's Biltype text as a code without verifying its meaning. Body type is not an approval requirement in this version.
 
 Unpowered trailers (`O1`–`O4`) must use `fuelTechnology: "NOT_APPLICABLE"`. This is an **application-only sentinel**, not an official SVV code and not the same as Other fuel (`"9"`). It is invalid for non-trailer categories. No engine-powered trailer exception is represented in this version. Both litres fields must be omitted/null for electric (`"5"`), hydrogen (`"6"`) and unpowered trailers. They are required for other submitted fuels, including both hybrids. The API has no kg/kWh/m³ consumption inputs; do not convert those quantities into litres by relabelling them.
+
+Electric/hydrogen statistics must use `co2Registered: false`, `co2GramsPerKm: 0`, `medianCo2: 0`, `totalNoxRegisteredGrams: 0`. These inputs are locked in the UI, and conflicting API/SQL values are rejected, not silently overwritten. This is the agreed reporting convention, not a universal claim about hydrogen combustion or lifecycle emissions. All reporting-coverage distances remain editable and mandatory; they are not emissions quantities. Other fuels retain explicit mandatory emission inputs, including zero when appropriate; NOx warning rules are deferred.
 
 ## Routes and HTTP statuses
 
@@ -243,7 +243,8 @@ Unpowered trailers (`O1`–`O4`) must use `fuelTechnology: "NOT_APPLICABLE"`. Th
 |---|---|---|
 | GET /health | Liveness: {"status":"UP"} | 200 |
 | GET / | Text greeting | 200 |
-| POST /api/trip-rows | Append reporting-period statistics | 201 |
+| GET /api/trip-rows | Browse reporting-period statistics | 200 |
+| POST /api/trip-rows | Append reporting-period statistics, then check distinct plates | 201 |
 | POST /api/vehicle-approvals | Add/replace submitted approvals | 201 |
 | POST /api/vehicle-approvals/{registrationNumber}/revoke | Revoke one approval | 200 |
 | POST /api/vehicle-checks | Save a check for one plate | 201 |
@@ -312,13 +313,15 @@ POST /api/trip-rows, Body → raw → JSON:
 
 All statistics fields above are mandatory except comments/references and inapplicable litres. sourceName is an optional batch reference, not an import ID or supplier identifier; assignmentNumber is an optional job reference. Trip rows have no approval flag. Zero and false are valid explicit values; missing measurements are not replaced with zero, inferred from SVV or defaulted by the UI. If a supplier cannot provide a required value, the current strict contract does not accept the row.
 
-Response: createdAt, rowCount, distinctVehicleCount, rows. Stored rows contain id, registrationNumber, optional sourceName, createdAt, data and read-only estimatedCo2Kg. Stored plates are normalized. Repeated submissions append more rows, including identical/overlapping periods. No deduplication or summation occurs. Retrieval sorts creation time then UUID; batch input order need not be retained.
+Response: `createdAt`, `rowCount`, `distinctVehicleCount`, `rows`, `checks`. Stored rows contain id, registrationNumber, optional sourceName, createdAt, data and read-only estimatedCo2Kg. Stored plates are normalized. Repeated submissions append more rows, including identical/overlapping periods. No deduplication or summation occurs. The global statistics list sorts creation time then insertion order; the existing per-vehicle details view sorts creation time then UUID.
 
-### Estimated CO₂
+After the batch transaction commits, the backend invokes the check service **once per distinct normalized plate**, with `forceRefresh=false`. This uses current approval as of today and the configurable 14-day SVV cache, just like a manual check. The check captures all rows present for that plate, including earlier rows. `checks` contains one `{registrationNumber, check}` result per plate, where `check` is the saved historical summary (`id`, `checkedAt`, `approvalStatus`, registry source/outcome and deviations). Ordinary SVV failures still save an incomplete check. Unexpected checking/storage failures instead return `{registrationNumber, error}` with a safe retry message. HTTP 201 means statistics were saved, not that SVV verification passed. Retry verification through `/api/vehicle-checks`; **do not resubmit statistics** to retry a check. Append and checks are not one atomic transaction: if the client disconnects/cancels after persistence, inspect rows and check history before taking further action. Large batches may wait for several sequential external lookups; there is no background job or new batch UI in this version.
+
+### Total CO₂ (calculated estimate, kg)
 
 estimatedCo2Kg = supplier totalTripKm × supplier co2GramsPerKm / 1000.
 
-The example row returns 123.456 kg. Exact decimal arithmetic is used. The result is computed, not independently editable or stored. Both operands are now required. co2Registered=false does not supply a zero rate; SVV values are not substituted. This is a nominal supplier-based estimate, not measured actual or lifecycle emissions. Estimates may have more precision than individual inputs.
+The example row returns 123.456 kg in `estimatedCo2Kg`. The statistics form displays this as **Total CO₂ (kg, calculated)** in a read-only preview; users cannot submit or override it. Exact decimal arithmetic is used. The result is computed from explicit columns, not independently editable or redundantly stored. Both operands are required. Electric/hydrogen use the fixed zero-rate reporting convention above; otherwise `co2Registered=false` alone does not supply a zero rate. SVV values are not substituted. This is a nominal supplier-based estimate, not measured actual or lifecycle emissions. Estimates may have more precision than individual inputs.
 
 The supplier NOx mass and distance are related, but no NOx-rate calculation, zero-NOx warning or comparison is implemented. A zero value is stored without generating a new issue. Supplier grams and SVV mg/km are different quantities.
 
@@ -457,7 +460,7 @@ GET /api/vehicle-checks/<check-id> uses the check's top-level UUID, not the plat
 
 ## Relational database and history
 
-Schema version 3 uses SQLite STRICT tables, foreign keys on each connection, explicit columns, constrained classification codes/booleans/statuses, mandatory statistics, validated dates and exact quantities. There are no data_json columns or arbitrary attribute maps. Both coefficient and scale are NOT NULL for required decimal fields. Conditional CHECK constraints enforce null litres for electric/hydrogen/trailer rows and present litres for other fuels. These constraints also apply to direct SQL inserts.
+Schema version 4 uses SQLite STRICT tables, foreign keys on each connection, explicit columns, constrained classification codes/booleans/statuses, mandatory statistics, validated dates and exact quantities. There are no data_json columns or arbitrary attribute maps. Both coefficient and scale are NOT NULL for required decimal fields. Conditional CHECK constraints enforce null litres for electric/hydrogen/trailer rows, present litres for other fuels, and fixed zero electric/hydrogen emission quantities with a false CO₂-emitting flag. Manual category/fuel constraints use the simplified catalogues. These constraints also apply to direct SQL inserts.
 
 | Table | Purpose |
 |---|---|
@@ -498,12 +501,12 @@ History is retained indefinitely by explicit product decision. There is no 90-da
 
 ### Database compatibility and safe development setup
 
-Schema version 3 intentionally changes version 2: required supplier statistics, restricted fuel/category/body codes, ordinary-plate validation and body type instead of detailed hybrid category. Startup refuses version 2 and earlier schemas **without reading their vehicle records, resetting them or guessing missing values**. An unversioned database must be empty. A reviewed migration remains a separate decision; previous permission to clear mock data does not authorize deleting a current database.
+Schema version 4 narrows manual classification codes and enforces the electric/hydrogen emission convention. A recognized version-3 database is rebuilt inside a transaction **only if all ten tables are empty**, including suppliers. The guard checks table names and record existence without loading vehicle observations. Populated version-3 databases, unexpected tables, version 2 and older schemas are refused without resetting data or guessing missing values. An unversioned database must be empty. A reviewed migration of populated data remains a separate decision.
 
-For native local testing, stop the backend and choose an **unused** filename. Set `VEHICLE_DB_PATH=data/vehicles-v3.db` in your private root `.env`, or temporarily override it from `backend/`:
+For native local testing, restart the backend; an empty version-3 database upgrades automatically. If the compatibility guard refuses the database, choose an **unused** filename. Set `VEHICLE_DB_PATH=data/vehicles-v4.db` in your private root `.env`, or temporarily override it from `backend/`:
 
 ~~~powershell
-$env:VEHICLE_DB_PATH = "data/vehicles-v3.db"
+$env:VEHICLE_DB_PATH = "data/vehicles-v4.db"
 .\gradlew.bat run
 ~~~
 
@@ -593,4 +596,4 @@ This stores the ID automatically. See **Test Results** after sending. Passing HT
 
 ## Current boundaries
 
-Vehicles and per-vehicle check history can be listed through the documented read endpoints; statistics are not yet paginated. No supplier assignment, statistics deletion, spreadsheet parsing, batch checking, background monitoring, fuel/CO₂ policy comparisons, or automatic cleanup is implemented. These describe current behavior, not promised future features.
+Vehicles, statistics rows and per-vehicle check history can be listed through the documented read endpoints. Saving a statistics batch checks its distinct plates, but there is no separate batch-check UI/endpoint, background monitoring, supplier assignment, statistics deletion, spreadsheet parsing, new fuel/CO₂ policy comparisons or automatic cleanup. These describe current behavior, not promised future features.

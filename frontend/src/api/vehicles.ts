@@ -1,5 +1,5 @@
 import { apiFetch } from "./client";
-import type { ApprovalInput, ApprovalStatus, CheckHistory, StoredApproval, VehicleCheck, VehicleDetails, VehicleList } from "../types/vehicle";
+import type { ApprovalInput, ApprovalStatus, CheckHistory, StoredApproval, VehicleCheck, VehicleDetails, VehicleList, StatisticsList, StatisticsSave } from "../types/vehicle";
 import { parseVehicleJson } from "../utils/vehicle";
 
 // Always real API calls, even when the separate login flow uses mocks.
@@ -17,7 +17,9 @@ export const getCheck = (id: string) => vehicleFetch<VehicleCheck>(`/vehicle-che
 export const runCheck = (plate: string, forceRefresh: boolean) => vehicleFetch<VehicleCheck>("/vehicle-checks", {
   method: "POST", body: JSON.stringify({ registrationNumber: plate, forceRefresh }),
 });
-export const appendStatistics = (body: string) => vehicleFetch<unknown>("/trip-rows", { method: "POST", body });
+export const appendStatistics = (body: string) => vehicleFetch<StatisticsSave>("/trip-rows", { method: "POST", body });
+export const getStatistics = (search: string, page: number) => vehicleFetch<StatisticsList>(
+  `/trip-rows?${new URLSearchParams({ search, page: String(page), pageSize: "25" })}`);
 export const saveApproval = (approval: ApprovalInput, sourceName?: string | null) => vehicleFetch<unknown>("/vehicle-approvals", {
   method: "POST", body: JSON.stringify({ sourceName, approvals: [approval] }),
 });

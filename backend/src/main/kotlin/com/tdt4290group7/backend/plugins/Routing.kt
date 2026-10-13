@@ -23,6 +23,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import com.tdt4290group7.backend.vehicles.ApprovalStatus
+import com.tdt4290group7.backend.vehicles.VehicleCheckRequest
+import com.tdt4290group7.backend.vehicles.VehicleCheckSummary
+import com.tdt4290group7.backend.vehicles.StatisticsCheckResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 
@@ -81,7 +85,18 @@ fun Application.configureRouting(
             call.respond(result)
         }
 
-        /** Each submitted statistics row is appended, including repeated registration numbers. */
+        get("/api/trip-rows") {
+            val result = try {
+                repository.listTripRows(call.request.queryParameters["search"] ?: "",
+                    pageParameter(call.request.queryParameters["page"], 1), pageParameter(call.request.queryParameters["pageSize"], 25))
+            } catch (cause: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid statistics query"))
+                return@get
+            }
+            call.respond(result)
+        }
+
+        /** Append first, then check once per distinct plate. Check failures never roll back saved rows. */
         post("/api/trip-rows") {
             val request = try {
                 decodeTripRowsRequest(call.receiveText())
@@ -99,7 +114,21 @@ fun Application.configureRouting(
                 "trip_rows_appended rows={} distinctVehicles={}",
                 response.rowCount, response.distinctVehicleCount,
             )
-            call.respond(HttpStatusCode.Created, response)
+            val results = response.rows.map { it.registrationNumber }.distinct().map { plate ->
+                try {
+                    val checked = checks.check(VehicleCheckRequest(plate))
+                    StatisticsCheckResult(plate, VehicleCheckSummary(checked.id, checked.checkedAt, checked.approvalStatus,
+                        checked.registry.dataSource, checked.registry.lookupOutcome, checked.registry.fetchedAt,
+                        checked.registry.refreshFailure, checked.deviations))
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (_: Exception) {
+                    // Never log a raw plate, supplier observations, SVV payload or exception message.
+                    call.application.log.warn("statistics_automatic_check_failed")
+                    StatisticsCheckResult(plate, error = "Statistics saved, but automatic verification failed. Retry the check from vehicle details; do not resubmit statistics.")
+                }
+            }
+            call.respond(HttpStatusCode.Created, response.copy(checks = results))
         }.apply {
             install(RequestBodyLimit) {
                 bodyLimit { MAX_VEHICLE_BATCH_BODY_BYTES }

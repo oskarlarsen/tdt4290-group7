@@ -21,6 +21,7 @@ interface VehicleStore {
     fun findOrCreateVehicle(registrationNumber: String, now: Instant): Vehicle
     fun appendTripRows(request: AppendTripRowsRequest, now: Instant): AppendTripRowsResponse
     fun tripRowsForVehicle(registrationNumber: String): List<StoredTripRow>
+    fun listTripRows(search: String, page: Int, pageSize: Int): TripRowsListResponse
     fun upsertApprovals(request: UpsertApprovalsRequest, now: Instant): UpsertApprovalsResponse
     fun approvalForVehicle(registrationNumber: String): StoredApproval?
     fun revokeApproval(registrationNumber: String, now: Instant): StoredApproval?
@@ -49,15 +50,27 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             }.isNotEmpty()
             check(!legacy) { "Legacy vehicle schema detected. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset." }
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            check(version == 0 || version == 3) {
+            check(version == 0 || version == 3 || version == 4) {
                 "Vehicle schema version $version is not supported. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
             }
             if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") {
                 it.getString(1)
             }.isEmpty()) { "Unversioned database is not empty; no automatic reinterpretation is allowed" }
+            if (version == 3) {
+                // Reviewed development-only transition: never rebuild a populated database.
+                val expected = listOf("vehicle_check_deviations", "vehicle_check_trip_rows", "vehicle_checks",
+                    "svv_emission_measurements", "svv_snapshot_fuels", "svv_snapshots", "vehicle_approvals",
+                    "trip_rows", "vehicles", "suppliers")
+                val tables = query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") { it.getString(1) }
+                check(tables.toSet() == expected.toSet()) { "Unexpected version-3 tables; arrange a reviewed migration; no data has been reset." }
+                check(expected.all { table -> query(db, "SELECT EXISTS(SELECT 1 FROM $table)") { it.getInt(1) }.single() == 0 }) {
+                    "Version-3 database contains data; choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
+                }
+                db.createStatement().use { statement -> expected.forEach { statement.executeUpdate("DROP TABLE $it") } }
+            }
             db.createStatement().use { statement ->
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
-                statement.execute("PRAGMA user_version = 3")
+                statement.execute("PRAGMA user_version = 4")
             }
         }
     }
@@ -97,6 +110,20 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 VehicleOverview(vehicle, approvalStatus(approval, today), approval, checkSummaries(db, vehicle.registrationNumber, 1, 0).firstOrNull())
             }
             VehicleListResponse(items, total, page, pageSize, today.toString())
+        }
+    }
+
+    override fun listTripRows(search: String, page: Int, pageSize: Int): TripRowsListResponse {
+        validatePage(page, pageSize)
+        val plateSearch = normalizeRegistrationNumber(search)
+        require(plateSearch.matches(Regex("[A-Z0-9]{0,7}"))) { "search must contain up to 7 registration-number characters" }
+        return readTransaction { db ->
+            val parameters = listOf("%$plateSearch%")
+            val total = query(db, "SELECT count(*) FROM trip_rows WHERE registration_number LIKE ?", parameters) { it.getInt(1) }.single()
+            val items = query(db, """SELECT * FROM trip_rows WHERE registration_number LIKE ?
+                ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?""",
+                parameters + listOf(pageSize, (page.toLong() - 1) * pageSize), ::tripFrom)
+            TripRowsListResponse(items, total, page, pageSize)
         }
     }
 
@@ -430,6 +457,11 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         require(!end.isBefore(start)) { "rows[$index].periodEnd must not be before periodStart" }
         require(input.make.isNotBlank() && input.model.isNotBlank()) { "rows[$index].make and model must not be blank" }
         require(input.tripCount >= 0) { "rows[$index].tripCount must be non-negative" }
+        if (input.fuelTechnology.locksEmissionsToZero) {
+            require(!input.co2Registered && listOf(input.co2GramsPerKm, input.medianCo2, input.totalNoxRegisteredGrams).all { it.signum() == 0 }) {
+                "rows[$index] must report co2Registered=false and zero CO2 rate, median CO2 and total NOx for electric/hydrogen vehicles"
+            }
+        }
         if (input.fuelTechnology.usesLitres) {
             require(input.averageConsumptionLitresPerKm != null && input.fuelConsumedLitres != null) {
                 "rows[$index] must provide both litres fields for this fuel technology"

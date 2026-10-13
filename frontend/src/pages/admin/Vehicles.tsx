@@ -6,7 +6,8 @@ import type { ApprovalStatus } from "../../types/vehicle";
 import { APPROVAL_LABELS, normalizePlate } from "../../utils/vehicle";
 import { VehicleTable } from "../../components/vehicles/VehicleTable";
 import { VehicleDetailsDrawer } from "../../components/vehicles/VehicleDetailsDrawer";
-import { ApprovalForm, CheckForm, StatisticsForm } from "../../components/vehicles/VehicleForms";
+import { ApprovalForm, StatisticsForm } from "../../components/vehicles/VehicleForms";
+import { StatisticsDirectory } from "../../components/vehicles/StatisticsDirectory";
 import { ErrorNotice, Paging, buttonClass, primaryClass } from "../../components/vehicles/VehicleDialog";
 
 const filterClass = "w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10";
@@ -15,7 +16,7 @@ export default function Vehicles() {
   const [search, setSearch] = useState(""); const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ApprovalStatus | "">(""); const [page, setPage] = useState(1);
   const [params, setParams] = useSearchParams(); const plate = params.get("plate");
-  const [form, setForm] = useState<"statistics" | "approval" | "check" | null>(null);
+  const [form, setForm] = useState<"statistics" | "approval" | null>(null);
   const [notice, setNotice] = useState("");
   const vehicles = useVehicles(query, status, page); const refresh = useRefreshVehicles();
   useEffect(() => { const timer = window.setTimeout(() => { setQuery(normalizePlate(search)); setPage(1); }, 300); return () => window.clearTimeout(timer); }, [search]);
@@ -27,10 +28,9 @@ export default function Vehicles() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">Municipal Oversight</p>
           <h1 className="mt-2 font-headline text-2xl font-semibold leading-tight tracking-[-0.04em] text-[#0f172a]">Vehicles</h1>
-          <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">Manage approvals, reporting-period statistics and explicit registry checks.</p>
+          <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">Manage approvals and reporting-period statistics. Saving statistics automatically checks approval and SVV.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button className={buttonClass} onClick={() => setForm("check")}><Search className="h-3.5 w-3.5" />Check a plate</button>
           <button className={buttonClass} onClick={() => setForm("approval")}><ClipboardCheck className="h-3.5 w-3.5" />Approve vehicle</button>
           <button className={primaryClass} onClick={() => setForm("statistics")}><Plus className="h-3.5 w-3.5" />Add statistics</button>
         </div>
@@ -48,13 +48,13 @@ export default function Vehicles() {
       {vehicles.isError && <button className={`${buttonClass} mt-3`} onClick={() => void vehicles.refetch()}>Retry loading</button>}
       {vehicles.data && <>
         <p className="mb-4 text-xs text-neutral-400">Current approval as of {vehicles.data.approvalAsOf} (Oslo). Check findings are historical.</p>
-        {vehicles.data.items.length ? <VehicleTable items={vehicles.data.items} onOpen={open} /> : <div className="py-10 text-center"><p className="font-medium">{vehicles.data.total ? "No vehicles on this page" : "No matching vehicles"}</p><p className="mt-2 text-sm text-neutral-500">Clear the filters, add statistics, approve a vehicle, or explicitly check a plate.</p></div>}
+        {vehicles.data.items.length ? <VehicleTable items={vehicles.data.items} onOpen={open} /> : <div className="py-10 text-center"><p className="font-medium">{vehicles.data.total ? "No vehicles on this page" : "No matching vehicles"}</p><p className="mt-2 text-sm text-neutral-500">Clear the filters, add statistics, or approve a vehicle.</p></div>}
         <div className="-mx-4 -mb-4 rounded-b-xl bg-neutral-50 px-4 pb-3"><Paging page={page} total={vehicles.data.total} pageSize={25} onChange={setPage} /></div>
       </>}
     </section>
+    <StatisticsDirectory onOpenVehicle={open} />
     {plate && <VehicleDetailsDrawer key={plate} plate={plate} onClose={() => setParams({})} />}
     {form === "statistics" && <StatisticsForm onClose={() => setForm(null)} onSaved={saved} />}
     {form === "approval" && <ApprovalForm onClose={() => setForm(null)} onSaved={saved} />}
-    {form === "check" && <CheckForm onClose={() => setForm(null)} onSaved={saved} />}
   </div>;
 }

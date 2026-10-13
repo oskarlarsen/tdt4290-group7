@@ -1,5 +1,5 @@
-import type { ApprovalStatus, CheckSummary, RegistryCode, VehicleCheck } from "../types/vehicle";
-import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres } from "./vehicleCatalog";
+import type { ApprovalStatus, CheckSummary, RegistryCode, VehicleCheck, StatisticsSave } from "../types/vehicle";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, locksEmissionsToZero, LOCKED_EMISSION_FIELDS } from "./vehicleCatalog";
 
 export const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
   ACTIVE: "Approved", NOT_YET_ACTIVE: "Not yet active", EXPIRED: "Expired", REVOKED: "Revoked", NOT_APPROVED: "Not approved",
@@ -52,6 +52,19 @@ export function decimalLiteral(value: string, label: string): string {
   return whole.replace(/^0+(?=\d)/, "") + (significantFraction ? `.${significantFraction}` : "");
 }
 
+/** Exact preview of the backend calculation; never sent as an editable request field. */
+export function estimatedCo2Preview(distance: string, rate: string): string {
+  try {
+    const [kmWhole, kmFraction = ""] = decimalLiteral(distance, "Distance").split(".");
+    const [rateWhole, rateFraction = ""] = decimalLiteral(rate, "CO₂ rate").split(".");
+    const coefficient = BigInt(kmWhole + kmFraction) * BigInt(rateWhole + rateFraction);
+    const scale = kmFraction.length + rateFraction.length + 3;
+    const digits = coefficient.toString().padStart(scale + 1, "0");
+    const fraction = digits.slice(-scale).replace(/0+$/, "");
+    return digits.slice(0, -scale) + (fraction ? `.${fraction}` : "");
+  } catch { return ""; }
+}
+
 export function statisticsBody(values: Record<string, string>): string {
   const plate = validPlate(values.registrationNumber ?? "");
   if (!validDate(values.periodStart) || !validDate(values.periodEnd)) throw new Error("Both reporting dates must be valid dates (YYYY-MM-DD).");
@@ -59,6 +72,8 @@ export function statisticsBody(values: Record<string, string>): string {
   const fuel = selectedCode(FUEL_TECHNOLOGIES, values.fuelTechnology ?? "", "fuel technology");
   const category = selectedCode(VEHICLE_CATEGORIES, values.vehicleCategory ?? "", "vehicle category");
   selectedCode(BODY_TYPES, values.bodyType ?? "", "body type");
+  if (locksEmissionsToZero(fuel) && (values.co2Registered !== "false" || LOCKED_EMISSION_FIELDS.some(key => decimalLiteral(values[key] ?? "", key) !== "0")))
+    throw new Error("Electric/hydrogen statistics require no CO₂-emitting flag and zero CO₂ rate, median CO₂ and total NOx.");
   if (isTrailer(category) !== (fuel === "NOT_APPLICABLE")) throw new Error("Use Not applicable fuel exactly for trailer categories O1–O4.");
   const row: string[] = [
     `"registrationNumber":${JSON.stringify(plate)}`, `"periodStart":${JSON.stringify(values.periodStart)}`, `"periodEnd":${JSON.stringify(values.periodEnd)}`,
@@ -96,6 +111,16 @@ export function checkLabel(check?: CheckSummary | null): string {
 }
 export function summaryOf(check: VehicleCheck): CheckSummary {
   return { ...check.registry, id: check.id, checkedAt: check.checkedAt, approvalStatus: check.approvalStatus, deviations: check.deviations };
+}
+export function statisticsSaveMessage(result: StatisticsSave, plate: string): string {
+  const outcome = result.checks.find(item => item.registrationNumber === plate);
+  if (outcome?.error) return outcome.error;
+  if (!outcome?.check) return "Statistics saved, but verification was not returned. Run a check from vehicle details; do not resubmit statistics.";
+  const checked = outcome.check;
+  const registry = checked.dataSource === "UNAVAILABLE" || checked.lookupOutcome !== "FOUND"
+    ? `SVV verification incomplete (${humanize(checked.lookupOutcome)}).`
+    : checked.dataSource === "STALE_CACHE" ? "SVV verification uses stale data; refresh failed." : `SVV data: ${humanize(checked.dataSource)}.`;
+  return `Statistics saved and automatic check recorded: ${checkLabel(checked)}. ${registry} No approval was created.`;
 }
 export function humanize(value: string): string { return value.toLowerCase().replace(/_/g, " "); }
 export function timestamp(value?: string | null): string { return value ? new Date(value).toLocaleString() : "Not available"; }

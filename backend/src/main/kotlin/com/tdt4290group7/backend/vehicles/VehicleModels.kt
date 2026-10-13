@@ -67,6 +67,22 @@ data class AppendTripRowsResponse(
     val rowCount: Int,
     val distinctVehicleCount: Int,
     val rows: List<StoredTripRow>,
+    /** One result per distinct plate, populated by the HTTP save workflow after persistence. */
+    @kotlinx.serialization.EncodeDefault
+    val checks: List<StatisticsCheckResult> = emptyList(),
+)
+
+@Serializable
+data class StatisticsCheckResult(
+    val registrationNumber: String,
+    val check: VehicleCheckSummary? = null,
+    /** Safe generic error: statistics remain saved when checking fails. */
+    val error: String? = null,
+)
+
+@Serializable
+data class TripRowsListResponse(
+    val items: List<StoredTripRow>, val total: Int, val page: Int, val pageSize: Int,
 )
 
 @Serializable
