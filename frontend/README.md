@@ -4,12 +4,12 @@ The vehicle page is at `/admin/vehicles` and connects to the real Kotlin backend
 
 ## Run locally
 
-1. Start the backend as described in [its guide](../backend/README.md#run-and-configure), using JDK 21, required JWT/seed-password process settings and a development database.
-2. From `frontend/`, run `npm.cmd ci`. Copy `.env.example` to `.env` only if a configured file does not already exist.
-3. Set `VITE_API_BASE_URL=http://localhost:8080/api`. For real login also set `VITE_USE_MOCKS=false`; login with `advisor.hansen@kommune.no` and the password set in `SEED_ADMIN_PASSWORD`.
+1. Configure the single root `.env` as described in [shared configuration](../README.md#shared-local-configuration), then start the backend using JDK 21 and a development database. Credentials are read from that file automatically.
+2. From `frontend/`, run `npm.cmd ci`. Do not create a separate frontend `.env`: Vite uses `envDir: ".."` to read root settings.
+3. In root `.env`, set `VITE_API_BASE_URL=http://localhost:8080/api`. For real login also set `VITE_USE_MOCKS=false`; login with `advisor.hansen@kommune.no` and the password set in `SEED_ADMIN_PASSWORD`.
 4. Run `npm.cmd run dev` and open `http://localhost:5173/admin/vehicles`. Use `localhost` for both frontend and API so the auth cookie stays same-site. Allow that origin in backend CORS. For local HTTP set `AUTH_COOKIE_SECURE=false`, not in production.
 
-`VITE_USE_MOCKS` affects login, not vehicle calls. With mock login, `admin@kommune.no` / `admin123` can open the UI, but a backend must still be running. Never put an SVV key in frontend settings. Restart Vite after changing settings. `npm.cmd run build` checks TypeScript and builds production assets; `npm.cmd test -- --run` runs the unit tests.
+`VITE_USE_MOCKS` affects login, not vehicle calls. With mock login, `admin@kommune.no` / `admin123` can open the UI, but a backend must still be running. Vite exposes only keys prefixed `VITE_`; SVV/JWT keys and seed passwords must never use that prefix. Process settings override file settings. Restart Vite after changing settings; Docker public build settings require rebuilding the image. `npm.cmd run build` checks TypeScript and builds production assets; `npm.cmd test -- --run` runs the unit tests. Docker receives only `VITE_API_BASE_URL` and `VITE_USE_MOCKS` as frontend build arguments, and `API_ORIGIN` as a public runtime setting for nginx's CSP; no backend secrets or root file are copied into the frontend image.
 
 ## Behaviour and safeguards
 

@@ -31,33 +31,42 @@ flowchart TD
 
 Use JDK 21 and the checked-in Gradle wrapper. Docker/Rancher Desktop is optional. An SVV Enkeltoppslag key is required only for live requests.
 
-From `backend/` in PowerShell:
+Configure root `.env` once using [the shared setup](../README.md#shared-local-configuration). Fill its required JWT secret and seed passwords privately, optionally adding the SVV key. Then from `backend/` in PowerShell:
 
 ```powershell
-Copy-Item .env.example .env
-# Edit .env locally; do not overwrite an existing configured file.
 .\gradlew.bat test
-# Required process settings; choose private local values before running.
-$env:JWT_SECRET = "<choose a random signing secret>"
-$env:SEED_ADMIN_PASSWORD = "<choose an admin password>"
-$env:SEED_SUPPLIER_PASSWORD = "<choose a supplier password>"
 .\gradlew.bat run
 ```
 
-Tests do not start a persistent Postman server. Keep the run terminal open; stop with `Ctrl+C`.
+Tests do not start a persistent Postman server. They use throwaway credentials, an isolated database and `BACKEND_ENV_FILE` pointing to an absent test-only file, with live SVV disabled; they never load root `.env`. Keep the run terminal open; stop with `Ctrl+C`.
+
+Configuration regression checks are available from the repository root:
+
+```powershell
+.\scripts\tests\Migrate-LocalEnv.Tests.ps1
+# Build the distribution first; this does not start your normal database.
+.\backend\gradlew.bat -p backend installDist
+.\scripts\tests\Backend-RootEnv.Smoke.ps1
+```
+
+The migration tests use a synthetic temporary directory. The startup smoke uses a fake checkout and synthetic `.env` under ignored `backend/build/test-data/`, launches Java hidden on an available loopback port, verifies auth cookies/CORS/isolated SQLite/disabled SVV, and stops that test server. It never opens the development database or makes an SVV request. Synthetic test artifacts remain available locally for troubleshooting.
 
 | Setting | Default | Where to set | Meaning |
 |---|---|---|---|
-| `SVV_API_KEY` | Unset | Process environment or `.env` | Private key enabling live SVV requests |
-| `SVV_CACHE_TTL_DAYS` | `14` | Process environment or `.env` | Positive whole days a successful snapshot may be reused |
-| `VEHICLE_DB_PATH` | `data/vehicles.db` | Process environment | SQLite path; relative paths use the server working directory |
-| `HOST` | `127.0.0.1` | Process environment | Listening interface |
-| `PORT` | `8080` | Process environment | HTTP port |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Process environment | Comma-separated full frontend origins, e.g. `http://localhost:5173,http://127.0.0.1:5173`; include schemes and omit paths |
+| `SVV_API_KEY` | Unset | Process environment or root `.env` | Private key enabling live SVV requests |
+| `SVV_CACHE_TTL_DAYS` | `14` | Process environment or root `.env` | Positive whole days a successful snapshot may be reused |
+| `VEHICLE_DB_PATH` | `data/vehicles.db` | Process environment or root `.env` | SQLite path; relative paths use the server working directory; Compose uses its own volume path |
+| `HOST` | `127.0.0.1` | Process environment or root `.env` | Standalone listening interface; container default is `0.0.0.0` |
+| `PORT` | `8080` | Process environment or root `.env` | Standalone HTTP port; Compose fixes container port at 8080 |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Process environment or root `.env` | Comma-separated full frontend origins; root template includes Vite 5173 and Docker 3000; include schemes and omit paths |
 
-Only the two `SVV_` settings are read from `.env` by the application. Nonblank process values take precedence. Blank process values fall back to `.env` and do not disable a key already there. Invalid, zero, negative, or TTL values too large to represent as a duration fall back to 14. Restart after configuration changes.
+All application settings, including authentication, cookies, CORS, proxy hops and optional `TESSERACT_PATH`, use the same root `.env`. Launching from the repository root or `backend/` finds that file; retired `backend/.env` is not read. Explicit process values take precedence, **including blank values**: a blank `SVV_API_KEY` disables live calls, and blank required secrets fail startup. Remove a PowerShell override with e.g. `Remove-Item Env:SVV_API_KEY` to return to the saved value. Invalid, zero, negative, or oversized TTL values fall back to 14. Restart after configuration changes.
 
-Example local `.env`:
+Use single-line literal values. Unquoted values trim whitespace and allow whitespace followed by an inline `#` comment. Single quotes preserve `$`, `#` and backslashes literally; double quotes support common backslash escapes. The standalone loader deliberately does not perform variable expansion, shell execution, multiline values or `export` directives. Use the common literal subset shown by root `.env.example` rather than Compose/Vite-specific syntax. Keep each key unique.
+
+Advanced: `BACKEND_ENV_FILE` can be supplied in the process environment to select a different file (relative to the server working directory or absolute). Tests use this to avoid local configuration. Packaged deployments without checkout markers fall back to working-directory `.env`; normally inject process settings instead and do not bundle a file. Relative database paths always use the working directory, not the configuration-file directory.
+
+Example optional values in root `.env` (the required authentication fields must also be filled):
 
 ```dotenv
 SVV_API_KEY=your-private-key-here
@@ -74,7 +83,7 @@ $env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
 
 These settings apply to that PowerShell session and its child processes. Postman environment variables configure requests, not the backend process.
 
-The key must never be sent to our API, placed in frontend configuration, or committed. `.env` is ignored by Git and excluded from the Docker context. `.env.example` contains no secret.
+The key must never be sent to our API, exposed through a `VITE_` variable, or committed. Root `.env` and migration backups are ignored by Git; the root file is outside both Docker build contexts. Root `.env.example` contains no secret. Vite exposes public `VITE_` fields only, not backend credentials.
 
 JWT authentication is available for the auth routes documented below. Vehicle routes are still unauthenticated and have no role/supplier access restrictions. CORS does not provide authorization. The standalone default host and Compose's published backend port are bound to loopback for local development. Local processes can still access these endpoints; authentication and authorization must be implemented before deployment or exposure to other machines.
 
@@ -84,12 +93,12 @@ From `backend/`:
 
 ```powershell
 docker build -t ktor-backend .
-docker run --env-file .env -e JWT_SECRET -e SEED_ADMIN_PASSWORD -e SEED_SUPPLIER_PASSWORD -p 127.0.0.1:8080:8080 -v vehicle-backend-data:/app/data ktor-backend
+docker run --env-file ../.env -e HOST=0.0.0.0 -e PORT=8080 -e VEHICLE_DB_PATH=/app/data/vehicles.db -p 127.0.0.1:8080:8080 -v vehicle-backend-data:/app/data ktor-backend
 ```
 
-The key and required authentication settings are supplied at runtime; the command above forwards the three process settings from the current shell. The named volume preserves SQLite across container replacement. The image initializes a new data volume for the unprivileged `app` user. Existing volumes created by an older root-running image may need an ownership migration before startup; do not delete stored vehicle data. Compose keeps the root filesystem read-only, with only the data volume and JVM scratch directory writable, and retains its capability and privilege restrictions. The container listens on `0.0.0.0`; this command publishes only on the host loopback interface.
+The key and required authentication settings are supplied at runtime from root `.env`. Docker's raw `--env-file` parser differs from Compose's dotenv parser: use simple unquoted values for this standalone command; prefer Compose for the documented quoted literal values. The named volume preserves SQLite across container replacement. The image initializes a new data volume for the unprivileged `app` user. Existing volumes created by an older root-running image may need an ownership migration before startup; do not delete stored vehicle data. Compose keeps the root filesystem read-only, with only the data volume and JVM scratch directory writable, and retains its capability and privilege restrictions. This command publishes only on the host loopback interface.
 
-For the full stack, use the [root README](../README.md#run-the-full-stack-with-docker). Compose reads the root `.env`, requires JWT/seed-password settings, passes optional SVV settings, and mounts persistent vehicle storage. Standalone auth settings must be process environment variables; the application does not load them from `backend/.env`.
+For the full stack, use the [root README](../README.md#run-the-full-stack-with-docker). Compose reads the same root `.env`, requires JWT/seed-password settings, passes selected backend settings, and mounts persistent vehicle storage. Public frontend build arguments are passed separately; no backend secrets enter the frontend build. Standalone auth settings also load from root `.env` automatically. The existing malformed Gradle command in `backend/Dockerfile` remains a separate build blocker; see the root guide before trying a full image build.
 
 ## Admin vehicle-page read API
 
@@ -554,4 +563,4 @@ This stores the ID automatically. See **Test Results** after sending. Passing HT
 
 ## Current boundaries
 
-No endpoints list all vehicles/approvals/checks or paginate statistics. No supplier assignment, statistics deletion, spreadsheet parsing, batch checking, background monitoring, fuel/CO₂ policy comparisons, or automatic cleanup is implemented. These describe current behavior, not promised future features.
+Vehicles and per-vehicle check history can be listed through the documented read endpoints; statistics are not yet paginated. No supplier assignment, statistics deletion, spreadsheet parsing, batch checking, background monitoring, fuel/CO₂ policy comparisons, or automatic cleanup is implemented. These describe current behavior, not promised future features.

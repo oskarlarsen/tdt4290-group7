@@ -52,6 +52,9 @@ dependencies {
 }
 
 tasks.test {
+    // Never read the developer's shared .env, SVV key or data-path overrides in tests.
+    environment("BACKEND_ENV_FILE", layout.buildDirectory.file("test-data/no-local-config.env").get().asFile.absolutePath)
+    environment("SVV_API_KEY", "")
     // The app refuses to start without these; tests get throwaway values that never ship.
     environment("JWT_SECRET", "test-only-jwt-secret")
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
