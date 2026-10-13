@@ -95,18 +95,6 @@ class VehicleCheckService(
         refreshFailure = refreshFailure,
     )
 
-    private fun approvalStatus(approval: StoredApproval?, today: LocalDate): ApprovalStatus {
-        if (approval == null) return ApprovalStatus.NOT_APPROVED
-        if (approval.revokedAt != null) return ApprovalStatus.REVOKED
-        val start = approval.data.startDate?.let(LocalDate::parse)
-        val expiry = approval.data.expiryDate?.let(LocalDate::parse)
-        return when {
-            start != null && start.isAfter(today) -> ApprovalStatus.NOT_YET_ACTIVE
-            expiry != null && expiry.isBefore(today) -> ApprovalStatus.EXPIRED
-            else -> ApprovalStatus.ACTIVE
-        }
-    }
-
     private fun approvalDeviations(status: ApprovalStatus): List<VehicleDeviation> = when (status) {
         ApprovalStatus.ACTIVE -> emptyList()
         ApprovalStatus.NOT_APPROVED -> listOf(VehicleDeviation.NOT_ON_APPROVED_LIST)
@@ -124,4 +112,17 @@ class VehicleCheckService(
             "UREGISTRERT" -> listOf(VehicleDeviation.UNREGISTERED)
             else -> listOf(VehicleDeviation.UNKNOWN_REGISTRATION_STATUS)
         }
+}
+
+/** Shared by current read views and check evaluation; expiry today is still active. */
+internal fun approvalStatus(approval: StoredApproval?, today: LocalDate): ApprovalStatus {
+    if (approval == null) return ApprovalStatus.NOT_APPROVED
+    if (approval.revokedAt != null) return ApprovalStatus.REVOKED
+    val start = approval.data.startDate?.let(LocalDate::parse)
+    val expiry = approval.data.expiryDate?.let(LocalDate::parse)
+    return when {
+        start != null && start.isAfter(today) -> ApprovalStatus.NOT_YET_ACTIVE
+        expiry != null && expiry.isBefore(today) -> ApprovalStatus.EXPIRED
+        else -> ApprovalStatus.ACTIVE
+    }
 }

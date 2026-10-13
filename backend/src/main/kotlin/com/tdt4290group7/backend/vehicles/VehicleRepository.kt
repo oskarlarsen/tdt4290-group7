@@ -27,6 +27,9 @@ interface VehicleStore {
     fun latestSnapshot(registrationNumber: String): RegistrySnapshot?
     fun saveCheck(check: VehicleCheckResponse, newSnapshot: RegistrySnapshot?)
     fun findCheck(id: String): VehicleCheckResponse?
+    fun listVehicles(search: String, status: ApprovalStatus?, page: Int, pageSize: Int, today: LocalDate): VehicleListResponse
+    fun vehicleDetails(registrationNumber: String, today: LocalDate): VehicleDetailsResponse?
+    fun checkHistory(registrationNumber: String, page: Int, pageSize: Int): VehicleHistoryResponse?
 }
 
 private val timestampFormat = DateTimeFormatterBuilder().appendInstant(9).toFormatter()
@@ -59,6 +62,81 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             it.execute("PRAGMA foreign_keys = ON")
             it.execute("PRAGMA busy_timeout = 5000")
         }
+    }
+
+    /** One SQLite read snapshot keeps totals, approvals and historical summaries consistent. */
+    private fun <T> readTransaction(action: (Connection) -> T): T = connection().use { db ->
+        db.autoCommit = false
+        try { action(db) } finally { db.rollback() }
+    }
+
+    override fun listVehicles(search: String, status: ApprovalStatus?, page: Int, pageSize: Int, today: LocalDate): VehicleListResponse {
+        validatePage(page, pageSize)
+        val plateSearch = normalizeRegistrationNumber(search)
+        require(plateSearch.matches(Regex("[A-Z0-9]{0,7}"))) { "search must contain up to 7 registration-number characters" }
+        return readTransaction { db ->
+            // Select the same approval the check endpoint uses, then evaluate dates without writing.
+            val approvalJoin = """LEFT JOIN vehicle_approvals a ON a.id = (
+                SELECT id FROM vehicle_approvals WHERE registration_number = v.registration_number
+                ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, updated_at DESC, rowid DESC LIMIT 1)"""
+            val statusSql = """CASE WHEN a.id IS NULL THEN 'NOT_APPROVED' WHEN a.revoked_at IS NOT NULL THEN 'REVOKED'
+                WHEN a.start_date > ? THEN 'NOT_YET_ACTIVE' WHEN a.expiry_date < ? THEN 'EXPIRED' ELSE 'ACTIVE' END"""
+            val where = "v.registration_number LIKE ?" + if (status == null) "" else " AND ($statusSql) = ?"
+            val parameters: List<Any?> = listOf("%$plateSearch%") +
+                if (status == null) emptyList() else listOf(today.toString(), today.toString(), status.name)
+            val total = query(db, "SELECT count(*) FROM vehicles v $approvalJoin WHERE $where", parameters) { it.getInt(1) }.single()
+            val items = query(db, """SELECT v.* FROM vehicles v $approvalJoin WHERE $where
+                ORDER BY v.registration_number LIMIT ? OFFSET ?""", parameters + listOf(pageSize, (page.toLong() - 1) * pageSize)) { row ->
+                val vehicle = vehicleFrom(row)
+                val approval = currentApproval(db, vehicle.registrationNumber)
+                VehicleOverview(vehicle, approvalStatus(approval, today), approval, checkSummaries(db, vehicle.registrationNumber, 1, 0).firstOrNull())
+            }
+            VehicleListResponse(items, total, page, pageSize, today.toString())
+        }
+    }
+
+    override fun vehicleDetails(registrationNumber: String, today: LocalDate): VehicleDetailsResponse? = readTransaction { db ->
+        val plate = validatedPlate(registrationNumber)
+        val vehicle = query(db, "SELECT * FROM vehicles WHERE registration_number = ?", listOf(plate), ::vehicleFrom).firstOrNull()
+            ?: return@readTransaction null
+        val approval = currentApproval(db, plate)
+        VehicleDetailsResponse(vehicle, approvalStatus(approval, today), today.toString(), approval,
+            query(db, "SELECT * FROM trip_rows WHERE registration_number = ? ORDER BY created_at DESC, id DESC", listOf(plate), ::tripFrom),
+            query(db, "SELECT * FROM svv_snapshots WHERE registration_number = ? ORDER BY fetched_at DESC, rowid DESC LIMIT 1", listOf(plate)) { snapshotFrom(db, it) }.firstOrNull(),
+            checkSummaries(db, plate, 1, 0).firstOrNull())
+    }
+
+    override fun checkHistory(registrationNumber: String, page: Int, pageSize: Int): VehicleHistoryResponse? {
+        validatePage(page, pageSize)
+        return readTransaction { db ->
+            val plate = validatedPlate(registrationNumber)
+            if (query(db, "SELECT 1 FROM vehicles WHERE registration_number = ?", listOf(plate)) { it.getInt(1) }.isEmpty()) return@readTransaction null
+            val total = query(db, "SELECT count(*) FROM vehicle_checks WHERE registration_number = ?", listOf(plate)) { it.getInt(1) }.single()
+            VehicleHistoryResponse(checkSummaries(db, plate, pageSize, (page.toLong() - 1) * pageSize), total, page, pageSize)
+        }
+    }
+
+    private fun vehicleFrom(row: ResultSet) = Vehicle(row.getString("registration_number"), row.getString("supplier_id"), row.getString("created_at"))
+
+    private fun currentApproval(db: Connection, plate: String): StoredApproval? =
+        query(db, """SELECT * FROM vehicle_approvals WHERE registration_number = ?
+            ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, updated_at DESC, rowid DESC LIMIT 1""", listOf(plate)) { approvalFrom(it) }.firstOrNull()
+
+    private fun checkSummaries(db: Connection, plate: String, limit: Int, offset: Long): List<VehicleCheckSummary> =
+        query(db, """SELECT c.*, s.fetched_at FROM vehicle_checks c LEFT JOIN svv_snapshots s ON s.id = c.snapshot_id
+            WHERE c.registration_number = ? ORDER BY c.checked_at DESC, c.rowid DESC LIMIT ? OFFSET ?""", listOf(plate, limit, offset)) { row ->
+            val id = row.getString("id")
+            VehicleCheckSummary(id, row.getString("checked_at"), ApprovalStatus.valueOf(row.getString("approval_status")),
+                RegistryDataSource.valueOf(row.getString("registry_data_source")), LookupOutcome.valueOf(row.getString("lookup_outcome")),
+                row.getString("fetched_at"), row.getString("refresh_failure")?.let(LookupOutcome::valueOf),
+                query(db, "SELECT deviation_code FROM vehicle_check_deviations WHERE check_id = ? ORDER BY ordinal", listOf(id)) {
+                    VehicleDeviation.valueOf(it.getString(1))
+                })
+        }
+
+    private fun validatePage(page: Int, pageSize: Int) {
+        require(page > 0) { "page must be a positive integer" }
+        require(pageSize in 1..100) { "pageSize must be between 1 and 100" }
     }
 
     /** Reserve the writer before reading; preserve atomic batches and cross-process contention handling. */

@@ -20,6 +20,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import com.tdt4290group7.backend.vehicles.ApprovalStatus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 
@@ -42,6 +45,40 @@ fun Application.configureRouting(
 
         get("/") {
             call.respondText("Hello World!")
+        }
+
+        get("/api/vehicles") {
+            val result = try {
+                val status = call.request.queryParameters["approvalStatus"]?.let { ApprovalStatus.valueOf(it) }
+                repository.listVehicles(call.request.queryParameters["search"] ?: "", status,
+                    pageParameter(call.request.queryParameters["page"], 1), pageParameter(call.request.queryParameters["pageSize"], 25),
+                    LocalDate.now(ZoneId.of("Europe/Oslo")))
+            } catch (cause: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid vehicle query"))
+                return@get
+            }
+            call.respond(result)
+        }
+
+        get("/api/vehicles/{registrationNumber}") {
+            val result = try {
+                repository.vehicleDetails(call.parameters["registrationNumber"]!!, LocalDate.now(ZoneId.of("Europe/Oslo")))
+            } catch (cause: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid registration number"))
+                return@get
+            } ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Vehicle not found"))
+            call.respond(result)
+        }
+
+        get("/api/vehicles/{registrationNumber}/checks") {
+            val result = try {
+                repository.checkHistory(call.parameters["registrationNumber"]!!,
+                    pageParameter(call.request.queryParameters["page"], 1), pageParameter(call.request.queryParameters["pageSize"], 10))
+            } catch (cause: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid history query"))
+                return@get
+            } ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Vehicle not found"))
+            call.respond(result)
         }
 
         /** Each submitted statistics row is appended, including repeated registration numbers. */
@@ -137,3 +174,6 @@ fun Application.configureRouting(
         }
     }
 }
+
+private fun pageParameter(value: String?, default: Int): Int =
+    if (value == null) default else value.toIntOrNull() ?: throw IllegalArgumentException("Pagination values must be integers")

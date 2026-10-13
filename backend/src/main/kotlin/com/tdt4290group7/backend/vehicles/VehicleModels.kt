@@ -191,5 +191,47 @@ data class VehicleCheckResponse(
     val deviations: List<VehicleDeviation>,
 )
 
+/** Small historical summary: browsing never creates checks or calls SVV. */
+@Serializable
+data class VehicleCheckSummary(
+    val id: String,
+    val checkedAt: String,
+    val approvalStatus: ApprovalStatus,
+    val dataSource: RegistryDataSource,
+    val lookupOutcome: LookupOutcome,
+    val fetchedAt: String? = null,
+    val refreshFailure: LookupOutcome? = null,
+    val deviations: List<VehicleDeviation>,
+)
+
+@Serializable
+data class VehicleOverview(
+    val vehicle: Vehicle,
+    val approvalStatus: ApprovalStatus,
+    val approval: StoredApproval? = null,
+    val latestCheck: VehicleCheckSummary? = null,
+)
+
+@Serializable
+data class VehicleListResponse(
+    val items: List<VehicleOverview>, val total: Int, val page: Int, val pageSize: Int, val approvalAsOf: String,
+)
+
+@Serializable
+data class VehicleDetailsResponse(
+    val vehicle: Vehicle,
+    val approvalStatus: ApprovalStatus,
+    val approvalAsOf: String,
+    val approval: StoredApproval? = null,
+    val tripRows: List<StoredTripRow>,
+    val latestSnapshot: RegistrySnapshot? = null,
+    val latestCheck: VehicleCheckSummary? = null,
+)
+
+@Serializable
+data class VehicleHistoryResponse(
+    val items: List<VehicleCheckSummary>, val total: Int, val page: Int, val pageSize: Int,
+)
+
 fun normalizeRegistrationNumber(value: String): String =
     value.uppercase(java.util.Locale.ROOT).replace(Regex("[\\s-]"), "")

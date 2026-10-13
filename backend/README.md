@@ -91,6 +91,22 @@ The key and required authentication settings are supplied at runtime; the comman
 
 For the full stack, use the [root README](../README.md#run-the-full-stack-with-docker). Compose reads the root `.env`, requires JWT/seed-password settings, passes optional SVV settings, and mounts persistent vehicle storage. Standalone auth settings must be process environment variables; the application does not load them from `backend/.env`.
 
+## Admin vehicle-page read API
+
+The admin frontend draft uses real vehicle endpoints even if login mocks are enabled separately. These GET requests only read SQLite: they never create vehicles, save checks or call SVV.
+
+| Endpoint | Parameters / result |
+|---|---|
+| `GET /api/vehicles` | `search`: optional partial registration number, case/space/hyphen normalized, up to 7 letters/digits. `approvalStatus`: optional `ACTIVE`, `NOT_YET_ACTIVE`, `EXPIRED`, `REVOKED`, or `NOT_APPROVED`. `page`: positive integer, default 1. `pageSize`: 1–100, default 25. Returns `items`, `total`, `page`, `pageSize`, and `approvalAsOf`. Stable registration-number order. |
+| `GET /api/vehicles/{registrationNumber}` | Returns current vehicle/approval, `approvalStatus`, `approvalAsOf`, all stored reporting rows newest first, latest selected SVV snapshot and latest saved check summary. Unknown plate: 404, without inserting it. |
+| `GET /api/vehicles/{registrationNumber}/checks` | `page`: positive integer, default 1. `pageSize`: 1–100, default 10. Returns newest-first saved check summaries with `items`, `total`, `page`, and `pageSize`. Unknown vehicle: 404; known vehicle with no checks: empty items. |
+
+Malformed parameters return 400. Out-of-range pages return empty items, not an error. Approval is evaluated on the current Oslo date (including the expiry date). Each read uses a single SQLite read transaction; its totals and items share one database snapshot. The summary's approval and deviations describe the **time of that check**, whereas the overview/details approval describes **today**. `dataSource` likewise describes how SVV data was obtained when that check ran; use `checkedAt` and `fetchedAt` to judge age.
+
+Use the existing `GET /api/vehicle-checks/{id}` for original check evidence. Opening the frontend or selecting history does not create checks. Only the explicit Run check action posts `/api/vehicle-checks`; `forceRefresh` remains optional. The details API currently returns all reporting rows for one vehicle; paginated statistics and batch actions are deferred. List/history paging bounds database work, but pagination is not a cross-request frozen snapshot if records change between pages.
+
+These routes retain the existing unauthenticated vehicle-route policy. The frontend's admin route guard is not server-side authorization; do not expose the draft beyond local development until backend access controls are implemented.
+
 ## Authentication
 
 Vehicle records use SQLite, but the separate authentication user store is currently in memory. These demo accounts are seeded at startup:

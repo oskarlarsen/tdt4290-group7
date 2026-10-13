@@ -9,6 +9,8 @@ TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The 
 
 See [the backend guide](backend/README.md) for endpoint parameters, responses, database relationships, configuration, request flow, logging, and step-by-step Postman testing.
 
+The admin vehicle-page draft is at `/admin/vehicles`. It connects to real vehicle endpoints and supports individual statistics entry, approval management, explicit checks and check history. See [the frontend vehicle guide](frontend/README.md) for setup, safeguards and code organization. Supplier vehicle pages and batch actions are not included.
+
 ## Frontend setup
 
 From the repository root in PowerShell:
@@ -22,7 +24,7 @@ npm run dev
 
 Do not overwrite an existing configured `.env`. Other commands: `npm run build`, `npm test`, and `npm run preview`.
 
-The example frontend configuration enables mocks and points at `http://localhost:4000/api`. To use the backend, disable mocks and set `VITE_API_BASE_URL` to match the backend address (normally `http://localhost:8080/api`). The backend permits the Vite origin `http://localhost:5173` by default. Authentication routes use cookies; vehicle routes are documented in the backend guide.
+The example frontend configuration enables mock login and points at `http://localhost:8080/api`. The admin vehicle page always uses the real backend, regardless of the mock toggle. For real backend login, set `VITE_USE_MOCKS=false`; other prototype pages may still depend on their mock data layer. The backend permits the Vite origin `http://localhost:5173` by default. Authentication routes use cookies; vehicle routes are documented in the backend guide.
 
 ## Backend setup
 
@@ -79,12 +81,12 @@ Compose retains SQLite in the `vehicle-backend-data` named volume. Authenticatio
 
 | Variable | Purpose |
 |---|---|
-| `VITE_API_BASE_URL` | Base URL for the real backend API (e.g. `http://localhost:4000/api`) |
-| `VITE_USE_MOCKS` | Set to `true` to run entirely against the built-in mock data layer, with no backend required |
+| `VITE_API_BASE_URL` | Base URL for the real backend API (normally `http://localhost:8080/api`) |
+| `VITE_USE_MOCKS` | Enables mock login and existing prototype mock layers; does not mock the admin vehicle page |
 
-Set `VITE_USE_MOCKS=true` in `frontend/.env` to run the frontend without the
-backend. See [Mock data architecture](#mock-data-architecture)
-below for how this is structured.
+Set `VITE_USE_MOCKS=true` in `frontend/.env` to explore existing mock pages without the
+backend. The admin vehicle page still requires the backend. See [Mock data architecture](#mock-data-architecture)
+below for how the prototype mock layers are structured.
 
 ## Test accounts (mock login)
 
