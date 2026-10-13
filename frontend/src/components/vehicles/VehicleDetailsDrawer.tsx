@@ -6,7 +6,7 @@ import { APPROVAL_LABELS, DECIMAL_FIELDS, checkLabel, humanize, timestamp } from
 import { ApprovalBadge } from "./VehicleTable";
 import { ApprovalForm, StatisticsForm } from "./VehicleForms";
 import { VehicleCheckResult } from "./VehicleCheckResult";
-import { VehicleDialog, ErrorNotice, Paging, buttonClass, primaryClass } from "./VehicleDialog";
+import { VehicleDialog, ErrorNotice, Paging, buttonClass, primaryClass, dangerClass, inputClass, checkboxClass } from "./VehicleDialog";
 
 export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClose: () => void }) {
   const detail = useVehicle(plate);
@@ -31,7 +31,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
   const data = detail.data;
   return <>
     <VehicleDialog title={`Vehicle ${plate}`} drawer onClose={onClose} busy={busy}>
-      {notice && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
+      {notice && <p role="status" className="mb-4 rounded-lg border border-tertiary-200 bg-tertiary-50 p-3 text-sm text-tertiary-700">{notice}</p>}
       {detail.isLoading && <p role="status">Loading vehicle…</p>}
       <ErrorNotice error={detail.error} />
       {detail.isError && <button className={`${buttonClass} mt-3`} onClick={() => void detail.refetch()}>Retry loading</button>}
@@ -43,10 +43,10 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
           <button className={buttonClass} disabled={busy} onClick={() => setForm("approval")}>{data.approval && !data.approval.revokedAt ? "Edit approval" : "Approve vehicle"}</button>
         </div>
         <details className="mb-5 text-sm"><summary className="cursor-pointer text-neutral-600">Check options</summary>
-          <label className="mt-2 flex gap-2"><input type="checkbox" checked={forceRefresh} disabled={busy} onChange={e => setForceRefresh(e.target.checked)} />Force new SVV lookup. Otherwise a recent successful snapshot is reused.</label>
+          <label className="mt-2 flex gap-2"><input type="checkbox" className={checkboxClass} checked={forceRefresh} disabled={busy} onChange={e => setForceRefresh(e.target.checked)} />Force new SVV lookup. Otherwise a recent successful snapshot is reused.</label>
         </details>
         <ErrorNotice error={run.error} />
-        <div role="tablist" aria-label="Vehicle information" className="my-5 flex flex-wrap gap-1 border-b border-neutral-200">
+        <div role="tablist" aria-label="Vehicle information" className="my-5 flex flex-wrap gap-1 border-b border-neutral-100">
           {["Overview", "Statistics", "Check result", "History"].map((name, index, tabs) => <button key={name} role="tab" tabIndex={tab === name ? 0 : -1} id={`vehicle-tab-${name.replace(/ /g, "-")}`} aria-selected={tab === name} aria-controls="vehicle-tab-panel" onClick={() => setTab(name)} onKeyDown={event => {
             let next: number | undefined;
             if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
@@ -54,7 +54,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
             if (event.key === "Home") next = 0;
             if (event.key === "End") next = tabs.length - 1;
             if (next !== undefined) { event.preventDefault(); setTab(tabs[next]); document.getElementById(`vehicle-tab-${tabs[next].replace(/ /g, "-")}`)?.focus(); }
-          }} className={`border-b-2 px-3 py-3 text-sm font-medium ${tab === name ? "border-primary-900 text-primary-900" : "border-transparent text-neutral-500"}`}>{name}</button>)}
+          }} className={`border-b-2 px-3 py-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 ${tab === name ? "border-primary-900 text-primary-900" : "border-transparent text-neutral-500 hover:text-neutral-900"}`}>{name}</button>)}
         </div>
         <div id="vehicle-tab-panel" role="tabpanel" aria-labelledby={`vehicle-tab-${tab.replace(/ /g, "-")}`}>
         {tab === "Overview" && <div className="space-y-5">
@@ -67,7 +67,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
                 ["Used throughout sheet period", data.approval?.data.usedThroughoutPeriod == null ? "Not provided" : data.approval.data.usedThroughoutPeriod ? "Yes" : "No"]].map(([label, value]) => <div key={label}><dt className="text-neutral-500">{label}</dt><dd>{value}</dd></div>)}
             </dl>
             {data.approval?.revokedAt && <p className="mt-3 text-sm text-amber-900">Revoked {timestamp(data.approval.revokedAt)}. Reapproval creates a new record.</p>}
-            {data.approval && !data.approval.revokedAt && <button className={`${buttonClass} mt-4 text-red-800`} disabled={busy} onClick={() => { revoke.reset(); setRevokeConfirmation(""); }}>Revoke approval…</button>}
+            {data.approval && !data.approval.revokedAt && <button className={`${dangerClass} mt-4`} disabled={busy} onClick={() => { revoke.reset(); setRevokeConfirmation(""); }}>Revoke approval…</button>}
           </section>
           <section className="rounded-lg bg-neutral-50 p-4"><h3 className="font-semibold">Latest recorded check</h3><p className="mt-2 text-sm">{checkLabel(data.latestCheck)}</p><p className="mt-1 text-xs text-neutral-500">{timestamp(data.latestCheck?.checkedAt)}. A saved check may predate changes to approval or statistics.</p></section>
           <p className="text-sm text-neutral-600">{data.tripRows.length} reporting rows are stored. Reporting rows may overlap; totals are deliberately not summed.</p>
@@ -106,8 +106,8 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
     {revokeConfirmation !== null && <VehicleDialog title="Revoke vehicle approval" busy={revoke.isPending} onClose={() => setRevokeConfirmation(null)}>
       <form className="space-y-4" onSubmit={event => { event.preventDefault(); if (revokeConfirmation === plate) revoke.mutate(); }}>
         <p className="text-sm">This revokes approval for <strong>{plate}</strong>. Statistics, approval records and previous checks remain stored. Reapproval will create a new record.</p>
-        <label className="block text-sm">Type {plate} to confirm<input autoFocus required disabled={revoke.isPending} className="mt-2 w-full rounded-lg border border-neutral-300 p-2 font-mono" value={revokeConfirmation} onChange={e => setRevokeConfirmation(e.target.value)} /></label>
-        <ErrorNotice error={revoke.error} /><button disabled={revokeConfirmation !== plate || revoke.isPending} className={`${buttonClass} text-red-800`}>{revoke.isPending ? "Revoking…" : "Confirm revocation"}</button>
+        <label className="block text-sm">Type {plate} to confirm<input autoFocus required disabled={revoke.isPending} className={`${inputClass} mt-2 font-mono`} value={revokeConfirmation} onChange={e => setRevokeConfirmation(e.target.value)} /></label>
+        <ErrorNotice error={revoke.error} /><button disabled={revokeConfirmation !== plate || revoke.isPending} className={dangerClass}>{revoke.isPending ? "Revoking…" : "Confirm revocation"}</button>
       </form>
     </VehicleDialog>}
   </>;

@@ -4,7 +4,7 @@ import * as api from "../../api/vehicles";
 import { ApiError } from "../../api/client";
 import type { StoredApproval, TripRow } from "../../types/vehicle";
 import { DECIMAL_FIELDS, statisticsBody, validDate, validPlate } from "../../utils/vehicle";
-import { VehicleDialog, Field, ErrorNotice, inputClass, buttonClass, primaryClass } from "./VehicleDialog";
+import { VehicleDialog, Field, ErrorNotice, inputClass, buttonClass, primaryClass, checkboxClass } from "./VehicleDialog";
 
 type Props = { plate?: string; onClose: () => void; onSaved: (plate: string, message: string) => void };
 
@@ -42,7 +42,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
   }
   return <VehicleDialog title="Add vehicle statistics" onClose={close} busy={busy}>
     <form onSubmit={submit} className="space-y-5">
-      <p className="text-sm text-neutral-600">One row describes a reporting period, not necessarily one trip. Saving always appends a new row; it never replaces statistics or approves the vehicle.</p>
+      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">One row describes a reporting period, not necessarily one trip. Saving always appends a new row; it never replaces statistics or approves the vehicle.</p>
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <Field label="Registration number *"><input required autoFocus readOnly={!!plate} maxLength={12} className={inputClass} value={values.registrationNumber} onChange={e => change("registrationNumber", e.target.value)} /></Field>
         <Field label="Source / reference (optional)"><input className={inputClass} value={values.sourceName ?? ""} onChange={e => change("sourceName", e.target.value)} /></Field>
@@ -52,7 +52,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
         <Field label="Registered as CO₂-emitting"><select className={inputClass} value={values.co2Registered} onChange={e => change("co2Registered", e.target.value)}><option value="unknown">Not provided</option><option value="true">Yes</option><option value="false">No</option></select></Field>
         {DECIMAL_FIELDS.slice(0, 2).map(([key, label]) => <Field key={key} label={label}><input inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
       </fieldset>
-      <details className="rounded-lg border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">Additional statistics (optional)</summary>
+      <details className="rounded-lg border border-neutral-100 p-4"><summary className="cursor-pointer text-sm font-medium text-neutral-900">Additional statistics (optional)</summary>
         <fieldset disabled={busy} className="mt-4 grid gap-4 sm:grid-cols-2">
           {[["make", "Reported make"], ["model", "Reported model"], ["vehicleType", "Reported vehicle type"], ["assignmentNumber", "Assignment number"]].map(([key, label]) => <Field key={key} label={label}><input className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
           <Field label="Job/trip count"><input inputMode="numeric" className={inputClass} value={values.tripCount ?? ""} onChange={e => change("tripCount", e.target.value)} /></Field>
@@ -62,10 +62,10 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
         <p className="mt-3 text-xs text-neutral-500">NOx grams relate to the NOx-covered distance. Median CO₂ is stored as reported; its interpretation is not assumed.</p>
       </details>
       <p className="text-xs text-neutral-500">Use a decimal point, e.g. 12.34. Blank means not provided; zero is stored as zero. Estimated CO₂ is calculated by the backend from total distance × supplier CO₂ / 1000, never entered manually.</p>
-      {overlapping && <label className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><input type="checkbox" disabled={busy} checked={overlapAccepted} onChange={e => setOverlapAccepted(e.target.checked)} />This period overlaps existing statistics. I intend to append another row.</label>}
+      {overlapping && <label className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><input type="checkbox" className={checkboxClass} disabled={busy} checked={overlapAccepted} onChange={e => setOverlapAccepted(e.target.checked)} />This period overlaps existing statistics. I intend to append another row.</label>}
       <ErrorNotice error={error} />
       {!!error && <p className="text-xs text-neutral-600">If the connection failed after sending, close this form and inspect the vehicle’s statistics before resubmitting: the row may already have been saved.</p>}
-      <footer className="flex justify-end gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy || (overlapping && !overlapAccepted)}>{busy ? "Saving…" : "Append statistics"}</button></footer>
+      <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy || (overlapping && !overlapAccepted)}>{busy ? "Saving…" : "Append statistics"}</button></footer>
     </form>
   </VehicleDialog>;
 }
@@ -104,7 +104,7 @@ export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { ap
   }
   return <VehicleDialog title={existing ? "Edit vehicle approval" : "Approve vehicle"} onClose={close} busy={busy}>
     <form onSubmit={submit} className="space-y-5">
-      <p className="text-sm text-neutral-600">Approval is separate from statistics. {existing ? "Saving replaces the current approval fields; clearing a field removes its value." : "Reapproving a revoked vehicle creates a new approval record."}</p>
+      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">Approval is separate from statistics. {existing ? "Saving replaces the current approval fields; clearing a field removes its value." : "Reapproving a revoked vehicle creates a new approval record."}</p>
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <Field label="Registration number *"><input autoFocus required readOnly={!!plate} className={inputClass} value={values.registrationNumber} onChange={e => change("registrationNumber", e.target.value)} /></Field>
         <Field label="Approved fuel technology"><input className={inputClass} value={values.fuelTechnology} onChange={e => change("fuelTechnology", e.target.value)} /></Field>
@@ -112,11 +112,11 @@ export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { ap
         <Field label="Used throughout the approval-sheet period"><select className={inputClass} value={values.usedThroughoutPeriod} onChange={e => change("usedThroughoutPeriod", e.target.value)}><option value="unknown">Not provided</option><option value="true">Yes</option><option value="false">No</option></select></Field>
         <Field label="Start date (blank = immediate)"><input type="date" className={inputClass} value={values.startDate} onChange={e => change("startDate", e.target.value)} /></Field>
         <Field label="Source / reference"><input className={inputClass} value={values.sourceName} onChange={e => change("sourceName", e.target.value)} /></Field>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={indefinite} onChange={e => { setIndefinite(e.target.checked); setDirty(true); }} />Approved indefinitely, until manually revoked</label>
+        <label className="flex items-start gap-2 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 sm:col-span-2"><input type="checkbox" className={checkboxClass} checked={indefinite} onChange={e => { setIndefinite(e.target.checked); setDirty(true); }} />Approved indefinitely, until manually revoked</label>
         {!indefinite && <Field label="Expiry date * (inclusive)"><input required type="date" min={values.startDate || undefined} className={inputClass} value={values.expiryDate} onChange={e => change("expiryDate", e.target.value)} /></Field>}
       </fieldset>
       <ErrorNotice error={error} />
-      <footer className="flex justify-end gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy}>{busy ? "Saving…" : "Save approval"}</button></footer>
+      <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy}>{busy ? "Saving…" : "Save approval"}</button></footer>
     </form>
   </VehicleDialog>;
 }
@@ -126,9 +126,9 @@ export function CheckForm({ onClose, onSaved }: Props) {
   const check = useMutation({ mutationFn: () => api.runCheck(validPlate(plate), force), retry: false });
   async function submit(event: FormEvent) { event.preventDefault(); setError(undefined); try { const result = await check.mutateAsync(); onSaved(result.vehicle.registrationNumber, "Check saved. Open Check result to inspect the findings and SVV availability."); } catch (cause) { setError(cause); } }
   return <VehicleDialog title="Check a registration number" onClose={onClose} busy={check.isPending}><form onSubmit={submit} className="space-y-4">
-    <p className="text-sm text-neutral-600">Checks local approval and SVV. An unknown plate will be added to the vehicle list, without approval or statistics.</p>
+    <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">Checks local approval and SVV. An unknown plate will be added to the vehicle list, without approval or statistics.</p>
     <Field label="Registration number *"><input autoFocus required disabled={check.isPending} className={inputClass} value={plate} onChange={e => setPlate(e.target.value)} /></Field>
-    <label className="flex gap-2 text-sm"><input type="checkbox" disabled={check.isPending} checked={force} onChange={e => setForce(e.target.checked)} />Force new SVV lookup instead of using recent cached data</label>
-    <ErrorNotice error={error} /><button className={primaryClass} disabled={check.isPending}>{check.isPending ? "Checking…" : "Run check"}</button>
+    <label className="flex gap-2 text-sm text-neutral-700"><input type="checkbox" className={checkboxClass} disabled={check.isPending} checked={force} onChange={e => setForce(e.target.checked)} />Force new SVV lookup instead of using recent cached data</label>
+    <ErrorNotice error={error} /><footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={check.isPending} onClick={onClose}>Cancel</button><button className={primaryClass} disabled={check.isPending}>{check.isPending ? "Checking…" : "Run check"}</button></footer>
   </form></VehicleDialog>;
 }

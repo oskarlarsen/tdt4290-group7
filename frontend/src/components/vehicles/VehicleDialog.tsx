@@ -1,9 +1,12 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
-export const inputClass = "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10 disabled:bg-neutral-100";
-export const buttonClass = "rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50";
-export const primaryClass = `${buttonClass} border-primary-900 bg-primary-900 text-white hover:bg-primary-800`;
+export const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10 disabled:bg-neutral-50 read-only:bg-neutral-50";
+const buttonBase = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50";
+export const buttonClass = `${buttonBase} border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50`;
+export const primaryClass = `${buttonBase} border-transparent bg-primary-900 text-white shadow-sm hover:bg-primary-700`;
+export const dangerClass = `${buttonBase} border-red-200 bg-white text-red-700 hover:bg-red-50`;
+export const checkboxClass = "mt-0.5 h-4 w-4 shrink-0 accent-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30";
 
 /** Native modal supplies focus trapping, Escape handling and background inertness. */
 export function VehicleDialog({ title, children, onClose, busy = false, drawer = false }: {
@@ -16,25 +19,25 @@ export function VehicleDialog({ title, children, onClose, busy = false, drawer =
     return () => dialog.close();
   }, []);
   return <dialog ref={ref} aria-label={title} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
-    className={`z-50 w-full overflow-y-auto bg-white p-0 text-neutral-800 shadow-xl backdrop:bg-neutral-900/40 ${drawer ? "fixed inset-y-0 left-auto right-0 m-0 h-screen max-h-screen max-w-3xl" : "max-h-[90vh] max-w-2xl rounded-2xl"}`}>
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
-      <h2 className="font-headline text-xl font-semibold">{title}</h2>
-      <button type="button" onClick={onClose} disabled={busy} aria-label={`Close ${title}`} className={buttonClass}><X className="h-4 w-4" /></button>
+    className={`fixed z-50 overflow-y-auto overscroll-contain border border-neutral-100 bg-white p-0 text-neutral-800 shadow-card backdrop:bg-neutral-900/30 ${drawer ? "inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-3xl" : "inset-0 m-auto h-fit max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl rounded-xl"}`}>
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-neutral-100 bg-white px-4 py-4 sm:px-5">
+      <h2 className="font-headline text-lg font-semibold text-neutral-900">{title}</h2>
+      <button type="button" onClick={onClose} disabled={busy} aria-label={`Close ${title}`} className="shrink-0 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"><X className="h-4 w-4" /></button>
     </header>
-    <div className="p-6">{children}</div>
+    <div className="p-4 sm:p-5">{children}</div>
   </dialog>;
 }
 export function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block space-y-1 text-sm font-medium text-neutral-700"><span>{label}</span>{children}</label>;
+  return <label className="block space-y-1.5 text-sm text-neutral-700"><span className="block text-xs font-medium">{label}</span>{children}</label>;
 }
 export function ErrorNotice({ error }: { error: unknown }) {
   return error ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error instanceof Error ? error.message : String(error)}</p> : null;
 }
 export function Paging({ page, total, pageSize, onChange }: { page: number; total: number; pageSize: number; onChange: (page: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  return <div className="flex items-center justify-between gap-3 pt-4 text-sm text-neutral-600">
-    <span>{total} record{total === 1 ? "" : "s"} · Page {page} of {pages}</span>
-    <div className="flex gap-2"><button className={buttonClass} disabled={page <= 1} onClick={() => onChange(page - 1)}>Previous</button>
-      <button className={buttonClass} disabled={page >= pages} onClick={() => onChange(page + 1)}>Next</button></div>
+  return <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
+    <span>{total} record{total === 1 ? "" : "s"} · <span className="font-mono">Page {page} of {pages}</span></span>
+    <div className="flex gap-1.5"><button type="button" className={buttonClass} disabled={page <= 1} onClick={() => onChange(page - 1)}><ChevronLeft className="h-3.5 w-3.5" />Previous</button>
+      <button type="button" className={buttonClass} disabled={page >= pages} onClick={() => onChange(page + 1)}>Next<ChevronRight className="h-3.5 w-3.5" /></button></div>
   </div>;
 }

@@ -1,6 +1,6 @@
 # Admin vehicle page draft
 
-The vehicle page is at `/admin/vehicles` and connects to the real Kotlin backend. It does **not** use vehicle mock fixtures. Supplier vehicle pages are unchanged. The existing admin layout, colour palette and details-drawer pattern are reused.
+The vehicle page is at `/admin/vehicles` and connects to the real Kotlin backend. It does **not** use vehicle mock fixtures. Supplier vehicle pages are unchanged. Header cards, compact actions, directory tables and status badges follow the supplier/dashboard styling. Statistics, approval and check-plate forms are centered, scrollable native dialogs with mobile viewport gutters; vehicle details remain a right-hand drawer. Native dialogs retain focus trapping, Escape handling and background inertness, including when a form opens over the details drawer.
 
 ## Run locally
 
