@@ -3,15 +3,16 @@ package com.tdt4290group7.backend.vehicles
 import java.math.BigDecimal
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
 
 class VehicleRequestJsonTest {
-    private fun body(extra: String = "") = """{"rows":[{"registrationNumber":"AB12345",
-        "periodStart":"2026-01-01","periodEnd":"2026-01-31"$extra}]}"""
+    private val baseline = Json.parseToJsonElement(Json.encodeToString(syntheticTrip())).jsonObject
+    private fun body(extra: String = "", omit: String? = null): String {
+        val overrides = Json.parseToJsonElement("{" + extra.removePrefix(",") + "}").jsonObject
+        val row = JsonObject((baseline + overrides).filterKeys { it != omit })
+        return "{\"rows\":[$row]}"
+    }
 
     @Test
     fun acceptsExactJsonNumbersIncludingExponentButNotNumericStrings() {
@@ -19,43 +20,49 @@ class VehicleRequestJsonTest {
             "medianCo2":12.34,"totalKmNoxRegistered":1000,"totalNoxRegisteredGrams":12.345,
             "tripCount":3,"co2Registered":true""")).rows.single()
         assertEquals(BigDecimal("123.456789"), input.co2GramsPerKm)
-        assertEquals(0, input.totalTripKm!!.compareTo(BigDecimal("1000")))
+        assertEquals(0, input.totalTripKm.compareTo(BigDecimal("1000")))
         assertEquals(3, input.tripCount)
-        assertEquals(true, input.co2Registered)
         val output = Json.encodeToString(StoredTripRow("row", "AB12345", createdAt = "2026-01-01T00:00:00Z", data = input))
-        assertTrue("123.456789" in output && """"estimatedCo2Kg":123.456789""" in output)
+        assertTrue("123.456789" in output && "\"estimatedCo2Kg\":123.456789" in output)
     }
 
     @Test
-    fun rejectsUnknownLegacyReadOnlyAndWronglyTypedFields() {
+    fun rejectsLegacyReadOnlyUnknownAndWronglyTypedFields() {
         listOf(
-            ""","fuel":"Diesel"""", ""","kmPerBus":100""", ""","additionalFields":{}""",
-            ""","estimatedCo2Kg":123""", ""","co2GramsPerKm":"123.45"""",
-            ""","co2Registered":"true"""", ""","tripCount":"3"""", ""","tripCount":3.0""",
-            ""","make":123""", ""","periodStart":123""", ""","co2GramsPerKm":-1""",
-            ""","co2GramsPerKm":1e1000000""", ""","co2GramsPerKm":0.0000000000000000001""",
-        ).forEach { extra -> assertFailsWith<SerializationException> { decodeTripRowsRequest(body(extra)) } }
-        assertFailsWith<SerializationException> {
-            decodeTripRowsRequest("""{"rows":[{"registrationNumber":"AB12345"}]}""")
+            "\"fuel\":\"Diesel\"", "\"vehicleType\":\"Sedan\"", "\"hybridCategory\":\"INGEN\"",
+            "\"estimatedCo2Kg\":123", "\"additionalFields\":{}", "\"co2GramsPerKm\":\"123.45\"",
+            "\"co2Registered\":\"true\"", "\"tripCount\":\"3\"", "\"tripCount\":3.0",
+            "\"make\":123", "\"periodStart\":123", "\"co2GramsPerKm\":-1",
+            "\"co2GramsPerKm\":1e1000000", "\"co2GramsPerKm\":0.0000000000000000001",
+            "\"fuelTechnology\":2", "\"fuelTechnology\":\"Diesel\"", "\"fuelTechnology\":\"999\"",
+            "\"vehicleCategory\":\"light\"", "\"vehicleCategory\":\"L3e\"", "\"bodyType\":\"Station wagon\"",
+        ).forEach { extra -> assertFailsWith<SerializationException>(extra) { decodeTripRowsRequest(body(extra)) } }
+        for (extra in listOf("\"vehicleGroup\":\"light\"", "\"fuelTechnology\":2", "\"fuelTechnology\":null", "\"usedThroughoutPeriod\":\"true\"")) {
+            assertFailsWith<SerializationException> {
+                decodeApprovalsRequest("{\"approvals\":[{\"registrationNumber\":\"AB12345\",\"fuelTechnology\":\"2\",\"vehicleCategory\":\"M1\",$extra}]}")
+            }
         }
-        assertFailsWith<SerializationException> {
-            decodeApprovalsRequest("""{"approvals":[{"registrationNumber":"AB12345","additionalFields":{}}]}""")
-        }
-        assertFailsWith<SerializationException> {
-            decodeApprovalsRequest("""{"approvals":[{"registrationNumber":"AB12345","usedThroughoutPeriod":"true"}]}""")
-        }
-        assertFailsWith<SerializationException> {
-            decodeVehicleCheckRequest("""{"registrationNumber":"AB12345","forceRefresh":"true"}""")
-        }
-        assertFailsWith<SerializationException> {
-            decodeVehicleCheckRequest("""{"registrationNumber":12345}""")
-        }
+        assertFailsWith<SerializationException> { decodeVehicleCheckRequest("""{"registrationNumber":"AB12345","forceRefresh":"true"}""") }
     }
 
     @Test
-    fun acceptsMissingOptionalValuesAndKeepsFalseDistinctFromUnknown() {
-        assertEquals(null, decodeTripRowsRequest(body()).rows.single().co2Registered)
-        assertEquals(false, decodeTripRowsRequest(body(""","co2Registered":false""")).rows.single().co2Registered)
-        assertEquals(null, decodeTripRowsRequest(body(""","co2GramsPerKm":null""")).rows.single().co2GramsPerKm)
+    fun everyStatisticsFieldExceptReferencesCommentsAndConditionalLitresIsRequired() {
+        val optional = setOf("assignmentNumber", "comment", "averageConsumptionLitresPerKm", "fuelConsumedLitres")
+        baseline.keys.filterNot { it in optional }.forEach { key ->
+            assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body(omit = key)) }
+            assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body("\"$key\":null")) }
+        }
+        assertEquals(false, decodeTripRowsRequest(body("\"co2Registered\":false")).rows.single().co2Registered)
+        assertEquals(BigDecimal.ZERO, decodeTripRowsRequest(body()).rows.single().totalNoxRegisteredGrams)
+        for (code in listOf("5", "6", "NOT_APPLICABLE")) {
+            val input = decodeTripRowsRequest(body("\"fuelTechnology\":\"$code\",\"averageConsumptionLitresPerKm\":null,\"fuelConsumedLitres\":null"))
+            assertNull(input.rows.single().fuelConsumedLitres)
+        }
+        for (key in listOf("fuelTechnology", "vehicleCategory")) {
+            val approval = Json.parseToJsonElement(Json.encodeToString(syntheticApproval())).jsonObject
+            assertFailsWith<SerializationException> {
+                decodeApprovalsRequest("{\"approvals\":[${JsonObject(approval.filterKeys { it != key })}]}")
+            }
+        }
     }
 }

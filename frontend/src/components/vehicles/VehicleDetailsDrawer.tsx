@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, catalogLabel, usesLitres } from "../../utils/vehicleCatalog";
 import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
 import { useVehicle, useVehicleCheck, useVehicleHistory, useRefreshVehicles } from "../../hooks/useVehicles";
@@ -60,8 +61,8 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
         {tab === "Overview" && <div className="space-y-5">
           <section><h3 className="font-semibold">Current approval</h3>
             <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-              {[["Status", APPROVAL_LABELS[data.approvalStatus]], ["Approved fuel technology", data.approval?.data.fuelTechnology ?? "Not provided"],
-                ["Vehicle group", data.approval?.data.vehicleGroup ?? "Not provided"], ["Source", data.approval?.sourceName ?? "Not provided"],
+              {[["Status", APPROVAL_LABELS[data.approvalStatus]], ["Approved fuel technology", catalogLabel(FUEL_TECHNOLOGIES, data.approval?.data.fuelTechnology)],
+                ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, data.approval?.data.vehicleCategory)], ["Source", data.approval?.sourceName ?? "Not provided"],
                 ["Start date", data.approval ? data.approval.data.startDate ?? "Immediate" : "Not applicable"],
                 ["Expiry date", data.approval ? data.approval.data.expiryDate ?? "Indefinite" : "Not applicable"],
                 ["Used throughout sheet period", data.approval?.data.usedThroughoutPeriod == null ? "Not provided" : data.approval.data.usedThroughoutPeriod ? "Yes" : "No"]].map(([label, value]) => <div key={label}><dt className="text-neutral-500">{label}</dt><dd>{value}</dd></div>)}
@@ -77,9 +78,10 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
           {!data.tripRows.length && <p className="rounded-lg bg-neutral-50 p-4 text-sm">No statistics yet. Use Add statistics to enter a reporting period.</p>}
           {data.tripRows.map(row => <details key={row.id} className="rounded-lg border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">{row.data.periodStart} – {row.data.periodEnd} · {row.data.totalTripKm ?? "Unknown"} km · Estimated CO₂: {row.estimatedCo2Kg ?? "Not available"} kg</summary>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              {[["Source", row.sourceName], ["Fuel technology", row.data.fuelTechnology], ["Make", row.data.make], ["Model", row.data.model], ["Vehicle type", row.data.vehicleType],
+              {[["Source", row.sourceName], ["Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology)], ["Make", row.data.make], ["Model", row.data.model],
+                ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory)], ["Body type", catalogLabel(BODY_TYPES, row.data.bodyType)],
                 ["Registered as CO₂-emitting", row.data.co2Registered == null ? "Not provided" : row.data.co2Registered ? "Yes" : "No"],
-                ...DECIMAL_FIELDS.map(([key, label]) => [label, row.data[key]]), ["Job/trip count", row.data.tripCount], ["Assignment number", row.data.assignmentNumber], ["Comment", row.data.comment], ["Added", timestamp(row.createdAt)]].map(([label, value]) => <div key={String(label)}><dt className="text-neutral-500">{label}</dt><dd className="break-words">{value ?? "Not provided"}</dd></div>)}
+                ...DECIMAL_FIELDS.map(([key, label]) => [label, ["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !usesLitres(row.data.fuelTechnology) ? "Not applicable" : row.data[key]]), ["Job/trip count", row.data.tripCount], ["Assignment number", row.data.assignmentNumber], ["Comment", row.data.comment], ["Added", timestamp(row.createdAt)]].map(([label, value]) => <div key={String(label)}><dt className="text-neutral-500">{label}</dt><dd className="break-words">{value ?? "Not provided"}</dd></div>)}
             </dl>
             <p className="mt-3 text-xs text-neutral-500">Estimated CO₂ = supplier total distance × supplier CO₂ g/km ÷ 1000. Missing inputs produce no estimate.</p>
           </details>)}

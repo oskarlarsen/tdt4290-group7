@@ -76,8 +76,8 @@ class VehicleCheckServiceTest {
         val repository = repository()
         val now = Instant.parse("2026-09-23T22:30:00Z") // Already September 24 in Oslo.
         repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
-            ApprovalInput("AB12345"), ApprovalInput("CD54321", startDate = "2026-09-25"),
-            ApprovalInput("EF12345", expiryDate = "2026-09-24"),
+            syntheticApproval("AB12345"), syntheticApproval("CD54321", startDate = "2026-09-25"),
+            syntheticApproval("EF12345", expiryDate = "2026-09-24"),
         )), now)
         assertEquals(ApprovalStatus.ACTIVE, service(repository, null, now.toString()).check(VehicleCheckRequest("AB12345")).approvalStatus)
         val future = service(repository, null, now.toString()).check(VehicleCheckRequest("CD54321"))
@@ -94,22 +94,22 @@ class VehicleCheckServiceTest {
         val repository = repository()
         val now = Instant.parse("2026-01-01T00:00:00Z")
         repository.appendTripRows(AppendTripRowsRequest(rows = listOf(
-            TripRowInput("AB 12345", "2025-12-01", "2025-12-31", fuelTechnology = "Diesel",
+            syntheticTrip("AB 12345", "2025-12-01", "2025-12-31", fuelTechnology = FuelTechnology.DIESEL,
                 co2GramsPerKm = BigDecimal("123.456"), totalTripKm = BigDecimal("1000"),
                 totalKmNoxRegistered = BigDecimal("1000"), totalNoxRegisteredGrams = BigDecimal("25.67")),
         )), now)
         repository.upsertApprovals(UpsertApprovalsRequest("original", listOf(
-            ApprovalInput("AB12345", "Fossil", true, "2025-01-01", "2026-12-31", "light"),
+            syntheticApproval("AB12345", FuelTechnology.DIESEL, true, "2025-01-01", "2026-12-31", VehicleCategory.M1),
         )), now)
         val first = service(repository, VehicleRegistryClient { RegistryLookup.Found(registryData()) }, now.toString())
             .check(VehicleCheckRequest("ab-12345"))
         assertEquals(BigDecimal("123.456"), first.tripRows.single().estimatedCo2Kg)
         assertTrue(first.deviations.isEmpty()) // No environmental comparisons, even though observations differ.
         repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
-            ApprovalInput("AB12345", "Elektrisk/Hydrogen"),
+            syntheticApproval("AB12345", FuelTechnology.ELECTRIC),
         )), now.plusSeconds(1))
         repository.appendTripRows(AppendTripRowsRequest(rows = listOf(
-            TripRowInput("AB12345", "2026-01-01", "2026-01-31"),
+            syntheticTrip("AB12345", "2026-01-01", "2026-01-31"),
         )), now.plusSeconds(2))
         repository.revokeApproval("AB12345", now.plusSeconds(3))
         val later = service(repository, null, "2028-01-01T00:00:00Z").check(VehicleCheckRequest("AB12345"))
@@ -118,7 +118,7 @@ class VehicleCheckServiceTest {
         assertEquals(RegistryDataSource.STALE_CACHE, later.registry.dataSource)
         val saved = assertNotNull(repository.findCheck(first.id))
         assertEquals(Json.encodeToString(first), Json.encodeToString(saved))
-        assertEquals("Fossil", saved.approval?.data?.fuelTechnology)
+        assertEquals(FuelTechnology.DIESEL, saved.approval?.data?.fuelTechnology)
         assertEquals(1, saved.tripRows.size)
         assertEquals(RegistryDataSource.LIVE, saved.registry.dataSource)
         assertEquals(first.registry.snapshotId, later.registry.snapshotId)
@@ -145,7 +145,7 @@ class VehicleCheckServiceTest {
 
     private fun registryData(status: String = "REGISTRERT", model: String = "Synthetic") = RegistryVehicleData(
         registrationNumber = "AB12345", registrationStatus = status, make = "Test Make", model = model,
-        vehicleCategory = RegistryCode("M1"), hybridCategory = RegistryCode("IKKE_HYBRID"),
+        vehicleCategory = RegistryCode("M1"), bodyType = RegistryCode("AA", "Sedan"),
         euroClass = RegistryCode("6", "Euro 6"),
         fuels = listOf(RegistryFuel(RegistryCode("2", "Diesel"), listOf(
             RegistryEmissionMeasurement(RegistryCode("WLTP"), BigDecimal("100.123456"), BigDecimal("12.34567")),

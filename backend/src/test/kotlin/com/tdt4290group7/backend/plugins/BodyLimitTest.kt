@@ -2,6 +2,10 @@ package com.tdt4290group7.backend.plugins
 
 import com.tdt4290group7.backend.module
 import com.tdt4290group7.backend.vehicles.VehicleRepository
+import com.tdt4290group7.backend.vehicles.AppendTripRowsRequest
+import com.tdt4290group7.backend.vehicles.syntheticTrip
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -40,12 +44,12 @@ class BodyLimitTest {
         for (chunked in listOf(false, true)) {
             assertEquals(HttpStatusCode.Created, vehicleStatusFor(
                 "/api/trip-rows",
-                """{"rows":[{"registrationNumber":"AB12345","periodStart":"2026-01-01","periodEnd":"2026-01-31","comment":"$padding"}]}""",
+                Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip(comment = padding)))),
                 chunked,
             ))
             assertEquals(HttpStatusCode.Created, vehicleStatusFor(
                 "/api/vehicle-approvals",
-                """{"sourceName":"$padding","approvals":[{"registrationNumber":"AB12345"}]}""",
+                """{"sourceName":"$padding","approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"}]}""",
                 chunked,
             ))
         }

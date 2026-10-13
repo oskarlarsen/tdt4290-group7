@@ -21,29 +21,30 @@ data class TripRowInput(
     val periodStart: String,
     val periodEnd: String,
     /** Supplier's reported technology; not the approval or SVV observation. */
-    val fuelTechnology: String? = null,
-    val make: String? = null,
-    val vehicleType: String? = null,
-    val model: String? = null,
-    val co2Registered: Boolean? = null,
-    val co2GramsPerKm: BigDecimal? = null,
-    val medianCo2: BigDecimal? = null,
-    val totalTripKm: BigDecimal? = null,
-    val totalKmCo2Registered: BigDecimal? = null,
-    val totalKmCo2NotRegistered: BigDecimal? = null,
-    val kmFuelNotRegistered: BigDecimal? = null,
-    val totalKmFuelRegistered: BigDecimal? = null,
-    val totalKmNoxRegistered: BigDecimal? = null,
-    val totalNoxRegisteredGrams: BigDecimal? = null,
-    val tripCount: Int? = null,
+    val fuelTechnology: FuelTechnology,
+    val make: String,
+    val bodyType: BodyType,
+    val model: String,
+    val co2Registered: Boolean,
+    val co2GramsPerKm: BigDecimal,
+    val medianCo2: BigDecimal,
+    val totalTripKm: BigDecimal,
+    val totalKmCo2Registered: BigDecimal,
+    val totalKmCo2NotRegistered: BigDecimal,
+    val kmFuelNotRegistered: BigDecimal,
+    val totalKmFuelRegistered: BigDecimal,
+    val totalKmNoxRegistered: BigDecimal,
+    val totalNoxRegisteredGrams: BigDecimal,
+    val tripCount: Int,
+    val vehicleCategory: VehicleCategory,
     val assignmentNumber: String? = null,
     val averageConsumptionLitresPerKm: BigDecimal? = null,
     val fuelConsumedLitres: BigDecimal? = null,
     val comment: String? = null,
 )
 
-fun TripRowInput.estimateCo2Kg(): BigDecimal? =
-    totalTripKm?.let { distance -> co2GramsPerKm?.let { distance.multiply(it).movePointLeft(3).stripTrailingZeros() } }
+fun TripRowInput.estimateCo2Kg(): BigDecimal =
+    totalTripKm.multiply(co2GramsPerKm).movePointLeft(3).stripTrailingZeros()
 
 @Serializable
 data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>)
@@ -55,9 +56,9 @@ data class StoredTripRow(
     val sourceName: String? = null,
     val createdAt: String,
     val data: TripRowInput,
-    /** Read-only supplier-based estimate; absent inputs do not imply zero emissions. */
+    /** Read-only supplier-based estimate from required explicit observations. */
     @kotlinx.serialization.EncodeDefault
-    val estimatedCo2Kg: BigDecimal? = data.estimateCo2Kg(),
+    val estimatedCo2Kg: BigDecimal = data.estimateCo2Kg(),
 )
 
 @Serializable
@@ -71,14 +72,14 @@ data class AppendTripRowsResponse(
 @Serializable
 data class ApprovalInput(
     val registrationNumber: String,
-    /** Approved technology, which can be broader than a supplier/SVV fuel description. */
-    val fuelTechnology: String? = null,
+    /** Official fuel code, separate from supplier/SVV observations. */
+    val fuelTechnology: FuelTechnology,
+    val vehicleCategory: VehicleCategory,
     val usedThroughoutPeriod: Boolean? = null,
     /** Missing means effective immediately. */
     val startDate: String? = null,
     /** Missing means approved indefinitely, until manually revoked. */
     val expiryDate: String? = null,
-    val vehicleGroup: String? = null,
 )
 
 @Serializable
@@ -133,7 +134,7 @@ data class RegistryVehicleData(
     val make: String? = null,
     val model: String? = null,
     val vehicleCategory: RegistryCode? = null,
-    val hybridCategory: RegistryCode? = null,
+    val bodyType: RegistryCode? = null,
     val euroClass: RegistryCode? = null,
     val fuels: List<RegistryFuel> = emptyList(),
 )

@@ -1,12 +1,13 @@
 import type { RegistryData, VehicleCheck } from "../../types/vehicle";
 import { APPROVAL_LABELS, checkLabel, codeLabel, humanize, summaryOf, timestamp } from "../../utils/vehicle";
+import { FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, catalogLabel } from "../../utils/vehicleCatalog";
 
 export function RegistryDetails({ data }: { data: RegistryData }) {
   return <section className="space-y-3">
     <h3 className="font-semibold">Selected SVV observations</h3>
     <dl className="grid gap-3 text-sm sm:grid-cols-2">
       {[["Registration status", data.registrationStatus], ["Make", data.make], ["Model", data.model],
-        ["Vehicle category", codeLabel(data.vehicleCategory)], ["Hybrid category", codeLabel(data.hybridCategory)], ["Euro class", codeLabel(data.euroClass)]].map(([label, value]) =>
+        ["Vehicle category", codeLabel(data.vehicleCategory)], ["Body type", codeLabel(data.bodyType)], ["Euro class", codeLabel(data.euroClass)]].map(([label, value]) =>
         <div key={label}><dt className="text-neutral-500">{label}</dt><dd className="font-medium">{value ?? "Not provided"}</dd></div>)}
     </dl>
     {data.fuels.map((fuel, fuelIndex) => <div key={fuelIndex} className="rounded-lg border border-neutral-200 p-3">
@@ -42,7 +43,8 @@ export function VehicleCheckResult({ check, historical }: { check: VehicleCheck;
     <details className="rounded-lg border border-neutral-200 p-3"><summary className="cursor-pointer text-sm font-medium">Approval evidence saved with this check</summary>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
         <div><dt>Approval ID</dt><dd className="break-all text-neutral-600">{check.approval?.id ?? "No approval recorded"}</dd></div>
-        <div><dt>Approved fuel technology</dt><dd>{check.approval?.data.fuelTechnology ?? "Not provided"}</dd></div>
+        <div><dt>Approved fuel technology</dt><dd>{catalogLabel(FUEL_TECHNOLOGIES, check.approval?.data.fuelTechnology)}</dd></div>
+        <div><dt>Approved vehicle category</dt><dd>{catalogLabel(VEHICLE_CATEGORIES, check.approval?.data.vehicleCategory)}</dd></div>
         <div><dt>Start</dt><dd>{check.approval?.data.startDate ?? (check.approval ? "Immediate" : "Not applicable")}</dd></div>
         <div><dt>Expiry</dt><dd>{check.approval?.data.expiryDate ?? (check.approval ? "Indefinite" : "Not applicable")}</dd></div>
         <div><dt>Revoked</dt><dd>{timestamp(check.approval?.revokedAt)}</dd></div>

@@ -87,7 +87,7 @@ internal fun projectRegistryVehicle(element: JsonElement, requestedPlate: String
     val drivetrain = technical.at("motorOgDrivverk")
     val environmentalFuels = environment.at("miljoOgdrivstoffGruppe").arrayOrEmpty().map { group ->
         RegistryFuel(
-            fuelTechnology = group.at("drivstoffKodeMiljodata").registryCode(),
+            fuelTechnology = group.at("drivstoffKodeMiljodata").registryCode()?.let { fuelCode(it.code) },
             measurements = group.at("forbrukOgUtslipp").arrayOrEmpty().map { measurement ->
                 RegistryEmissionMeasurement(
                     measurementMethod = measurement.at("malemetode").registryCode(),
@@ -102,7 +102,7 @@ internal fun projectRegistryVehicle(element: JsonElement, requestedPlate: String
     }.distinctBy { it.code }
     val fuels = environmentalFuels + engineFuels
         .filter { engine -> environmentalFuels.none { it.fuelTechnology?.code == engine.code } }
-        .map { RegistryFuel(it) }
+        .map { RegistryFuel(fuelCode(it.code)) }
     return RegistryVehicleData(
         registrationNumber = requestedPlate,
         registrationStatus = vehicle.at("registrering", "registreringsstatus").registryCode()?.code,
@@ -110,8 +110,8 @@ internal fun projectRegistryVehicle(element: JsonElement, requestedPlate: String
             .distinct().joinToString("; ").ifEmpty { null },
         model = general.at("handelsbetegnelse").arrayOrEmpty().mapNotNull { it.stringOrNull() }
             .distinct().joinToString("; ").ifEmpty { null },
-        vehicleCategory = approval.at("kjoretoyklassifisering", "tekniskKode").registryCode(),
-        hybridCategory = drivetrain.at("hybridKategori").registryCode(),
+        vehicleCategory = approval.at("kjoretoyklassifisering", "tekniskKode").registryCode()?.let { categoryCode(it.code) },
+        bodyType = technical.at("karosseriOgLasteplan", "karosseritype").registryCode()?.let { bodyCode(it.code) },
         euroClass = environment.at("euroKlasse").registryCode(),
         fuels = fuels,
     )

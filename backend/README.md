@@ -204,12 +204,38 @@ Vehicle POST bodies use Content-Type: application/json. There are no query param
 - Text must be quoted JSON text. Booleans must be unquoted true/false. Amounts must be JSON numbers, not quoted strings. tripCount is a non-negative 32-bit integer.
 - Required fields cannot be missing or null. Optional fields may be omitted/null. Missing is not zero or false.
 - Amounts are non-negative exact decimals: at most 18 fractional places after removing insignificant trailing zeroes, and an unscaled integer between 0 and 9223372036854775807. Unsupported values are rejected, never rounded.
-- Plates are uppercased, with whitespace/hyphens removed, then must contain 2–7 A–Z/0–9 characters. This validates syntax, not registry recognition.
+- Plates are uppercased, with whitespace/hyphens removed, then must match `^[A-Z]{2}[1-9][0-9]{3,4}$`: two letters followed by four or five digits, no leading zero. This accepts ordinary Norwegian plates only, not personal/historical/foreign formats, and validates syntax rather than registry recognition. Directory search remains partial.
 - Trip rows require periodStart and periodEnd: valid YYYY-MM-DD dates with start <= end. Both boundaries are inclusive. Single-day periods are allowed.
 - Batches contain 1–10,000 entries. One invalid entry rejects the entire batch. BEGIN IMMEDIATE reserves SQLite's writer before reading, waits up to five seconds for contention, and rolls back failed writes atomically.
 - The normalized registration number is the vehicle primary key. Other record IDs are UUID strings. Generated timestamps are UTC with nine fractional digits. Approval is evaluated as of today in Europe/Oslo, not the statistics period.
-- Optional/default response fields can be omitted. estimatedCo2Kg is always returned on stored statistics rows, as a number or null.
-- fuelTechnology always means fuel technology, but belongs to a separate supplier, approval or registry observation. Broader categories such as Fossil are not silently changed into specific fuels such as Diesel.
+- Optional/default response fields can be omitted. estimatedCo2Kg is always returned on stored statistics rows as a number calculated from required supplier inputs.
+- fuelTechnology always means fuel technology, but belongs to a separate supplier, approval or registry observation. Approvals and trip rows now require official code strings, not labels or broad values such as Fossil or Electric/Hydrogen. Never guess a more specific value during import.
+
+### Classification codes and English labels
+
+Fuel/category/body-type dropdowns display official codes alongside application-owned English labels. API inputs store the codes as JSON strings, not numbers or translated labels. Kotlin enums, TypeScript literal unions and SQLite CHECK constraints restrict submitted values. The frontend catalogue parity test ensures both clients stay aligned.
+
+| fuelTechnology | English label | fuelTechnology | English label |
+|---|---|---|---|
+| `"1"` | Gasoline | `"2"` | Diesel |
+| `"3"` | Kerosene | `"4"` | Gas |
+| `"5"` | Electric | `"6"` | Hydrogen |
+| `"7"` | Gasoline hybrid | `"8"` | Diesel hybrid |
+| `"9"` | Other fuel | `"10"` | Biodiesel |
+| `"11"` | Biogasoline | `"12"` | LPG |
+| `"13"` | CNG | `"14"` | Methanol |
+| `"15"` | Ethanol | `"16"` | LPG A |
+| `"17"` | LPG B | `"18"` | CNG 20 |
+| `"19"` | CNG 25 | `"20"` | Compressed air |
+| `"21"` | LNG | `"22"` | CNG and LNG |
+
+These are the complete [SVV fuel codes](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=DRIVSTOFFTYPE). Gasoline hybrid and diesel hybrid remain separate; no separate hybridCategory or isHybrid field is accepted or retained. The fuel codes do not establish whether a hybrid is plug-in/non-plug-in or which fuel was actually used during a period.
+
+`vehicleCategory` replaces approval `vehicleGroup` and is also required on trip rows. Submitted categories are `M1`, `M1G`, `M2`, `M2G`, `M3`, `M3G`, `N1`, `N1G`, `N2`, `N2G`, `N3`, `N3G`, `O1`, `O2`, `O3`, `O4`: passenger cars, buses, vans, trucks, their off-road variants and trailers. This is not the former approval sheet's 7.5-tonne grouping. See [SVV technical categories](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=TEKNISKKODE) and `VehicleCatalog.kt` / `vehicleCatalog.ts` for the code/English-label definitions.
+
+`bodyType` replaces ambiguous trip-row `vehicleType` and represents body style, not technical category: e.g. `AA` Sedan, `AB` Hatchback, `AC` Station wagon, `AD` Coupe, `AE` Convertible. The complete [SVV body-type catalogue](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=KAROSSERITYPE) is supported, including bus/truck/trailer bodies. Do not automatically reinterpret an old spreadsheet's Biltype text as a code without verifying its meaning. Body type is not an approval requirement in this version.
+
+Unpowered trailers (`O1`–`O4`) must use `fuelTechnology: "NOT_APPLICABLE"`. This is an **application-only sentinel**, not an official SVV code and not the same as Other fuel (`"9"`). It is invalid for non-trailer categories. No engine-powered trailer exception is represented in this version. Both litres fields must be omitted/null for electric (`"5"`), hydrogen (`"6"`) and unpowered trailers. They are required for other submitted fuels, including both hybrids. The API has no kg/kWh/m³ consumption inputs; do not convert those quantities into litres by relabelling them.
 
 ## Routes and HTTP statuses
 
@@ -239,23 +265,24 @@ POST /api/trip-rows, Body → raw → JSON:
       "registrationNumber": "AB 12345",
       "periodStart": "2026-01-01",
       "periodEnd": "2026-01-31",
-      "fuelTechnology": "Diesel",
+      "fuelTechnology": "2",
+      "vehicleCategory": "M1",
+      "bodyType": "AC",
+      "make": "Synthetic Make",
+      "model": "Synthetic Model",
       "co2Registered": true,
       "co2GramsPerKm": 123.456,
       "medianCo2": 120.25,
       "totalTripKm": 1000,
+      "totalKmCo2Registered": 1000,
+      "totalKmCo2NotRegistered": 0,
+      "kmFuelNotRegistered": 0,
+      "totalKmFuelRegistered": 1000,
       "totalKmNoxRegistered": 1000,
       "totalNoxRegisteredGrams": 25.67,
       "averageConsumptionLitresPerKm": 0.08,
       "fuelConsumedLitres": 80,
       "tripCount": 3
-    },
-    {
-      "registrationNumber": "AB12345",
-      "periodStart": "2026-01-01",
-      "periodEnd": "2026-01-31",
-      "assignmentNumber": "EXAMPLE-2",
-      "tripCount": 7
     }
   ]
 }
@@ -265,23 +292,25 @@ POST /api/trip-rows, Body → raw → JSON:
 |---|---|---|
 | registrationNumber | Required string | Regnr / Registreringsnr. |
 | periodStart, periodEnd | Required date strings | Reporting-period boundaries; not individual journey dates |
-| fuelTechnology | Optional string | Supplier Drivstoff / Type drivstoff |
-| make, vehicleType, model | Optional strings | Bilmerke, Biltype, Bilmodell |
-| co2Registered | Optional boolean | Supplier marks the vehicle as CO₂-emitting |
-| co2GramsPerKm | Optional number | Supplier emission rate, g/km |
-| medianCo2 | Optional number | Stored source value; meaning/unit are not inferred |
-| totalTripKm | Optional number | Unified distance, km; includes former km per buss |
-| totalKmCo2Registered, totalKmCo2NotRegistered | Optional numbers | Supplier CO₂ coverage distances, km |
-| kmFuelNotRegistered, totalKmFuelRegistered | Optional numbers | Supplier fuel-data coverage distances, km |
-| totalKmNoxRegistered | Optional number | Distance covered by reported NOx mass, km |
-| totalNoxRegisteredGrams | Optional number | Supplier NOx mass over that distance, grams |
-| tripCount | Optional integer | #turer |
+| fuelTechnology | Required code string | Supplier-reported fuel; official code, or trailer-only NOT_APPLICABLE |
+| vehicleCategory | Required code string | Supplier-reported SVV technical category |
+| bodyType | Required code string | Supplier-reported body style; distinct from technical category |
+| make, model | Required non-blank strings | Supplier make/model |
+| co2Registered | Required boolean | Supplier marks the vehicle as CO₂-emitting; false must be explicit |
+| co2GramsPerKm | Required number | Supplier emission rate, g/km |
+| medianCo2 | Required number | Stored source value; meaning/unit are not inferred |
+| totalTripKm | Required number | Unified distance, km; includes former km per buss |
+| totalKmCo2Registered, totalKmCo2NotRegistered | Required numbers | Supplier CO₂ coverage distances, km |
+| kmFuelNotRegistered, totalKmFuelRegistered | Required numbers | Supplier fuel-data coverage distances, km |
+| totalKmNoxRegistered | Required number | Distance covered by reported NOx mass, km |
+| totalNoxRegisteredGrams | Required number | Supplier NOx mass over that distance, grams; zero is accepted |
+| tripCount | Required integer | Job/trip count; zero is accepted |
 | assignmentNumber | Optional string | Oppdrag nr. |
-| averageConsumptionLitresPerKm | Optional number | Average consumption, L/km; not L/100 km |
-| fuelConsumedLitres | Optional number | Total litres; replaces fuelConsumptionLitresPerBus |
+| averageConsumptionLitresPerKm | Conditionally required number | Average consumption, L/km; not L/100 km. Must be omitted/null for codes 5, 6 or NOT_APPLICABLE |
+| fuelConsumedLitres | Conditionally required number | Total litres; same applicability rule as average consumption |
 | comment | Optional string | Supplier comment |
 
-sourceName is an optional batch label, not an import ID or supplier identifier. Trip rows have no approval flag.
+All statistics fields above are mandatory except comments/references and inapplicable litres. sourceName is an optional batch reference, not an import ID or supplier identifier; assignmentNumber is an optional job reference. Trip rows have no approval flag. Zero and false are valid explicit values; missing measurements are not replaced with zero, inferred from SVV or defaulted by the UI. If a supplier cannot provide a required value, the current strict contract does not accept the row.
 
 Response: createdAt, rowCount, distinctVehicleCount, rows. Stored rows contain id, registrationNumber, optional sourceName, createdAt, data and read-only estimatedCo2Kg. Stored plates are normalized. Repeated submissions append more rows, including identical/overlapping periods. No deduplication or summation occurs. Retrieval sorts creation time then UUID; batch input order need not be retained.
 
@@ -289,9 +318,9 @@ Response: createdAt, rowCount, distinctVehicleCount, rows. Stored rows contain i
 
 estimatedCo2Kg = supplier totalTripKm × supplier co2GramsPerKm / 1000.
 
-The first example row returns 123.456 kg. Exact decimal arithmetic is used. The result is computed, not independently editable or stored. If either operand is missing it returns null. co2Registered=false does not supply a zero rate; SVV values are not substituted. This is a nominal supplier-based estimate, not measured actual or lifecycle emissions. Estimates may have more precision than individual inputs.
+The example row returns 123.456 kg. Exact decimal arithmetic is used. The result is computed, not independently editable or stored. Both operands are now required. co2Registered=false does not supply a zero rate; SVV values are not substituted. This is a nominal supplier-based estimate, not measured actual or lifecycle emissions. Estimates may have more precision than individual inputs.
 
-The supplier NOx mass and distance are related, but no NOx-rate calculation or comparison is implemented. Supplier grams and SVV mg/km are different quantities.
+The supplier NOx mass and distance are related, but no NOx-rate calculation, zero-NOx warning or comparison is implemented. A zero value is stored without generating a new issue. Supplier grams and SVV mg/km are different quantities.
 
 ## Add or replace approvals
 
@@ -303,17 +332,17 @@ POST /api/vehicle-approvals:
   "approvals": [
     {
       "registrationNumber": "AB12345",
-      "fuelTechnology": "Fossil",
+      "fuelTechnology": "2",
+      "vehicleCategory": "M1",
       "usedThroughoutPeriod": true,
       "startDate": "2026-01-01",
-      "expiryDate": "2026-12-31",
-      "vehicleGroup": "example group"
+      "expiryDate": "2026-12-31"
     }
   ]
 }
 ~~~
 
-registrationNumber is required; all other row fields and sourceName are optional. usedThroughoutPeriod is boolean. Dates must be YYYY-MM-DD. Missing startDate means immediately effective; missing expiryDate means indefinite until revoked. Expiry equal to today is active.
+registrationNumber, fuelTechnology and vehicleCategory are required. Other row fields and sourceName are optional. usedThroughoutPeriod is boolean. Dates must be YYYY-MM-DD. Missing startDate means immediately effective; missing expiryDate means indefinite until revoked. Expiry equal to today is active. No bodyType is required for approval. Trailer fuel applicability is enforced just as for trip rows.
 
 At most one unrevoked approval exists per plate. Submitting creates one if absent, otherwise fully replaces its submitted fields, including future/expired records. Omitted optional fields are cleared. Omitted vehicles are untouched. Repeated plates are processed in order, with the final entry winning. approvalCount counts entries, not distinct vehicles.
 
@@ -366,8 +395,8 @@ registry.data is a typed object, not raw JSON or the old generic tree:
   "registrationStatus": "REGISTRERT",
   "make": "Synthetic Make",
   "model": "Synthetic Model",
-  "vehicleCategory": { "code": "M1", "name": "Personbil" },
-  "hybridCategory": { "code": "IKKE_HYBRID" },
+  "vehicleCategory": { "code": "M1", "name": "Passenger car" },
+  "bodyType": { "code": "AC", "name": "Station wagon" },
   "euroClass": { "code": "6", "name": "Euro 6" },
   "fuels": [
     {
@@ -384,9 +413,9 @@ registry.data is a typed object, not raw JSON or the old generic tree:
 }
 ~~~
 
-Whitelist: registration identity/status, make/model, vehicle/hybrid category, Euro class, fuel code/name, measurement method code/name, combined-driving CO₂ g/km and NOx mg/km. Missing values remain unknown, never zero. Multiple measurements retain their fuel/method association; no preferred measurement is selected. Multiple make/model names are joined with "; ".
+Whitelist: registration identity/status, make/model, vehicle category, body type, Euro class, fuel code/name, measurement method code/name, combined-driving CO₂ g/km and NOx mg/km. Detailed hybrid category is discarded. Missing SVV values remain unknown, never zero, even though supplier entry is mandatory. Known fuel/category/body codes use application-owned English labels; unknown codes are preserved without importing untranslated names. Multiple measurements retain their fuel/method association; no preferred measurement is selected. Multiple make/model names are joined with "; ".
 
-Technical data is projected from godkjenning.tekniskGodkjenning.tekniskeData. Environmental fuel groups carry forbrukOgUtslipp measurements. Engine fuel codes absent from environmental groups are included without invented measurements; grouping matches code equality only. kjoretoyId.kjennemerke must match the requested plate.
+Technical data is projected from godkjenning.tekniskGodkjenning.tekniskeData; body type comes from karosseriOgLasteplan.karosseritype. Environmental fuel groups carry forbrukOgUtslipp measurements. Engine fuel codes absent from environmental groups are included without invented measurements; grouping matches code equality only. kjoretoyId.kjennemerke must match the requested plate. No live SVV records are needed for synthetic projection tests.
 
 Unselected fields are discarded before persistence or response construction. Raw HTTP bodies are transient, never logged/saved. VIN, inspection/first-registration dates, filter/particle details, registered fuel consumption, electric consumption/range, weight, seats, noise and administrative/mechanical details are not retained.
 
@@ -428,7 +457,7 @@ GET /api/vehicle-checks/<check-id> uses the check's top-level UUID, not the plat
 
 ## Relational database and history
 
-Schema version 2 uses SQLite STRICT tables, foreign keys on each connection, explicit columns, constrained booleans/statuses, validated dates and exact quantities. There are no data_json columns or arbitrary attribute maps.
+Schema version 3 uses SQLite STRICT tables, foreign keys on each connection, explicit columns, constrained classification codes/booleans/statuses, mandatory statistics, validated dates and exact quantities. There are no data_json columns or arbitrary attribute maps. Both coefficient and scale are NOT NULL for required decimal fields. Conditional CHECK constraints enforce null litres for electric/hydrogen/trailer rows and present litres for other fuels. These constraints also apply to direct SQL inserts.
 
 | Table | Purpose |
 |---|---|
@@ -467,19 +496,20 @@ History shares immutable snapshots/statistics. Named approval_* columns delibera
 
 History is retained indefinitely by explicit product decision. There is no 90-day window, automatic cleanup or deletion/retention API. Cache TTL controls refreshes, not deletion. Growth/pagination and final privacy, access-control and deletion requirements remain future work, not a claim of complete GDPR compliance.
 
-### Development reset and incompatibility
+### Database compatibility and safe development setup
 
-This intentionally breaks the old vehicle-ID/JSON mock schema and API, with no migration. Startup refuses a legacy schema rather than deleting/converting it. Earlier databases were confirmed mock-only. Never reset unverified data.
+Schema version 3 intentionally changes version 2: required supplier statistics, restricted fuel/category/body codes, ordinary-plate validation and body type instead of detailed hybrid category. Startup refuses version 2 and earlier schemas **without reading their vehicle records, resetting them or guessing missing values**. An unversioned database must be empty. A reviewed migration remains a separate decision; previous permission to clear mock data does not authorize deleting a current database.
 
-For the confirmed mock default database only, stop the backend and run from backend/:
+For native local testing, stop the backend and choose an **unused** filename. Set `VEHICLE_DB_PATH=data/vehicles-v3.db` in your private root `.env`, or temporarily override it from `backend/`:
 
 ~~~powershell
-Remove-Item -LiteralPath data/vehicles.db
+$env:VEHICLE_DB_PATH = "data/vehicles-v3.db"
+.\gradlew.bat run
 ~~~
 
-If vehicles.db-wal, vehicles.db-shm or vehicles.db-journal exist, remove those exact files only while the backend is stopped. Do not delete an entire directory or Docker volume. Startup creates the empty new schema. Custom VEHICLE_DB_PATH databases and Docker volumes require their own explicitly authorised reset; none is automatic.
+The relative path is resolved against the process working directory. Startup creates a new empty database; the old file and its journal/WAL files remain untouched. A process override is not persistent: use root `.env` for later restarts, or remove the override to return to file configuration. Do not delete databases or Docker volumes without checking their contents and obtaining explicit authorization. Docker retains its configured `/app/data/vehicles.db` path; an old-volume database also needs a separately agreed migration or non-destructive new storage setup.
 
-Clients must adopt mandatory period dates, numeric quantities, fuelTechnology/fuelConsumedLitres/totalTripKm, registrationNumber rather than vehicleId, and typed registry.data. Old fuel/kmPerBus/fuelConsumptionLitresPerBus/additionalFields names and quoted quantities are rejected.
+Clients must use code strings for fuelTechnology, vehicleCategory in both approvals/statistics, bodyType in statistics, all required numeric/boolean observations, and nullable inapplicable litres. Old vehicleType/vehicleGroup, fuel/kmPerBus/fuelConsumptionLitresPerBus/additionalFields aliases, broad fuel labels and quoted quantities are rejected. Historical records cannot be automatically upgraded by inventing zeros or classifications.
 
 
 ## Logging

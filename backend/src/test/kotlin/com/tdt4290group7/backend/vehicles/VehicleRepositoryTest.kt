@@ -27,7 +27,7 @@ class VehicleRepositoryTest {
                     {
                         repository.upsertApprovals(
                             UpsertApprovalsRequest(approvals = listOf(
-                                ApprovalInput(plate, fuelTechnology = "synthetic-$index"),
+                                syntheticApproval(plate, fuelTechnology = FuelTechnology.entries[index], vehicleCategory = VehicleCategory.M1),
                             )),
                             Instant.now(),
                         )
@@ -55,8 +55,8 @@ class VehicleRepositoryTest {
             {
                 repository.appendTripRows(
                     AppendTripRowsRequest(rows = listOf(
-                        TripRowInput("AB 12345", "2026-01-01", "2026-01-31", tripCount = index),
-                        TripRowInput("ab-12345", "2026-01-01", "2026-01-31", tripCount = index),
+                        syntheticTrip("AB 12345", "2026-01-01", "2026-01-31", tripCount = index),
+                        syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", tripCount = index),
                     )),
                     Instant.now(),
                 )
@@ -78,7 +78,7 @@ class VehicleRepositoryTest {
         val path = databasePath()
         val repository = VehicleRepository(path)
         val request = UpsertApprovalsRequest(approvals = listOf(
-            ApprovalInput("AB12345"), ApprovalInput("CD12345"),
+            syntheticApproval("AB12345"), syntheticApproval("CD12345"),
         ))
 
         // A reader permits BEGIN IMMEDIATE and the writes, but blocks their commit.

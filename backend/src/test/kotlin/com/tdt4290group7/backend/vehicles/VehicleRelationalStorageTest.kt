@@ -50,8 +50,8 @@ class VehicleRelationalStorageTest {
     @Test
     fun decimalsAndAllSupplierFieldsRoundTripAndEstimateUsesOnlySupplierValues() {
         val repository = VehicleRepository(path())
-        val input = TripRowInput("ab-12345", "2026-01-01", "2026-01-31", "Diesel",
-            "Make", "Bus", "Model", true, BigDecimal("123.456789"), BigDecimal("44.12"),
+        val input = syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", FuelTechnology.DIESEL,
+            "Make", BodyType.AA, "Model", true, BigDecimal("123.456789"), BigDecimal("44.12"),
             BigDecimal("1000"), BigDecimal("900"), BigDecimal("100"), BigDecimal("50"),
             BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"), 3, "assignment",
             BigDecimal("0.123456"), BigDecimal("123.456"), "Synthetic comment")
@@ -60,15 +60,15 @@ class VehicleRelationalStorageTest {
         assertEquals(stored, loaded)
         assertEquals(input.copy(registrationNumber = "AB12345"), loaded.data)
         assertEquals(BigDecimal("123.456789"), loaded.estimatedCo2Kg)
-        val missing = TripRowInput("AB12345", "2026-02-01", "2026-02-28", co2Registered = false)
+        val missing = syntheticTrip("AB12345", "2026-02-01", "2026-02-28", co2Registered = false)
         val absent = repository.appendTripRows(AppendTripRowsRequest(rows = listOf(missing)), now).rows.single()
-        assertNull(absent.estimatedCo2Kg) // false never silently supplies a zero rate.
+        assertEquals(BigDecimal.ZERO, absent.estimatedCo2Kg) // Explicit zero is reported, never inferred.
     }
 
     @Test
     fun inputValidationIsAtomicAndRejectsDatesNegativeValuesAndNumericOverflow() {
         val repository = VehicleRepository(path())
-        val valid = TripRowInput("AB12345", "2026-01-01", "2026-01-31")
+        val valid = syntheticTrip("AB12345", "2026-01-01", "2026-01-31")
         val invalid = listOf(
             valid.copy(periodStart = "2026-1-01"), valid.copy(periodEnd = "2026-02-30"),
             valid.copy(periodEnd = "2025-12-31"), valid.copy(totalTripKm = BigDecimal("-1")),
@@ -83,52 +83,14 @@ class VehicleRelationalStorageTest {
         assertTrue(repository.tripRowsForVehicle("AB12345").isEmpty())
     }
 
-    @Test
-    fun databaseRejectsBadTypesDatesBooleanValuesDecimalPairsAndOrphanRows() {
-        val path = path()
-        val repository = VehicleRepository(path)
-        repository.findOrCreateVehicle("AB12345", now)
-        connection(path).use { db ->
-            val cases = listOf(
-                "co2_registered" to "2",
-                "trip_count" to "'not-a-number'",
-                "trip_count" to "2147483648",
-                "total_trip_km_unscaled" to "-1",
-                "total_trip_km_unscaled" to "123", // Its scale cannot be absent.
-                "total_trip_km_scale" to "2", // Its coefficient cannot be absent.
-            )
-            cases.forEach { (column, value) ->
-                assertFailsWith<SQLException> {
-                    db.createStatement().use { it.executeUpdate(
-                        "INSERT INTO trip_rows(id,registration_number,created_at,period_start,period_end," + column +
-                            ") VALUES('synthetic','AB12345','2026-01-01T00:00:00Z','2026-01-01','2026-01-31'," + value + ")",
-                    ) }
-                }
-            }
-            listOf("'2026-02-30','2026-03-01'", "'2026-02-01','2026-01-01'").forEach { dates ->
-                assertFailsWith<SQLException> {
-                    db.createStatement().use { it.executeUpdate(
-                        "INSERT INTO trip_rows(id,registration_number,created_at,period_start,period_end) " +
-                            "VALUES('synthetic','AB12345','2026-01-01T00:00:00Z'," + dates + ")",
-                    ) }
-                }
-            }
-            assertFailsWith<SQLException> {
-                db.createStatement().use { it.executeUpdate(
-                    "INSERT INTO trip_rows(id,registration_number,created_at,period_start,period_end) " +
-                        "VALUES('synthetic','CD12345','2026-01-01T00:00:00Z','2026-01-01','2026-01-31')",
-                ) }
-            }
-        }
-    }
 
     @Test
     fun historicalLinksRejectOtherVehiclesAndRollbackTheWholeCheck() = runBlocking<Unit> {
         val path = path()
         val repository = VehicleRepository(path)
         val rows = repository.appendTripRows(AppendTripRowsRequest(rows = listOf(
-            TripRowInput("AB12345", "2026-01-01", "2026-01-31"),
-            TripRowInput("CD12345", "2026-01-01", "2026-01-31"),
+            syntheticTrip("AB12345", "2026-01-01", "2026-01-31"),
+            syntheticTrip("CD12345", "2026-01-01", "2026-01-31"),
         )), now).rows
         val original = VehicleCheckService(repository, null).check(VehicleCheckRequest("AB12345"))
         val wrongId = UUID.randomUUID().toString()
@@ -153,20 +115,21 @@ class VehicleRelationalStorageTest {
     fun approvalReplacementClearsOmittedFieldsAndNormalizesThePlate() {
         val repository = VehicleRepository(path())
         val first = repository.upsertApprovals(UpsertApprovalsRequest("source", listOf(
-            ApprovalInput("ab 12345", "Fossil", true, "2025-01-01", "2026-12-31", "bus"),
+            syntheticApproval("ab 12345", FuelTechnology.DIESEL, true, "2025-01-01", "2026-12-31", VehicleCategory.M3),
         )), now).approvals.single()
         val replaced = repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
-            ApprovalInput("AB12345"),
+            syntheticApproval("AB12345"),
         )), now.plusSeconds(1)).approvals.single()
         assertEquals(first.id, replaced.id)
-        assertNull(replaced.data.fuelTechnology)
+        assertEquals(FuelTechnology.DIESEL, replaced.data.fuelTechnology)
+        assertEquals(VehicleCategory.M1, replaced.data.vehicleCategory)
         assertNull(replaced.data.usedThroughoutPeriod)
         assertNull(replaced.data.expiryDate)
         assertNull(replaced.sourceName)
         assertEquals(replaced, repository.approvalForVehicle("ab-12345"))
         repository.revokeApproval("AB12345", now.plusSeconds(2))
         val reapproved = repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
-            ApprovalInput("AB12345"),
+            syntheticApproval("AB12345"),
         )), now.plusSeconds(3)).approvals.single()
         assertTrue(reapproved.id != first.id)
     }

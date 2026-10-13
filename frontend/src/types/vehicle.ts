@@ -1,11 +1,12 @@
 // Decimal JSON numbers are decoded as strings by the vehicle API client to avoid IEEE-754 rounding.
+import type { BodyType, FuelTechnology, VehicleCategory } from "../utils/vehicleCatalog";
 export type Decimal = string;
 export type ApprovalStatus = "ACTIVE" | "NOT_YET_ACTIVE" | "EXPIRED" | "REVOKED" | "NOT_APPROVED";
 export type DataSource = "LIVE" | "CACHE" | "STALE_CACHE" | "UNAVAILABLE";
 export type Vehicle = { registrationNumber: string; supplierId?: string | null; createdAt: string };
 export type ApprovalInput = {
-  registrationNumber: string; fuelTechnology?: string | null; usedThroughoutPeriod?: boolean | null;
-  startDate?: string | null; expiryDate?: string | null; vehicleGroup?: string | null;
+  registrationNumber: string; fuelTechnology: FuelTechnology; vehicleCategory: VehicleCategory;
+  usedThroughoutPeriod?: boolean | null; startDate?: string | null; expiryDate?: string | null;
 };
 export type StoredApproval = {
   id: string; registrationNumber: string; sourceName?: string | null; createdAt: string;
@@ -13,19 +14,19 @@ export type StoredApproval = {
 };
 export type TripData = {
   registrationNumber: string; periodStart: string; periodEnd: string;
-  fuelTechnology?: string | null; make?: string | null; vehicleType?: string | null; model?: string | null;
-  co2Registered?: boolean | null; co2GramsPerKm?: Decimal | null; medianCo2?: Decimal | null;
-  totalTripKm?: Decimal | null; totalKmCo2Registered?: Decimal | null; totalKmCo2NotRegistered?: Decimal | null;
-  kmFuelNotRegistered?: Decimal | null; totalKmFuelRegistered?: Decimal | null;
-  totalKmNoxRegistered?: Decimal | null; totalNoxRegisteredGrams?: Decimal | null;
-  tripCount?: number | null; assignmentNumber?: string | null;
+  fuelTechnology: FuelTechnology; vehicleCategory: VehicleCategory; bodyType: BodyType; make: string; model: string;
+  co2Registered: boolean; co2GramsPerKm: Decimal; medianCo2: Decimal;
+  totalTripKm: Decimal; totalKmCo2Registered: Decimal; totalKmCo2NotRegistered: Decimal;
+  kmFuelNotRegistered: Decimal; totalKmFuelRegistered: Decimal;
+  totalKmNoxRegistered: Decimal; totalNoxRegisteredGrams: Decimal;
+  tripCount: number; assignmentNumber?: string | null;
   averageConsumptionLitresPerKm?: Decimal | null; fuelConsumedLitres?: Decimal | null; comment?: string | null;
 };
-export type TripRow = { id: string; registrationNumber: string; sourceName?: string | null; createdAt: string; data: TripData; estimatedCo2Kg?: Decimal | null };
+export type TripRow = { id: string; registrationNumber: string; sourceName?: string | null; createdAt: string; data: TripData; estimatedCo2Kg: Decimal };
 export type RegistryCode = { code: string; name?: string | null };
 export type RegistryData = {
   registrationNumber: string; registrationStatus?: string | null; make?: string | null; model?: string | null;
-  vehicleCategory?: RegistryCode | null; hybridCategory?: RegistryCode | null; euroClass?: RegistryCode | null;
+  vehicleCategory?: RegistryCode | null; bodyType?: RegistryCode | null; euroClass?: RegistryCode | null;
   fuels: { fuelTechnology?: RegistryCode | null; measurements: {
     measurementMethod?: RegistryCode | null; co2GramsPerKm?: Decimal | null; noxMgPerKm?: Decimal | null;
   }[] }[];

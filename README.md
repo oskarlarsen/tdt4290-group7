@@ -67,7 +67,7 @@ Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
 
 The backend runs without an SVV key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
 
-Vehicle storage now uses strict relational tables, registration numbers as vehicle primary keys, exact decimal quantities, mandatory statistics periods, and selected SVV fields only. Check history is retained indefinitely; the 14-day SVV cache setting controls freshness, not retention. This intentionally breaks the earlier JSON-backed mock schema/API. See the [vehicle API guide](backend/README.md#shared-request-rules) and [mock-only reset instructions](backend/README.md#development-reset-and-incompatibility) before using an older database.
+Vehicle storage uses strict relational tables, registration numbers as vehicle primary keys, exact decimal quantities and selected SVV fields only. Schema version 3 requires supplier statistics and official fuel/category/body codes; comments/references and inapplicable litres are exceptions. Dropdown labels are English and include official codes. Check history is retained indefinitely; the 14-day SVV cache setting controls freshness, not retention. Older databases are refused, never automatically reset or populated with guessed values. See the [vehicle API guide](backend/README.md#shared-request-rules) and [safe development database setup](backend/README.md#database-compatibility-and-safe-development-setup) before running with an older database.
 
 ## Local data and credentials
 

@@ -18,7 +18,7 @@ fun decodeTripRowsRequest(text: String): AppendTripRowsRequest {
     root.textFields("sourceName")
     root.items("rows").forEach { row ->
         row.textFields("registrationNumber", "periodStart", "periodEnd", "fuelTechnology",
-            "make", "vehicleType", "model", "assignmentNumber", "comment")
+            "make", "bodyType", "vehicleCategory", "model", "assignmentNumber", "comment")
         row.booleanFields("co2Registered")
         row["tripCount"]?.takeUnless { it == JsonNull }?.let {
             val value = it as? JsonPrimitive ?: invalidType()
@@ -32,7 +32,7 @@ fun decodeApprovalsRequest(text: String): UpsertApprovalsRequest {
     val root = requestObject(text)
     root.textFields("sourceName")
     root.items("approvals").forEach {
-        it.textFields("registrationNumber", "fuelTechnology", "startDate", "expiryDate", "vehicleGroup")
+        it.textFields("registrationNumber", "fuelTechnology", "startDate", "expiryDate", "vehicleCategory")
         it.booleanFields("usedThroughoutPeriod")
     }
     return requestJson.decodeFromJsonElement(root)

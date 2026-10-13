@@ -1,6 +1,9 @@
 package com.tdt4290group7.backend
 
 import com.tdt4290group7.backend.vehicles.VehicleRepository
+import com.tdt4290group7.backend.vehicles.AppendTripRowsRequest
+import com.tdt4290group7.backend.vehicles.syntheticTrip
+import kotlinx.serialization.encodeToString
 import io.ktor.client.request.cookie
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -59,7 +62,7 @@ class ApplicationTest {
         val repository = VehicleRepository(path)
         application { module(repository, null, Duration.ofDays(14)) }
         startApplication()
-        val body = """{"approvals":[{"registrationNumber":"AB12345"},{"registrationNumber":"CD12345"}]}"""
+        val body = """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"},{"registrationNumber":"CD12345","fuelTechnology":"2","vehicleCategory":"M1"}]}"""
 
         databaseConnection(path).use { blocker ->
             blocker.createStatement().use { it.execute("BEGIN IMMEDIATE") }
@@ -98,7 +101,7 @@ class ApplicationTest {
 
         val response = postJson(
             "/api/vehicle-approvals",
-            """{"approvals":[{"registrationNumber":"AB12345"},{"registrationNumber":"CD12345"}]}""",
+            """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"},{"registrationNumber":"CD12345","fuelTechnology":"2","vehicleCategory":"M1"}]}""",
         )
         assertEquals(HttpStatusCode.InternalServerError, response.status)
         assertEquals("Internal server error", response.bodyAsText())
@@ -124,10 +127,10 @@ class ApplicationTest {
 
         val trips = postJson(
             "/api/trip-rows",
-            """{"sourceName":"trip-sheet","rows":[
-                {"registrationNumber":"AB 12345","periodStart":"2026-01-01","periodEnd":"2026-01-31","tripCount":3,"totalTripKm":45.5},
-                {"registrationNumber":"AB12345","periodStart":"2026-01-01","periodEnd":"2026-01-31","tripCount":7,"totalTripKm":62}
-            ]}""",
+            Json.encodeToString(AppendTripRowsRequest("trip-sheet", listOf(
+                syntheticTrip("AB 12345", tripCount = 3, totalTripKm = "45.5".toBigDecimal()),
+                syntheticTrip("AB12345", tripCount = 7, totalTripKm = "62".toBigDecimal()),
+            ))),
         )
         assertEquals(HttpStatusCode.Created, trips.status)
         val tripResponse = Json.parseToJsonElement(trips.bodyAsText()).jsonObject
@@ -137,7 +140,7 @@ class ApplicationTest {
         val approvals = postJson(
             "/api/vehicle-approvals",
             """{"sourceName":"approved-sheet","approvals":[{
-                "registrationNumber":"AB12345","fuelTechnology":"Elektrisk/Hydrogen",
+                "registrationNumber":"AB12345","fuelTechnology":"5","vehicleCategory":"M1",
                 "usedThroughoutPeriod":true
             }]}""",
         )
@@ -169,7 +172,7 @@ class ApplicationTest {
         application { module(testRepository(), null, Duration.ofDays(14)) }
         val first = postJson(
             "/api/vehicle-approvals",
-            """{"approvals":[{"registrationNumber":"AB12345"}]}""",
+            """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"}]}""",
         )
         val firstId = Json.parseToJsonElement(first.bodyAsText()).jsonObject
             .getValue("approvals").jsonArray.single().jsonObject.getValue("id").jsonPrimitive.content
@@ -189,7 +192,7 @@ class ApplicationTest {
 
         val second = postJson(
             "/api/vehicle-approvals",
-            """{"approvals":[{"registrationNumber":"AB12345","expiryDate":"2099-12-31"}]}""",
+            """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1","expiryDate":"2099-12-31"}]}""",
         )
         val secondId = Json.parseToJsonElement(second.bodyAsText()).jsonObject
             .getValue("approvals").jsonArray.single().jsonObject.getValue("id").jsonPrimitive.content
@@ -207,10 +210,10 @@ class ApplicationTest {
         val path = Path.of("build", "test-data", UUID.randomUUID().toString() + ".db")
         val repository = VehicleRepository(path)
         application { module(repository, null, Duration.ofDays(14)) }
-        val valid = """{"registrationNumber":"AB12345","periodStart":"2026-01-01",
-            "periodEnd":"2026-01-31","fuelTechnology":"Diesel","co2GramsPerKm":123.456789,
-            "totalTripKm":1000,"totalKmNoxRegistered":1000,"totalNoxRegisteredGrams":25.67,
-            "averageConsumptionLitresPerKm":0.08,"fuelConsumedLitres":80}"""
+        val valid = Json.encodeToString(syntheticTrip(co2GramsPerKm = "123.456789".toBigDecimal(),
+            totalTripKm = "1000".toBigDecimal(), totalKmNoxRegistered = "1000".toBigDecimal(),
+            totalNoxRegisteredGrams = "25.67".toBigDecimal(), averageConsumptionLitresPerKm = "0.08".toBigDecimal(),
+            fuelConsumedLitres = "80".toBigDecimal()))
         listOf(
             """{"registrationNumber":"CD12345"}""",
             valid.replace("2026-01-31", "2026-02-30"),

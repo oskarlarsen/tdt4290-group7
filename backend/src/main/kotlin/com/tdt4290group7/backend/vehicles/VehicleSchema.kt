@@ -19,9 +19,9 @@ internal val tripDecimalColumns = listOf(
     TripDecimalColumn("fuel_consumed_litres") { it.fuelConsumedLitres },
 )
 
-private fun decimalColumns(name: String) = """
-    ${name}_unscaled INTEGER CHECK (${name}_unscaled >= 0),
-    ${name}_scale INTEGER CHECK (${name}_scale BETWEEN 0 AND 18)
+private fun decimalColumns(name: String, required: Boolean = false) = """
+    ${name}_unscaled INTEGER ${if (required) "NOT NULL" else ""} CHECK (${name}_unscaled >= 0),
+    ${name}_scale INTEGER ${if (required) "NOT NULL" else ""} CHECK (${name}_scale BETWEEN 0 AND 18)
       CHECK ((${name}_unscaled IS NULL) = (${name}_scale IS NULL))
 """.trimIndent()
 
@@ -34,7 +34,10 @@ private fun dateColumn(name: String, required: Boolean = false) = """
 private fun timestampColumn(name: String, required: Boolean = false) =
     "$name TEXT ${if (required) "NOT NULL" else ""} CHECK ($name IS NULL OR (julianday($name) IS NOT NULL AND substr($name, -1) = 'Z'))"
 
-private fun booleanColumn(name: String) = "$name INTEGER CHECK ($name IN (0, 1))"
+private fun booleanColumn(name: String, required: Boolean = false) =
+    "$name INTEGER ${if (required) "NOT NULL" else ""} CHECK ($name IN (0, 1))"
+private fun fuelColumn(name: String, required: Boolean = true) =
+    "$name TEXT ${if (required) "NOT NULL" else ""} CHECK ($name IN (${FuelTechnology.entries.joinToString(",") { "'${it.code}'" }}))"
 private inline fun <reified T : Enum<T>> enumColumn(name: String, required: Boolean = true) =
     "$name TEXT ${if (required) "NOT NULL" else ""} CHECK ($name IN (${enumValues<T>().joinToString(",") { "'${it.name}'" }}))"
 
@@ -44,7 +47,8 @@ internal val vehicleSchemaStatements = listOf(
     ) STRICT""",
     """CREATE TABLE IF NOT EXISTS vehicles (
         registration_number TEXT PRIMARY KEY
-          CHECK (length(registration_number) BETWEEN 2 AND 7 AND registration_number NOT GLOB '*[^A-Z0-9]*'),
+          CHECK (registration_number GLOB '[A-Z][A-Z][1-9][0-9][0-9][0-9]'
+            OR registration_number GLOB '[A-Z][A-Z][1-9][0-9][0-9][0-9][0-9]'),
         supplier_id TEXT REFERENCES suppliers(id),
         ${timestampColumn("created_at", true)}
     ) STRICT""",
@@ -54,11 +58,18 @@ internal val vehicleSchemaStatements = listOf(
         source_name TEXT,
         ${timestampColumn("created_at", true)},
         ${dateColumn("period_start", true)}, ${dateColumn("period_end", true)},
-        fuel_technology TEXT, make TEXT, vehicle_type TEXT, model TEXT,
-        ${booleanColumn("co2_registered")},
-        trip_count INTEGER CHECK (trip_count BETWEEN 0 AND 2147483647),
+        ${fuelColumn("fuel_technology")}, ${enumColumn<VehicleCategory>("vehicle_category")},
+        ${enumColumn<BodyType>("body_type")},
+        make TEXT NOT NULL CHECK (length(trim(make)) > 0),
+        model TEXT NOT NULL CHECK (length(trim(model)) > 0),
+        ${booleanColumn("co2_registered", true)},
+        trip_count INTEGER NOT NULL CHECK (trip_count BETWEEN 0 AND 2147483647),
         assignment_number TEXT, comment TEXT,
-        ${tripDecimalColumns.joinToString(",\n") { decimalColumns(it.name) }},
+        ${tripDecimalColumns.joinToString(",\n") { decimalColumns(it.name, it.name !in listOf("average_consumption_litres_per_km", "fuel_consumed_litres")) }},
+        CHECK ((vehicle_category IN ('O1','O2','O3','O4')) = (fuel_technology = 'NOT_APPLICABLE')),
+        CHECK (CASE WHEN fuel_technology IN ('5','6','NOT_APPLICABLE') THEN
+          average_consumption_litres_per_km_unscaled IS NULL AND fuel_consumed_litres_unscaled IS NULL
+          ELSE average_consumption_litres_per_km_unscaled IS NOT NULL AND fuel_consumed_litres_unscaled IS NOT NULL END),
         CHECK (period_start <= period_end),
         UNIQUE (id, registration_number)
     ) STRICT""",
@@ -66,12 +77,13 @@ internal val vehicleSchemaStatements = listOf(
     """CREATE TABLE IF NOT EXISTS vehicle_approvals (
         id TEXT PRIMARY KEY,
         registration_number TEXT NOT NULL REFERENCES vehicles(registration_number),
-        source_name TEXT, fuel_technology TEXT, vehicle_group TEXT,
+        source_name TEXT, ${fuelColumn("fuel_technology")}, ${enumColumn<VehicleCategory>("vehicle_category")},
         ${booleanColumn("used_throughout_period")},
         ${dateColumn("start_date")}, ${dateColumn("expiry_date")},
         ${timestampColumn("created_at", true)}, ${timestampColumn("updated_at", true)},
         ${timestampColumn("revoked_at")},
         CHECK (start_date IS NULL OR expiry_date IS NULL OR start_date <= expiry_date),
+        CHECK ((vehicle_category IN ('O1','O2','O3','O4')) = (fuel_technology = 'NOT_APPLICABLE')),
         UNIQUE (id, registration_number)
     ) STRICT""",
     """CREATE UNIQUE INDEX IF NOT EXISTS idx_one_unrevoked_approval
@@ -82,7 +94,7 @@ internal val vehicleSchemaStatements = listOf(
         ${timestampColumn("fetched_at", true)},
         source TEXT NOT NULL, registration_status TEXT, make TEXT, model TEXT,
         vehicle_category TEXT, vehicle_category_name TEXT,
-        hybrid_category TEXT, hybrid_category_name TEXT,
+        body_type TEXT, body_type_name TEXT,
         euro_class TEXT, euro_class_name TEXT,
         UNIQUE (id, registration_number)
     ) STRICT""",
@@ -113,7 +125,8 @@ internal val vehicleSchemaStatements = listOf(
         ${enumColumn<LookupOutcome>("lookup_outcome")},
         ${enumColumn<LookupOutcome>("refresh_failure", false)},
         usage_prohibition_state TEXT NOT NULL CHECK (usage_prohibition_state = 'UNKNOWN'),
-        approval_source_name TEXT, approval_fuel_technology TEXT, approval_vehicle_group TEXT,
+        approval_source_name TEXT, ${fuelColumn("approval_fuel_technology", false)},
+        ${enumColumn<VehicleCategory>("approval_vehicle_category", false)},
         ${booleanColumn("approval_used_throughout_period")},
         ${dateColumn("approval_start_date")}, ${dateColumn("approval_expiry_date")},
         ${timestampColumn("approval_created_at")}, ${timestampColumn("approval_updated_at")},

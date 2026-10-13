@@ -24,6 +24,7 @@ class VehicleRegistryClientTest {
             "tekniskeData":{
                 "generelt":{"merke":[{"merke":"Test Make"}],"handelsbetegnelse":["Test Model"]},
                 "vekter":{"tillattTotalvekt":1234},
+                "karosseriOgLasteplan":{"karosseritype":{"kodeVerdi":"AC","kodeNavn":"Stasjonsvogn"}},
                 "motorOgDrivverk":{"hybridKategori":{"kodeVerdi":"IKKE_HYBRID"},
                     "motor":[{"drivstoff":[{"drivstoffKode":{"kodeVerdi":"2","kodeNavn":"Diesel"}},
                         {"drivstoffKode":{"kodeVerdi":"5","kodeNavn":"Elektrisk"}}]}]},
@@ -43,7 +44,9 @@ class VehicleRegistryClientTest {
         val data = projectRegistryVehicle(Json.parseToJsonElement(payload).jsonObject.getValue("kjoretoydataListe")
             .let { (it as kotlinx.serialization.json.JsonArray).single() }, "AB12345")
         assertEquals("Test Make", data.make)
-        assertEquals(RegistryCode("M1", "Personbil"), data.vehicleCategory)
+        assertEquals(RegistryCode("M1", "Passenger car"), data.vehicleCategory)
+        assertEquals(RegistryCode("AC", "Station wagon"), data.bodyType)
+        assertEquals(RegistryCode("5", "Electric"), data.fuels.last().fuelTechnology)
         assertEquals("6", data.euroClass?.code)
         assertEquals(2, data.fuels.size)
         val measurements = data.fuels.first().measurements
@@ -54,7 +57,7 @@ class VehicleRegistryClientTest {
         assertEquals("NEDC", measurements.last().measurementMethod?.code)
         val saved = Json.encodeToString(data)
         listOf("PRIVATE_SENTINEL", "kontrollfrist", "tillattTotalvekt", "forbrukBlandetKjoring",
-            "partikkelfilter", "utslippPartikler", "understellsnummer").forEach { assertTrue(it !in saved) }
+            "partikkelfilter", "utslippPartikler", "understellsnummer", "hybridCategory", "Personbil", "Stasjonsvogn", "Elektrisk").forEach { assertTrue(it !in saved) }
     }
 
     @Test

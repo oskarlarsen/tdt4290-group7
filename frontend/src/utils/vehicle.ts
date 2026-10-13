@@ -1,4 +1,5 @@
 import type { ApprovalStatus, CheckSummary, RegistryCode, VehicleCheck } from "../types/vehicle";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres } from "./vehicleCatalog";
 
 export const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
   ACTIVE: "Approved", NOT_YET_ACTIVE: "Not yet active", EXPIRED: "Expired", REVOKED: "Revoked", NOT_APPROVED: "Not approved",
@@ -30,7 +31,7 @@ export function parseVehicleJson<T>(text: string): T {
 export function normalizePlate(value: string): string { return value.toUpperCase().replace(/[\s-]/g, ""); }
 export function validPlate(value: string): string {
   const plate = normalizePlate(value);
-  if (!/^[A-Z0-9]{2,7}$/.test(plate)) throw new Error("Enter a registration number with 2–7 letters or digits.");
+  if (!/^[A-Z]{2}[1-9][0-9]{3,4}$/.test(plate)) throw new Error("Enter two letters followed by four or five digits, without a leading zero.");
   return plate;
 }
 
@@ -55,18 +56,34 @@ export function statisticsBody(values: Record<string, string>): string {
   const plate = validPlate(values.registrationNumber ?? "");
   if (!validDate(values.periodStart) || !validDate(values.periodEnd)) throw new Error("Both reporting dates must be valid dates (YYYY-MM-DD).");
   if (values.periodEnd < values.periodStart) throw new Error("Period end cannot be before period start.");
+  const fuel = selectedCode(FUEL_TECHNOLOGIES, values.fuelTechnology ?? "", "fuel technology");
+  const category = selectedCode(VEHICLE_CATEGORIES, values.vehicleCategory ?? "", "vehicle category");
+  selectedCode(BODY_TYPES, values.bodyType ?? "", "body type");
+  if (isTrailer(category) !== (fuel === "NOT_APPLICABLE")) throw new Error("Use Not applicable fuel exactly for trailer categories O1–O4.");
   const row: string[] = [
     `"registrationNumber":${JSON.stringify(plate)}`, `"periodStart":${JSON.stringify(values.periodStart)}`, `"periodEnd":${JSON.stringify(values.periodEnd)}`,
   ];
-  for (const key of ["fuelTechnology", "make", "vehicleType", "model", "assignmentNumber", "comment"]) {
+  for (const key of ["fuelTechnology", "make", "vehicleCategory", "bodyType", "model"]) {
+    if (!values[key]?.trim()) throw new Error(`${key} is required.`);
+    row.push(`${JSON.stringify(key)}:${JSON.stringify(values[key].trim())}`);
+  }
+  for (const key of ["assignmentNumber", "comment"]) {
     if (values[key]?.trim()) row.push(`${JSON.stringify(key)}:${JSON.stringify(values[key].trim())}`);
   }
-  for (const [key, label] of DECIMAL_FIELDS) if (values[key]?.trim()) row.push(`${JSON.stringify(key)}:${decimalLiteral(values[key], label)}`);
-  if (values.tripCount?.trim()) {
-    if (!/^\d+$/.test(values.tripCount.trim()) || BigInt(values.tripCount.trim()) > 2147483647n) throw new Error("Job/trip count must be a whole number between 0 and 2147483647.");
-    row.push(`"tripCount":${Number(values.tripCount)}`);
+  for (const [key, label] of DECIMAL_FIELDS) {
+    if (["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !usesLitres(fuel)) {
+      if (values[key]?.trim()) throw new Error(`${label} is not applicable for this fuel technology.`);
+      row.push(`${JSON.stringify(key)}:null`);
+    } else {
+      if (!values[key]?.trim()) throw new Error(`${label} is required.`);
+      row.push(`${JSON.stringify(key)}:${decimalLiteral(values[key], label)}`);
+    }
   }
-  if (values.co2Registered && values.co2Registered !== "unknown") row.push(`"co2Registered":${values.co2Registered === "true"}`);
+  if (!values.tripCount?.trim()) throw new Error("Job/trip count is required.");
+  if (!/^\d+$/.test(values.tripCount.trim()) || BigInt(values.tripCount.trim()) > 2147483647n) throw new Error("Job/trip count must be a whole number between 0 and 2147483647.");
+  row.push(`"tripCount":${Number(values.tripCount)}`);
+  if (!["true", "false"].includes(values.co2Registered)) throw new Error("Select whether the vehicle is registered as CO₂-emitting.");
+  row.push(`"co2Registered":${values.co2Registered === "true"}`);
   return `{"sourceName":${JSON.stringify(values.sourceName?.trim() || null)},"rows":[{${row.join(",")}}]}`;
 }
 

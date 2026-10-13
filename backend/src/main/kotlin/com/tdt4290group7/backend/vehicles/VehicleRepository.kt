@@ -47,12 +47,17 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             val legacy = query(db, "SELECT name FROM pragma_table_info('vehicles') WHERE name = 'id'") {
                 it.getString("name")
             }.isNotEmpty()
-            check(!legacy) { "Legacy vehicle schema detected. Reset the authorised mock vehicle database before startup." }
+            check(!legacy) { "Legacy vehicle schema detected. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset." }
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            check(version == 0 || version == 2) { "Unsupported vehicle database schema version" }
+            check(version == 0 || version == 3) {
+                "Vehicle schema version $version is not supported. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
+            }
+            if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") {
+                it.getString(1)
+            }.isEmpty()) { "Unversioned database is not empty; no automatic reinterpretation is allowed" }
             db.createStatement().use { statement ->
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
-                statement.execute("PRAGMA user_version = 2")
+                statement.execute("PRAGMA user_version = 3")
             }
         }
     }
@@ -183,9 +188,9 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                     "id" to record.id, "registration_number" to record.registrationNumber,
                     "source_name" to source, "created_at" to record.createdAt,
                     "period_start" to input.periodStart, "period_end" to input.periodEnd,
-                    "fuel_technology" to input.fuelTechnology, "make" to input.make,
-                    "vehicle_type" to input.vehicleType, "model" to input.model,
-                    "co2_registered" to input.co2Registered?.asInteger(),
+                    "fuel_technology" to input.fuelTechnology.code, "make" to input.make,
+                    "body_type" to input.bodyType.name, "vehicle_category" to input.vehicleCategory.name,
+                    "model" to input.model, "co2_registered" to input.co2Registered.asInteger(),
                     "trip_count" to input.tripCount, "assignment_number" to input.assignmentNumber,
                     "comment" to input.comment,
                 )
@@ -325,7 +330,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             "registration_status" to data.registrationStatus, "make" to data.make, "model" to data.model,
         )
         values.putCode("vehicle_category", data.vehicleCategory)
-        values.putCode("hybrid_category", data.hybridCategory)
+        values.putCode("body_type", data.bodyType)
         values.putCode("euro_class", data.euroClass)
         insert(db, "svv_snapshots", values)
         data.fuels.forEachIndexed { fuelIndex, fuel ->
@@ -357,7 +362,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }
         return RegistrySnapshot(id, plate, row.getString("fetched_at"), row.getString("source"),
             RegistryVehicleData(plate, row.getString("registration_status"), row.getString("make"), row.getString("model"),
-                row.code("vehicle_category"), row.code("hybrid_category"), row.code("euro_class"), fuels))
+                row.code("vehicle_category"), row.code("body_type"), row.code("euro_class"), fuels))
     }
 
     private fun tripFrom(row: ResultSet): StoredTripRow {
@@ -365,17 +370,18 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         return StoredTripRow(row.getString("id"), plate, row.getString("source_name"), row.getString("created_at"),
             TripRowInput(
                 registrationNumber = plate, periodStart = row.getString("period_start"), periodEnd = row.getString("period_end"),
-                fuelTechnology = row.getString("fuel_technology"), make = row.getString("make"),
-                vehicleType = row.getString("vehicle_type"), model = row.getString("model"),
-                co2Registered = row.boolean("co2_registered"), co2GramsPerKm = row.decimal("co2_grams_per_km"),
-                medianCo2 = row.decimal("median_co2"), totalTripKm = row.decimal("total_trip_km"),
-                totalKmCo2Registered = row.decimal("total_km_co2_registered"),
-                totalKmCo2NotRegistered = row.decimal("total_km_co2_not_registered"),
-                kmFuelNotRegistered = row.decimal("km_fuel_not_registered"),
-                totalKmFuelRegistered = row.decimal("total_km_fuel_registered"),
-                totalKmNoxRegistered = row.decimal("total_km_nox_registered"),
-                totalNoxRegisteredGrams = row.decimal("total_nox_registered_grams"),
-                tripCount = row.getObject("trip_count")?.let { row.getInt("trip_count") },
+                fuelTechnology = FuelTechnology.fromCode(row.getString("fuel_technology")), make = row.getString("make"),
+                bodyType = BodyType.valueOf(row.getString("body_type")),
+                vehicleCategory = VehicleCategory.valueOf(row.getString("vehicle_category")), model = row.getString("model"),
+                co2Registered = row.boolean("co2_registered")!!, co2GramsPerKm = row.decimal("co2_grams_per_km")!!,
+                medianCo2 = row.decimal("median_co2")!!, totalTripKm = row.decimal("total_trip_km")!!,
+                totalKmCo2Registered = row.decimal("total_km_co2_registered")!!,
+                totalKmCo2NotRegistered = row.decimal("total_km_co2_not_registered")!!,
+                kmFuelNotRegistered = row.decimal("km_fuel_not_registered")!!,
+                totalKmFuelRegistered = row.decimal("total_km_fuel_registered")!!,
+                totalKmNoxRegistered = row.decimal("total_km_nox_registered")!!,
+                totalNoxRegisteredGrams = row.decimal("total_nox_registered_grams")!!,
+                tripCount = row.getInt("trip_count"),
                 assignmentNumber = row.getString("assignment_number"),
                 averageConsumptionLitresPerKm = row.decimal("average_consumption_litres_per_km"),
                 fuelConsumedLitres = row.decimal("fuel_consumed_litres"), comment = row.getString("comment"),
@@ -387,16 +393,18 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         return StoredApproval(
             row.getString(prefix + "id"), plate, row.getString(prefix + "source_name"),
             row.getString(prefix + "created_at"), row.getString(prefix + "updated_at"), row.getString(prefix + "revoked_at"),
-            ApprovalInput(plate, row.getString(prefix + "fuel_technology"), row.boolean(prefix + "used_throughout_period"),
-                row.getString(prefix + "start_date"), row.getString(prefix + "expiry_date"), row.getString(prefix + "vehicle_group")),
+            ApprovalInput(plate, FuelTechnology.fromCode(row.getString(prefix + "fuel_technology")),
+                VehicleCategory.valueOf(row.getString(prefix + "vehicle_category")), row.boolean(prefix + "used_throughout_period"),
+                row.getString(prefix + "start_date"), row.getString(prefix + "expiry_date")),
         )
     }
 
     private fun approvalValues(record: StoredApproval) = linkedMapOf<String, Any?>(
         "id" to record.id, "registration_number" to record.registrationNumber, "source_name" to record.sourceName,
         "created_at" to record.createdAt, "updated_at" to record.updatedAt, "revoked_at" to record.revokedAt,
-        "fuel_technology" to record.data.fuelTechnology, "used_throughout_period" to record.data.usedThroughoutPeriod?.asInteger(),
-        "start_date" to record.data.startDate, "expiry_date" to record.data.expiryDate, "vehicle_group" to record.data.vehicleGroup,
+        "fuel_technology" to record.data.fuelTechnology.code, "used_throughout_period" to record.data.usedThroughoutPeriod?.asInteger(),
+        "start_date" to record.data.startDate, "expiry_date" to record.data.expiryDate,
+        "vehicle_category" to record.data.vehicleCategory.name,
     )
 
     private fun unrevokedApproval(db: Connection, plate: String): StoredApproval? =
@@ -416,10 +424,21 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
     }
 
     private fun validateTrip(input: TripRowInput, index: Int) {
+        validateTrailerFuel(input.vehicleCategory, input.fuelTechnology, "rows[$index]")
         val start = validatedDate(input.periodStart, "rows[$index].periodStart")
         val end = validatedDate(input.periodEnd, "rows[$index].periodEnd")
         require(!end.isBefore(start)) { "rows[$index].periodEnd must not be before periodStart" }
-        require(input.tripCount == null || input.tripCount >= 0) { "rows[$index].tripCount must be non-negative" }
+        require(input.make.isNotBlank() && input.model.isNotBlank()) { "rows[$index].make and model must not be blank" }
+        require(input.tripCount >= 0) { "rows[$index].tripCount must be non-negative" }
+        if (input.fuelTechnology.usesLitres) {
+            require(input.averageConsumptionLitresPerKm != null && input.fuelConsumedLitres != null) {
+                "rows[$index] must provide both litres fields for this fuel technology"
+            }
+        } else {
+            require(input.averageConsumptionLitresPerKm == null && input.fuelConsumedLitres == null) {
+                "rows[$index] must omit litres fields or set them to null for electric/hydrogen vehicles and unpowered trailers"
+            }
+        }
         tripDecimalColumns.forEach { column ->
             column.value(input)?.let {
                 try { decimalParts(it) } catch (_: IllegalArgumentException) {
@@ -430,9 +449,16 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
     }
 
     private fun validateApprovalDates(input: ApprovalInput, index: Int) {
+        validateTrailerFuel(input.vehicleCategory, input.fuelTechnology, "approvals[$index]")
         val start = input.startDate?.let { validatedDate(it, "approvals[$index].startDate") }
         val end = input.expiryDate?.let { validatedDate(it, "approvals[$index].expiryDate") }
         require(start == null || end == null || !end.isBefore(start)) { "approvals[$index].expiryDate must not be before startDate" }
+    }
+
+    private fun validateTrailerFuel(category: VehicleCategory, fuel: FuelTechnology, field: String) {
+        require(category.isTrailer == (fuel == FuelTechnology.NOT_APPLICABLE)) {
+            "$field must use NOT_APPLICABLE fuel exactly when the vehicle category is O1, O2, O3 or O4"
+        }
     }
 
     private fun validatedDate(value: String, field: String): LocalDate {
@@ -448,7 +474,9 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
 
     private fun validatedPlate(value: String, field: String = "registrationNumber"): String =
         normalizeRegistrationNumber(value).also {
-            require(it.matches(Regex("[A-Z0-9]{2,7}"))) { "$field must be a 2-7 character Norwegian registration number" }
+            require(it.matches(Regex("[A-Z]{2}[1-9][0-9]{3,4}"))) {
+                "$field must contain two letters followed by four or five digits, without a leading zero"
+            }
         }
 
     private fun Boolean.asInteger(): Int = if (this) 1 else 0
