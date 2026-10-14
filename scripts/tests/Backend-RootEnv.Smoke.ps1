@@ -3,8 +3,8 @@ $ErrorActionPreference = 'Stop'
 $repoPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $distribution = Join-Path $repoPath 'backend/build/install/backend/lib'
 if (-not (Test-Path -LiteralPath $distribution)) { throw 'Run backend/gradlew.bat installDist first.' }
-$javaPath = Join-Path $env:JAVA_HOME 'bin/java.exe'
-if (-not (Test-Path -LiteralPath $javaPath)) { $javaPath = (Get-Command java).Source }
+$javaPath = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin/java.exe' } else { $null }
+if (-not $javaPath -or -not (Test-Path -LiteralPath $javaPath)) { $javaPath = (Get-Command java -ErrorAction Stop).Source }
 $fixtureRoot = Join-Path $repoPath ('backend/build/test-data/env-smoke-' + [guid]::NewGuid().ToString('N'))
 $backendDirectory = Join-Path $fixtureRoot 'backend'
 New-Item -ItemType Directory -Path $backendDirectory | Out-Null
