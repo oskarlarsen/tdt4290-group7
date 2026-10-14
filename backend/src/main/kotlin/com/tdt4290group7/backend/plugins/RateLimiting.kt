@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.plugins
 
+import com.tdt4290group7.backend.backendSetting
+
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.application.log
@@ -45,7 +47,7 @@ private fun Application.configureTrustedProxies(hops: Int) {
 }
 
 private fun trustedProxyHopsFromEnv(): Int {
-    val raw = System.getenv("TRUSTED_PROXY_HOPS")?.takeIf { it.isNotBlank() } ?: return 0
+    val raw = backendSetting("TRUSTED_PROXY_HOPS") ?: return 0
     return requireNotNull(raw.trim().toIntOrNull()?.takeIf { it >= 0 }) {
         "TRUSTED_PROXY_HOPS must be a non-negative integer, was '$raw'"
     }

@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.auth
 
+import com.tdt4290group7.backend.backendSetting
+
 import io.ktor.http.HttpHeaders
 import io.ktor.http.renderSetCookieHeader
 import io.ktor.server.application.ApplicationCall
@@ -16,7 +18,7 @@ object AuthCookie {
 
     // Only disable for local http setups where the browser drops Secure cookies (e.g. Safari on
     // http://localhost). Chrome and Firefox accept Secure cookies on http://localhost.
-    private val secure: Boolean = System.getenv("AUTH_COOKIE_SECURE")?.lowercase() != "false"
+    private val secure: Boolean = backendSetting("AUTH_COOKIE_SECURE")?.trim()?.lowercase() != "false"
 
     /** [maxAgeSeconds] null makes it a session cookie that the browser drops when it closes. */
     fun set(call: ApplicationCall, token: String, maxAgeSeconds: Long?) {

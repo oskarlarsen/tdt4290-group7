@@ -24,9 +24,10 @@ export class ApiError extends Error {
   }
 }
 
-type ApiFetchOptions = {
+type ApiFetchOptions<T> = {
   /** Set false when a 401 is an expected answer rather than a lost session (e.g. login, startup check). */
   notifySessionExpired?: boolean;
+  parseResponse?: (text: string) => T;
 };
 
 // Persist activity per user so it survives refreshes and is not confused with
@@ -52,7 +53,7 @@ export function recordLastActive(userId: string): string {
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
-  { notifySessionExpired = true }: ApiFetchOptions = {}
+  { notifySessionExpired = true, parseResponse }: ApiFetchOptions<T> = {}
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -71,11 +72,11 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
-    const message = typeof body?.message === "string" ? body.message : `API error ${res.status}`;
+    const body = (await res.json().catch(() => null)) as { message?: unknown; error?: unknown } | null;
+    const message = typeof body?.message === "string" ? body.message : typeof body?.error === "string" ? body.error : `API error ${res.status}`;
     throw new ApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  return text.trim() ? (JSON.parse(text) as T) : (undefined as T);
+  return text.trim() ? (parseResponse ? parseResponse(text) : JSON.parse(text) as T) : (undefined as T);
 }

@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.auth
 
+import com.tdt4290group7.backend.backendSetting
+
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.Payload
@@ -8,13 +10,13 @@ import com.tdt4290group7.backend.model.User
 import java.util.Date
 
 object JwtConfig {
-    val issuer: String = System.getenv("JWT_ISSUER") ?: "tdt4290-backend"
-    val audience: String = System.getenv("JWT_AUDIENCE") ?: "tdt4290-frontend"
+    val issuer: String = backendSetting("JWT_ISSUER") ?: "tdt4290-backend"
+    val audience: String = backendSetting("JWT_AUDIENCE") ?: "tdt4290-frontend"
     const val REALM = "tdt4290-api"
     const val CLAIM_USER_ID = "uid"
     const val CLAIM_TOKEN_VERSION = "tv"
 
-    private val secret: String = requireSecret("JWT_SECRET", System.getenv("JWT_SECRET"))
+    private val secret: String = requireSecret("JWT_SECRET", backendSetting("JWT_SECRET"))
 
     val algorithm: Algorithm = Algorithm.HMAC256(secret)
 

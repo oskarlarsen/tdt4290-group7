@@ -7,6 +7,8 @@ services:
       PORT: 8080
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your .env file (see .env.example)}
+      JWT_ISSUER: ${JWT_ISSUER:-tdt4290-backend}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-tdt4290-frontend}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in your .env file (see .env.example)}
       SEED_SUPPLIER_PASSWORD: ${SEED_SUPPLIER_PASSWORD:?Set SEED_SUPPLIER_PASSWORD in your .env file (see .env.example)}
       SVV_API_KEY: ${SVV_API_KEY:-}
@@ -14,6 +16,7 @@ services:
       APP_ENV: ${APP_ENV:-prod}
       ALLOW_DEV_PASSWORD_RESET_LOG: ${ALLOW_DEV_PASSWORD_RESET_LOG:-false}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
     # The data volume stays writable while the rest of the filesystem is read-only.
     volumes:
       - vehicle-backend-data:/app/data
@@ -36,6 +39,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+        VITE_USE_MOCKS: ${VITE_USE_MOCKS:-false}
     environment:
       # Must match the origin of VITE_API_BASE_URL, or the CSP blocks API calls.
       API_ORIGIN: ${API_ORIGIN:-http://localhost:8080}
