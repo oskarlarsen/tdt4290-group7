@@ -1,31 +1,7 @@
-# Vehicle backend guide
+# Backend guide
 
-This Kotlin/Ktor service accepts JSON containing vehicle statistics and approvals, stores them in SQLite, and checks one registration number against local approval data and Statens Vegvesen.
-
-A statistics row covers a mandatory reporting period and may represent several jobs or days, not one individual trip. Approval is separate: submitting statistics never approves a vehicle. All examples here are synthetic. Agents must not inspect confidential datasets, real vehicle responses, or logs containing them.
-
-## Request flow
-
-1. Submit usage statistics through `POST /api/trip-rows`.
-2. Submit approved vehicles through `POST /api/vehicle-approvals`.
-3. Saving statistics automatically checks each submitted plate. Use `POST /api/vehicle-checks` to recheck a vehicle or force a refresh separately.
-4. The backend reads local approval/statistics, reuses a recent snapshot or calls Statens Vegvesen, then saves and returns a combined result.
-
-There are no import IDs to pair or suppliers to select. The API accepts JSON, not PDF/spreadsheet uploads. Convert source columns into the fields below before submitting.
-
-```mermaid
-flowchart TD
-    A[Frontend or Postman] --> B[POST statistics or approvals]
-    B --> C[(SQLite)]
-    A --> D[POST check for one plate]
-    C --> D
-    D --> E{Recent snapshot and no forced refresh?}
-    E -- Yes --> F[Use cache]
-    E -- No --> G[Backend calls Statens Vegvesen]
-    F --> H[Evaluate local approval and registry status]
-    G --> H
-    H --> I[Save relational check evidence and return result]
-```
+For vehicle work, start with [Vehicle API](#vehicle-api), [request examples](#statistics) and [deviation rules](#checks-and-deviations).
+The frontend guide is in [frontend/README.md](../frontend/README.md).
 
 ## Run and configure
 
@@ -99,23 +75,6 @@ docker run --env-file ../.env -e HOST=0.0.0.0 -e PORT=8080 -e VEHICLE_DB_PATH=/a
 The key and required authentication settings are supplied at runtime from root `.env`. Docker's raw `--env-file` parser differs from Compose's dotenv parser: use simple unquoted values for this standalone command; prefer Compose for the documented quoted literal values. The named volume preserves SQLite across container replacement. The image initializes a new data volume for the unprivileged `app` user. Existing volumes created by an older root-running image may need an ownership migration before startup; do not delete stored vehicle data. Compose keeps the root filesystem read-only, with only the data volume and JVM scratch directory writable, and retains its capability and privilege restrictions. This command publishes only on the host loopback interface.
 
 For the full stack, use the [root README](../README.md#run-the-full-stack-with-docker). Compose reads the same root `.env`, requires JWT/seed-password settings, passes selected backend settings, and mounts persistent vehicle storage. Public frontend build arguments are passed separately; no backend secrets enter the frontend build. Standalone auth settings also load from root `.env` automatically. The existing malformed Gradle command in `backend/Dockerfile` remains a separate build blocker; see the root guide before trying a full image build.
-
-## Admin vehicle-page read API
-
-The admin frontend draft uses real vehicle endpoints even if login mocks are enabled separately. These GET requests only read SQLite: they never create vehicles, save checks or call Statens Vegvesen.
-
-| Endpoint | Parameters / result |
-|---|---|
-| `GET /api/vehicles` | `search`: optional partial registration number, case/space/hyphen normalized, up to 7 letters/digits. `approvalStatus`: optional `ACTIVE`, `NOT_YET_ACTIVE`, `EXPIRED`, `REVOKED`, or `NOT_APPROVED`. `page`: positive integer, default 1. `pageSize`: 1–100, default 25. Returns `items`, `total`, `page`, `pageSize`, and `approvalAsOf`. Stable registration-number order. |
-| `GET /api/vehicles/{registrationNumber}` | Returns current vehicle/approval, `approvalStatus`, `approvalAsOf`, all stored reporting rows newest first, latest selected Statens Vegvesen snapshot and latest saved check summary. Unknown plate: 404, without inserting it. |
-| `GET /api/vehicles/{registrationNumber}/checks` | `page`: positive integer, default 1. `pageSize`: 1–100, default 10. Returns newest-first saved check summaries with `items`, `total`, `page`, and `pageSize`. Unknown vehicle: 404; known vehicle with no checks: empty items. |
-| `GET /api/trip-rows` | `search`: optional normalized partial plate, up to 7 alphanumeric characters. `page`: positive integer, default 1. `pageSize`: 1–100, default 25. Returns `items`, `total`, `page`, `pageSize`, newest creation time first, then insertion order for ties. Repeated plates/periods stay separate. |
-
-Malformed parameters return 400. Out-of-range pages return empty items, not an error. Approval is evaluated on the current Oslo date (including the expiry date). Each read uses a single SQLite read transaction; its totals and items share one database snapshot. The summary's approval and deviations describe the **time of that check**, whereas the overview/details approval describes **today**. `dataSource` likewise describes how Statens Vegvesen data was obtained when that check ran; use `checkedAt` and `fetchedAt` to judge age.
-
-Use the existing `GET /api/vehicle-checks/{id}` for original check evidence. Opening the frontend, statistics rows or history does not create checks. Saving statistics automatically invokes the check service after appending; explicit Run check in vehicle details posts `/api/vehicle-checks`, with optional `forceRefresh`. The details API still returns all reporting rows for one vehicle, while the statistics directory uses the paginated global endpoint. Batch UI actions are deferred. Pagination is not a cross-request frozen snapshot if records change between pages.
-
-These routes retain the existing unauthenticated vehicle-route policy. The frontend's admin route guard is not server-side authorization; do not expose the draft beyond local development until backend access controls are implemented.
 
 ## Authentication
 
@@ -197,401 +156,167 @@ Postman login example (set a local `adminPassword` variable matching the backend
 
 Postman's cookie jar retains the `auth_token` cookie from login and sends it to `/api/auth/me`; logout clears it. Do not configure a Bearer token: Authorization headers are ignored. Vehicle tests continue to use No Auth. Do not share credentials or tokens with agents.
 
+## Vehicle API
+
+Base URL: `http://localhost:8080`. Vehicle endpoints use JSON and currently have **no backend authorization**; keep them local.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/health` | Check whether the server is running |
+| GET | `/api/vehicles` | Browse vehicles and today's approval status |
+| GET | `/api/vehicles/{plate}` | Read a vehicle, approval periods, statistics and latest saved check |
+| GET | `/api/vehicles/{plate}/checks` | Browse saved check history |
+| GET | `/api/trip-rows` | Browse statistics rows |
+| POST | `/api/trip-rows` | Append statistics, then check each distinct plate |
+| POST | `/api/vehicle-approvals` | Create approval-period records |
+| PUT | `/api/vehicle-approvals/{approvalId}` | Edit one approval period |
+| POST | `/api/vehicle-approvals/{approvalId}/revoke` | Revoke one approval period |
+| POST | `/api/vehicle-checks` | Run and save a check |
+| GET | `/api/vehicle-checks/{checkId}` | Read the original saved check evidence |
+
+Lists accept `page` (default 1) and `pageSize` (1–100, default 25; history defaults to 10).
+Vehicle/statistics lists also accept `search` for a partial plate. Vehicles accept `approvalStatus`:
+`ACTIVE`, `NOT_YET_ACTIVE`, `EXPIRED`, `REVOKED`, `NOT_APPROVED`.
+List responses contain `items`, `total`, `page` and `pageSize`. GET requests never call Statens Vegvesen or save checks.
+
 ## Shared request rules
 
-Vehicle POST bodies use Content-Type: application/json. There are no query parameters; vehicle routes currently require no Authorization header.
+- POST/PUT: `Content-Type: application/json`; booleans and numbers must not be quoted. Unknown fields are rejected.
+- Ordinary plates have two letters and four/five digits, without a leading zero. Spaces/hyphens are removed and letters uppercased.
+- Dates use `YYYY-MM-DD`, with inclusive boundaries and start ≤ end.
+- Fuel, category and body style use code strings, not labels. See [VehicleCatalog.kt](src/main/kotlin/com/tdt4290group7/backend/vehicles/VehicleCatalog.kt).
+- Applicable statistics fields are required. Numbers are non-negative; zero and false are explicit values, not missing data. Source precision is preserved.
+- Batches contain 1–10,000 entries. One invalid entry rejects the whole batch. Neither statistics nor approval POSTs deduplicate repeated submissions.
 
-- Unknown fields are rejected, including additionalFields, legacy aliases, and user-supplied estimatedCo2Kg.
-- Text must be quoted JSON text. Booleans must be unquoted true/false. Amounts must be JSON numbers, not quoted strings. tripCount is a non-negative 32-bit integer.
-- Applicable observations are required and cannot be missing/null. The five electric/hydrogen emission fields listed below require explicit JSON null keys; missing those keys is still invalid. Optional fields may be omitted/null. Missing is not zero or false.
-- Amounts are non-negative exact decimals: at most 18 fractional places after removing insignificant trailing zeroes, and an unscaled integer between 0 and 9223372036854775807. Unsupported values are rejected, never rounded.
-- Plates are uppercased, with whitespace/hyphens removed, then must match `^[A-Z]{2}[1-9][0-9]{3,4}$`: two letters followed by four or five digits, no leading zero. This accepts ordinary Norwegian plates only, not personal/historical/foreign formats, and validates syntax rather than registry recognition. Directory search remains partial.
-- Trip rows require periodStart and periodEnd: valid YYYY-MM-DD dates with start <= end. Both boundaries are inclusive. Single-day periods are allowed.
-- Batches contain 1–10,000 entries. One invalid entry rejects the entire batch. BEGIN IMMEDIATE reserves SQLite's writer before reading, waits up to five seconds for contention, and rolls back failed writes atomically.
-- The normalized registration number is the vehicle primary key. Other record IDs are UUID strings. Generated timestamps are UTC with nine fractional digits. Approval is evaluated as of today in Europe/Oslo, not the statistics period.
-- Optional/default response fields can be omitted. estimatedCo2Kg is always returned: a calculated number for applicable observations, or null for electric/hydrogen statistics.
-- fuelTechnology always means fuel technology, but belongs to a separate supplier, approval or registry observation. Approvals and trip rows now require official code strings, not labels or broad values such as Fossil or Electric/Hydrogen. Never guess a more specific value during import.
+## Statistics
 
-### Classification codes and English labels
-
-Fuel/category/body-type dropdowns display official codes alongside application-owned English labels. API inputs store the codes as JSON strings, not numbers or translated labels. Kotlin enums, TypeScript literal unions and SQLite CHECK constraints restrict submitted values. The frontend catalogue parity test ensures both clients stay aligned.
-
-| fuelTechnology | English label | fuelTechnology | English label |
-|---|---|---|---|
-| `"1"` | Gasoline | `"2"` | Diesel |
-| `"3"` | Kerosene | `"4"` | Gas |
-| `"5"` | Electric | `"6"` | Hydrogen |
-| `"7"` | Gasoline hybrid | `"8"` | Diesel hybrid |
-| `"9"` | Other fuel | `"10"` | Biodiesel |
-| `"11"` | Biogasoline | `"12"` | LPG |
-| `"13"` | CNG | `"14"` | Methanol |
-| `"21"` | LNG | | |
-
-This is the simplified manual input subset of [Statens Vegvesen fuel codes](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=DRIVSTOFFTYPE): 1–14 and 21. CNG (`13`) and LNG (`21`) are separate choices. LPG A/B (`16`/`17`) group with LPG (`12`); CNG 20/25 (`18`/`19`) group with CNG (`13`); combined CNG/LNG (`22`) represents both groups, not a separate manual option. Grouping helpers are available but no new comparison rules are enabled. The structured Statens Vegvesen observation always preserves the original code; ethanol (`15`) and compressed air (`20`) are never falsely relabelled as another fuel. Gasoline/diesel hybrids remain separate; no hybridCategory/isHybrid is retained. Codes do not establish plug-in status or fuel actually used during a period.
-
-`vehicleCategory` replaces approval `vehicleGroup` and is required on trip rows. Submitted categories are `M1`, `M2`, `M3`, `N1`, `N2`, `N3`, `O1`, `O2`, `O3`, `O4`: passenger cars, buses, vans, trucks and trailers. G variants are merged into their base category for application grouping (`M1G` → `M1`, etc.), but original Statens Vegvesen codes remain in the structured observation. This is not the former approval sheet's 7.5-tonne grouping. See [Statens Vegvesen technical categories](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=TEKNISKKODE) and `VehicleCatalog.kt` / `vehicleCatalog.ts`.
-
-`bodyType` replaces ambiguous trip-row `vehicleType` and represents body style, not technical category: e.g. `AA` Sedan, `AB` Hatchback, `AC` Station wagon, `AD` Coupe, `AE` Convertible. The complete [Statens Vegvesen body-type catalogue](https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=KAROSSERITYPE) is supported, including bus/truck/trailer bodies. Do not automatically reinterpret an old spreadsheet's Biltype text as a code without verifying its meaning. Body type is not an approval requirement in this version.
-
-Unpowered trailers (`O1`–`O4`) must use `fuelTechnology: "NOT_APPLICABLE"`. This is an **application-only sentinel**, not an official Statens Vegvesen code and not the same as Other fuel (`"9"`). It is invalid for non-trailer categories. No engine-powered trailer exception is represented in this version. Both litres fields must be omitted/null for electric (`"5"`), hydrogen (`"6"`) and unpowered trailers. They are required for other submitted fuels, including both hybrids. The API has no kg/kWh/m³ consumption inputs; do not convert those quantities into litres by relabelling them.
-
-Electric/hydrogen statistics must use `co2Registered: false` and explicit `null` for `co2GramsPerKm`, `medianCo2`, `totalNoxRegisteredGrams`, `totalKmCo2Registered` and `totalKmNoxRegistered`. The UI shows **Not applicable** for these locked fields; API and SQL reject numeric values, including zero. This is an agreed reporting applicability rule, not a universal assertion about hydrogen powertrains or lifecycle emissions. CO₂-unregistered distance and both fuel-registered/unregistered distances remain editable and mandatory. Other fuels require numeric emission observations, including explicit zero when appropriate; NOx warning rules are deferred.
-
-## Routes and HTTP statuses
-
-| Method and route | Purpose | Success |
-|---|---|---|
-| GET /health | Liveness: {"status":"UP"} | 200 |
-| GET / | Text greeting | 200 |
-| GET /api/trip-rows | Browse reporting-period statistics | 200 |
-| POST /api/trip-rows | Append reporting-period statistics, then check distinct plates | 201 |
-| POST /api/vehicle-approvals | Add/replace submitted approvals | 201 |
-| POST /api/vehicle-approvals/{registrationNumber}/revoke | Revoke one approval | 200 |
-| POST /api/vehicle-checks | Save a check for one plate | 201 |
-| GET /api/vehicle-checks/{id} | Retrieve original saved evidence | 200 |
-
-Malformed JSON, unknown fields, wrong types and invalid values return 400 with an error object. Missing saved checks/unrevoked approvals return 404. SQLite contention returns 503 with {"error":"Vehicle database is busy; try again later"}. Other unhandled errors return 500 with "Internal server error".
-
-An Statens Vegvesen failure does not prevent saving a check: POST still returns 201. Inspect registry lookup metadata, not just HTTP status. Health does not verify Statens Vegvesen configuration/connectivity.
-
-## Append statistics
-
-POST /api/trip-rows, Body → raw → JSON:
+`POST /api/trip-rows`. One row represents a trip/reporting period, not necessarily an individual journey.
+This synthetic example contains all required fields:
 
 ~~~json
 {
-  "sourceName": "synthetic-trip-sheet",
-  "rows": [
-    {
-      "registrationNumber": "AB 12345",
-      "periodStart": "2026-01-01",
-      "periodEnd": "2026-01-31",
-      "fuelTechnology": "2",
-      "vehicleCategory": "M1",
-      "bodyType": "AC",
-      "make": "Synthetic Make",
-      "model": "Synthetic Model",
-      "co2Registered": true,
-      "co2GramsPerKm": 123.456,
-      "medianCo2": 120.25,
-      "totalTripKm": 1000,
-      "totalKmCo2Registered": 1000,
-      "totalKmCo2NotRegistered": 0,
-      "kmFuelNotRegistered": 0,
-      "totalKmFuelRegistered": 1000,
-      "totalKmNoxRegistered": 1000,
-      "totalNoxRegisteredGrams": 25.67,
-      "averageFuelConsumptionLitresPer100Km": 8,
-      "fuelConsumedLitres": 80,
-      "tripCount": 3
-    }
-  ]
+  "sourceName": "synthetic-statistics",
+  "rows": [{
+    "registrationNumber": "AB12345",
+    "periodStart": "2026-01-01",
+    "periodEnd": "2026-01-31",
+    "fuelTechnology": "2",
+    "vehicleCategory": "M1",
+    "bodyType": "AA",
+    "make": "Synthetic Make",
+    "model": "Synthetic Model",
+    "co2Registered": true,
+    "co2GramsPerKm": 120,
+    "medianCo2": 110,
+    "totalTripKm": 1000,
+    "totalKmCo2Registered": 1000,
+    "totalKmCo2NotRegistered": 0,
+    "kmFuelNotRegistered": 0,
+    "totalKmFuelRegistered": 1000,
+    "totalKmNoxRegistered": 1000,
+    "totalNoxRegisteredGrams": 20,
+    "averageFuelConsumptionLitresPer100Km": 8,
+    "fuelConsumedLitres": 80,
+    "tripCount": 3
+  }]
 }
 ~~~
 
-| Field | JSON type | Meaning |
-|---|---|---|
-| registrationNumber | Required string | Regnr / Registreringsnr. |
-| periodStart, periodEnd | Required date strings | Reporting-period boundaries; not individual journey dates |
-| fuelTechnology | Required code string | Supplier-reported fuel; official code, or trailer-only NOT_APPLICABLE |
-| vehicleCategory | Required code string | Supplier-reported Statens Vegvesen technical category |
-| bodyType | Required code string | Supplier-reported body style; distinct from technical category |
-| make, model | Required non-blank strings | Supplier make/model |
-| co2Registered | Required boolean | Supplier marks the vehicle as CO₂-emitting; false must be explicit |
-| co2GramsPerKm | Required number or explicit null | Supplier emission rate, g/km; null only for electric/hydrogen |
-| medianCo2 | Required number or explicit null | Stored source value; meaning/unit are not inferred; null only for electric/hydrogen |
-| totalTripKm | Required number | Unified distance, km; includes former km per buss |
-| totalKmCo2Registered, totalKmCo2NotRegistered | Required keys | Supplier CO₂-registered/unregistered distances, km. Registered distance is null only for electric/hydrogen; unregistered distance remains numeric |
-| kmFuelNotRegistered, totalKmFuelRegistered | Required numbers | Supplier fuel-unregistered/registered distances, km |
-| totalKmNoxRegistered | Required number or explicit null | Supplier NOx-registered distance, km; null only for electric/hydrogen |
-| totalNoxRegisteredGrams | Required number or explicit null | Supplier NOx total, grams; numeric zero accepted for applicable fuels, null for electric/hydrogen |
-| tripCount | Required integer | Job/trip count; zero is accepted |
-| averageFuelConsumptionLitresPer100Km | Conditionally required number | Average fuel consumption, L/100km. Must be omitted/null for codes 5, 6 or NOT_APPLICABLE |
-| fuelConsumedLitres | Conditionally required number | Total litres; same applicability rule as average consumption |
-| comment | Optional string | Supplier comment |
+`sourceName` and row `comment` are optional. Distance is km; average fuel consumption is **L/100km**; total fuel is liters; total NOx is grams.
+`co2Registered` means the supplier marks the vehicle as CO₂-emitting. Median CO₂ and registered distances retain the supplier's meaning; no contractual interpretation is assumed.
 
-All applicable statistics fields above are mandatory; comments/references and inapplicable litres are optional. `sourceName` is an optional batch reference, not an import ID or supplier identifier. `assignmentNumber` was removed; use sourceName/comment for contextual references. Trip rows have no approval flag. Numeric zero and boolean false remain explicit values, distinct from not-applicable nulls. Missing measurements are not inferred from Statens Vegvesen or defaulted by the UI. Registered distances retain the supplier's reporting meaning: no contractual or coverage interpretation is assumed. The exact meaning of Median CO₂ still needs client clarification. The old `averageConsumptionLitresPerKm` field is rejected: for example, 0.08 L/km must now be submitted as 8 L/100km under the new field name.
+For electric/hydrogen (`"5"`/`"6"`), send `co2Registered: false` and explicit null for:
+`co2GramsPerKm`, `medianCo2`, `totalNoxRegisteredGrams`, `totalKmCo2Registered`, `totalKmNoxRegistered`.
+Both liters fields are null/omitted for electric, hydrogen and unpowered trailers (`NOT_APPLICABLE`, categories O1–O4).
+CO₂-unregistered distance and fuel distances remain required numbers.
 
-Response: `createdAt`, `rowCount`, `distinctVehicleCount`, `rows`, `checks`. Stored rows contain id, registrationNumber, optional sourceName, createdAt, data and read-only estimatedCo2Kg. Stored plates are normalized. Repeated submissions append more rows, including identical/overlapping periods. No deduplication or summation occurs. The global statistics list sorts creation time then insertion order; the existing per-vehicle details view sorts creation time then UUID.
+The response includes saved `rows` and one `checks` result per distinct plate.
+Read-only `estimatedCo2Kg` = distance × supplier CO₂ g/km ÷ 1000; it is null when inapplicable.
+**201 means statistics were saved**, not that verification succeeded. If a check fails, retry the check, not the statistics POST.
+After an ambiguous connection failure, inspect saved rows before resubmitting.
 
-After the batch transaction commits, the backend invokes the check service **once per distinct normalized plate**, with `forceRefresh=false`. This uses current approval as of today and the configurable 14-day Statens Vegvesen cache, just like a manual check. The check captures all rows present for that plate, including earlier rows. `checks` contains one `{registrationNumber, check}` result per plate, where `check` is the saved historical summary (`id`, `checkedAt`, `approvalStatus`, registry source/outcome and deviations). Ordinary Statens Vegvesen failures still save an incomplete check. Unexpected checking/storage failures instead return `{registrationNumber, error}` with a safe retry message. HTTP 201 means statistics were saved, not that Statens Vegvesen verification passed. Retry verification through `/api/vehicle-checks`; **do not resubmit statistics** to retry a check. Append and checks are not one atomic transaction: if the client disconnects/cancels after persistence, inspect rows and check history before taking further action. Large batches may wait for several sequential external lookups; there is no background job or new batch UI in this version.
+## Approval periods
 
-### Total CO₂ (calculated estimate, kg)
-
-estimatedCo2Kg = supplier totalTripKm × supplier co2GramsPerKm / 1000.
-
-The example row returns 123.456 kg in `estimatedCo2Kg`. The statistics form displays this as **Total CO₂ (kg, calculated)** in a read-only preview; users cannot submit or override it. Exact decimal arithmetic is used. The result is computed from explicit columns, not independently editable or redundantly stored. For electric/hydrogen, the supplier rate and calculated estimate are null and the UI displays Not applicable. Otherwise `co2Registered=false` alone does not supply a zero rate. Statens Vegvesen values are not substituted. This is a nominal supplier-based estimate, not measured actual or lifecycle emissions. Estimates may have more precision than individual inputs.
-
-The supplier NOx mass and distance are related, but no NOx-rate calculation, zero-NOx warning or comparison is implemented. A zero value is stored without generating a new issue. Supplier grams and Statens Vegvesen mg/km are different quantities.
-
-## Add or replace approvals
-
-POST /api/vehicle-approvals:
+`POST /api/vehicle-approvals` always creates new records, including overlapping recertification:
 
 ~~~json
 {
-  "sourceName": "synthetic-approved-sheet",
-  "approvals": [
-    {
-      "registrationNumber": "AB12345",
-      "fuelTechnology": "2",
-      "vehicleCategory": "M1",
-      "startDate": "2026-01-01",
-      "expiryDate": "2026-12-31"
-    }
-  ]
+  "sourceName": "synthetic-approvals",
+  "approvals": [{
+    "registrationNumber": "AB12345",
+    "fuelTechnology": "2",
+    "vehicleCategory": "M1",
+    "startDate": "2026-01-01",
+    "expiryDate": "2027-06-30"
+  }]
 }
 ~~~
 
-registrationNumber, fuelTechnology and vehicleCategory are required. Other row fields and sourceName are optional. The former usedThroughoutPeriod flag is removed and rejected. Dates must be YYYY-MM-DD. Missing startDate means immediately effective; missing expiryDate means indefinite until revoked. Expiry equal to today is active. No bodyType is required for approval. Trailer fuel applicability is enforced just as for trip rows.
+Blank/null start becomes today's Oslo date; blank/null expiry means indefinite.
+Compatible overlaps are allowed. Conflicting fuel/category values create a deviation.
+Reporting periods must be covered without gaps; adjacent and overlapping approvals can jointly cover them.
 
-At most one unrevoked approval exists per plate. Submitting creates one if absent, otherwise fully replaces its submitted fields, including future/expired records. Omitted optional fields are cleared. Omitted vehicles are untouched. Repeated plates are processed in order, with the final entry winning. approvalCount counts entries, not distinct vehicles.
+To edit, PUT to the **approval UUID** with:
+`{ "approval": { ...complete approval fields... }, "sourceName": "optional", "expectedUpdatedAt": "stored timestamp" }`.
+A stale timestamp or revoked period returns 409. The plate cannot change. Clearing expiry makes it indefinite; clearing start retains its original date.
 
-Response: updatedAt, approvalCount, approvals. Stored records have id, registrationNumber, optional sourceName, createdAt, updatedAt, optional revokedAt and data. Ordinary approval edits do not create versions; checks freeze the original evaluated details.
+Revoke by approval UUID with POST and no body. Only that period changes.
+Coverage ends from the revocation's Oslo date, preserving earlier days. Other periods and previous saved checks remain unchanged.
 
-### Approval evaluation
+## Checks and deviations
 
-| Situation as of today in Europe/Oslo | approvalStatus | Deviation |
-|---|---|---|
-| No record | NOT_APPROVED | NOT_ON_APPROVED_LIST |
-| Revoked | REVOKED | APPROVAL_REVOKED |
-| Future start | NOT_YET_ACTIVE | APPROVAL_NOT_YET_ACTIVE |
-| Expiry before today | EXPIRED | APPROVAL_EXPIRED |
-| Otherwise | ACTIVE | None |
+POST `/api/vehicle-checks` with `{ "registrationNumber": "AB12345", "forceRefresh": false }`.
+A check includes **every saved statistics row** and all approval evidence for the plate.
+Today's approval is separate from historical period coverage; current registry data does not establish past registry status.
 
-Statistics period dates do not change these rules or establish a past registry state.
+Successful registry snapshots are reused for 14 days, configurable via `SVV_CACHE_TTL_DAYS`.
+`forceRefresh: true` bypasses the cache. Sources are `LIVE`, `CACHE`, `STALE_CACHE` or `UNAVAILABLE`.
+Inspect `lookupOutcome`, `refreshFailure` and `fetchedAt`; HTTP success alone is not proof of verification.
 
-### Revoke manually
-
-POST /api/vehicle-approvals/AB12345/revoke, no body. Returns the revoked record (200), or 404 if no unrevoked approval exists. Reapproval creates a new ID, retaining the revoked record.
-
-## Check one vehicle
-
-POST /api/vehicle-checks:
-
-~~~json
-{ "registrationNumber": "AB12345", "forceRefresh": false }
-~~~
-
-registrationNumber is required. forceRefresh is an optional boolean, default false. Unknown plates are created with supplierId=null and no approval; no statistics import is required.
-
-| Response field | Meaning |
+| Priority | Examples |
 |---|---|
-| id, checkedAt | Historical check ID and time |
-| vehicle | registrationNumber, optional supplierId, createdAt; no surrogate vehicle ID |
-| approvalStatus, approval | Status and approval evidence evaluated at check time |
-| tripRows | Statistics included at the time, with individual estimates |
-| registry | Selected Statens Vegvesen facts and lookup metadata |
-| deviations | Combined approval and registration findings |
+| HIGH | Approval failures/conflicts, fuel/category mismatches, adverse registration status |
+| MODERATE | CO₂/NOx/consumption differences, body/brand/model differences, overlapping statistics, missing/stale verification |
 
-### Selected registry data
+All findings are deviations. `findings` provides descriptions and links to affected rows, approvals and registry measurements.
+`deviations` contains distinct codes; `highPriorityCount`/`moderatePriorityCount` count individual occurrences.
+The frontend's **Deviations** tab shows saved facts side by side, with units and calculation inputs.
 
-registry includes dataSource, lookupOutcome, optional fetchedAt/registrationStatus/data/snapshotId/refreshFailure, usageProhibitionState and registry deviations.
+Numerical comparisons round to the nearest integer (.5 upward), without changing stored precision:
+- Every relevant CO₂ measurement is compared; one mismatch still flags even if another matches.
+- NOx mg/km = supplier grams × 1000 ÷ NOx-registered distance.
+- Fuel L/100km = liters × 100 ÷ total distance, assuming the same reporting scope.
 
-registry.data is a typed object, not raw JSON or the old generic tree:
+Different registry methods/reporting scopes may explain numerical discrepancies. Missing data is not zero.
+Median CO₂, Euro-class thresholds and registered-distance sum checks are not implemented.
+Usage prohibition (`bruksforbud`) remains unknown for this registry endpoint.
 
-~~~json
-{
-  "registrationNumber": "AB12345",
-  "registrationStatus": "REGISTRERT",
-  "make": "Synthetic Make",
-  "model": "Synthetic Model",
-  "vehicleCategory": { "code": "M1", "name": "Passenger car" },
-  "bodyType": { "code": "AC", "name": "Station wagon" },
-  "euroClass": { "code": "6", "name": "Euro 6" },
-  "fuels": [
-    {
-      "fuelTechnology": { "code": "2", "name": "Diesel" },
-      "measurements": [
-        {
-          "measurementMethod": { "code": "WLTP" },
-          "co2GramsPerKm": 123.456789,
-          "noxMgPerKm": 12.34567
-        }
-      ]
-    }
-  ]
-}
-~~~
+## Database compatibility and safe development setup
 
-Whitelist: registration identity/status, make/model, vehicle category, body type, Euro class, fuel code/name, measurement method code/name, combined-driving CO₂ g/km and NOx mg/km. Detailed hybrid category is discarded. Missing Statens Vegvesen values remain unknown, never zero, even though supplier entry is mandatory. Known fuel/category/body codes use application-owned English labels; unknown codes are preserved without importing untranslated names. Multiple measurements retain their fuel/method association; no preferred measurement is selected. Multiple make/model names are joined with "; ".
+SQLite uses schema version 6, explicit columns/relationships and exact decimals.
+It stores supplier observations, approval periods, selected registry fields and saved check evidence—not full registry responses.
+History is retained indefinitely; cache age controls freshness, not retention.
 
-Technical data is projected from godkjenning.tekniskGodkjenning.tekniskeData; body type comes from karosseriOgLasteplan.karosseritype. Environmental fuel groups carry forbrukOgUtslipp measurements. Engine fuel codes absent from environmental groups are included without invented measurements; grouping matches code equality only. kjoretoyId.kjennemerke must match the requested plate. No live Statens Vegvesen records are needed for synthetic projection tests.
+The default native path is `backend/data/vehicles.db`. Configure `VEHICLE_DB_PATH` in root `.env`; relative paths use the server working directory.
+Recognized empty version-3/4/5 databases upgrade automatically. Populated/unknown older schemas are preserved and refused.
+For testing, choose a new filename rather than deleting data without approval. See [VehicleSchema.kt](src/main/kotlin/com/tdt4290group7/backend/vehicles/VehicleSchema.kt) for the exact tables.
 
-Unselected fields are discarded before persistence or response construction. Raw HTTP bodies are transient, never logged/saved. VIN, inspection/first-registration dates, filter/particle details, registered fuel consumption, electric consumption/range, weight, seats, noise and administrative/mechanical details are not retained.
+## Testing and common errors
 
-No fuel/CO₂/NOx/Euro comparison rules are implemented yet. Differing supplier/Statens Vegvesen CO₂ is the agreed future deviation rule; measurement selection/comparison remain deferred. Empty deviations do not prove complete verification. Enkeltoppslag cannot establish bruksforbud; usageProhibitionState remains UNKNOWN.
+In Postman: choose No Auth, use **Body → raw → JSON**, and start with GET `/health`.
+POST the synthetic approval/statistics examples, then run a check. Copy its top-level ID to GET the saved check.
+Use approval IDs—not plates—for editing/revocation. Never send the Statens Vegvesen key through Postman.
 
-### Cache and fallback
-
-SVV_CACHE_TTL_DAYS defaults to 14. Age equal to TTL is fresh; future timestamps are not fresh. Reuse never changes fetchedAt.
-
-| Situation | Result |
+| Status/problem | Meaning |
 |---|---|
-| Fresh snapshot and forceRefresh=false | CACHE; no external request |
-| No fresh snapshot or forceRefresh=true | Attempt backend-to-Statens Vegvesen request |
-| Successful lookup | LIVE; new immutable selected-field snapshot |
-| Failed lookup with previous success | STALE_CACHE, plus refreshFailure |
-| Failed lookup without previous success | UNAVAILABLE, with lookupOutcome |
+| 400 | Invalid JSON, fields, codes, dates or values |
+| 404 | Requested vehicle/check/approval record not found |
+| 409 | Approval changed or was revoked; reload before editing |
+| 503 | SQLite is busy; retry later |
+| `NOT_CONFIGURED` | No registry key configured |
+| `STALE_CACHE` | Refresh failed; older registry facts are used |
+| Connection refused | Backend is not running or the address is wrong |
 
-All failed-refresh outcomes, including NOT_FOUND/ACCESS_DENIED, follow this fallback. Forced refresh attempts a request; it does not guarantee fresh data on failure. Failed responses are never cached. Stale fallback has no maximum age. Freshness and indefinite history retention are independent.
-
-### External lookup and outcomes
-
-The backend requests GET https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata?kjennemerke=<plate> with the official `SVV-Authorization: Apikey <private-key>` header. Internal configuration/header names retain SVV; user-facing labels say Statens Vegvesen. Connection timeout: 10 seconds; request timeout: 20 seconds. Frontend/Postman neither supplies nor receives this key.
-
-| Statens Vegvesen response | lookupOutcome |
-|---|---|
-| 200, one matching vehicle with valid selected fields | FOUND |
-| Empty vehicle list or 404 | NOT_FOUND |
-| 401/403 | ACCESS_DENIED |
-| 422/429 | QUOTA_EXHAUSTED |
-| 500/502/503/504 or network failure | TEMPORARILY_UNAVAILABLE |
-| Malformed/unexpected data, wrong plate, invalid selected number, multiple vehicles, other status | INVALID_RESPONSE |
-| Backend has no configured client | NOT_CONFIGURED |
-
-Registration codes REGISTRERT/AVREGISTRERT/UTFORT/VRAKET/UREGISTRERT produce respectively no finding/DEREGISTERED/EXPORTED/SCRAPPED/UNREGISTERED. Missing/other codes in a successful snapshot produce UNKNOWN_REGISTRATION_STATUS. Failed uncached lookups do not fabricate registration findings.
-
-## Read a saved check
-
-GET /api/vehicle-checks/<check-id> uses the check's top-level UUID, not the plate. It returns original evidence without calling Statens Vegvesen or reevaluating approval. Later approval replacement/revocation, statistics imports or registry refreshes do not modify it. Unknown IDs return 404.
-
-## Relational database and history
-
-Schema version 5 uses SQLite STRICT tables, foreign keys on each connection, explicit columns, constrained classification codes/booleans/statuses, mandatory applicable statistics, validated dates and exact quantities. There are no data_json columns or arbitrary attribute maps. Coefficient/scale pairs are NOT NULL for unconditionally required measurements; conditionally applicable fields use paired nulls. CHECK constraints enforce null litres for electric/hydrogen/trailer rows, present litres for other fuels, and null electric/hydrogen CO₂/NOx measurements and registered distances with a false CO₂-emitting flag. For other fuels those five emission fields must be numeric. These constraints also apply to direct SQL inserts. Removed assignment/whole-period flags have no columns, including in frozen check evidence.
-
-| Table | Purpose |
-|---|---|
-| suppliers | Reserved identity/name; no supplier-management API |
-| vehicles | registration_number primary key, nullable supplier_id FK, created_at |
-| trip_rows | Vehicle FK, required period, explicit supplier statistics |
-| vehicle_approvals | Vehicle FK, approval observations, dates and revocation |
-| svv_snapshots | Vehicle FK, fetch metadata and selected Statens Vegvesen identity/status/classification |
-| svv_snapshot_fuels | Snapshot FK, fuel_index and fuel technology code/name |
-| svv_emission_measurements | Composite fuel FK, measurement_index, method, CO₂ and NOx |
-| vehicle_checks | Vehicle/approval/snapshot FKs, result metadata and frozen approval/vehicle evidence |
-| vehicle_check_trip_rows | Check-to-statistics links, vehicle consistency and original response order |
-| vehicle_check_deviations | Check FK, finding code, origin and response order |
-
-~~~mermaid
-erDiagram
-    SUPPLIERS o|--o{ VEHICLES : supplies
-    VEHICLES ||--o{ TRIP_ROWS : reports
-    VEHICLES ||--o{ VEHICLE_APPROVALS : approves
-    VEHICLES ||--o{ SVV_SNAPSHOTS : looked_up
-    SVV_SNAPSHOTS ||--o{ SVV_SNAPSHOT_FUELS : contains
-    SVV_SNAPSHOT_FUELS ||--o{ SVV_EMISSION_MEASUREMENTS : measured
-    VEHICLES ||--o{ VEHICLE_CHECKS : checked
-    VEHICLE_APPROVALS o|--o{ VEHICLE_CHECKS : evaluated
-    SVV_SNAPSHOTS o|--o{ VEHICLE_CHECKS : used
-    VEHICLE_CHECKS ||--o{ VEHICLE_CHECK_TRIP_ROWS : includes
-    TRIP_ROWS ||--o{ VEHICLE_CHECK_TRIP_ROWS : referenced
-    VEHICLE_CHECKS ||--o{ VEHICLE_CHECK_DEVIATIONS : found
-~~~
-
-registration_number and fuel_technology have consistent meanings/names, while observations remain source-specific. Composite foreign keys prevent a check from linking another vehicle's approval, snapshot or statistics.
-
-Each numeric quantity has <name>_unscaled and <name>_scale INTEGER columns. Value = unscaled × 10^(-scale): 123.456 becomes 123456 and 3. Both must be null together or present together. Insignificant zeroes/exponent notation may be canonicalized; numerical value is exact. JSON numbers are decoded into BigDecimal without Double conversion.
-
-History shares immutable snapshots/statistics. Named approval_* columns deliberately freeze the evaluated approval because the current record can change. Supplier/creation metadata is also frozen for original retrieval. Supporting tables preserve membership/order and the origin of findings. UPDATE triggers protect historical tables; referenced deletions are blocked by foreign keys. Complete field/constraint definitions are in VehicleSchema.kt; tripDecimalColumns lists the supplier quantity columns.
-
-History is retained indefinitely by explicit product decision. There is no 90-day window, automatic cleanup or deletion/retention API. Cache TTL controls refreshes, not deletion. Growth/pagination and final privacy, access-control and deletion requirements remain future work, not a claim of complete GDPR compliance.
-
-### Database compatibility and safe development setup
-
-Schema version 5 changes average fuel consumption to L/100km, removes assignment/whole-period flags and stores inapplicable electric/hydrogen observations as null. A recognized version-3/4 database is rebuilt inside a transaction **only if all ten tables are empty**, including suppliers. The guard checks table names and record existence without loading vehicle observations. Populated version-3/4 databases, unexpected tables, version 2 and older schemas are refused without resetting data or guessing missing values. An unversioned database must be empty. A reviewed migration of populated data remains a separate decision.
-
-For native local testing, restart the backend; an empty version-3/4 database upgrades automatically. If the compatibility guard refuses the database, choose an **unused** filename. Set `VEHICLE_DB_PATH=data/vehicles-v5.db` in your private root `.env`, or temporarily override it from `backend/`:
-
-~~~powershell
-$env:VEHICLE_DB_PATH = "data/vehicles-v5.db"
-.\gradlew.bat run
-~~~
-
-The relative path is resolved against the process working directory. Startup creates a new empty database; the old file and its journal/WAL files remain untouched. A process override is not persistent: use root `.env` for later restarts, or remove the override to return to file configuration. Do not delete databases or Docker volumes without checking their contents and obtaining explicit authorization. Docker retains its configured `/app/data/vehicles.db` path; an old-volume database also needs a separately agreed migration or non-destructive new storage setup.
-
-Clients must use code strings for fuelTechnology and vehicleCategory in both approvals/statistics, bodyType in statistics, and all required numeric/boolean observations. Use nullable inapplicable litres and explicit null emission fields as documented above. Average fuel consumption uses averageFuelConsumptionLitresPer100Km (L/100km). Removed assignmentNumber/usedThroughoutPeriod and old per-kilometre consumption fields are rejected, as are vehicleType/vehicleGroup, fuel/kmPerBus/fuelConsumptionLitresPerBus/additionalFields aliases, broad fuel labels and quoted quantities. Historical records cannot be automatically upgraded by inventing measurements or classifications.
-
-
-## Logging
-
-Logback writes INFO logs to the console: timestamp, thread, level, logger, message. No rotating file logs, central logging, or automated log retention is configured.
-
-Application events record counts, approval/check IDs, registry origin, and deviation counts. They do not intentionally log payloads, keys, or complete Statens Vegvesen responses. Ktor also logs HTTP calls; the revocation path can contain a plate. Unhandled exceptions include stack traces and may contain identifiers. Treat console output as potentially confidential and do not share real-data logs with agents.
-
-Saved checks/snapshots are database records, not console logs. They do not identify the user performing a vehicle action because vehicle routes are not connected to authentication.
-
-## Postman walkthrough
-
-Use synthetic local records. Real Statens Vegvesen testing must be performed by an authorized developer without sharing records/responses with agents.
-
-1. Start the backend from `backend/` with `.\gradlew.bat run`.
-2. Use the Postman desktop app, or its web app with Desktop Agent.
-3. Click **Environments** in the sidebar, create `Local Backend`, and add the values below.
-4. Save and select it in the upper-right environment dropdown.
-
-| Variable | Local/current value |
-|---|---|
-| `baseUrl` | `http://127.0.0.1:8080` |
-| `plate` | `AB12345` (synthetic) |
-| `checkId` | Empty initially |
-
-If both initial/current values appear, use current values for local requests. Variables belong under **Environments**, not **Params**. `{{baseUrl}}` substitutes the saved address. Postman variables do not set server settings.
-
-Create a collection named `Vehicle Backend`. Save each request there. For POST JSON, select **Body → raw → JSON**, paste the body, then **Send**. Use **No Auth**. Never put the Statens Vegvesen key in Postman.
-
-### Test sequence
-
-1. GET `{{baseUrl}}/health`: expect 200 and `{"status":"UP"}`.
-2. POST `{{baseUrl}}/api/trip-rows`: use the statistics example, replacing example plates with `{{plate}}`. Expect 201, two rows, one distinct vehicle.
-3. POST `{{baseUrl}}/api/vehicle-approvals`: use the approval example with `{{plate}}`. Expect 201.
-4. POST `{{baseUrl}}/api/vehicle-checks` with:
-
-```json
-{ "registrationNumber": "{{plate}}", "forceRefresh": false }
-```
-
-Expect 201 and `ACTIVE`. Without a key/snapshot, expect `UNAVAILABLE`/`NOT_CONFIGURED`. A synthetic plate is not expected to produce a successful real Statens Vegvesen result.
-
-5. Copy top-level `id` into environment variable `checkId` and save.
-6. GET `{{baseUrl}}/api/vehicle-checks/{{checkId}}`: expect 200 and the original result.
-7. Repeat POST check: after a successful Statens Vegvesen lookup, expect `CACHE`. Failed uncached lookups do not establish a cache.
-8. Set `forceRefresh` to true: expect `LIVE` on success, or the documented failure/fallback.
-9. POST `{{baseUrl}}/api/vehicle-approvals/{{plate}}/revoke` with no body: expect 200.
-10. Repeat POST check: expect `REVOKED` and `APPROVAL_REVOKED`.
-11. Submit approval again: expect a new approval ID and `ACTIVE` on the next check.
-
-Statistics repeats append. Approval repeats replace the unrevoked record. Old saved checks remain unchanged.
-
-### Optional script
-
-On a POST check, open **Scripts → Post-response**, or **Tests** in older versions:
-
-```javascript
-pm.test("A check was created", function () {
-    pm.response.to.have.status(201);
-    const body = pm.response.json();
-    pm.expect(body.id).to.be.a("string");
-    pm.environment.set("checkId", body.id);
-});
-```
-
-This stores the ID automatically. See **Test Results** after sending. Passing HTTP status alone does not prove Statens Vegvesen success.
-
-### Troubleshooting
-
-| Symptom | Check |
-|---|---|
-| `ECONNREFUSED` | Server running, correct port, local agent selected |
-| Unresolved `{{baseUrl}}` | Environment saved/selected, name correct |
-| Invalid JSON 400 | Raw JSON, field names/types correct, no unsupported fields |
-| `NOT_CONFIGURED` | Configure key locally and restart |
-| `ACCESS_DENIED` | Statens Vegvesen rejected backend credentials |
-| `NOT_FOUND` | Synthetic/unknown plate; separate from local approval |
-| `STALE_CACHE` | Inspect `refreshFailure` and `fetchedAt` |
-| Saved-check 404 | Correct check ID, same server/database |
-| Frontend CORS error | Configure frontend host/port and restart |
-
-## Current boundaries
-
-Vehicles, statistics rows and per-vehicle check history can be listed through the documented read endpoints. Saving a statistics batch checks its distinct plates, but there is no separate batch-check UI/endpoint, background monitoring, supplier assignment, statistics deletion, spreadsheet parsing, new fuel/CO₂ policy comparisons or automatic cleanup. These describe current behavior, not promised future features.
+Automated tests use synthetic data and isolated databases. Do not share confidential records, registry responses, keys or real-data logs with agents.
+Logs go to the console; saved checks are database evidence, not logs.
+Excel batch upload is only a disabled frontend placeholder; no file-import endpoint/parser is implemented.

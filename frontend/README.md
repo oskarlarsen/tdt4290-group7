@@ -1,40 +1,39 @@
-# Admin vehicle page draft
+# Admin vehicle page
 
-The vehicle page is at `/admin/vehicles` and connects to the real Kotlin backend. It does **not** use vehicle mock fixtures. Supplier vehicle pages are unchanged. Header cards, compact actions, directory tables and status badges follow the supplier/dashboard styling. Statistics and approval forms are centered, scrollable native dialogs with mobile viewport gutters; vehicle details remain a right-hand drawer. Native dialogs retain focus trapping, Escape handling and background inertness, including when a form opens over the details drawer.
+Open `/admin/vehicles`. Vehicle data always comes from the real backend, even with mock login.
+Supplier pages are unchanged.
 
 ## Run locally
 
-1. Configure the single root `.env` as described in [shared configuration](../README.md#shared-local-configuration), then start the backend using JDK 21 and a development database. Credentials are read from that file automatically.
-2. From `frontend/`, run `npm.cmd ci`. Do not create a separate frontend `.env`: Vite uses `envDir: ".."` to read root settings.
-3. In root `.env`, set `VITE_API_BASE_URL=http://localhost:8080/api`. For real login also set `VITE_USE_MOCKS=false`; login with `advisor.hansen@kommune.no` and the password set in `SEED_ADMIN_PASSWORD`.
-4. Run `npm.cmd run dev` and open `http://localhost:5173/admin/vehicles`. Use `localhost` for both frontend and API so the auth cookie stays same-site. Allow that origin in backend CORS. For local HTTP set `AUTH_COOKIE_SECURE=false`, not in production.
+1. Configure the root `.env` and start the backend using the [root setup guide](../README.md#backend-setup).
+2. From `frontend/`, run `npm.cmd ci`, then `npm.cmd run dev`.
+3. Use `VITE_API_BASE_URL=http://localhost:8080/api`. For real login, set `VITE_USE_MOCKS=false` and use the seeded admin account.
+4. Open `http://localhost:5173/admin/vehicles`. Use localhost for both services so login cookies work.
 
-`VITE_USE_MOCKS` affects login, not vehicle calls. With mock login, `admin@kommune.no` / `admin123` can open the UI, but a backend must still be running. Vite exposes only keys prefixed `VITE_`; Statens Vegvesen/JWT keys and seed passwords must never use that prefix. Process settings override file settings. Restart Vite after changing settings; Docker public build settings require rebuilding the image. `npm.cmd run build` checks TypeScript and builds production assets; `npm.cmd test -- --run` runs the unit tests. Docker receives only `VITE_API_BASE_URL` and `VITE_USE_MOCKS` as frontend build arguments, and `API_ORIGIN` as a public runtime setting for nginx's CSP; no backend secrets or root file are copied into the frontend image.
+Mock login: `admin@kommune.no` / `admin123`. It does not mock vehicle requests.
+Do not create a frontend `.env` or expose backend secrets through `VITE_` variables.
 
-## Behaviour and safeguards
+## Using the page
 
-- The overview reads a paginated vehicle list, with normalized plate search and current approval filtering. It separates today's approval from the latest historical check; empty/error/loading states are explicit. Vehicle selection is deep-linked via `?plate=...`.
-- The native modal drawer traps focus and offers Overview, Statistics, Check result and History sections. Browsing only issues GET requests. The page-level Check a plate action is removed; Run check and force-refresh remain inside vehicle details. No automatic POST retries, background checks or bulk operations are enabled.
-- **Add vehicle trip/period statistics** sends one reporting row. Applicable ISO dates, fuel technology, category, body type, vehicle brand/model, CO₂-emitting Yes/No, counts and measurements are required in one equal-weight form. Comment/source reference is optional; assignment number is removed. Average fuel consumption is L/100km across UI/API/storage, with the tooltip “Liters used per 100 kilometers”. Supplier NOx total is grams, related to its registered distance. Median CO₂ is stored without assuming a meaning. Registered distances retain the supplier's reporting definitions, without assuming contractual or data-coverage meaning.
-- Fuel, technical-category and body-type dropdowns display official Statens Vegvesen codes plus English labels. Submitted fuels are codes 1–14 plus 21 (LNG), including separate gasoline/diesel hybrids and separate CNG/LNG choices. G category options are removed: use M1–M3/N1–N3 and O1–O4 trailers. Statens Vegvesen observations preserve original codes; grouping helpers equate LPG A/B with LPG, CNG 20/25 with CNG, G categories with their base category, and combined CNG/LNG with both separate fuels. Ethanol/compressed air remain accurately labelled if Statens Vegvesen returns them but are not manual choices. These helpers do not implement new deviation rules. Body type is distinct (e.g. M1 Passenger car / AC Station wagon). Approval and statistics share the restricted fuel/category values; only statistics require body type.
-- Litres fields are disabled/null for electric/hydrogen and unpowered trailers (`NOT_APPLICABLE`, an application-only fuel sentinel for O1–O4). Electric/hydrogen fixes CO₂-emitting to No and displays **Not applicable**, storing null for CO₂ g/km, median CO₂, NOx grams, CO₂-registered distance and NOx-registered distance. The calculated CO₂ total is also null/Not applicable. Applicable numeric zeros remain distinct from nulls. CO₂-unregistered distance and fuel distances stay numeric, editable and required. This is an agreed reporting rule, not a lifecycle-emissions claim. Changing classification asks before discarding values; switching back requires explicit re-entry. No NOx warning rule is added.
-- Registration-number inputs automatically uppercase letters and remove spaces/hyphens without truncation or letter/digit guesses. Forms and the backend require two letters followed by four or five digits, no leading zero. Inline hints/native validation explain the rule; list searches still accept partial text. This covers ordinary Norwegian registration numbers only and does not prove a vehicle exists.
-- Decimal inputs remain text while editing, are validated against the backend's non-negative 64-bit integer-plus-scale range, and are serialized as exact JSON numeric literals. Decimal response fields are decoded as strings for display without JavaScript floating-point rounding; ordinary counts/page values remain numbers. The read-only Total CO₂ (kg, calculated) field previews total distance × supplier CO₂ g/km ÷ 1000 using exact integer arithmetic. It is an estimate, not a reported/measured total. It is not sent as an input; the backend returns the authoritative `estimatedCo2Kg`.
-- Statistics always append, including duplicates. The form checks current reporting rows and requires acknowledgment before appending an overlapping period. A network failure after submitting is ambiguous: inspect stored rows before resubmitting. Buttons are disabled during requests; the API still has no idempotency guarantee. Rows are shown individually without summing potentially overlapping periods.
-- Save and check uses one POST `/api/trip-rows`: the backend commits the batch, then saves one check per distinct normalized plate, reusing the normal 14-day Statens Vegvesen cache. A normal registry failure still produces a saved incomplete check. Unexpected checking failures return saved rows plus a safe per-plate error; retry checking from vehicle details, not the statistics submission. The UI clearly distinguishes saved statistics from incomplete verification. The statistics directory below the vehicle directory reads paginated rows through GET `/api/trip-rows`, with its own plate search, newest-first ordering and individual row details. Browsing never calls Statens Vegvesen or totals duplicate/overlapping rows.
-- Approval editing starts with the complete stored record and explicitly sends optional fields, so cleared fields are cleared intentionally. The top-level form refuses to overwrite an existing unrevoked approval; open that vehicle and use Edit approval instead. A preflight read detects already-changed approvals, but this is **not** an atomic optimistic-lock guarantee: a concurrent writer between GET and POST may still win under the existing API contract.
-- Blank approval start means immediate, and the explicit indefinite option clears expiry. The former used-throughout-sheet-period flag is removed from UI/API/storage. Revocation requires typing the plate; history is retained. Reapproving starts a new record. Approval changes do not automatically check; saving statistics does. Earlier results are unchanged.
-- History is paginated; selecting a result reads its original evidence and does not refresh Statens Vegvesen. Stale/unavailable registry information is never presented as a clean verification. Usage prohibition remains unknown. No new fuel, CO₂, NOx or Euro-class comparison rules are added; Statens Vegvesen measurements stay grouped by fuel and measurement method.
+- Search/filter the vehicle directory and open a vehicle's details. The drawer uses roughly three-quarters of desktop page width and full width on small screens.
+- Add trip/period statistics or approval periods individually. Applicable statistics are required; non-applicable electric/hydrogen inputs are locked. Consumption uses L/100km.
+- Approval periods can overlap for recertification. Edit/revoke the specific period; contradictory fuel/category values create deviations.
+- Saving statistics appends a row and checks every saved row for that plate. Repeated submissions are not deduplicated.
+- Open **Deviations**, filter by priority/reporting row, and expand **Compare facts**. It shows readable labels, units, supplier/approval values and saved registry references. Numerical calculations show their inputs.
+- **Check result** shows registry/check metadata; **History** opens earlier saved evidence. Browsing never performs a new registry lookup.
+- **Run check** saves a new result. Force refresh bypasses the normal 14-day registry cache.
+- **Upload Excel** is disabled and marked coming soon for approval/statistics batches. It does not read or upload files.
 
-## Code map
+On an ambiguous save failure, inspect stored rows before trying again. Approval edits reject stale versions.
+Today's approval and historical period coverage are separate; registry snapshots do not prove past registry status.
 
-- `src/pages/admin/Vehicles.tsx`: overview, filters, pagination and entry actions.
-- `src/components/vehicles/`: tables, native dialogs, forms, details/history and check evidence. `FieldTooltip.tsx` supplies compact help on hover, keyboard focus or tap, with outside-click/Escape dismissal. Help is limited to category versus body style, supplier versus registry CO₂, calculated estimates, consumption units, inapplicable values and indefinite approvals; core validation remains visible.
-- `src/api/vehicles.ts`, `src/hooks/useVehicles.ts`: typed real requests and read-cache invalidation after successful mutations.
-- `src/types/vehicle.ts`: API response types; `src/utils/vehicle.ts`: exact decimal handling, validation and presentation helpers.
-- `src/utils/vehicleCatalog.ts`, backend `VehicleCatalog.kt`: official codes and English labels; `VehicleInputs.tsx`: shared required dropdowns and registration-number inputs. `tests/vehicleCatalog.test.tsx` checks catalogue parity and form safeguards using synthetic rendering.
-- `tests/vehicle.test.ts`: synthetic decimal, date, payload and incomplete-verification regression tests.
+## Developer pointers
 
-Vehicle routes are currently unauthenticated. An admin frontend guard is not backend authorization. Keep this draft local until access control is implemented. Batch actions, supplier ownership/UI and new environmental comparisons are deliberately outside this draft.
+- [Vehicles.tsx](src/pages/admin/Vehicles.tsx): directory and entry actions.
+- [components/vehicles](src/components/vehicles): forms, wider drawer, approval periods and deviation comparisons.
+- [deviationAnalysis.ts](src/utils/deviationAnalysis.ts): projects saved facts and exact display calculations; no API calls or new deviation rules.
+- [api/vehicles.ts](src/api/vehicles.ts), [types/vehicle.ts](src/types/vehicle.ts): requests and response types.
+- [Backend API guide](../backend/README.md#vehicle-api): JSON examples, approval lifecycle, units and check behavior.
 
-This contract uses database schema version 5. A recognized version-3/4 database upgrades only when all ten tables are empty; populated/unknown older databases are preserved and refused. See [safe database setup](../backend/README.md#database-compatibility-and-safe-development-setup). No real vehicle data or live Statens Vegvesen access is needed for the automated tests.
+Verify with `npm.cmd test -- --run` and `npm.cmd run build`.
+Vehicle routes still lack backend authorization; the admin route guard is not sufficient for deployment.

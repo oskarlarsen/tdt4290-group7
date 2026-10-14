@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class VehicleRepositoryTest {
     @Test
-    fun concurrentApprovalsReuseOneUnrevokedRecordAcrossRepositories() {
+    fun concurrentApprovalsAppendIndependentOverlappingRecordsAcrossRepositories() {
         val path = databasePath()
         val repositories = List(8) { VehicleRepository(path) }
 
@@ -25,8 +25,8 @@ class VehicleRepositoryTest {
                 if (precreate) repositories.first().findOrCreateVehicle(plate, Instant.now())
                 val responses = concurrently(repositories.mapIndexed { index, repository ->
                     {
-                        repository.upsertApprovals(
-                            UpsertApprovalsRequest(approvals = listOf(
+                        repository.appendApprovals(
+                            AppendApprovalsRequest(approvals = listOf(
                                 syntheticApproval(plate, fuelTechnology = FuelTechnology.entries[index], vehicleCategory = VehicleCategory.M1),
                             )),
                             Instant.now(),
@@ -35,15 +35,16 @@ class VehicleRepositoryTest {
                 })
 
                 val records = responses.map { it.approvals.single() }
-                assertEquals(1, records.map { it.id }.distinct().size)
+                assertEquals(8, records.map { it.id }.distinct().size)
                 assertEquals(1, records.map { it.registrationNumber }.distinct().size)
                 val stored = repositories.first().approvalForVehicle(records.first().registrationNumber)!!
                 assertTrue(stored.data.fuelTechnology in records.map { it.data.fuelTechnology })
+                assertEquals(8, repositories.first().approvalsForVehicle(plate).size)
             }
         }
         connection(path).use { db ->
             assertEquals(8, count(db, "vehicles"))
-            assertEquals(8, count(db, "vehicle_approvals"))
+            assertEquals(64, count(db, "vehicle_approvals"))
         }
     }
 
@@ -77,7 +78,7 @@ class VehicleRepositoryTest {
     fun busyCommitRollsBackTheEntireBatchAndAllowsLaterWrites() {
         val path = databasePath()
         val repository = VehicleRepository(path)
-        val request = UpsertApprovalsRequest(approvals = listOf(
+        val request = AppendApprovalsRequest(approvals = listOf(
             syntheticApproval("AB12345"), syntheticApproval("CD12345"),
         ))
 
@@ -87,7 +88,7 @@ class VehicleRepositoryTest {
             try {
                 assertEquals(0, count(reader, "vehicle_approvals"))
                 assertFailsWith<VehicleStorageBusyException> {
-                    repository.upsertApprovals(request, Instant.now())
+                    repository.appendApprovals(request, Instant.now())
                 }
             } finally {
                 reader.createStatement().use { it.execute("ROLLBACK") }
@@ -98,7 +99,7 @@ class VehicleRepositoryTest {
             assertEquals(0, count(db, "vehicles"))
             assertEquals(0, count(db, "vehicle_approvals"))
         }
-        assertEquals(2, repository.upsertApprovals(request, Instant.now()).approvalCount)
+        assertEquals(2, repository.appendApprovals(request, Instant.now()).approvalCount)
     }
 
     private fun <T> concurrently(actions: List<() -> T>): List<T> {

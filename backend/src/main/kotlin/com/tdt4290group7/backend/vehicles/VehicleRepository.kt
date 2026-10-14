@@ -9,6 +9,7 @@ import java.sql.DriverManager
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatterBuilder
 import java.util.UUID
 import org.sqlite.SQLiteErrorCode
@@ -17,14 +18,18 @@ import org.sqlite.SQLiteException
 internal class VehicleStorageBusyException(cause: SQLiteException) :
     RuntimeException("Vehicle database is busy", cause)
 
+internal class ApprovalConflictException : RuntimeException("Approval changed or was revoked; reload before editing")
+
 interface VehicleStore {
     fun findOrCreateVehicle(registrationNumber: String, now: Instant): Vehicle
     fun appendTripRows(request: AppendTripRowsRequest, now: Instant): AppendTripRowsResponse
     fun tripRowsForVehicle(registrationNumber: String): List<StoredTripRow>
     fun listTripRows(search: String, page: Int, pageSize: Int): TripRowsListResponse
-    fun upsertApprovals(request: UpsertApprovalsRequest, now: Instant): UpsertApprovalsResponse
+    fun appendApprovals(request: AppendApprovalsRequest, now: Instant): AppendApprovalsResponse
     fun approvalForVehicle(registrationNumber: String): StoredApproval?
-    fun revokeApproval(registrationNumber: String, now: Instant): StoredApproval?
+    fun approvalsForVehicle(registrationNumber: String): List<StoredApproval>
+    fun updateApproval(id: String, request: UpdateApprovalRequest, now: Instant): StoredApproval?
+    fun revokeApproval(approvalId: String, now: Instant): StoredApproval?
     fun latestSnapshot(registrationNumber: String): RegistrySnapshot?
     fun saveCheck(check: VehicleCheckResponse, newSnapshot: RegistrySnapshot?)
     fun findCheck(id: String): VehicleCheckResponse?
@@ -50,13 +55,13 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             }.isNotEmpty()
             check(!legacy) { "Legacy vehicle schema detected. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset." }
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            check(version == 0 || version in 3..5) {
+            check(version == 0 || version in 3..6) {
                 "Vehicle schema version $version is not supported. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
             }
             if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") {
                 it.getString(1)
             }.isEmpty()) { "Unversioned database is not empty; no automatic reinterpretation is allowed" }
-            if (version in 3..4) {
+            if (version in 3..5) {
                 // Reviewed development-only transition: never rebuild a populated database.
                 val expected = listOf("vehicle_check_deviations", "vehicle_check_trip_rows", "vehicle_checks",
                     "svv_emission_measurements", "svv_snapshot_fuels", "svv_snapshots", "vehicle_approvals",
@@ -70,7 +75,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             }
             db.createStatement().use { statement ->
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
-                statement.execute("PRAGMA user_version = 5")
+                statement.execute("PRAGMA user_version = 6")
             }
         }
     }
@@ -93,10 +98,10 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         val plateSearch = normalizeRegistrationNumber(search)
         require(plateSearch.matches(Regex("[A-Z0-9]{0,7}"))) { "search must contain up to 7 registration-number characters" }
         return readTransaction { db ->
-            // Select the same approval the check endpoint uses, then evaluate dates without writing.
+            // Prefer any active approval, then future/expired/revoked. Overlaps are permitted.
             val approvalJoin = """LEFT JOIN vehicle_approvals a ON a.id = (
                 SELECT id FROM vehicle_approvals WHERE registration_number = v.registration_number
-                ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, updated_at DESC, rowid DESC LIMIT 1)"""
+                ${approvalOrderSql(today)} LIMIT 1)"""
             val statusSql = """CASE WHEN a.id IS NULL THEN 'NOT_APPROVED' WHEN a.revoked_at IS NOT NULL THEN 'REVOKED'
                 WHEN a.start_date > ? THEN 'NOT_YET_ACTIVE' WHEN a.expiry_date < ? THEN 'EXPIRED' ELSE 'ACTIVE' END"""
             val where = "v.registration_number LIKE ?" + if (status == null) "" else " AND ($statusSql) = ?"
@@ -106,7 +111,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             val items = query(db, """SELECT v.* FROM vehicles v $approvalJoin WHERE $where
                 ORDER BY v.registration_number LIMIT ? OFFSET ?""", parameters + listOf(pageSize, (page.toLong() - 1) * pageSize)) { row ->
                 val vehicle = vehicleFrom(row)
-                val approval = currentApproval(db, vehicle.registrationNumber)
+                val approval = currentApproval(db, vehicle.registrationNumber, today)
                 VehicleOverview(vehicle, approvalStatus(approval, today), approval, checkSummaries(db, vehicle.registrationNumber, 1, 0).firstOrNull())
             }
             VehicleListResponse(items, total, page, pageSize, today.toString())
@@ -131,11 +136,11 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         val plate = validatedPlate(registrationNumber)
         val vehicle = query(db, "SELECT * FROM vehicles WHERE registration_number = ?", listOf(plate), ::vehicleFrom).firstOrNull()
             ?: return@readTransaction null
-        val approval = currentApproval(db, plate)
+        val approval = currentApproval(db, plate, today)
         VehicleDetailsResponse(vehicle, approvalStatus(approval, today), today.toString(), approval,
             query(db, "SELECT * FROM trip_rows WHERE registration_number = ? ORDER BY created_at DESC, id DESC", listOf(plate), ::tripFrom),
             query(db, "SELECT * FROM svv_snapshots WHERE registration_number = ? ORDER BY fetched_at DESC, rowid DESC LIMIT 1", listOf(plate)) { snapshotFrom(db, it) }.firstOrNull(),
-            checkSummaries(db, plate, 1, 0).firstOrNull())
+            checkSummaries(db, plate, 1, 0).firstOrNull(), approvals(db, plate))
     }
 
     override fun checkHistory(registrationNumber: String, page: Int, pageSize: Int): VehicleHistoryResponse? {
@@ -150,9 +155,19 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
 
     private fun vehicleFrom(row: ResultSet) = Vehicle(row.getString("registration_number"), row.getString("supplier_id"), row.getString("created_at"))
 
-    private fun currentApproval(db: Connection, plate: String): StoredApproval? =
+    // Only a typed LocalDate is interpolated; never raw request text.
+    private fun approvalOrderSql(today: LocalDate) = """ORDER BY CASE
+        WHEN revoked_at IS NULL AND start_date <= '$today' AND (expiry_date IS NULL OR expiry_date >= '$today') THEN 0
+        WHEN revoked_at IS NULL AND start_date > '$today' THEN 1
+        WHEN revoked_at IS NULL THEN 2 ELSE 3 END, start_date DESC, created_at DESC, rowid DESC"""
+
+    private fun currentApproval(db: Connection, plate: String, today: LocalDate): StoredApproval? =
         query(db, """SELECT * FROM vehicle_approvals WHERE registration_number = ?
-            ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, updated_at DESC, rowid DESC LIMIT 1""", listOf(plate)) { approvalFrom(it) }.firstOrNull()
+            ${approvalOrderSql(today)} LIMIT 1""", listOf(plate)) { approvalFrom(it) }.firstOrNull()
+
+    private fun approvals(db: Connection, plate: String) = query(db,
+        "SELECT * FROM vehicle_approvals WHERE registration_number = ? ORDER BY start_date, created_at, rowid",
+        listOf(plate), ::approvalFrom)
 
     private fun checkSummaries(db: Connection, plate: String, limit: Int, offset: Long): List<VehicleCheckSummary> =
         query(db, """SELECT c.*, s.fetched_at FROM vehicle_checks c LEFT JOIN svv_snapshots s ON s.id = c.snapshot_id
@@ -163,7 +178,9 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 row.getString("fetched_at"), row.getString("refresh_failure")?.let(LookupOutcome::valueOf),
                 query(db, "SELECT deviation_code FROM vehicle_check_deviations WHERE check_id = ? ORDER BY ordinal", listOf(id)) {
                     VehicleDeviation.valueOf(it.getString(1))
-                })
+                }.distinct(),
+                query(db, "SELECT count(*) FROM vehicle_check_deviations WHERE check_id = ? AND priority = 'HIGH'", listOf(id)) { it.getInt(1) }.single(),
+                query(db, "SELECT count(*) FROM vehicle_check_deviations WHERE check_id = ? AND priority = 'MODERATE'", listOf(id)) { it.getInt(1) }.single())
         }
 
     private fun validatePage(page: Int, pageSize: Int) {
@@ -234,42 +251,50 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             listOf(validatedPlate(registrationNumber)), ::tripFrom)
     }
 
-    override fun upsertApprovals(request: UpsertApprovalsRequest, now: Instant): UpsertApprovalsResponse {
+    override fun appendApprovals(request: AppendApprovalsRequest, now: Instant): AppendApprovalsResponse {
         validateBatch(request.approvals.size)
         val inputs = request.approvals.mapIndexed { index, input ->
-            validateApprovalDates(input, index)
-            input.copy(registrationNumber = validatedPlate(input.registrationNumber, "approvals[$index].registrationNumber"))
+            input.copy(registrationNumber = validatedPlate(input.registrationNumber, "approvals[$index].registrationNumber"),
+                startDate = input.startDate ?: now.atZone(ZoneId.of("Europe/Oslo")).toLocalDate().toString())
+                .also { validateApprovalDates(it, index) }
         }
         val source = request.sourceName?.trim()?.takeIf(String::isNotEmpty)
         val records = writeTransaction { db ->
             inputs.map { input ->
                 findOrCreateVehicle(db, input.registrationNumber, now)
-                val existing = unrevokedApproval(db, input.registrationNumber)
-                val record = existing?.copy(sourceName = source, updatedAt = now.storageTimestamp(), data = input)
-                    ?: StoredApproval(UUID.randomUUID().toString(), input.registrationNumber, source,
-                        now.storageTimestamp(), now.storageTimestamp(), data = input)
+                val record = StoredApproval(UUID.randomUUID().toString(), input.registrationNumber, source,
+                    now.storageTimestamp(), now.storageTimestamp(), data = input)
                 val values = approvalValues(record)
-                if (existing == null) insert(db, "vehicle_approvals", values)
-                else {
-                    values.remove("id")
-                    values.remove("registration_number")
-                    values.remove("created_at")
-                    update(db, "vehicle_approvals", values, "id = ? AND revoked_at IS NULL", listOf(record.id))
-                }
+                insert(db, "vehicle_approvals", values)
                 record
             }
         }
-        return UpsertApprovalsResponse(now.storageTimestamp(), records.size, records)
+        return AppendApprovalsResponse(now.storageTimestamp(), records.size, records)
     }
 
     override fun approvalForVehicle(registrationNumber: String): StoredApproval? = connection().use { db ->
-        query(db, """SELECT * FROM vehicle_approvals WHERE registration_number = ?
-            ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, updated_at DESC, rowid DESC LIMIT 1""",
-            listOf(validatedPlate(registrationNumber))) { approvalFrom(it) }.firstOrNull()
+        currentApproval(db, validatedPlate(registrationNumber), LocalDate.now(ZoneId.of("Europe/Oslo"))) }
+
+    override fun approvalsForVehicle(registrationNumber: String) = connection().use { approvals(it, validatedPlate(registrationNumber)) }
+
+    override fun updateApproval(id: String, request: UpdateApprovalRequest, now: Instant): StoredApproval? = writeTransaction { db ->
+        val existing = query(db, "SELECT * FROM vehicle_approvals WHERE id = ?", listOf(id), ::approvalFrom).firstOrNull()
+            ?: return@writeTransaction null
+        if (existing.revokedAt != null || existing.updatedAt != request.expectedUpdatedAt) throw ApprovalConflictException()
+        val input = request.approval.copy(registrationNumber = validatedPlate(request.approval.registrationNumber),
+            startDate = request.approval.startDate ?: existing.data.startDate)
+        require(input.registrationNumber == existing.registrationNumber) { "An approval cannot be moved to another vehicle" }
+        validateApprovalDates(input, 0)
+        val record = existing.copy(sourceName = request.sourceName?.trim()?.takeIf(String::isNotEmpty),
+            updatedAt = now.storageTimestamp(), data = input)
+        val values = approvalValues(record).filterKeys { it !in setOf("id", "registration_number", "created_at") }
+        update(db, "vehicle_approvals", values, "id = ?", listOf(id))
+        record
     }
 
-    override fun revokeApproval(registrationNumber: String, now: Instant): StoredApproval? = writeTransaction { db ->
-        val record = unrevokedApproval(db, validatedPlate(registrationNumber)) ?: return@writeTransaction null
+    override fun revokeApproval(approvalId: String, now: Instant): StoredApproval? = writeTransaction { db ->
+        val record = query(db, "SELECT * FROM vehicle_approvals WHERE id = ? AND revoked_at IS NULL",
+            listOf(approvalId), ::approvalFrom).firstOrNull() ?: return@writeTransaction null
         update(db, "vehicle_approvals",
             linkedMapOf("revoked_at" to now.storageTimestamp(), "updated_at" to now.storageTimestamp()),
             "id = ? AND revoked_at IS NULL", listOf(record.id))
@@ -306,10 +331,20 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                     "registration_number" to check.vehicle.registrationNumber, "ordinal" to index,
                 ))
             }
-            check.deviations.forEachIndexed { index, deviation ->
+            check.approvals.forEachIndexed { index, approval ->
+                val frozen = linkedMapOf<String, Any?>("check_id" to check.id, "approval_id" to approval.id,
+                    "registration_number" to check.vehicle.registrationNumber, "ordinal" to index)
+                approvalValues(approval).filterKeys { it !in setOf("id", "registration_number") }.forEach { (key, value) -> frozen[key] = value }
+                insert(db, "vehicle_check_approvals", frozen)
+            }
+            check.findings.forEachIndexed { index, finding ->
                 insert(db, "vehicle_check_deviations", linkedMapOf(
-                    "check_id" to check.id, "deviation_code" to deviation.name,
-                    "origin" to if (deviation in check.registry.deviations) "REGISTRY" else "APPROVAL",
+                    "check_id" to check.id, "deviation_code" to finding.code.name,
+                    "origin" to finding.origin.name, "priority" to finding.priority.name, "description" to finding.description,
+                    "trip_row_id" to finding.tripRowId, "related_trip_row_id" to finding.relatedTripRowId,
+                    "approval_id" to finding.approvalId, "related_approval_id" to finding.relatedApprovalId,
+                    "snapshot_id" to if (finding.fuelIndex != null) check.registry.snapshotId else null,
+                    "fuel_index" to finding.fuelIndex, "measurement_index" to finding.measurementIndex,
                     "ordinal" to index,
                 ))
             }
@@ -322,9 +357,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             val snapshot = row.getString("snapshot_id")?.let { snapshotId ->
                 query(db, "SELECT * FROM svv_snapshots WHERE id = ?", listOf(snapshotId)) { snapshotFrom(db, it) }.single()
             }
-            val findings = query(db, "SELECT * FROM vehicle_check_deviations WHERE check_id = ? ORDER BY ordinal", listOf(id)) {
-                VehicleDeviation.valueOf(it.getString("deviation_code")) to it.getString("origin")
-            }
+            val findings = query(db, "SELECT * FROM vehicle_check_deviations WHERE check_id = ? ORDER BY ordinal", listOf(id), ::findingFrom)
             val statistics = query(db, """SELECT t.* FROM trip_rows t JOIN vehicle_check_trip_rows c ON c.trip_row_id = t.id
                 WHERE c.check_id = ? ORDER BY c.ordinal""", listOf(id), ::tripFrom)
             VehicleCheckResponse(
@@ -339,14 +372,22 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                     fetchedAt = snapshot?.fetchedAt, registrationStatus = snapshot?.data?.registrationStatus,
                     data = snapshot?.data,
                     usageProhibitionState = UsageProhibitionState.valueOf(row.getString("usage_prohibition_state")),
-                    deviations = findings.filter { it.second == "REGISTRY" }.map { it.first },
+                    deviations = findings.filter { it.origin == DeviationOrigin.REGISTRY }.map { it.code }.distinct(),
                     snapshotId = snapshot?.id,
                     refreshFailure = row.getString("refresh_failure")?.let(LookupOutcome::valueOf),
                 ),
-                findings.map { it.first },
+                findings.map { it.code }.distinct(),
+                query(db, "SELECT *, approval_id AS id FROM vehicle_check_approvals WHERE check_id = ? ORDER BY ordinal", listOf(id), ::approvalFrom),
+                findings,
             )
         }.firstOrNull()
     }
+
+    private fun findingFrom(row: ResultSet) = DeviationFinding(VehicleDeviation.valueOf(row.getString("deviation_code")),
+        DeviationPriority.valueOf(row.getString("priority")), DeviationOrigin.valueOf(row.getString("origin")),
+        row.getString("description"), row.getString("trip_row_id"), row.getString("related_trip_row_id"),
+        row.getString("approval_id"), row.getString("related_approval_id"),
+        row.getObject("fuel_index")?.let { row.getInt("fuel_index") }, row.getObject("measurement_index")?.let { row.getInt("measurement_index") })
 
     private fun insertSnapshot(db: Connection, snapshot: RegistrySnapshot) {
         require(snapshot.registrationNumber == snapshot.data.registrationNumber) { "Snapshot vehicle mismatch" }
@@ -432,11 +473,6 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         "start_date" to record.data.startDate, "expiry_date" to record.data.expiryDate,
         "vehicle_category" to record.data.vehicleCategory.name,
     )
-
-    private fun unrevokedApproval(db: Connection, plate: String): StoredApproval? =
-        query(db, "SELECT * FROM vehicle_approvals WHERE registration_number = ? AND revoked_at IS NULL", listOf(plate)) {
-            approvalFrom(it)
-        }.firstOrNull()
 
     private fun findOrCreateVehicle(db: Connection, plate: String, now: Instant): Vehicle {
         db.prepareStatement("INSERT OR IGNORE INTO vehicles (registration_number, created_at) VALUES (?, ?)").use {

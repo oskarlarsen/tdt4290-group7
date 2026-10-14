@@ -176,7 +176,7 @@ class ApplicationTest {
         val firstId = Json.parseToJsonElement(first.bodyAsText()).jsonObject
             .getValue("approvals").jsonArray.single().jsonObject.getValue("id").jsonPrimitive.content
 
-        val revoked = client.post("/api/vehicle-approvals/AB12345/revoke")
+        val revoked = client.post("/api/vehicle-approvals/$firstId/revoke")
         assertEquals(HttpStatusCode.OK, revoked.status)
         val revokedJson = Json.parseToJsonElement(revoked.bodyAsText()).jsonObject
         assertEquals(firstId, revokedJson.getValue("id").jsonPrimitive.content)

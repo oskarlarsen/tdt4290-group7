@@ -104,13 +104,17 @@ export function statisticsBody(values: Record<string, string>): string {
 
 export function checkLabel(check?: CheckSummary | null): string {
   if (!check) return "Not checked";
+  const total = (check.highPriorityCount ?? 0) + (check.moderatePriorityCount ?? 0);
+  if (total) return `${total} deviation${total === 1 ? "" : "s"} (${check.highPriorityCount ?? 0} high, ${check.moderatePriorityCount ?? 0} moderate)`;
   if (check.deviations.length) return `${check.deviations.length} recorded deviation${check.deviations.length === 1 ? "" : "s"}`;
   if (check.dataSource === "UNAVAILABLE" || check.lookupOutcome !== "FOUND") return "Verification incomplete";
   if (check.dataSource === "STALE_CACHE") return "Stale verification";
   return "No recorded deviations";
 }
 export function summaryOf(check: VehicleCheck): CheckSummary {
-  return { ...check.registry, id: check.id, checkedAt: check.checkedAt, approvalStatus: check.approvalStatus, deviations: check.deviations };
+  return { ...check.registry, id: check.id, checkedAt: check.checkedAt, approvalStatus: check.approvalStatus, deviations: check.deviations,
+    highPriorityCount: (check.findings ?? []).filter(f => f.priority === "HIGH").length,
+    moderatePriorityCount: (check.findings ?? []).filter(f => f.priority === "MODERATE").length };
 }
 export function statisticsSaveMessage(result: StatisticsSave, plate: string): string {
   const outcome = result.checks.find(item => item.registrationNumber === plate);

@@ -30,7 +30,7 @@ class VehicleRelationalStorageTest {
                         assertEquals(1, rows.getInt("strict"))
                         count++
                     }
-                    assertEquals(10, count)
+                    assertEquals(11, count)
                 }
                 statement.executeQuery("PRAGMA table_info(vehicles)").use { rows ->
                     val names = mutableListOf<String>()
@@ -102,8 +102,18 @@ class VehicleRelationalStorageTest {
             repository.saveCheck(original.copy(id = wrongId, tripRows = listOf(rows.last())), null)
         }
         assertNull(repository.findCheck(wrongId))
+        assertFailsWith<SQLException> {
+            repository.saveCheck(original.copy(id = UUID.randomUUID().toString(), findings = original.findings.mapIndexed { index, finding ->
+                if (index == 0) finding.copy(tripRowId = rows.last().id) else finding
+            }), null)
+        }
         assertNotNull(repository.findCheck(original.id))
         connection(path).use { db ->
+            assertFailsWith<SQLException> {
+                db.prepareStatement("INSERT INTO vehicle_check_deviations(check_id,deviation_code,priority,origin,description,ordinal) VALUES(?, 'FUEL_MISMATCH', 'INVALID', 'STATISTICS', 'Synthetic', 999)").use {
+                    it.setString(1, original.id); it.executeUpdate()
+                }
+            }
             assertFailsWith<SQLException> {
                 db.createStatement().use { it.executeUpdate("UPDATE trip_rows SET comment = 'changed'") }
             }
@@ -118,20 +128,18 @@ class VehicleRelationalStorageTest {
     @Test
     fun approvalReplacementClearsOmittedFieldsAndNormalizesThePlate() {
         val repository = VehicleRepository(path())
-        val first = repository.upsertApprovals(UpsertApprovalsRequest("source", listOf(
+        val first = repository.appendApprovals(AppendApprovalsRequest("source", listOf(
             syntheticApproval("ab 12345", FuelTechnology.DIESEL, "2025-01-01", "2026-12-31", VehicleCategory.M3),
         )), now).approvals.single()
-        val replaced = repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
-            syntheticApproval("AB12345"),
-        )), now.plusSeconds(1)).approvals.single()
+        val replaced = repository.updateApproval(first.id, UpdateApprovalRequest(syntheticApproval("AB12345"), first.updatedAt), now.plusSeconds(1))!!
         assertEquals(first.id, replaced.id)
         assertEquals(FuelTechnology.DIESEL, replaced.data.fuelTechnology)
         assertEquals(VehicleCategory.M1, replaced.data.vehicleCategory)
         assertNull(replaced.data.expiryDate)
         assertNull(replaced.sourceName)
         assertEquals(replaced, repository.approvalForVehicle("ab-12345"))
-        repository.revokeApproval("AB12345", now.plusSeconds(2))
-        val reapproved = repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
+        repository.revokeApproval(replaced.id, now.plusSeconds(2))
+        val reapproved = repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(
             syntheticApproval("AB12345"),
         )), now.plusSeconds(3)).approvals.single()
         assertTrue(reapproved.id != first.id)

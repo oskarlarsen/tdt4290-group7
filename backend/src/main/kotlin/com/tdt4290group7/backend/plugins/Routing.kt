@@ -24,8 +24,11 @@ import java.time.LocalDate
 import java.time.ZoneId
 import com.tdt4290group7.backend.vehicles.ApprovalStatus
 import com.tdt4290group7.backend.vehicles.VehicleCheckRequest
-import com.tdt4290group7.backend.vehicles.VehicleCheckSummary
 import com.tdt4290group7.backend.vehicles.StatisticsCheckResult
+import com.tdt4290group7.backend.vehicles.summary
+import com.tdt4290group7.backend.vehicles.decodeUpdateApprovalRequest
+import com.tdt4290group7.backend.vehicles.ApprovalConflictException
+import io.ktor.server.routing.put
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -117,9 +120,7 @@ fun Application.configureRouting(
             val results = response.rows.map { it.registrationNumber }.distinct().map { plate ->
                 try {
                     val checked = checks.check(VehicleCheckRequest(plate))
-                    StatisticsCheckResult(plate, VehicleCheckSummary(checked.id, checked.checkedAt, checked.approvalStatus,
-                        checked.registry.dataSource, checked.registry.lookupOutcome, checked.registry.fetchedAt,
-                        checked.registry.refreshFailure, checked.deviations))
+                    StatisticsCheckResult(plate, checked.summary())
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (_: Exception) {
@@ -135,7 +136,7 @@ fun Application.configureRouting(
             }
         }
 
-        /** Upserts the unrevoked approval for each plate; omitted plates are not affected. */
+        /** Every submitted approval creates a period record, including overlapping recertifications. */
         post("/api/vehicle-approvals") {
             val request = try {
                 decodeApprovalsRequest(call.receiveText())
@@ -144,12 +145,12 @@ fun Application.configureRouting(
                 return@post
             }
             val response = try {
-                repository.upsertApprovals(request, Instant.now())
+                repository.appendApprovals(request, Instant.now())
             } catch (cause: IllegalArgumentException) {
                 call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid approvals"))
                 return@post
             }
-            call.application.log.info("vehicle_approvals_upserted approvals={}", response.approvalCount)
+            call.application.log.info("vehicle_approvals_appended approvals={}", response.approvalCount)
             call.respond(HttpStatusCode.Created, response)
         }.apply {
             install(RequestBodyLimit) {
@@ -158,17 +159,28 @@ fun Application.configureRouting(
         }
 
         /** Revocation retains history. A later approval submission creates a new approval row. */
-        post("/api/vehicle-approvals/{registrationNumber}/revoke") {
-            val registrationNumber = call.parameters["registrationNumber"]
-                ?: return@post call.respond(HttpStatusCode.BadRequest, ApiError("Registration number is required"))
+        post("/api/vehicle-approvals/{approvalId}/revoke") {
+            val approvalId = call.parameters["approvalId"]
+                ?: return@post call.respond(HttpStatusCode.BadRequest, ApiError("Approval ID is required"))
             val approval = try {
-                repository.revokeApproval(registrationNumber, Instant.now())
+                repository.revokeApproval(approvalId, Instant.now())
             } catch (cause: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid registration number"))
+                call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid approval ID"))
                 return@post
-            } ?: return@post call.respond(HttpStatusCode.NotFound, ApiError("Active approval not found"))
+            } ?: return@post call.respond(HttpStatusCode.NotFound, ApiError("Unrevoked approval not found"))
             call.application.log.info("vehicle_approval_revoked approvalId={}", approval.id)
             call.respond(approval)
+        }
+
+        put("/api/vehicle-approvals/{approvalId}") {
+            val request = try { decodeUpdateApprovalRequest(call.receiveText()) } catch (_: SerializationException) {
+                return@put call.respond(HttpStatusCode.BadRequest, ApiError("Invalid approval update JSON"))
+            }
+            val result = try { repository.updateApproval(call.parameters["approvalId"]!!, request, Instant.now()) }
+            catch (_: ApprovalConflictException) { return@put call.respond(HttpStatusCode.Conflict, ApiError("Approval changed or was revoked; reload before editing")) }
+            catch (cause: IllegalArgumentException) { return@put call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid approval")) }
+                ?: return@put call.respond(HttpStatusCode.NotFound, ApiError("Approval not found"))
+            call.respond(result)
         }
 
         /**

@@ -138,25 +138,24 @@ export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { ap
       if (!indefinite && !validDate(values.expiryDate)) throw new Error("Enter an expiry date or select indefinite approval.");
       if (!indefinite && values.startDate && values.expiryDate < values.startDate) throw new Error("Expiry cannot be before the start date.");
       const current = await existingVehicle(registrationNumber);
-      const currentApproval = current?.approval;
-      if (currentApproval && !currentApproval.revokedAt && (!existing || currentApproval.id !== existing.id || currentApproval.updatedAt !== existing.updatedAt))
-        throw new Error("This vehicle already has an approval, or its approval has changed. Close this form and open the vehicle to edit its current approval without overwriting unseen fields.");
-      if (existing && (!currentApproval || currentApproval.revokedAt)) throw new Error("This approval was revoked while you were editing. Close and reopen the vehicle to create a new approval.");
+      const currentApproval = existing ? current?.approvals.find(item => item.id === existing.id) : undefined;
+      if (existing && (!currentApproval || currentApproval.revokedAt || currentApproval.updatedAt !== existing.updatedAt))
+        throw new Error("This approval period changed or was revoked. Close and reload before editing it.");
       await save.mutateAsync([{
         registrationNumber, fuelTechnology, vehicleCategory,
         startDate: values.startDate || null, expiryDate: indefinite ? null : values.expiryDate,
-      }, values.sourceName.trim() || null]);
+      }, values.sourceName.trim() || null, existing ?? undefined]);
       onSaved(registrationNumber, "Approval saved. Previous check results are unchanged; run a new check to record the updated approval.");
     } catch (cause) { setError(cause); } finally { setPreparing(false); }
   }
-  return <VehicleDialog title={existing ? "Edit vehicle approval" : "Approve vehicle"} onClose={close} busy={busy}>
+  return <VehicleDialog title={existing ? "Edit approval period" : "Add approval period"} onClose={close} busy={busy}>
     <form onSubmit={submit} className="space-y-5">
-      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">Approval is separate from statistics. {existing ? "Saving replaces the current approval fields; clearing a field removes its value." : "Reapproving a revoked vehicle creates a new approval record."}</p>
+      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">Approval is separate from statistics. {existing ? "Only this approval period is edited; saved checks retain their original evidence." : "Saving adds a new approval period. Existing periods are retained. Recertification may overlap; conflicting fuel/category values create a deviation."}</p>
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <Field label="Registration number *"><RegistrationNumberInput autoFocus readOnly={!!plate} value={values.registrationNumber} onChange={value => change("registrationNumber", value)} /></Field>
         <Field label="Vehicle category *" tooltip={categoryHelp}><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory} onChange={value => change("vehicleCategory", value)} /></Field>
         <Field label="Approved fuel technology *"><CatalogSelect catalog={FUEL_TECHNOLOGIES} value={values.fuelTechnology} disabled={isTrailer(values.vehicleCategory)} notApplicable={isTrailer(values.vehicleCategory)} onChange={value => change("fuelTechnology", value)} /></Field>
-        <Field label="Start date (blank = immediate)"><input type="date" className={inputClass} value={values.startDate} onChange={e => change("startDate", e.target.value)} /></Field>
+        <Field label="Start date (blank = today for new approval)"><input type="date" className={inputClass} value={values.startDate} onChange={e => change("startDate", e.target.value)} /></Field>
         <Field label="Source / reference"><input className={inputClass} value={values.sourceName} onChange={e => change("sourceName", e.target.value)} /></Field>
         <div className="sm:col-span-2"><Field label="Approval duration" tooltip={indefinite ? "Approval remains valid until it is manually revoked." : undefined}><span className="flex items-start gap-2 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700"><input type="checkbox" className={checkboxClass} checked={indefinite} onChange={e => { setIndefinite(e.target.checked); setDirty(true); }} />Approved indefinitely</span></Field></div>
         {!indefinite && <Field label="Expiry date * (inclusive)"><input required type="date" min={values.startDate || undefined} className={inputClass} value={values.expiryDate} onChange={e => change("expiryDate", e.target.value)} /></Field>}

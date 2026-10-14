@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ClipboardCheck, Info, Plus, Search } from "lucide-react";
+import { ClipboardCheck, Info, Plus, Search, Upload } from "lucide-react";
 import { useRefreshVehicles, useVehicles } from "../../hooks/useVehicles";
 import type { ApprovalStatus } from "../../types/vehicle";
 import { APPROVAL_LABELS, normalizePlate } from "../../utils/vehicle";
@@ -31,7 +31,8 @@ export default function Vehicles() {
           <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">Manage approvals and reporting-period statistics. Saving statistics automatically checks approval and Statens Vegvesen.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button className={buttonClass} onClick={() => setForm("approval")}><ClipboardCheck className="h-3.5 w-3.5" />Approve vehicle</button>
+          <div><button type="button" disabled aria-describedby="excel-upload-placeholder" className={buttonClass}><Upload className="h-3.5 w-3.5" />Upload Excel</button><p id="excel-upload-placeholder" className="mt-1 text-[10px] text-neutral-500">Approval or statistics batches — coming soon</p></div>
+          <button className={buttonClass} onClick={() => setForm("approval")}><ClipboardCheck className="h-3.5 w-3.5" />Add approval period</button>
           <button className={primaryClass} onClick={() => setForm("statistics")}><Plus className="h-3.5 w-3.5" />Add statistics</button>
         </div>
       </div>

@@ -28,7 +28,7 @@ fun decodeTripRowsRequest(text: String): AppendTripRowsRequest {
     return requestJson.decodeFromJsonElement(root)
 }
 
-fun decodeApprovalsRequest(text: String): UpsertApprovalsRequest {
+fun decodeApprovalsRequest(text: String): AppendApprovalsRequest {
     val root = requestObject(text)
     root.textFields("sourceName")
     root.items("approvals").forEach {
@@ -41,6 +41,14 @@ fun decodeVehicleCheckRequest(text: String): VehicleCheckRequest {
     val root = requestObject(text)
     root.textFields("registrationNumber")
     root.booleanFields("forceRefresh")
+    return requestJson.decodeFromJsonElement(root)
+}
+
+fun decodeUpdateApprovalRequest(text: String): UpdateApprovalRequest {
+    val root = requestObject(text)
+    root.textFields("sourceName", "expectedUpdatedAt")
+    val approval = root["approval"] as? JsonObject ?: invalidType()
+    approval.textFields("registrationNumber", "fuelTechnology", "startDate", "expiryDate", "vehicleCategory")
     return requestJson.decodeFromJsonElement(root)
 }
 

@@ -31,5 +31,8 @@ describe("statistics directory", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><MemoryRouter><Vehicles /></MemoryRouter></QueryClientProvider>);
     expect(html.indexOf("Statistics directory")).toBeGreaterThan(html.indexOf("Vehicle directory"));
     expect(html).not.toContain("Check a plate"); expect(html).toContain("Add statistics");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="excel-upload-placeholder"/);
+    expect(html).toContain("Upload Excel"); expect(html).toContain("Approval or statistics batches — coming soon");
+    expect(html).not.toContain('type="file"');
   });
 });

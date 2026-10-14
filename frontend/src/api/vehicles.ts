@@ -20,7 +20,8 @@ export const runCheck = (plate: string, forceRefresh: boolean) => vehicleFetch<V
 export const appendStatistics = (body: string) => vehicleFetch<StatisticsSave>("/trip-rows", { method: "POST", body });
 export const getStatistics = (search: string, page: number) => vehicleFetch<StatisticsList>(
   `/trip-rows?${new URLSearchParams({ search, page: String(page), pageSize: "25" })}`);
-export const saveApproval = (approval: ApprovalInput, sourceName?: string | null) => vehicleFetch<unknown>("/vehicle-approvals", {
-  method: "POST", body: JSON.stringify({ sourceName, approvals: [approval] }),
-});
-export const revokeApproval = (plate: string) => vehicleFetch<StoredApproval>(`/vehicle-approvals/${encodeURIComponent(plate)}/revoke`, { method: "POST" });
+export const saveApproval = (approval: ApprovalInput, sourceName?: string | null, existing?: StoredApproval) =>
+  existing ? vehicleFetch<StoredApproval>(`/vehicle-approvals/${encodeURIComponent(existing.id)}`, {
+    method: "PUT", body: JSON.stringify({ sourceName, approval, expectedUpdatedAt: existing.updatedAt }),
+  }) : vehicleFetch<unknown>("/vehicle-approvals", { method: "POST", body: JSON.stringify({ sourceName, approvals: [approval] }) });
+export const revokeApproval = (approvalId: string) => vehicleFetch<StoredApproval>(`/vehicle-approvals/${encodeURIComponent(approvalId)}/revoke`, { method: "POST" });

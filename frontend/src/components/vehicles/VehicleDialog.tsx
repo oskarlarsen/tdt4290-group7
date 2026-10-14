@@ -20,7 +20,7 @@ export function VehicleDialog({ title, children, onClose, busy = false, drawer =
     return () => dialog.close();
   }, []);
   return <dialog ref={ref} aria-label={title} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
-    className={`fixed z-50 overflow-y-auto overscroll-contain border border-neutral-100 bg-white p-0 text-neutral-800 shadow-card backdrop:bg-neutral-900/30 ${drawer ? "inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-3xl" : "inset-0 m-auto h-fit max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl rounded-xl"}`}>
+    className={`fixed z-50 overflow-y-auto overscroll-contain border border-neutral-100 bg-white p-0 text-neutral-800 shadow-card backdrop:bg-neutral-900/30 ${drawer ? "inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-full lg:w-[calc((100vw_-_15rem)*0.75)] lg:min-w-[48rem]" : "inset-0 m-auto h-fit max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl rounded-xl"}`}>
     <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-neutral-100 bg-white px-4 py-4 sm:px-5">
       <h2 className="font-headline text-lg font-semibold text-neutral-900">{title}</h2>
       <button type="button" onClick={onClose} disabled={busy} aria-label={`Close ${title}`} className="shrink-0 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"><X className="h-4 w-4" /></button>

@@ -85,15 +85,14 @@ internal val vehicleSchemaStatements = listOf(
         id TEXT PRIMARY KEY,
         registration_number TEXT NOT NULL REFERENCES vehicles(registration_number),
         source_name TEXT, ${fuelColumn("fuel_technology")}, ${enumColumn<VehicleCategory>("vehicle_category")},
-        ${dateColumn("start_date")}, ${dateColumn("expiry_date")},
+        ${dateColumn("start_date", true)}, ${dateColumn("expiry_date")},
         ${timestampColumn("created_at", true)}, ${timestampColumn("updated_at", true)},
         ${timestampColumn("revoked_at")},
         CHECK (start_date IS NULL OR expiry_date IS NULL OR start_date <= expiry_date),
         CHECK ((vehicle_category IN ('O1','O2','O3','O4')) = (fuel_technology = 'NOT_APPLICABLE')),
         UNIQUE (id, registration_number)
     ) STRICT""",
-    """CREATE UNIQUE INDEX IF NOT EXISTS idx_one_unrevoked_approval
-       ON vehicle_approvals(registration_number) WHERE revoked_at IS NULL""",
+    "CREATE INDEX IF NOT EXISTS idx_approvals_vehicle_dates ON vehicle_approvals(registration_number, start_date, expiry_date)",
     """CREATE TABLE IF NOT EXISTS svv_snapshots (
         id TEXT PRIMARY KEY,
         registration_number TEXT NOT NULL REFERENCES vehicles(registration_number),
@@ -143,7 +142,7 @@ internal val vehicleSchemaStatements = listOf(
         CHECK (approval_id IS NULL OR (approval_created_at IS NOT NULL AND approval_updated_at IS NOT NULL)),
         FOREIGN KEY (approval_id, registration_number) REFERENCES vehicle_approvals(id, registration_number),
         FOREIGN KEY (snapshot_id, registration_number) REFERENCES svv_snapshots(id, registration_number),
-        UNIQUE (id, registration_number)
+        UNIQUE (id, registration_number), UNIQUE (id, snapshot_id)
     ) STRICT""",
     "CREATE INDEX IF NOT EXISTS idx_vehicle_checks_vehicle_time ON vehicle_checks(registration_number, checked_at DESC, id DESC)",
     """CREATE TABLE IF NOT EXISTS vehicle_check_trip_rows (
@@ -155,17 +154,36 @@ internal val vehicleSchemaStatements = listOf(
         FOREIGN KEY (check_id, registration_number) REFERENCES vehicle_checks(id, registration_number),
         FOREIGN KEY (trip_row_id, registration_number) REFERENCES trip_rows(id, registration_number)
     ) STRICT""",
+    """CREATE TABLE IF NOT EXISTS vehicle_check_approvals (
+        check_id TEXT NOT NULL, approval_id TEXT NOT NULL, registration_number TEXT NOT NULL,
+        ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+        source_name TEXT, ${fuelColumn("fuel_technology")}, ${enumColumn<VehicleCategory>("vehicle_category")},
+        ${dateColumn("start_date", true)}, ${dateColumn("expiry_date")},
+        ${timestampColumn("created_at", true)}, ${timestampColumn("updated_at", true)}, ${timestampColumn("revoked_at")},
+        PRIMARY KEY (check_id, approval_id), UNIQUE (check_id, ordinal),
+        FOREIGN KEY (check_id, registration_number) REFERENCES vehicle_checks(id, registration_number),
+        FOREIGN KEY (approval_id, registration_number) REFERENCES vehicle_approvals(id, registration_number)
+    ) STRICT""",
     """CREATE TABLE IF NOT EXISTS vehicle_check_deviations (
         check_id TEXT NOT NULL REFERENCES vehicle_checks(id),
-        ${enumColumn<VehicleDeviation>("deviation_code")},
-        origin TEXT NOT NULL CHECK (origin IN ('APPROVAL','REGISTRY')),
+        ${enumColumn<VehicleDeviation>("deviation_code")}, ${enumColumn<DeviationPriority>("priority")},
+        ${enumColumn<DeviationOrigin>("origin")}, description TEXT NOT NULL CHECK (length(trim(description)) > 0),
         ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
-        PRIMARY KEY (check_id, deviation_code),
-        UNIQUE (check_id, ordinal)
+        trip_row_id TEXT, related_trip_row_id TEXT, approval_id TEXT, related_approval_id TEXT,
+        snapshot_id TEXT, fuel_index INTEGER CHECK (fuel_index >= 0), measurement_index INTEGER CHECK (measurement_index >= 0),
+        CHECK (measurement_index IS NULL OR fuel_index IS NOT NULL), CHECK (fuel_index IS NULL OR snapshot_id IS NOT NULL),
+        PRIMARY KEY (check_id, ordinal),
+        FOREIGN KEY (check_id, trip_row_id) REFERENCES vehicle_check_trip_rows(check_id, trip_row_id),
+        FOREIGN KEY (check_id, related_trip_row_id) REFERENCES vehicle_check_trip_rows(check_id, trip_row_id),
+        FOREIGN KEY (check_id, approval_id) REFERENCES vehicle_check_approvals(check_id, approval_id),
+        FOREIGN KEY (check_id, related_approval_id) REFERENCES vehicle_check_approvals(check_id, approval_id),
+        FOREIGN KEY (check_id, snapshot_id) REFERENCES vehicle_checks(id, snapshot_id),
+        FOREIGN KEY (snapshot_id, fuel_index) REFERENCES svv_snapshot_fuels(snapshot_id, fuel_index),
+        FOREIGN KEY (snapshot_id, fuel_index, measurement_index) REFERENCES svv_emission_measurements(snapshot_id, fuel_index, measurement_index)
     ) STRICT""",
 ) + listOf(
     "trip_rows", "svv_snapshots", "svv_snapshot_fuels", "svv_emission_measurements",
-    "vehicle_checks", "vehicle_check_trip_rows", "vehicle_check_deviations",
+    "vehicle_checks", "vehicle_check_trip_rows", "vehicle_check_approvals", "vehicle_check_deviations",
 ).map { table ->
     """CREATE TRIGGER IF NOT EXISTS immutable_${table} BEFORE UPDATE ON $table
        BEGIN SELECT RAISE(ABORT, 'Historical data is immutable'); END"""

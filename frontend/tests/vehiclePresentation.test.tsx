@@ -27,6 +27,9 @@ describe("vehicle presentation", () => {
   it("retains the right-hand details drawer instead of centering it", () => {
     const html = renderToStaticMarkup(<VehicleDialog title="Synthetic details" drawer onClose={() => {}}>Details</VehicleDialog>);
     expect(html).toContain("inset-y-0 left-auto right-0 m-0");
+    expect(html).toContain("lg:w-[calc((100vw_-_15rem)*0.75)]");
+    expect(html).toContain("lg:min-w-[48rem]");
+    expect(html).not.toContain("max-w-3xl");
     expect(html).not.toContain("inset-0 m-auto");
   });
 

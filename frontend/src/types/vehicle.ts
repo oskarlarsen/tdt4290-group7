@@ -35,17 +35,24 @@ export type Snapshot = { id: string; fetchedAt: string; source: string; data: Re
 export type CheckSummary = {
   id: string; checkedAt: string; approvalStatus: ApprovalStatus; dataSource: DataSource;
   lookupOutcome: string; fetchedAt?: string | null; refreshFailure?: string | null; deviations: string[];
+  highPriorityCount?: number; moderatePriorityCount?: number;
+};
+export type DeviationFinding = {
+  code: string; priority: "MODERATE" | "HIGH"; origin: "APPROVAL" | "REGISTRY" | "STATISTICS"; description: string;
+  tripRowId?: string | null; relatedTripRowId?: string | null; approvalId?: string | null; relatedApprovalId?: string | null;
+  fuelIndex?: number | null; measurementIndex?: number | null;
 };
 export type VehicleCheck = {
   id: string; checkedAt: string; vehicle: Vehicle; approvalStatus: ApprovalStatus;
   approval?: StoredApproval | null; tripRows: TripRow[]; deviations: string[];
+  approvals: StoredApproval[]; findings: DeviationFinding[];
   registry: { dataSource: DataSource; lookupOutcome: string; fetchedAt?: string | null;
     refreshFailure?: string | null; registrationStatus?: string | null; data?: RegistryData | null;
     deviations: string[]; usageProhibitionState: "UNKNOWN" };
 };
 export type VehicleOverview = { vehicle: Vehicle; approvalStatus: ApprovalStatus; approval?: StoredApproval | null; latestCheck?: CheckSummary | null };
 export type VehicleList = { items: VehicleOverview[]; total: number; page: number; pageSize: number; approvalAsOf: string };
-export type VehicleDetails = VehicleOverview & { approvalAsOf: string; tripRows: TripRow[]; latestSnapshot?: Snapshot | null };
+export type VehicleDetails = VehicleOverview & { approvalAsOf: string; tripRows: TripRow[]; approvals: StoredApproval[]; latestSnapshot?: Snapshot | null };
 export type CheckHistory = { items: CheckSummary[]; total: number; page: number; pageSize: number };
 export type StatisticsList = { items: TripRow[]; total: number; page: number; pageSize: number };
 export type StatisticsSave = { createdAt: string; rowCount: number; distinctVehicleCount: number; rows: TripRow[];

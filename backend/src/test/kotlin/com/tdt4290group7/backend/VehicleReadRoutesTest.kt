@@ -44,13 +44,13 @@ class VehicleReadRoutesTest {
         val repository = repository()
         val today = LocalDate.now(ZoneId.of("Europe/Oslo"))
         val now = Instant.now()
-        repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
+        repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(
             syntheticApproval("AB10001", fuelTechnology = FuelTechnology.DIESEL, expiryDate = today.toString()),
             syntheticApproval("AB10002", startDate = today.plusDays(1).toString()),
-            syntheticApproval("AB10003", expiryDate = today.minusDays(1).toString()),
+            syntheticApproval("AB10003", startDate = today.minusDays(10).toString(), expiryDate = today.minusDays(1).toString()),
             syntheticApproval("AB10004"),
         )), now)
-        repository.revokeApproval("AB10004", now)
+        repository.revokeApproval(repository.approvalsForVehicle("AB10004").single().id, now)
         repository.appendTripRows(AppendTripRowsRequest(rows = listOf(
             syntheticTrip("AB10001", "2026-01-01", "2026-01-31", totalTripKm = "123.45".toBigDecimal()),
             syntheticTrip("AB10001", "2026-01-01", "2026-01-31", totalTripKm = "123.45".toBigDecimal()),
@@ -78,7 +78,7 @@ class VehicleReadRoutesTest {
             val filtered = read("/api/vehicles?approvalStatus=$status").getValue("items").jsonArray
             assertEquals(plate, filtered.single().jsonObject.getValue("vehicle").jsonObject.getValue("registrationNumber").jsonPrimitive.content)
         }
-        repository.revokeApproval("AB10001", Instant.now())
+        repository.revokeApproval(repository.approvalsForVehicle("AB10001").single().id, Instant.now())
         val detail = read("/api/vehicles/ab-10001")
         assertEquals("REVOKED", detail.getValue("approvalStatus").jsonPrimitive.content)
         assertEquals("ACTIVE", detail.getValue("latestCheck").jsonObject.getValue("approvalStatus").jsonPrimitive.content)

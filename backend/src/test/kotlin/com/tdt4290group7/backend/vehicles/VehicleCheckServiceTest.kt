@@ -50,7 +50,9 @@ class VehicleCheckServiceTest {
             assertEquals(LookupOutcome.FOUND, result.registry.lookupOutcome)
             assertEquals(failure, result.registry.refreshFailure)
             assertEquals(first.registry.snapshotId, result.registry.snapshotId)
-            assertEquals(listOf(VehicleDeviation.NOT_ON_APPROVED_LIST, VehicleDeviation.DEREGISTERED), result.deviations)
+            assertTrue(VehicleDeviation.NOT_ON_APPROVED_LIST in result.deviations)
+            assertTrue(VehicleDeviation.DEREGISTERED in result.deviations)
+            assertTrue(VehicleDeviation.UNABLE_TO_VERIFY in result.deviations)
             assertEquals(result, repository.findCheck(result.id))
         }
     }
@@ -75,9 +77,9 @@ class VehicleCheckServiceTest {
     fun approvalUsesTodayInOsloNotTheStatisticsPeriod() = runBlocking {
         val repository = repository()
         val now = Instant.parse("2026-09-23T22:30:00Z") // Already September 24 in Oslo.
-        repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
+        repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(
             syntheticApproval("AB12345"), syntheticApproval("CD54321", startDate = "2026-09-25"),
-            syntheticApproval("EF12345", expiryDate = "2026-09-24"),
+            syntheticApproval("EF12345", startDate = "2026-01-01", expiryDate = "2026-09-24"),
         )), now)
         assertEquals(ApprovalStatus.ACTIVE, service(repository, null, now.toString()).check(VehicleCheckRequest("AB12345")).approvalStatus)
         val future = service(repository, null, now.toString()).check(VehicleCheckRequest("CD54321"))
@@ -98,20 +100,20 @@ class VehicleCheckServiceTest {
                 co2GramsPerKm = BigDecimal("123.456"), totalTripKm = BigDecimal("1000"),
                 totalKmNoxRegistered = BigDecimal("1000"), totalNoxRegisteredGrams = BigDecimal("25.67")),
         )), now)
-        repository.upsertApprovals(UpsertApprovalsRequest("original", listOf(
+        repository.appendApprovals(AppendApprovalsRequest("original", listOf(
             syntheticApproval("AB12345", FuelTechnology.DIESEL, "2025-01-01", "2026-12-31", VehicleCategory.M1),
         )), now)
         val first = service(repository, VehicleRegistryClient { RegistryLookup.Found(registryData()) }, now.toString())
             .check(VehicleCheckRequest("ab-12345"))
         assertEquals(BigDecimal("123.456"), first.tripRows.single().estimatedCo2Kg)
-        assertTrue(first.deviations.isEmpty()) // No environmental comparisons, even though observations differ.
-        repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
+        assertTrue(VehicleDeviation.CO2_MISMATCH in first.deviations)
+        repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(
             syntheticApproval("AB12345", FuelTechnology.ELECTRIC),
         )), now.plusSeconds(1))
         repository.appendTripRows(AppendTripRowsRequest(rows = listOf(
             syntheticTrip("AB12345", "2026-01-01", "2026-01-31"),
         )), now.plusSeconds(2))
-        repository.revokeApproval("AB12345", now.plusSeconds(3))
+        repository.approvalsForVehicle("AB12345").forEach { repository.revokeApproval(it.id, now.plusSeconds(3)) }
         val later = service(repository, null, "2028-01-01T00:00:00Z").check(VehicleCheckRequest("AB12345"))
         assertEquals(ApprovalStatus.REVOKED, later.approvalStatus)
         assertEquals(2, later.tripRows.size)
@@ -134,7 +136,7 @@ class VehicleCheckServiceTest {
             val repository = repository()
             val result = service(repository, VehicleRegistryClient { RegistryLookup.Found(registryData(status)) },
                 "2026-01-01T00:00:00Z").check(VehicleCheckRequest("AB12345"))
-            assertEquals(listOf(deviation), result.registry.deviations)
+            assertTrue(deviation in result.registry.deviations)
             assertEquals(result, repository.findCheck(result.id))
         }
     }

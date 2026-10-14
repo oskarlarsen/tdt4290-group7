@@ -43,12 +43,12 @@ class VehicleInputRulesTest {
         val emptyPath = path()
         VehicleRepository(emptyPath)
         fun markVersionThree(path: Path) = DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.execute("PRAGMA user_version=3") }
+            db.createStatement().use { it.execute("DROP TABLE vehicle_check_approvals"); it.execute("PRAGMA user_version=3") }
         }
         markVersionThree(emptyPath)
         VehicleRepository(emptyPath)
         DriverManager.getConnection("jdbc:sqlite:${emptyPath.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(5, rows.getInt(1)) } }
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(6, rows.getInt(1)) } }
         }
         val populatedPath = path()
         val repository = VehicleRepository(populatedPath)
@@ -98,11 +98,11 @@ class VehicleInputRulesTest {
         val repository = VehicleRepository(path())
         for (category in VehicleCategory.entries) {
             val fuel = if (category.isTrailer) FuelTechnology.NOT_APPLICABLE else FuelTechnology.DIESEL
-            repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(syntheticApproval(
+            repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(syntheticApproval(
                 fuelTechnology = fuel, vehicleCategory = category))), now)
             val wrong = if (category.isTrailer) FuelTechnology.DIESEL else FuelTechnology.NOT_APPLICABLE
             assertFailsWith<IllegalArgumentException> {
-                repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(syntheticApproval(
+                repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(syntheticApproval(
                     fuelTechnology = wrong, vehicleCategory = category))), now)
             }
         }
@@ -182,7 +182,7 @@ class VehicleInputRulesTest {
             val repository = VehicleRepository(database)
             if (populated) repository.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip())), now)
             DriverManager.getConnection("jdbc:sqlite:${database.toAbsolutePath()}").use { db ->
-                db.createStatement().use { it.execute("PRAGMA user_version=4") }
+                db.createStatement().use { it.execute("DROP TABLE vehicle_check_approvals"); it.execute("PRAGMA user_version=4") }
             }
             if (populated) {
                 assertFailsWith<IllegalStateException> { VehicleRepository(database) }

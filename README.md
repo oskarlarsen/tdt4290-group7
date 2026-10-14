@@ -7,9 +7,9 @@ TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The 
 - `frontend/`: React + TypeScript + Vite dashboard.
 - `backend/`: Ktor HTTP API, SQLite storage, and Statens Vegvesen integration.
 
-See [the backend guide](backend/README.md) for endpoint parameters, responses, database relationships, configuration, request flow, logging, and step-by-step Postman testing.
+See the [vehicle API guide](backend/README.md#vehicle-api) for endpoints, JSON examples and check behavior.
 
-The admin vehicle-page draft is at `/admin/vehicles`. It connects to real vehicle endpoints and supports individual statistics entry, approval management, explicit checks and check history. See [the frontend vehicle guide](frontend/README.md) for setup, safeguards and code organization. Supplier vehicle pages and batch actions are not included.
+The admin vehicle page at `/admin/vehicles` supports statistics, approval periods, saved checks and side-by-side deviation analysis. See the [frontend guide](frontend/README.md). Excel upload is a disabled placeholder; supplier vehicle pages are unchanged.
 
 ## Shared local configuration
 
@@ -67,7 +67,7 @@ Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
 
 The backend runs without an Statens Vegvesen key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
 
-Vehicle storage uses strict relational tables, registration numbers as primary keys, exact decimal quantities and selected Statens Vegvesen fields only. Schema version 5 requires applicable supplier statistics and official fuel/category/body codes. Average fuel consumption is L/100km across UI/API/database. Electric/hydrogen CO₂/NOx measurements and registered distances are null/Not applicable, with the CO₂-emitting flag No; CO₂-unregistered and fuel distances remain editable. Saving statistics automatically checks each distinct plate using cached or live registry data; directory browsing only reads saved data. Total CO₂ kg is a read-only supplier-based estimate, null when inapplicable. History is retained indefinitely; the 14-day cache controls freshness, not retention. Only recognized, completely empty version-3/4 databases rebuild automatically; populated older databases are preserved and refused. See the [vehicle API guide](backend/README.md#shared-request-rules) and [safe development database setup](backend/README.md#database-compatibility-and-safe-development-setup).
+Vehicle storage uses SQLite with explicit relationships and selected registry fields. Checks cover every saved reporting row, approval periods and registry comparisons, with high/moderate deviations. History is retained indefinitely; the default 14-day cache controls freshness only. See the [API guide](backend/README.md#vehicle-api) and [database setup](backend/README.md#database-compatibility-and-safe-development-setup).
 
 ## Local data and credentials
 
