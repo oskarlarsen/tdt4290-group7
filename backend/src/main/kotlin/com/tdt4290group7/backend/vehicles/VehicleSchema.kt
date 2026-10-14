@@ -3,6 +3,9 @@ package com.tdt4290group7.backend.vehicles
 import java.math.BigDecimal
 
 internal data class TripDecimalColumn(val name: String, val value: (TripRowInput) -> BigDecimal?)
+internal val inapplicableEmissionColumns = setOf(
+    "co2_grams_per_km", "median_co2", "total_km_co2_registered", "total_km_nox_registered", "total_nox_registered_grams",
+)
 
 /** Explicit allowlist, shared by DDL and bindings. Never constructed from request keys. */
 internal val tripDecimalColumns = listOf(
@@ -15,7 +18,7 @@ internal val tripDecimalColumns = listOf(
     TripDecimalColumn("total_km_fuel_registered") { it.totalKmFuelRegistered },
     TripDecimalColumn("total_km_nox_registered") { it.totalKmNoxRegistered },
     TripDecimalColumn("total_nox_registered_grams") { it.totalNoxRegisteredGrams },
-    TripDecimalColumn("average_consumption_litres_per_km") { it.averageConsumptionLitresPerKm },
+    TripDecimalColumn("average_fuel_consumption_litres_per_100_km") { it.averageFuelConsumptionLitresPer100Km },
     TripDecimalColumn("fuel_consumed_litres") { it.fuelConsumedLitres },
 )
 
@@ -64,14 +67,15 @@ internal val vehicleSchemaStatements = listOf(
         model TEXT NOT NULL CHECK (length(trim(model)) > 0),
         ${booleanColumn("co2_registered", true)},
         trip_count INTEGER NOT NULL CHECK (trip_count BETWEEN 0 AND 2147483647),
-        assignment_number TEXT, comment TEXT,
-        ${tripDecimalColumns.joinToString(",\n") { decimalColumns(it.name, it.name !in listOf("average_consumption_litres_per_km", "fuel_consumed_litres")) }},
+        comment TEXT,
+        ${tripDecimalColumns.joinToString(",\n") { decimalColumns(it.name, it.name !in inapplicableEmissionColumns && it.name !in listOf("average_fuel_consumption_litres_per_100_km", "fuel_consumed_litres")) }},
         CHECK ((vehicle_category IN ('O1','O2','O3','O4')) = (fuel_technology = 'NOT_APPLICABLE')),
         CHECK (CASE WHEN fuel_technology IN ('5','6','NOT_APPLICABLE') THEN
-          average_consumption_litres_per_km_unscaled IS NULL AND fuel_consumed_litres_unscaled IS NULL
-          ELSE average_consumption_litres_per_km_unscaled IS NOT NULL AND fuel_consumed_litres_unscaled IS NOT NULL END),
-        CHECK (fuel_technology NOT IN ('5','6') OR (co2_registered = 0
-          AND co2_grams_per_km_unscaled = 0 AND median_co2_unscaled = 0 AND total_nox_registered_grams_unscaled = 0)),
+          average_fuel_consumption_litres_per_100_km_unscaled IS NULL AND fuel_consumed_litres_unscaled IS NULL
+          ELSE average_fuel_consumption_litres_per_100_km_unscaled IS NOT NULL AND fuel_consumed_litres_unscaled IS NOT NULL END),
+        CHECK (CASE WHEN fuel_technology IN ('5','6') THEN co2_registered = 0
+          AND ${inapplicableEmissionColumns.joinToString(" AND ") { "${it}_unscaled IS NULL" }}
+          ELSE ${inapplicableEmissionColumns.joinToString(" AND ") { "${it}_unscaled IS NOT NULL" }} END),
         CHECK (period_start <= period_end),
         UNIQUE (id, registration_number)
     ) STRICT""",
@@ -81,7 +85,6 @@ internal val vehicleSchemaStatements = listOf(
         id TEXT PRIMARY KEY,
         registration_number TEXT NOT NULL REFERENCES vehicles(registration_number),
         source_name TEXT, ${fuelColumn("fuel_technology")}, ${enumColumn<VehicleCategory>("vehicle_category")},
-        ${booleanColumn("used_throughout_period")},
         ${dateColumn("start_date")}, ${dateColumn("expiry_date")},
         ${timestampColumn("created_at", true)}, ${timestampColumn("updated_at", true)},
         ${timestampColumn("revoked_at")},
@@ -130,7 +133,6 @@ internal val vehicleSchemaStatements = listOf(
         usage_prohibition_state TEXT NOT NULL CHECK (usage_prohibition_state = 'UNKNOWN'),
         approval_source_name TEXT, ${fuelColumn("approval_fuel_technology", false)},
         ${enumColumn<VehicleCategory>("approval_vehicle_category", false)},
-        ${booleanColumn("approval_used_throughout_period")},
         ${dateColumn("approval_start_date")}, ${dateColumn("approval_expiry_date")},
         ${timestampColumn("approval_created_at")}, ${timestampColumn("approval_updated_at")},
         ${timestampColumn("approval_revoked_at")},

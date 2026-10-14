@@ -1,4 +1,4 @@
-// Official SVV codes with application-owned English labels. Keep in sync with VehicleCatalog.kt.
+// Official Statens Vegvesen codes with application-owned English labels. Keep in sync with VehicleCatalog.kt.
 export const FUEL_TECHNOLOGIES = {
   "1": "Gasoline",
   "2": "Diesel",
@@ -97,8 +97,12 @@ export type BodyType = keyof typeof BODY_TYPES;
 
 export function isTrailer(category: string): boolean { return ["O1", "O2", "O3", "O4"].includes(category); }
 export function usesLitres(fuel: string): boolean { return !["5", "6", "NOT_APPLICABLE"].includes(fuel); }
-export function locksEmissionsToZero(fuel: string): boolean { return ["5", "6"].includes(fuel); }
-export const LOCKED_EMISSION_FIELDS = ["co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams"] as const;
+export function emissionsNotApplicable(fuel: string): boolean { return ["5", "6"].includes(fuel); }
+export const INAPPLICABLE_EMISSION_FIELDS = ["co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered"] as const;
+export function statisticNotApplicable(key: string, fuel: string): boolean {
+  return (["averageFuelConsumptionLitresPer100Km", "fuelConsumedLitres"].includes(key) && !usesLitres(fuel)) ||
+    ((INAPPLICABLE_EMISSION_FIELDS as readonly string[]).includes(key) && emissionsNotApplicable(fuel));
+}
 export function fuelGroups(code: string): string[] {
   if (["16", "17"].includes(code)) return ["12"];
   if (["18", "19"].includes(code)) return ["13"];

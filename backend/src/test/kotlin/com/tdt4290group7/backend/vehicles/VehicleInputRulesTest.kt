@@ -13,13 +13,16 @@ class VehicleInputRulesTest {
     private fun path() = Path.of("build", "test-data", "rules-${UUID.randomUUID()}.db")
 
     @Test
-    fun electricAndHydrogenRequireFixedZeroEmissionValues() {
+    fun electricAndHydrogenRequireNullEmissionValuesAndDistances() {
         val repository = VehicleRepository(path())
         for (fuel in listOf(FuelTechnology.ELECTRIC, FuelTechnology.HYDROGEN)) {
             val valid = syntheticTrip(fuelTechnology = fuel)
-            repository.appendTripRows(AppendTripRowsRequest(rows = listOf(valid)), now)
+            val saved = repository.appendTripRows(AppendTripRowsRequest(rows = listOf(valid)), now).rows.single()
+            assertNull(saved.estimatedCo2Kg)
+            assertEquals(valid, repository.tripRowsForVehicle("AB12345").first { it.id == saved.id }.data)
             for (invalid in listOf(valid.copy(co2Registered = true), valid.copy(co2GramsPerKm = BigDecimal.ONE),
-                valid.copy(medianCo2 = BigDecimal.ONE), valid.copy(totalNoxRegisteredGrams = BigDecimal.ONE)))
+                valid.copy(medianCo2 = BigDecimal.ONE), valid.copy(totalNoxRegisteredGrams = BigDecimal.ONE),
+                valid.copy(totalKmCo2Registered = BigDecimal.ZERO), valid.copy(totalKmNoxRegistered = BigDecimal.ZERO)))
                 assertFailsWith<IllegalArgumentException> { repository.appendTripRows(AppendTripRowsRequest(rows = listOf(invalid)), now) }
         }
     }
@@ -45,7 +48,7 @@ class VehicleInputRulesTest {
         markVersionThree(emptyPath)
         VehicleRepository(emptyPath)
         DriverManager.getConnection("jdbc:sqlite:${emptyPath.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(4, rows.getInt(1)) } }
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(5, rows.getInt(1)) } }
         }
         val populatedPath = path()
         val repository = VehicleRepository(populatedPath)
@@ -80,7 +83,7 @@ class VehicleInputRulesTest {
                 vehicleCategory = if (fuel == FuelTechnology.NOT_APPLICABLE) VehicleCategory.O1 else VehicleCategory.M1)
             val row = repository.appendTripRows(AppendTripRowsRequest(rows = listOf(input)), now).rows.single()
             assertEquals(input, repository.tripRowsForVehicle("AB12345").first { it.id == row.id }.data)
-            assertEquals(BigDecimal.ZERO, row.data.totalNoxRegisteredGrams)
+            assertEquals(if (fuel.emissionsNotApplicable) null else BigDecimal.ZERO, row.data.totalNoxRegisteredGrams)
             val bad = if (fuel.usesLitres) input.copy(fuelConsumedLitres = null)
                 else input.copy(fuelConsumedLitres = BigDecimal.ZERO)
             assertFailsWith<IllegalArgumentException> { repository.appendTripRows(AppendTripRowsRequest(rows = listOf(bad)), now) }
@@ -128,9 +131,23 @@ class VehicleInputRulesTest {
                 "period_end" to "'2025-12-31'", "registration_number" to "'CD12345'",
             )
             for ((column, value) in invalid) assertFailsWith<SQLException>(column) { clone(mapOf(column to value)) }
+            // Applicable numeric zero and inapplicable null cannot be interchanged through SQL.
+            for (column in inapplicableEmissionColumns) assertFailsWith<SQLException>(column) {
+                clone(mapOf("${column}_unscaled" to "NULL", "${column}_scale" to "NULL"))
+            }
+            val electric = buildMap {
+                put("fuel_technology", "'5'"); put("co2_registered", "0")
+                for (column in inapplicableEmissionColumns + setOf("fuel_consumed_litres", "average_fuel_consumption_litres_per_100_km")) {
+                    put("${column}_unscaled", "NULL"); put("${column}_scale", "NULL")
+                }
+            }
+            clone(electric)
+            for (column in inapplicableEmissionColumns) assertFailsWith<SQLException>(column) {
+                clone(electric + mapOf("${column}_unscaled" to "0", "${column}_scale" to "0"))
+            }
             // Reject a mismatched decimal pair even when litres are inapplicable.
             assertFailsWith<SQLException> { clone(mapOf("fuel_technology" to "'5'", "fuel_consumed_litres_unscaled" to "NULL",
-                "average_consumption_litres_per_km_unscaled" to "NULL")) }
+                "average_fuel_consumption_litres_per_100_km_unscaled" to "NULL")) }
             for (fuel in listOf("5", "6")) assertFailsWith<SQLException> { clone(mapOf("fuel_technology" to "'$fuel'")) }
             for (plate in listOf("TEST01", "AB01234", "AB123456")) assertFailsWith<SQLException> {
                 db.createStatement().use { it.executeUpdate("INSERT INTO vehicles(registration_number,created_at) VALUES('$plate','2026-01-01T00:00:00Z')") }
@@ -156,5 +173,26 @@ class VehicleInputRulesTest {
             } }
             db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(2, rows.getInt(1)) } }
         }
+    }
+
+    @Test
+    fun versionFourIsRebuiltOnlyWhenEmptyAndNullsAreRejectedForDiesel() {
+        for (populated in listOf(false, true)) {
+            val database = path()
+            val repository = VehicleRepository(database)
+            if (populated) repository.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip())), now)
+            DriverManager.getConnection("jdbc:sqlite:${database.toAbsolutePath()}").use { db ->
+                db.createStatement().use { it.execute("PRAGMA user_version=4") }
+            }
+            if (populated) {
+                assertFailsWith<IllegalStateException> { VehicleRepository(database) }
+                assertEquals(1, repository.tripRowsForVehicle("AB12345").size)
+            } else VehicleRepository(database)
+        }
+        val repository = VehicleRepository(path())
+        val diesel = syntheticTrip()
+        for (invalid in listOf(diesel.copy(co2GramsPerKm = null), diesel.copy(medianCo2 = null),
+            diesel.copy(totalKmCo2Registered = null), diesel.copy(totalKmNoxRegistered = null), diesel.copy(totalNoxRegisteredGrams = null)))
+            assertFailsWith<IllegalArgumentException> { repository.appendTripRows(AppendTripRowsRequest(rows = listOf(invalid)), now) }
     }
 }

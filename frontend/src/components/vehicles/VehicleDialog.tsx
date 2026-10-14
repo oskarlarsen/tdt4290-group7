@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { FieldTooltip } from "./FieldTooltip";
 
 export const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10 disabled:bg-neutral-50 read-only:bg-neutral-50";
 const buttonBase = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50";
@@ -27,8 +28,8 @@ export function VehicleDialog({ title, children, onClose, busy = false, drawer =
     <div className="p-4 sm:p-5">{children}</div>
   </dialog>;
 }
-export function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block space-y-1.5 text-sm text-neutral-700"><span className="block text-xs font-medium">{label}</span>{children}</label>;
+export function Field({ label, tooltip, children }: { label: string; tooltip?: string; children: ReactNode }) {
+  return <div className="relative"><label className="block space-y-1.5 text-sm text-neutral-700"><span className={`block text-xs font-medium ${tooltip ? "pr-6" : ""}`}>{label}</span>{children}</label>{tooltip && <FieldTooltip label={label} text={tooltip} />}</div>;
 }
 export function ErrorNotice({ error }: { error: unknown }) {
   return error ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error instanceof Error ? error.message : String(error)}</p> : null;

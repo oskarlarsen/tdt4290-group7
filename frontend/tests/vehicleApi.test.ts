@@ -35,8 +35,8 @@ describe("real vehicle API client", () => {
   });
   it("sends all intended approval fields, including cleared expiry", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetch);
-    await saveApproval({ registrationNumber: "AB10001", expiryDate: null, fuelTechnology: "2", vehicleCategory: "M1", usedThroughoutPeriod: false }, "Synthetic");
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ sourceName: "Synthetic", approvals: [{ registrationNumber: "AB10001", expiryDate: null, fuelTechnology: "2", vehicleCategory: "M1", usedThroughoutPeriod: false }] });
+    await saveApproval({ registrationNumber: "AB10001", expiryDate: null, fuelTechnology: "2", vehicleCategory: "M1" }, "Synthetic");
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ sourceName: "Synthetic", approvals: [{ registrationNumber: "AB10001", expiryDate: null, fuelTechnology: "2", vehicleCategory: "M1" }] });
   });
   it("shows the backend vehicle error and does not retry a failed write", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('{"error":"Synthetic validation error"}', { status: 400 })); vi.stubGlobal("fetch", fetch);

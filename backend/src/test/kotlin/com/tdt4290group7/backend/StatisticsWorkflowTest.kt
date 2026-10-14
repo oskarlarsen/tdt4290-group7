@@ -17,6 +17,33 @@ class StatisticsWorkflowTest {
     private fun repository() = VehicleRepository(Path.of("build", "test-data", "statistics-${UUID.randomUUID()}.db"))
 
     @Test
+    fun inapplicableValuesRemainExplicitNullThroughSaveListAndCheckHistory() = testApplication {
+        val repository = repository()
+        application { module(repository, null, Duration.ofDays(14)) }
+        for (fuel in listOf(FuelTechnology.ELECTRIC, FuelTechnology.HYDROGEN)) {
+            val input = syntheticTrip(fuelTechnology = fuel, totalKmCo2NotRegistered = "7.5".toBigDecimal())
+            val response = client.post("/api/trip-rows") {
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(AppendTripRowsRequest(rows = listOf(input))))
+            }
+            assertEquals(HttpStatusCode.Created, response.status)
+            val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val checkId = result.getValue("checks").jsonArray.single().jsonObject.getValue("check").jsonObject.getValue("id").jsonPrimitive.content
+            val historical = Json.parseToJsonElement(client.get("/api/vehicle-checks/$checkId").bodyAsText()).jsonObject.getValue("tripRows").jsonArray
+            val listed = Json.parseToJsonElement(client.get("/api/trip-rows").bodyAsText()).jsonObject.getValue("items").jsonArray
+            for (row in result.getValue("rows").jsonArray + historical + listed) {
+                val stored = row.jsonObject
+                assertEquals(JsonNull, stored.getValue("estimatedCo2Kg"))
+                val data = stored.getValue("data").jsonObject
+                assertFalse(data.getValue("co2Registered").jsonPrimitive.boolean)
+                assertEquals("7.5", data.getValue("totalKmCo2NotRegistered").jsonPrimitive.content)
+                for (field in listOf("co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered"))
+                    assertEquals(JsonNull, data.getValue(field))
+            }
+        }
+    }
+
+    @Test
     fun savingChecksEachDistinctPlateAfterAppendAndReusesRecentSnapshot() = testApplication {
         val repository = repository()
         var lookups = 0

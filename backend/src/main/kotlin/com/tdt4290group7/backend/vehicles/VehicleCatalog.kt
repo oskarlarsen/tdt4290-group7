@@ -25,8 +25,8 @@ enum class FuelTechnology(val code: String, val label: String) {
     NOT_APPLICABLE("NOT_APPLICABLE", "Not applicable - unpowered trailer");
 
     val usesLitres: Boolean get() = this !in listOf(ELECTRIC, HYDROGEN, NOT_APPLICABLE)
-    /** Application reporting convention, not a claim about every hydrogen powertrain. */
-    val locksEmissionsToZero: Boolean get() = this in listOf(ELECTRIC, HYDROGEN)
+    /** Reporting applicability, not a claim about every hydrogen powertrain. */
+    val emissionsNotApplicable: Boolean get() = this in listOf(ELECTRIC, HYDROGEN)
     companion object { fun fromCode(code: String) = entries.first { it.code == code } }
 }
 

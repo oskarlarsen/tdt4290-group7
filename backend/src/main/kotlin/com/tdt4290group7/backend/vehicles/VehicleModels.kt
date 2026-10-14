@@ -26,25 +26,24 @@ data class TripRowInput(
     val bodyType: BodyType,
     val model: String,
     val co2Registered: Boolean,
-    val co2GramsPerKm: BigDecimal,
-    val medianCo2: BigDecimal,
+    val co2GramsPerKm: BigDecimal?,
+    val medianCo2: BigDecimal?,
     val totalTripKm: BigDecimal,
-    val totalKmCo2Registered: BigDecimal,
+    val totalKmCo2Registered: BigDecimal?,
     val totalKmCo2NotRegistered: BigDecimal,
     val kmFuelNotRegistered: BigDecimal,
     val totalKmFuelRegistered: BigDecimal,
-    val totalKmNoxRegistered: BigDecimal,
-    val totalNoxRegisteredGrams: BigDecimal,
+    val totalKmNoxRegistered: BigDecimal?,
+    val totalNoxRegisteredGrams: BigDecimal?,
     val tripCount: Int,
     val vehicleCategory: VehicleCategory,
-    val assignmentNumber: String? = null,
-    val averageConsumptionLitresPerKm: BigDecimal? = null,
+    val averageFuelConsumptionLitresPer100Km: BigDecimal? = null,
     val fuelConsumedLitres: BigDecimal? = null,
     val comment: String? = null,
 )
 
-fun TripRowInput.estimateCo2Kg(): BigDecimal =
-    totalTripKm.multiply(co2GramsPerKm).movePointLeft(3).stripTrailingZeros()
+fun TripRowInput.estimateCo2Kg(): BigDecimal? =
+    co2GramsPerKm?.let { totalTripKm.multiply(it).movePointLeft(3).stripTrailingZeros() }
 
 @Serializable
 data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>)
@@ -56,9 +55,9 @@ data class StoredTripRow(
     val sourceName: String? = null,
     val createdAt: String,
     val data: TripRowInput,
-    /** Read-only supplier-based estimate from required explicit observations. */
+    /** Read-only supplier-based estimate; null when emissions are not applicable. */
     @kotlinx.serialization.EncodeDefault
-    val estimatedCo2Kg: BigDecimal = data.estimateCo2Kg(),
+    val estimatedCo2Kg: BigDecimal? = data.estimateCo2Kg(),
 )
 
 @Serializable
@@ -91,7 +90,6 @@ data class ApprovalInput(
     /** Official fuel code, separate from supplier/SVV observations. */
     val fuelTechnology: FuelTechnology,
     val vehicleCategory: VehicleCategory,
-    val usedThroughoutPeriod: Boolean? = null,
     /** Missing means effective immediately. */
     val startDate: String? = null,
     /** Missing means approved indefinitely, until manually revoked. */

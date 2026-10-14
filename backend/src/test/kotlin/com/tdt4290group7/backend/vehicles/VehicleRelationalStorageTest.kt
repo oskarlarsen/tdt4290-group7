@@ -41,7 +41,11 @@ class VehicleRelationalStorageTest {
                     assertEquals(listOf("registration_number", "supplier_id", "created_at"), names)
                 }
                 statement.executeQuery("SELECT sql FROM sqlite_schema WHERE type = 'table'").use { rows ->
-                    while (rows.next()) assertTrue("data_json" !in rows.getString("sql"))
+                    while (rows.next()) {
+                        val ddl = rows.getString("sql")
+                        for (removed in listOf("data_json", "assignment_number", "used_throughout_period", "average_consumption_litres_per_km"))
+                            assertTrue(removed !in ddl, "Removed column must not exist: $removed")
+                    }
                 }
             }
         }
@@ -53,8 +57,8 @@ class VehicleRelationalStorageTest {
         val input = syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", FuelTechnology.DIESEL,
             "Make", BodyType.AA, "Model", true, BigDecimal("123.456789"), BigDecimal("44.12"),
             BigDecimal("1000"), BigDecimal("900"), BigDecimal("100"), BigDecimal("50"),
-            BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"), 3, "assignment",
-            BigDecimal("0.123456"), BigDecimal("123.456"), "Synthetic comment")
+            BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"), 3,
+            BigDecimal("12.3456"), BigDecimal("123.456"), "Synthetic comment")
         val stored = repository.appendTripRows(AppendTripRowsRequest("source", listOf(input)), now).rows.single()
         val loaded = repository.tripRowsForVehicle("AB12345").single()
         assertEquals(stored, loaded)
@@ -115,7 +119,7 @@ class VehicleRelationalStorageTest {
     fun approvalReplacementClearsOmittedFieldsAndNormalizesThePlate() {
         val repository = VehicleRepository(path())
         val first = repository.upsertApprovals(UpsertApprovalsRequest("source", listOf(
-            syntheticApproval("ab 12345", FuelTechnology.DIESEL, true, "2025-01-01", "2026-12-31", VehicleCategory.M3),
+            syntheticApproval("ab 12345", FuelTechnology.DIESEL, "2025-01-01", "2026-12-31", VehicleCategory.M3),
         )), now).approvals.single()
         val replaced = repository.upsertApprovals(UpsertApprovalsRequest(approvals = listOf(
             syntheticApproval("AB12345"),
@@ -123,7 +127,6 @@ class VehicleRelationalStorageTest {
         assertEquals(first.id, replaced.id)
         assertEquals(FuelTechnology.DIESEL, replaced.data.fuelTechnology)
         assertEquals(VehicleCategory.M1, replaced.data.vehicleCategory)
-        assertNull(replaced.data.usedThroughoutPeriod)
         assertNull(replaced.data.expiryDate)
         assertNull(replaced.sourceName)
         assertEquals(replaced, repository.approvalForVehicle("ab-12345"))

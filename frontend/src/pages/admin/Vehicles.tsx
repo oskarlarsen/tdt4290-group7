@@ -28,7 +28,7 @@ export default function Vehicles() {
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">Municipal Oversight</p>
           <h1 className="mt-2 font-headline text-2xl font-semibold leading-tight tracking-[-0.04em] text-[#0f172a]">Vehicles</h1>
-          <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">Manage approvals and reporting-period statistics. Saving statistics automatically checks approval and SVV.</p>
+          <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">Manage approvals and reporting-period statistics. Saving statistics automatically checks approval and Statens Vegvesen.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button className={buttonClass} onClick={() => setForm("approval")}><ClipboardCheck className="h-3.5 w-3.5" />Approve vehicle</button>
@@ -37,7 +37,7 @@ export default function Vehicles() {
       </div>
     </header>
     {notice && <p role="status" className="rounded-lg border border-tertiary-200 bg-tertiary-50 p-3 text-sm text-tertiary-700">{notice}</p>}
-    <div className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white p-4 text-xs leading-5 text-neutral-500"><Info className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" /><p>Approval and SVV verification are separate. No recorded deviations is not a guarantee of compliance. Browsing does not call SVV. Vehicle API authorization is still pending; this draft is for local development.</p></div>
+    <div className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white p-4 text-xs leading-5 text-neutral-500"><Info className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" /><p>Approval and Statens Vegvesen verification are separate. No recorded deviations is not a guarantee of compliance. Browsing does not call Statens Vegvesen. Vehicle API authorization is still pending; this draft is for local development.</p></div>
     <section className="rounded-xl border border-neutral-100 bg-white p-4">
       <h2 className="mb-3 font-headline text-base font-semibold text-neutral-900">Vehicle directory</h2>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="block w-full max-w-xs text-xs text-neutral-600"><span className="mb-1.5 block font-medium">Registration number search</span><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input className={`${filterClass} pl-9`} maxLength={12} placeholder="Search a plate…" value={search} onChange={e => setSearch(e.target.value)} /></div></label>

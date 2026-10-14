@@ -99,7 +99,7 @@ class VehicleCheckServiceTest {
                 totalKmNoxRegistered = BigDecimal("1000"), totalNoxRegisteredGrams = BigDecimal("25.67")),
         )), now)
         repository.upsertApprovals(UpsertApprovalsRequest("original", listOf(
-            syntheticApproval("AB12345", FuelTechnology.DIESEL, true, "2025-01-01", "2026-12-31", VehicleCategory.M1),
+            syntheticApproval("AB12345", FuelTechnology.DIESEL, "2025-01-01", "2026-12-31", VehicleCategory.M1),
         )), now)
         val first = service(repository, VehicleRegistryClient { RegistryLookup.Found(registryData()) }, now.toString())
             .check(VehicleCheckRequest("ab-12345"))

@@ -15,8 +15,8 @@ export function StatisticsTable({ rows, onSelect }: { rows: TripRow[]; onSelect:
       <td className="py-3 pr-3"><button className="rounded font-mono font-medium text-neutral-900 hover:text-primary-900 hover:underline focus-visible:ring-2 focus-visible:ring-primary-700/30" aria-label={`View statistics for ${row.registrationNumber}, ${row.data.periodStart} to ${row.data.periodEnd}`} onClick={() => onSelect(row)}>{row.registrationNumber}</button></td>
       <td className="py-3 pr-3 whitespace-nowrap">{row.data.periodStart} — {row.data.periodEnd}</td>
       <td className="py-3 pr-3">{row.data.totalTripKm}</td>
-      <td className="py-3 pr-3">{row.estimatedCo2Kg}</td>
-      <td className="py-3 pr-3">{row.data.totalNoxRegisteredGrams}</td>
+      <td className="py-3 pr-3">{row.estimatedCo2Kg ?? "Not applicable"}</td>
+      <td className="py-3 pr-3">{row.data.totalNoxRegisteredGrams ?? "Not applicable"}</td>
       <td className="py-3 pr-3">{row.data.tripCount}</td>
       <td className="py-3 text-xs text-neutral-500">{timestamp(row.createdAt)}</td>
     </tr>)}</tbody>
@@ -31,12 +31,12 @@ export function StatisticsRowDetails({ row, onClose, onOpenVehicle }: { row: Tri
         ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory)],
         ["Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology)],
         ["Body type", catalogLabel(BODY_TYPES, row.data.bodyType)],
-        ["Make", row.data.make], ["Model", row.data.model],
+        ["Vehicle brand", row.data.make], ["Vehicle model", row.data.model],
         ["Registered as CO₂-emitting", row.data.co2Registered ? "Yes" : "No"],
-        ["Total CO₂ (kg, calculated)", row.estimatedCo2Kg],
+        ["Total CO₂ (kg, calculated)", row.estimatedCo2Kg ?? "Not applicable"],
         ...DECIMAL_FIELDS.map(([key, label]) => [label, row.data[key] ?? "Not applicable"]),
         ["Jobs/trips", row.data.tripCount], ["Source / reference", row.sourceName ?? "Not provided"],
-        ["Assignment reference", row.data.assignmentNumber ?? "Not provided"], ["Comment", row.data.comment ?? "Not provided"],
+        ["Comment", row.data.comment ?? "Not provided"],
         ["Added", timestamp(row.createdAt)], ["Row ID", row.id],
       ].map(([label, value]) => <div key={String(label)}><dt className="text-neutral-500">{label}</dt><dd className="break-words font-medium text-neutral-900">{value}</dd></div>)}
     </dl>

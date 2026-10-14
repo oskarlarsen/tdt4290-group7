@@ -6,7 +6,7 @@ export function ApprovalBadge({ status }: { status: ApprovalStatus }) {
 }
 export function VehicleTable({ items, onOpen }: { items: VehicleOverview[]; onOpen: (plate: string) => void }) {
   return <div className="overflow-x-auto"><table className="w-full text-left text-sm">
-    <thead className="text-xs font-mono uppercase tracking-wide text-neutral-400"><tr>{["Registration number", "Current approval", "Latest check result", "SVV source", "Last check"].map(label => <th key={label} scope="col" className="pb-2 pr-3 font-medium">{label}</th>)}</tr></thead>
+    <thead className="text-xs font-mono uppercase tracking-wide text-neutral-400"><tr>{["Registration number", "Current approval", "Latest check result", "Statens Vegvesen source", "Last check"].map(label => <th key={label} scope="col" className="pb-2 pr-3 font-medium">{label}</th>)}</tr></thead>
     <tbody>{items.map(item => <tr key={item.vehicle.registrationNumber} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
       <td className="py-3 pr-3"><button className="rounded font-mono font-medium text-neutral-900 hover:text-primary-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30" onClick={() => onOpen(item.vehicle.registrationNumber)}>{item.vehicle.registrationNumber}</button></td>
       <td className="py-3 pr-3"><ApprovalBadge status={item.approvalStatus} /></td>

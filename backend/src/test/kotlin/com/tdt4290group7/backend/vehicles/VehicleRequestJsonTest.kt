@@ -31,13 +31,14 @@ class VehicleRequestJsonTest {
         listOf(
             "\"fuel\":\"Diesel\"", "\"vehicleType\":\"Sedan\"", "\"hybridCategory\":\"INGEN\"",
             "\"estimatedCo2Kg\":123", "\"additionalFields\":{}", "\"co2GramsPerKm\":\"123.45\"",
+            "\"assignmentNumber\":\"job\"", "\"averageConsumptionLitresPerKm\":0.08",
             "\"co2Registered\":\"true\"", "\"tripCount\":\"3\"", "\"tripCount\":3.0",
             "\"make\":123", "\"periodStart\":123", "\"co2GramsPerKm\":-1",
             "\"co2GramsPerKm\":1e1000000", "\"co2GramsPerKm\":0.0000000000000000001",
             "\"fuelTechnology\":2", "\"fuelTechnology\":\"Diesel\"", "\"fuelTechnology\":\"999\"",
             "\"vehicleCategory\":\"light\"", "\"vehicleCategory\":\"L3e\"", "\"bodyType\":\"Station wagon\"",
         ).forEach { extra -> assertFailsWith<SerializationException>(extra) { decodeTripRowsRequest(body(extra)) } }
-        for (extra in listOf("\"vehicleGroup\":\"light\"", "\"fuelTechnology\":2", "\"fuelTechnology\":null", "\"usedThroughoutPeriod\":\"true\"")) {
+        for (extra in listOf("\"vehicleGroup\":\"light\"", "\"fuelTechnology\":2", "\"fuelTechnology\":null", "\"usedThroughoutPeriod\":true")) {
             assertFailsWith<SerializationException> {
                 decodeApprovalsRequest("{\"approvals\":[{\"registrationNumber\":\"AB12345\",\"fuelTechnology\":\"2\",\"vehicleCategory\":\"M1\",$extra}]}")
             }
@@ -47,15 +48,16 @@ class VehicleRequestJsonTest {
 
     @Test
     fun everyStatisticsFieldExceptReferencesCommentsAndConditionalLitresIsRequired() {
-        val optional = setOf("assignmentNumber", "comment", "averageConsumptionLitresPerKm", "fuelConsumedLitres")
+        val optional = setOf("comment", "averageFuelConsumptionLitresPer100Km", "fuelConsumedLitres")
+        val nullable = setOf("co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered")
         baseline.keys.filterNot { it in optional }.forEach { key ->
             assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body(omit = key)) }
-            assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body("\"$key\":null")) }
+            if (key !in nullable) assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body("\"$key\":null")) }
         }
         assertEquals(false, decodeTripRowsRequest(body("\"co2Registered\":false")).rows.single().co2Registered)
         assertEquals(BigDecimal.ZERO, decodeTripRowsRequest(body()).rows.single().totalNoxRegisteredGrams)
         for (code in listOf("5", "6", "NOT_APPLICABLE")) {
-            val input = decodeTripRowsRequest(body("\"fuelTechnology\":\"$code\",\"averageConsumptionLitresPerKm\":null,\"fuelConsumedLitres\":null"))
+            val input = decodeTripRowsRequest(body("\"fuelTechnology\":\"$code\",\"averageFuelConsumptionLitresPer100Km\":null,\"fuelConsumedLitres\":null"))
             assertNull(input.rows.single().fuelConsumedLitres)
         }
         for (key in listOf("fuelTechnology", "vehicleCategory")) {
@@ -64,5 +66,16 @@ class VehicleRequestJsonTest {
                 decodeApprovalsRequest("{\"approvals\":[${JsonObject(approval.filterKeys { it != key })}]}")
             }
         }
+    }
+
+    @Test
+    fun explicitNullEmissionKeysAndPerHundredKilometreUnitSurviveJson() {
+        val electric = decodeTripRowsRequest(body(""""fuelTechnology":"5","co2Registered":false,
+            "co2GramsPerKm":null,"medianCo2":null,"totalNoxRegisteredGrams":null,
+            "totalKmCo2Registered":null,"totalKmNoxRegistered":null,
+            "averageFuelConsumptionLitresPer100Km":null,"fuelConsumedLitres":null""")).rows.single()
+        assertNull(electric.estimateCo2Kg())
+        assertTrue("\"estimatedCo2Kg\":null" in Json.encodeToString(StoredTripRow("row", "AB12345", createdAt = "synthetic", data = electric)))
+        assertEquals(BigDecimal("8.25"), decodeTripRowsRequest(body("\"averageFuelConsumptionLitresPer100Km\":8.25")).rows.single().averageFuelConsumptionLitresPer100Km)
     }
 }

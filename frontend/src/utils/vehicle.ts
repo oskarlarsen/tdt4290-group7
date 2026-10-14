@@ -1,16 +1,16 @@
 import type { ApprovalStatus, CheckSummary, RegistryCode, VehicleCheck, StatisticsSave } from "../types/vehicle";
-import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, locksEmissionsToZero, LOCKED_EMISSION_FIELDS } from "./vehicleCatalog";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, statisticNotApplicable, emissionsNotApplicable, INAPPLICABLE_EMISSION_FIELDS } from "./vehicleCatalog";
 
 export const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
   ACTIVE: "Approved", NOT_YET_ACTIVE: "Not yet active", EXPIRED: "Expired", REVOKED: "Revoked", NOT_APPROVED: "Not approved",
 };
 export const DECIMAL_FIELDS = [
   ["totalTripKm", "Total distance (km)"], ["co2GramsPerKm", "Supplier CO₂ (g/km)"],
-  ["medianCo2", "Median CO₂ (reported value)"], ["averageConsumptionLitresPerKm", "Average consumption (L/km, not L/100 km)"],
-  ["fuelConsumedLitres", "Total fuel consumed (L)"], ["totalKmNoxRegistered", "NOx-covered distance (km)"],
-  ["totalNoxRegisteredGrams", "Total registered NOx (g)"], ["totalKmCo2Registered", "CO₂-covered distance (km)"],
+  ["medianCo2", "Median CO₂"], ["averageFuelConsumptionLitresPer100Km", "Average fuel consumption (L/100km)"],
+  ["fuelConsumedLitres", "Total fuel consumed (L)"], ["totalKmNoxRegistered", "NOx-registered distance (km)"],
+  ["totalNoxRegisteredGrams", "Total registered NOx (g)"], ["totalKmCo2Registered", "CO₂-registered distance (km)"],
   ["totalKmCo2NotRegistered", "Distance without registered CO₂ (km)"],
-  ["totalKmFuelRegistered", "Fuel-covered distance (km)"], ["kmFuelNotRegistered", "Distance without registered fuel (km)"],
+  ["totalKmFuelRegistered", "Fuel-registered distance (km)"], ["kmFuelNotRegistered", "Distance without registered fuel (km)"],
 ] as const;
 const decimalKeys = new Set<string>([...DECIMAL_FIELDS.map(([key]) => key), "estimatedCo2Kg", "noxMgPerKm"]);
 
@@ -72,8 +72,8 @@ export function statisticsBody(values: Record<string, string>): string {
   const fuel = selectedCode(FUEL_TECHNOLOGIES, values.fuelTechnology ?? "", "fuel technology");
   const category = selectedCode(VEHICLE_CATEGORIES, values.vehicleCategory ?? "", "vehicle category");
   selectedCode(BODY_TYPES, values.bodyType ?? "", "body type");
-  if (locksEmissionsToZero(fuel) && (values.co2Registered !== "false" || LOCKED_EMISSION_FIELDS.some(key => decimalLiteral(values[key] ?? "", key) !== "0")))
-    throw new Error("Electric/hydrogen statistics require no CO₂-emitting flag and zero CO₂ rate, median CO₂ and total NOx.");
+  if (emissionsNotApplicable(fuel) && (values.co2Registered !== "false" || INAPPLICABLE_EMISSION_FIELDS.some(key => values[key]?.trim())))
+    throw new Error("Electric/hydrogen statistics require no CO₂-emitting flag and not-applicable CO₂/NOx values and registered distances.");
   if (isTrailer(category) !== (fuel === "NOT_APPLICABLE")) throw new Error("Use Not applicable fuel exactly for trailer categories O1–O4.");
   const row: string[] = [
     `"registrationNumber":${JSON.stringify(plate)}`, `"periodStart":${JSON.stringify(values.periodStart)}`, `"periodEnd":${JSON.stringify(values.periodEnd)}`,
@@ -82,11 +82,11 @@ export function statisticsBody(values: Record<string, string>): string {
     if (!values[key]?.trim()) throw new Error(`${key} is required.`);
     row.push(`${JSON.stringify(key)}:${JSON.stringify(values[key].trim())}`);
   }
-  for (const key of ["assignmentNumber", "comment"]) {
+  for (const key of ["comment"]) {
     if (values[key]?.trim()) row.push(`${JSON.stringify(key)}:${JSON.stringify(values[key].trim())}`);
   }
   for (const [key, label] of DECIMAL_FIELDS) {
-    if (["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !usesLitres(fuel)) {
+    if (statisticNotApplicable(key, fuel)) {
       if (values[key]?.trim()) throw new Error(`${label} is not applicable for this fuel technology.`);
       row.push(`${JSON.stringify(key)}:null`);
     } else {
@@ -118,8 +118,8 @@ export function statisticsSaveMessage(result: StatisticsSave, plate: string): st
   if (!outcome?.check) return "Statistics saved, but verification was not returned. Run a check from vehicle details; do not resubmit statistics.";
   const checked = outcome.check;
   const registry = checked.dataSource === "UNAVAILABLE" || checked.lookupOutcome !== "FOUND"
-    ? `SVV verification incomplete (${humanize(checked.lookupOutcome)}).`
-    : checked.dataSource === "STALE_CACHE" ? "SVV verification uses stale data; refresh failed." : `SVV data: ${humanize(checked.dataSource)}.`;
+    ? `Statens Vegvesen verification incomplete (${humanize(checked.lookupOutcome)}).`
+    : checked.dataSource === "STALE_CACHE" ? "Statens Vegvesen verification uses stale data; refresh failed." : `Statens Vegvesen data: ${humanize(checked.dataSource)}.`;
   return `Statistics saved and automatic check recorded: ${checkLabel(checked)}. ${registry} No approval was created.`;
 }
 export function humanize(value: string): string { return value.toLowerCase().replace(/_/g, " "); }

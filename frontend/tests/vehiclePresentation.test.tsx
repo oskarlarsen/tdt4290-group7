@@ -2,8 +2,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { VehicleDialog, primaryClass } from "../src/components/vehicles/VehicleDialog";
 import { ApprovalBadge } from "../src/components/vehicles/VehicleTable";
+import { Field } from "../src/components/vehicles/VehicleDialog";
 
 describe("vehicle presentation", () => {
+  it("provides a separate focusable help button and an initially hidden description", () => {
+    const html = renderToStaticMarkup(<Field label="Fuel consumption" tooltip="Liters used per 100 kilometers"><input disabled value="Not applicable" readOnly /></Field>);
+    expect(html).toContain('aria-label="Help for Fuel consumption"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('role="tooltip" hidden=""');
+    expect(html).toContain("Liters used per 100 kilometers");
+    expect(html.indexOf("</label>")).toBeLessThan(html.indexOf("<button"));
+    expect(renderToStaticMarkup(<Field label="Vehicle brand"><input /></Field>)).not.toContain("tooltip");
+  });
   it("explicitly centers action dialogs with viewport gutters and scroll limits", () => {
     const html = renderToStaticMarkup(<VehicleDialog title="Synthetic form" onClose={() => {}}>Form fields</VehicleDialog>);
     expect(html).toContain("inset-0 m-auto h-fit");

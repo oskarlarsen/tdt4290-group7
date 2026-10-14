@@ -50,27 +50,27 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             }.isNotEmpty()
             check(!legacy) { "Legacy vehicle schema detected. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset." }
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            check(version == 0 || version == 3 || version == 4) {
+            check(version == 0 || version in 3..5) {
                 "Vehicle schema version $version is not supported. Choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
             }
             if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") {
                 it.getString(1)
             }.isEmpty()) { "Unversioned database is not empty; no automatic reinterpretation is allowed" }
-            if (version == 3) {
+            if (version in 3..4) {
                 // Reviewed development-only transition: never rebuild a populated database.
                 val expected = listOf("vehicle_check_deviations", "vehicle_check_trip_rows", "vehicle_checks",
                     "svv_emission_measurements", "svv_snapshot_fuels", "svv_snapshots", "vehicle_approvals",
                     "trip_rows", "vehicles", "suppliers")
                 val tables = query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") { it.getString(1) }
-                check(tables.toSet() == expected.toSet()) { "Unexpected version-3 tables; arrange a reviewed migration; no data has been reset." }
+                check(tables.toSet() == expected.toSet()) { "Unexpected version-$version tables; arrange a reviewed migration; no data has been reset." }
                 check(expected.all { table -> query(db, "SELECT EXISTS(SELECT 1 FROM $table)") { it.getInt(1) }.single() == 0 }) {
-                    "Version-3 database contains data; choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
+                    "Version-$version database contains data; choose a new VEHICLE_DB_PATH or arrange a reviewed migration; no data has been reset."
                 }
                 db.createStatement().use { statement -> expected.forEach { statement.executeUpdate("DROP TABLE $it") } }
             }
             db.createStatement().use { statement ->
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
-                statement.execute("PRAGMA user_version = 4")
+                statement.execute("PRAGMA user_version = 5")
             }
         }
     }
@@ -218,7 +218,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                     "fuel_technology" to input.fuelTechnology.code, "make" to input.make,
                     "body_type" to input.bodyType.name, "vehicle_category" to input.vehicleCategory.name,
                     "model" to input.model, "co2_registered" to input.co2Registered.asInteger(),
-                    "trip_count" to input.tripCount, "assignment_number" to input.assignmentNumber,
+                    "trip_count" to input.tripCount,
                     "comment" to input.comment,
                 )
                 tripDecimalColumns.forEach { values.putDecimal(it.name, it.value(input)) }
@@ -400,17 +400,16 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 fuelTechnology = FuelTechnology.fromCode(row.getString("fuel_technology")), make = row.getString("make"),
                 bodyType = BodyType.valueOf(row.getString("body_type")),
                 vehicleCategory = VehicleCategory.valueOf(row.getString("vehicle_category")), model = row.getString("model"),
-                co2Registered = row.boolean("co2_registered")!!, co2GramsPerKm = row.decimal("co2_grams_per_km")!!,
-                medianCo2 = row.decimal("median_co2")!!, totalTripKm = row.decimal("total_trip_km")!!,
-                totalKmCo2Registered = row.decimal("total_km_co2_registered")!!,
+                co2Registered = row.boolean("co2_registered")!!, co2GramsPerKm = row.decimal("co2_grams_per_km"),
+                medianCo2 = row.decimal("median_co2"), totalTripKm = row.decimal("total_trip_km")!!,
+                totalKmCo2Registered = row.decimal("total_km_co2_registered"),
                 totalKmCo2NotRegistered = row.decimal("total_km_co2_not_registered")!!,
                 kmFuelNotRegistered = row.decimal("km_fuel_not_registered")!!,
                 totalKmFuelRegistered = row.decimal("total_km_fuel_registered")!!,
-                totalKmNoxRegistered = row.decimal("total_km_nox_registered")!!,
-                totalNoxRegisteredGrams = row.decimal("total_nox_registered_grams")!!,
+                totalKmNoxRegistered = row.decimal("total_km_nox_registered"),
+                totalNoxRegisteredGrams = row.decimal("total_nox_registered_grams"),
                 tripCount = row.getInt("trip_count"),
-                assignmentNumber = row.getString("assignment_number"),
-                averageConsumptionLitresPerKm = row.decimal("average_consumption_litres_per_km"),
+                averageFuelConsumptionLitresPer100Km = row.decimal("average_fuel_consumption_litres_per_100_km"),
                 fuelConsumedLitres = row.decimal("fuel_consumed_litres"), comment = row.getString("comment"),
             ))
     }
@@ -421,7 +420,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             row.getString(prefix + "id"), plate, row.getString(prefix + "source_name"),
             row.getString(prefix + "created_at"), row.getString(prefix + "updated_at"), row.getString(prefix + "revoked_at"),
             ApprovalInput(plate, FuelTechnology.fromCode(row.getString(prefix + "fuel_technology")),
-                VehicleCategory.valueOf(row.getString(prefix + "vehicle_category")), row.boolean(prefix + "used_throughout_period"),
+                VehicleCategory.valueOf(row.getString(prefix + "vehicle_category")),
                 row.getString(prefix + "start_date"), row.getString(prefix + "expiry_date")),
         )
     }
@@ -429,7 +428,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
     private fun approvalValues(record: StoredApproval) = linkedMapOf<String, Any?>(
         "id" to record.id, "registration_number" to record.registrationNumber, "source_name" to record.sourceName,
         "created_at" to record.createdAt, "updated_at" to record.updatedAt, "revoked_at" to record.revokedAt,
-        "fuel_technology" to record.data.fuelTechnology.code, "used_throughout_period" to record.data.usedThroughoutPeriod?.asInteger(),
+        "fuel_technology" to record.data.fuelTechnology.code,
         "start_date" to record.data.startDate, "expiry_date" to record.data.expiryDate,
         "vehicle_category" to record.data.vehicleCategory.name,
     )
@@ -457,17 +456,21 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         require(!end.isBefore(start)) { "rows[$index].periodEnd must not be before periodStart" }
         require(input.make.isNotBlank() && input.model.isNotBlank()) { "rows[$index].make and model must not be blank" }
         require(input.tripCount >= 0) { "rows[$index].tripCount must be non-negative" }
-        if (input.fuelTechnology.locksEmissionsToZero) {
-            require(!input.co2Registered && listOf(input.co2GramsPerKm, input.medianCo2, input.totalNoxRegisteredGrams).all { it.signum() == 0 }) {
-                "rows[$index] must report co2Registered=false and zero CO2 rate, median CO2 and total NOx for electric/hydrogen vehicles"
+        if (input.fuelTechnology.emissionsNotApplicable) {
+            require(!input.co2Registered && tripDecimalColumns.filter { it.name in inapplicableEmissionColumns }.all { it.value(input) == null }) {
+                "rows[$index] must report co2Registered=false and null CO2/NOx measurements and registered distances for electric/hydrogen vehicles"
+            }
+        } else {
+            require(tripDecimalColumns.filter { it.name in inapplicableEmissionColumns }.all { it.value(input) != null }) {
+                "rows[$index] must provide CO2/NOx measurements and registered distances for this fuel technology"
             }
         }
         if (input.fuelTechnology.usesLitres) {
-            require(input.averageConsumptionLitresPerKm != null && input.fuelConsumedLitres != null) {
+            require(input.averageFuelConsumptionLitresPer100Km != null && input.fuelConsumedLitres != null) {
                 "rows[$index] must provide both litres fields for this fuel technology"
             }
         } else {
-            require(input.averageConsumptionLitresPerKm == null && input.fuelConsumedLitres == null) {
+            require(input.averageFuelConsumptionLitresPer100Km == null && input.fuelConsumedLitres == null) {
                 "rows[$index] must omit litres fields or set them to null for electric/hydrogen vehicles and unpowered trailers"
             }
         }

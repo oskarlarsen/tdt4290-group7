@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DECIMAL_FIELDS, checkLabel, decimalLiteral, parseVehicleJson, statisticsBody, validDate, validPlate, estimatedCo2Preview, statisticsSaveMessage } from "../src/utils/vehicle";
-import { fuelGroups, categoryGroup } from "../src/utils/vehicleCatalog";
+import { fuelGroups, categoryGroup, INAPPLICABLE_EMISSION_FIELDS } from "../src/utils/vehicleCatalog";
 import type { CheckSummary } from "../src/types/vehicle";
 
 const values: Record<string, string> = {
@@ -27,17 +27,21 @@ describe("vehicle input and safe status presentation", () => {
     for (const fuelTechnology of ["15", "16", "17", "18", "19", "20", "22"])
       expect(() => statisticsBody({ ...values, fuelTechnology })).toThrow();
   });
-  it("rejects nonzero locked emissions instead of silently rewriting API input", () => {
-    const electric = { ...values, fuelTechnology: "5", averageConsumptionLitresPerKm: "", fuelConsumedLitres: "" };
+  it("stores inapplicable emissions as null and rejects numeric values including zero", () => {
+    const electric = { ...values, fuelTechnology: "5", averageFuelConsumptionLitresPer100Km: "", fuelConsumedLitres: "", ...Object.fromEntries(INAPPLICABLE_EMISSION_FIELDS.map(key => [key, ""])) };
     expect(() => statisticsBody(electric)).not.toThrow();
-    for (const field of ["co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams"])
-      expect(() => statisticsBody({ ...electric, [field]: "1" })).toThrow();
+    const row = JSON.parse(statisticsBody(electric)).rows[0];
+    for (const field of INAPPLICABLE_EMISSION_FIELDS) {
+      expect(row[field]).toBeNull();
+      for (const value of ["0", "1"]) expect(() => statisticsBody({ ...electric, [field]: value })).toThrow();
+    }
+    expect(row.co2Registered).toBe(false); expect(row.totalKmCo2NotRegistered).toBe(0);
     expect(() => statisticsBody({ ...electric, co2Registered: "true" })).toThrow();
   });
   it("clearly separates saved statistics from incomplete or failed automatic verification", () => {
     const check: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", approvalStatus: "NOT_APPROVED", lookupOutcome: "NOT_CONFIGURED", dataSource: "UNAVAILABLE", deviations: ["NOT_ON_APPROVED_LIST"] };
     const result = { createdAt: "synthetic", rowCount: 1, distinctVehicleCount: 1, rows: [], checks: [{ registrationNumber: "AB12345", check }] };
-    expect(statisticsSaveMessage(result, "AB12345")).toContain("SVV verification incomplete");
+    expect(statisticsSaveMessage(result, "AB12345")).toContain("Statens Vegvesen verification incomplete");
     expect(statisticsSaveMessage({ ...result, checks: [{ registrationNumber: "AB12345", error: "Saved; retry check only" }] }, "AB12345")).toBe("Saved; retry check only");
     expect(statisticsSaveMessage({ ...result, checks: [] }, "AB12345")).toContain("do not resubmit");
   });
@@ -86,9 +90,10 @@ describe("vehicle input and safe status presentation", () => {
   it("makes litres not applicable for electric/hydrogen vehicles and trailers, not hybrids", () => {
     for (const fuelTechnology of ["5", "6", "NOT_APPLICABLE"]) {
       const input = { ...values, fuelTechnology, vehicleCategory: fuelTechnology === "NOT_APPLICABLE" ? "O1" : "M1",
-        averageConsumptionLitresPerKm: "", fuelConsumedLitres: "" };
+        ...(fuelTechnology === "NOT_APPLICABLE" ? {} : Object.fromEntries(INAPPLICABLE_EMISSION_FIELDS.map(key => [key, ""]))),
+        averageFuelConsumptionLitresPer100Km: "", fuelConsumedLitres: "" };
       const row = JSON.parse(statisticsBody(input)).rows[0];
-      expect(row.averageConsumptionLitresPerKm).toBeNull(); expect(row.fuelConsumedLitres).toBeNull();
+      expect(row.averageFuelConsumptionLitresPer100Km).toBeNull(); expect(row.fuelConsumedLitres).toBeNull();
       expect(() => statisticsBody({ ...input, fuelConsumedLitres: "0" })).toThrow();
     }
     for (const fuelTechnology of ["7", "8"]) {

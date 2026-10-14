@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, catalogLabel, usesLitres } from "../../utils/vehicleCatalog";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, catalogLabel, statisticNotApplicable } from "../../utils/vehicleCatalog";
 import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
 import { useVehicle, useVehicleCheck, useVehicleHistory, useRefreshVehicles } from "../../hooks/useVehicles";
@@ -22,7 +22,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
   const check = useVehicleCheck(selectedCheck ?? detail.data?.latestCheck?.id);
   const refresh = useRefreshVehicles();
   const run = useMutation({ mutationFn: () => api.runCheck(plate, forceRefresh), retry: false, onSuccess: result => {
-    setSelectedCheck(result.id); setTab("Check result"); setNotice("New check saved. Review its findings and SVV availability below."); void refresh();
+    setSelectedCheck(result.id); setTab("Check result"); setNotice("New check saved. Review its findings and Statens Vegvesen availability below."); void refresh();
   } });
   const revoke = useMutation({ mutationFn: () => api.revokeApproval(plate), retry: false, onSuccess: () => {
     setRevokeConfirmation(null); setNotice("Approval revoked. Previous checks remain unchanged."); void refresh();
@@ -44,7 +44,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
           <button className={buttonClass} disabled={busy} onClick={() => setForm("approval")}>{data.approval && !data.approval.revokedAt ? "Edit approval" : "Approve vehicle"}</button>
         </div>
         <details className="mb-5 text-sm"><summary className="cursor-pointer text-neutral-600">Check options</summary>
-          <label className="mt-2 flex gap-2"><input type="checkbox" className={checkboxClass} checked={forceRefresh} disabled={busy} onChange={e => setForceRefresh(e.target.checked)} />Force new SVV lookup. Otherwise a recent successful snapshot is reused.</label>
+          <label className="mt-2 flex gap-2"><input type="checkbox" className={checkboxClass} checked={forceRefresh} disabled={busy} onChange={e => setForceRefresh(e.target.checked)} />Force new Statens Vegvesen lookup. Otherwise a recent successful snapshot is reused.</label>
         </details>
         <ErrorNotice error={run.error} />
         <div role="tablist" aria-label="Vehicle information" className="my-5 flex flex-wrap gap-1 border-b border-neutral-100">
@@ -64,8 +64,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
               {[["Status", APPROVAL_LABELS[data.approvalStatus]], ["Approved fuel technology", catalogLabel(FUEL_TECHNOLOGIES, data.approval?.data.fuelTechnology)],
                 ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, data.approval?.data.vehicleCategory)], ["Source", data.approval?.sourceName ?? "Not provided"],
                 ["Start date", data.approval ? data.approval.data.startDate ?? "Immediate" : "Not applicable"],
-                ["Expiry date", data.approval ? data.approval.data.expiryDate ?? "Indefinite" : "Not applicable"],
-                ["Used throughout sheet period", data.approval?.data.usedThroughoutPeriod == null ? "Not provided" : data.approval.data.usedThroughoutPeriod ? "Yes" : "No"]].map(([label, value]) => <div key={label}><dt className="text-neutral-500">{label}</dt><dd>{value}</dd></div>)}
+                ["Expiry date", data.approval ? data.approval.data.expiryDate ?? "Indefinite" : "Not applicable"]].map(([label, value]) => <div key={label}><dt className="text-neutral-500">{label}</dt><dd>{value}</dd></div>)}
             </dl>
             {data.approval?.revokedAt && <p className="mt-3 text-sm text-amber-900">Revoked {timestamp(data.approval.revokedAt)}. Reapproval creates a new record.</p>}
             {data.approval && !data.approval.revokedAt && <button className={`${dangerClass} mt-4`} disabled={busy} onClick={() => { revoke.reset(); setRevokeConfirmation(""); }}>Revoke approval…</button>}
@@ -74,14 +73,14 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
           <p className="text-sm text-neutral-600">{data.tripRows.length} reporting rows are stored. Reporting rows may overlap; totals are deliberately not summed.</p>
         </div>}
         {tab === "Statistics" && <div className="space-y-3">
-          <p className="text-sm text-neutral-600">Supplier observations—not approval requirements or SVV measurements. Blank values are not treated as zero. Rows are append-only.</p>
+          <p className="text-sm text-neutral-600">Supplier observations—not approval requirements or Statens Vegvesen measurements. Blank values are not treated as zero. Rows are append-only.</p>
           {!data.tripRows.length && <p className="rounded-lg bg-neutral-50 p-4 text-sm">No statistics yet. Use Add statistics to enter a reporting period.</p>}
-          {data.tripRows.map(row => <details key={row.id} className="rounded-lg border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">{row.data.periodStart} – {row.data.periodEnd} · {row.data.totalTripKm} km · Total CO₂ (calculated): {row.estimatedCo2Kg} kg</summary>
+          {data.tripRows.map(row => <details key={row.id} className="rounded-lg border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">{row.data.periodStart} – {row.data.periodEnd} · {row.data.totalTripKm} km · Total CO₂ (calculated): {row.estimatedCo2Kg == null ? "Not applicable" : `${row.estimatedCo2Kg} kg`}</summary>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              {[["Source", row.sourceName], ["Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology)], ["Make", row.data.make], ["Model", row.data.model],
+              {[["Source", row.sourceName], ["Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology)], ["Vehicle brand", row.data.make], ["Vehicle model", row.data.model],
                 ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory)], ["Body type", catalogLabel(BODY_TYPES, row.data.bodyType)],
                 ["Registered as CO₂-emitting", row.data.co2Registered == null ? "Not provided" : row.data.co2Registered ? "Yes" : "No"],
-                ...DECIMAL_FIELDS.map(([key, label]) => [label, ["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !usesLitres(row.data.fuelTechnology) ? "Not applicable" : row.data[key]]), ["Job/trip count", row.data.tripCount], ["Assignment number", row.data.assignmentNumber], ["Comment", row.data.comment], ["Added", timestamp(row.createdAt)]].map(([label, value]) => <div key={String(label)}><dt className="text-neutral-500">{label}</dt><dd className="break-words">{value ?? "Not provided"}</dd></div>)}
+                ...DECIMAL_FIELDS.map(([key, label]) => [label, statisticNotApplicable(key, row.data.fuelTechnology) ? "Not applicable" : row.data[key]]), ["Job/trip count", row.data.tripCount], ["Comment", row.data.comment], ["Added", timestamp(row.createdAt)]].map(([label, value]) => <div key={String(label)}><dt className="text-neutral-500">{label}</dt><dd className="break-words">{value ?? "Not provided"}</dd></div>)}
             </dl>
             <p className="mt-3 text-xs text-neutral-500">Total CO₂ (calculated) = supplier total distance × supplier CO₂ g/km ÷ 1000. This read-only value is an estimate, not measured emissions.</p>
           </details>)}
@@ -97,7 +96,7 @@ export function VehicleDetailsDrawer({ plate, onClose }: { plate: string; onClos
           {history.isLoading && <p role="status">Loading history…</p>}<ErrorNotice error={history.error} />
           {history.isError && <button className={buttonClass} onClick={() => void history.refetch()}>Retry loading history</button>}
           {history.data && <><div className="space-y-2">{history.data.items.map(item => <button key={item.id} onClick={() => { setSelectedCheck(item.id); setTab("Check result"); }} className="block w-full rounded-lg border border-neutral-200 p-4 text-left hover:bg-neutral-50">
-            <p className="text-sm font-medium">{timestamp(item.checkedAt)} · {checkLabel(item)}</p><p className="mt-1 text-xs text-neutral-500">Approval then: {APPROVAL_LABELS[item.approvalStatus]} · SVV: {humanize(item.dataSource)}</p>
+            <p className="text-sm font-medium">{timestamp(item.checkedAt)} · {checkLabel(item)}</p><p className="mt-1 text-xs text-neutral-500">Approval then: {APPROVAL_LABELS[item.approvalStatus]} · Statens Vegvesen: {humanize(item.dataSource)}</p>
           </button>)}</div>{!history.data.items.length && <p>No saved checks.</p>}<Paging page={historyPage} total={history.data.total} pageSize={10} onChange={setHistoryPage} /></>}
         </>}
         </div>

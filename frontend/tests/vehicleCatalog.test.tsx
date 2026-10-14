@@ -39,9 +39,15 @@ describe("official vehicle catalogues and required form inputs", () => {
 
   it("renders required statistics openly and keeps comments/references optional", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><StatisticsForm onClose={() => {}} onSaved={() => {}} /></QueryClientProvider>);
-    expect(html).toContain("Required statistics"); expect(html).not.toContain("Additional statistics (optional)");
-    expect(html).toContain("Comment (optional)"); expect(html).toContain("Assignment number / reference (optional)");
-    expect(html).toContain("Reported vehicle category *"); expect(html).toContain("Reported body type *");
+    expect(html).toContain("Add vehicle trip/period statistics"); expect(html).not.toContain("Required statistics");
+    expect(html).toContain("Comment (optional)"); expect(html).not.toContain("Assignment number");
+    expect(html).toContain("Reported vehicle category"); expect(html).toContain("Reported body type");
+    expect(html).toContain("Vehicle brand"); expect(html).toContain("Vehicle model");
+    expect(html).toContain("Average fuel consumption (L/100km)");
+    expect(html).toContain("Liters used per 100 kilometers");
+    expect(html).toContain('aria-label="Help for Reported vehicle category"');
+    expect(html).not.toContain('aria-label="Help for NOx-registered distance');
+    expect(html.match(/<fieldset/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Total CO₂ (kg, calculated)"'); expect(html).toContain('readonly=""');
     expect(html).toContain("Save and check");
     expect(html).not.toContain("Not provided</option>");
@@ -52,5 +58,6 @@ describe("official vehicle catalogues and required form inputs", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><ApprovalForm onClose={() => {}} onSaved={() => {}} /></QueryClientProvider>);
     expect(html).toContain("Vehicle category *"); expect(html).toContain("Approved fuel technology *");
     expect(html).toContain("Approved indefinitely"); expect(html).not.toContain('type="date" required');
+    expect(html).not.toContain("Used throughout");
   });
 });

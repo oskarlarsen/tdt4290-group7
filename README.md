@@ -1,11 +1,11 @@
 # TDT4290 Group 7 — Environmental Monitoring & Contract Compliance
 
-TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens vegvesen (SVV).
+TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens Vegvesen.
 
 ## Repository layout
 
 - `frontend/`: React + TypeScript + Vite dashboard.
-- `backend/`: Ktor HTTP API, SQLite storage, and SVV integration.
+- `backend/`: Ktor HTTP API, SQLite storage, and Statens Vegvesen integration.
 
 See [the backend guide](backend/README.md) for endpoint parameters, responses, database relationships, configuration, request flow, logging, and step-by-step Postman testing.
 
@@ -57,7 +57,7 @@ cd backend
 .\gradlew.bat run
 ```
 
-The backend discovers root `.env` automatically when launched from `backend/` or the repository root. No repeated PowerShell credential assignments are needed. Tests use isolated synthetic configuration and do not read your saved SVV key or database path. Keep the server terminal open. In another terminal:
+The backend discovers root `.env` automatically when launched from `backend/` or the repository root. No repeated PowerShell credential assignments are needed. Tests use isolated synthetic configuration and do not read your saved Statens Vegvesen key or database path. Keep the server terminal open. In another terminal:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8080/health
@@ -65,13 +65,13 @@ Invoke-RestMethod http://127.0.0.1:8080/health
 
 Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
 
-The backend runs without an SVV key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
+The backend runs without an Statens Vegvesen key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
 
-Vehicle storage uses strict relational tables, registration numbers as vehicle primary keys, exact decimal quantities and selected SVV fields only. Schema version 4 requires supplier statistics and simplified official fuel/category/body codes; comments/references and inapplicable litres are exceptions. Electric/hydrogen emission inputs are locked to zero by the reporting convention. Dropdown labels are English and include official codes. Saving statistics automatically checks each distinct plate using recent cached or live SVV data; browsing the vehicle/statistics directories only reads saved data. Total CO₂ kg is a read-only supplier-based calculation, not measured emissions. Check history is retained indefinitely; the 14-day SVV cache setting controls freshness, not retention. Only recognized, completely empty version-3 databases rebuild automatically; populated older databases are preserved and refused. See the [vehicle API guide](backend/README.md#shared-request-rules) and [safe development database setup](backend/README.md#database-compatibility-and-safe-development-setup).
+Vehicle storage uses strict relational tables, registration numbers as primary keys, exact decimal quantities and selected Statens Vegvesen fields only. Schema version 5 requires applicable supplier statistics and official fuel/category/body codes. Average fuel consumption is L/100km across UI/API/database. Electric/hydrogen CO₂/NOx measurements and registered distances are null/Not applicable, with the CO₂-emitting flag No; CO₂-unregistered and fuel distances remain editable. Saving statistics automatically checks each distinct plate using cached or live registry data; directory browsing only reads saved data. Total CO₂ kg is a read-only supplier-based estimate, null when inapplicable. History is retained indefinitely; the 14-day cache controls freshness, not retention. Only recognized, completely empty version-3/4 databases rebuild automatically; populated older databases are preserved and refused. See the [vehicle API guide](backend/README.md#shared-request-rules) and [safe development database setup](backend/README.md#database-compatibility-and-safe-development-setup).
 
 ## Local data and credentials
 
-Keep the SVV key and authentication secrets in ignored root `.env`, never in browser-visible `VITE_` settings or vehicle request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
+Keep the Statens Vegvesen key and authentication secrets in ignored root `.env`, never in browser-visible `VITE_` settings or vehicle request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
 
 The backend includes cookie-based JWT authentication and clears the cookie on logout. Vehicle endpoints remain unauthenticated. The default host and Compose's published backend port are bound to loopback for local development. Authentication and authorization for vehicle endpoints are pending separate work; implement them before deploying or exposing the backend to other machines.
 

@@ -8,8 +8,8 @@ import type { TripRow } from "../src/types/vehicle";
 
 const row: TripRow = {
   id: "synthetic-row", registrationNumber: "AB12345", createdAt: "2026-01-01T00:00:00Z", estimatedCo2Kg: "123.456789012345678",
-  data: { registrationNumber: "AB12345", periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "5", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic", model: "Synthetic",
-    co2Registered: false, co2GramsPerKm: "0", medianCo2: "0", totalTripKm: "1000", totalKmCo2Registered: "1000", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "0", totalKmNoxRegistered: "1000", totalNoxRegisteredGrams: "0", tripCount: 2, averageConsumptionLitresPerKm: null, fuelConsumedLitres: null },
+  data: { registrationNumber: "AB12345", periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic", model: "Synthetic",
+    co2Registered: false, co2GramsPerKm: "0", medianCo2: "0", totalTripKm: "1000", totalKmCo2Registered: "1000", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "0", totalKmNoxRegistered: "1000", totalNoxRegisteredGrams: "0", tripCount: 2, averageFuelConsumptionLitresPer100Km: null, fuelConsumedLitres: null },
 };
 
 describe("statistics directory", () => {
@@ -21,7 +21,8 @@ describe("statistics directory", () => {
     expect(html).toContain("2026-01-01"); expect(html).toContain("2026-01-31");
   });
   it("shows zero separately from not-applicable litres in read-only row details", () => {
-    const html = renderToStaticMarkup(<StatisticsRowDetails row={row} onClose={() => {}} onOpenVehicle={() => {}} />);
+    const electric = { ...row, estimatedCo2Kg: null, data: { ...row.data, fuelTechnology: "5", co2GramsPerKm: null, medianCo2: null, totalNoxRegisteredGrams: null, totalKmCo2Registered: null, totalKmNoxRegistered: null } };
+    const html = renderToStaticMarkup(<StatisticsRowDetails row={electric} onClose={() => {}} onOpenVehicle={() => {}} />);
     expect(html).toContain("Not applicable"); expect(html).toContain("Total CO₂ (kg, calculated)");
     expect(html).toContain("5 - Electric"); expect(html).toContain("Open vehicle");
     expect(html).not.toContain("<input"); expect(html).toContain("not measured emissions");

@@ -140,8 +140,7 @@ class ApplicationTest {
         val approvals = postJson(
             "/api/vehicle-approvals",
             """{"sourceName":"approved-sheet","approvals":[{
-                "registrationNumber":"AB12345","fuelTechnology":"5","vehicleCategory":"M1",
-                "usedThroughoutPeriod":true
+                "registrationNumber":"AB12345","fuelTechnology":"5","vehicleCategory":"M1"
             }]}""",
         )
         assertEquals(HttpStatusCode.Created, approvals.status)
@@ -212,7 +211,7 @@ class ApplicationTest {
         application { module(repository, null, Duration.ofDays(14)) }
         val valid = Json.encodeToString(syntheticTrip(co2GramsPerKm = "123.456789".toBigDecimal(),
             totalTripKm = "1000".toBigDecimal(), totalKmNoxRegistered = "1000".toBigDecimal(),
-            totalNoxRegisteredGrams = "25.67".toBigDecimal(), averageConsumptionLitresPerKm = "0.08".toBigDecimal(),
+            totalNoxRegisteredGrams = "25.67".toBigDecimal(), averageFuelConsumptionLitresPer100Km = "0.08".toBigDecimal(),
             fuelConsumedLitres = "80".toBigDecimal()))
         listOf(
             """{"registrationNumber":"CD12345"}""",

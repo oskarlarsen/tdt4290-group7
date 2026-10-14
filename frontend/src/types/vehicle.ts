@@ -6,7 +6,7 @@ export type DataSource = "LIVE" | "CACHE" | "STALE_CACHE" | "UNAVAILABLE";
 export type Vehicle = { registrationNumber: string; supplierId?: string | null; createdAt: string };
 export type ApprovalInput = {
   registrationNumber: string; fuelTechnology: FuelTechnology; vehicleCategory: VehicleCategory;
-  usedThroughoutPeriod?: boolean | null; startDate?: string | null; expiryDate?: string | null;
+  startDate?: string | null; expiryDate?: string | null;
 };
 export type StoredApproval = {
   id: string; registrationNumber: string; sourceName?: string | null; createdAt: string;
@@ -15,14 +15,14 @@ export type StoredApproval = {
 export type TripData = {
   registrationNumber: string; periodStart: string; periodEnd: string;
   fuelTechnology: FuelTechnology; vehicleCategory: VehicleCategory; bodyType: BodyType; make: string; model: string;
-  co2Registered: boolean; co2GramsPerKm: Decimal; medianCo2: Decimal;
-  totalTripKm: Decimal; totalKmCo2Registered: Decimal; totalKmCo2NotRegistered: Decimal;
+  co2Registered: boolean; co2GramsPerKm: Decimal | null; medianCo2: Decimal | null;
+  totalTripKm: Decimal; totalKmCo2Registered: Decimal | null; totalKmCo2NotRegistered: Decimal;
   kmFuelNotRegistered: Decimal; totalKmFuelRegistered: Decimal;
-  totalKmNoxRegistered: Decimal; totalNoxRegisteredGrams: Decimal;
-  tripCount: number; assignmentNumber?: string | null;
-  averageConsumptionLitresPerKm?: Decimal | null; fuelConsumedLitres?: Decimal | null; comment?: string | null;
+  totalKmNoxRegistered: Decimal | null; totalNoxRegisteredGrams: Decimal | null;
+  tripCount: number;
+  averageFuelConsumptionLitresPer100Km?: Decimal | null; fuelConsumedLitres?: Decimal | null; comment?: string | null;
 };
-export type TripRow = { id: string; registrationNumber: string; sourceName?: string | null; createdAt: string; data: TripData; estimatedCo2Kg: Decimal };
+export type TripRow = { id: string; registrationNumber: string; sourceName?: string | null; createdAt: string; data: TripData; estimatedCo2Kg: Decimal | null };
 export type RegistryCode = { code: string; name?: string | null };
 export type RegistryData = {
   registrationNumber: string; registrationStatus?: string | null; make?: string | null; model?: string | null;

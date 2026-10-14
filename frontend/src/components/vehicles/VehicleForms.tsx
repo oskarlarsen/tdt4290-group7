@@ -6,7 +6,15 @@ import type { StoredApproval, TripRow } from "../../types/vehicle";
 import { DECIMAL_FIELDS, statisticsBody, validDate, validPlate, estimatedCo2Preview, statisticsSaveMessage } from "../../utils/vehicle";
 import { VehicleDialog, Field, ErrorNotice, inputClass, buttonClass, primaryClass, checkboxClass } from "./VehicleDialog";
 import { CatalogSelect, RegistrationNumberInput } from "./VehicleInputs";
-import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, locksEmissionsToZero, LOCKED_EMISSION_FIELDS } from "../../utils/vehicleCatalog";
+import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, emissionsNotApplicable, INAPPLICABLE_EMISSION_FIELDS, statisticNotApplicable } from "../../utils/vehicleCatalog";
+
+const statisticHelp: Record<string, string> = {
+  co2GramsPerKm: "Enter the supplier’s reported value. Statens Vegvesen measurements are retrieved separately for comparison.",
+  averageFuelConsumptionLitresPer100Km: "Liters used per 100 kilometers",
+};
+const emissionsHelp = "Not applicable under the reporting rules for electric or hydrogen vehicles.";
+const litresHelp = "The selected fuel technology is not reported in liters.";
+const categoryHelp = "Technical vehicle category, such as M1 passenger car. Body style is selected separately.";
 
 type Props = { plate?: string; onClose: () => void; onSaved: (plate: string, message: string) => void };
 
@@ -27,8 +35,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
   const save = useMutation({ mutationFn: api.appendStatistics, retry: false });
   const busy = preparing || save.isPending;
   const overlapping = rows.some(row => values.periodStart && values.periodEnd && row.data.periodStart <= values.periodEnd && row.data.periodEnd >= values.periodStart);
-  const litresApplicable = usesLitres(values.fuelTechnology ?? "");
-  const emissionsLocked = locksEmissionsToZero(values.fuelTechnology ?? "");
+  const emissionsLocked = emissionsNotApplicable(values.fuelTechnology ?? "");
   function change(key: string, value: string) {
     const next = { ...values, [key]: value };
     if (key === "vehicleCategory") {
@@ -36,18 +43,18 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
       else if (next.fuelTechnology === "NOT_APPLICABLE") next.fuelTechnology = "";
     }
     if (!usesLitres(next.fuelTechnology ?? "")) {
-      if ((values.averageConsumptionLitresPerKm || values.fuelConsumedLitres) &&
+      if ((values.averageFuelConsumptionLitresPer100Km || values.fuelConsumedLitres) &&
         !window.confirm("This selection makes litres not applicable. Clear the litres values you entered?")) return;
-      next.averageConsumptionLitresPerKm = ""; next.fuelConsumedLitres = "";
+      next.averageFuelConsumptionLitresPer100Km = ""; next.fuelConsumedLitres = "";
     }
-    if (locksEmissionsToZero(next.fuelTechnology ?? "")) {
-      if (!emissionsLocked && (values.co2Registered === "true" || LOCKED_EMISSION_FIELDS.some(field => values[field] && !/^0+(?:\.0+)?$/.test(values[field]))) &&
-          !window.confirm("Electric/hydrogen reporting locks CO₂ and NOx values to zero. Replace the emission values you entered?")) return;
+    if (emissionsNotApplicable(next.fuelTechnology ?? "")) {
+      if (!emissionsLocked && (values.co2Registered === "true" || INAPPLICABLE_EMISSION_FIELDS.some(field => values[field])) &&
+          !window.confirm("CO₂ and NOx values and registered distances are not applicable for electric or hydrogen vehicles. Clear the values you entered?")) return;
       next.co2Registered = "false";
-      for (const field of LOCKED_EMISSION_FIELDS) next[field] = "0";
+      for (const field of INAPPLICABLE_EMISSION_FIELDS) next[field] = "";
     } else if (emissionsLocked) {
       next.co2Registered = "";
-      for (const field of LOCKED_EMISSION_FIELDS) next[field] = "";
+      for (const field of INAPPLICABLE_EMISSION_FIELDS) next[field] = "";
     }
     setValues(next); setDirty(true); setError(undefined); setOverlapAccepted(false);
     if (key === "registrationNumber") setRows([]);
@@ -66,36 +73,33 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
       onSaved(validPlate(values.registrationNumber), statisticsSaveMessage(result, validPlate(values.registrationNumber)));
     } catch (cause) { setError(cause); } finally { setPreparing(false); }
   }
-  return <VehicleDialog title="Add vehicle statistics" onClose={close} busy={busy}>
+  return <VehicleDialog title="Add vehicle trip/period statistics" onClose={close} busy={busy}>
     <form onSubmit={submit} className="space-y-5">
-      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">One row describes a reporting period, not necessarily one trip. Saving always appends a new row; it never replaces statistics or approves the vehicle.</p>
+      <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">One row describes a trip or reporting period. All applicable fields are required unless marked optional. Saving adds a new row and runs a check; it does not approve the vehicle.</p>
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
-        <Field label="Registration number *"><RegistrationNumberInput autoFocus readOnly={!!plate} value={values.registrationNumber} onChange={value => change("registrationNumber", value)} /></Field>
+        <Field label="Registration number"><RegistrationNumberInput autoFocus readOnly={!!plate} value={values.registrationNumber} onChange={value => change("registrationNumber", value)} /></Field>
         <Field label="Source / reference (optional)"><input className={inputClass} value={values.sourceName ?? ""} onChange={e => change("sourceName", e.target.value)} /></Field>
-        <Field label="Period start *"><input type="date" required className={inputClass} value={values.periodStart} onChange={e => change("periodStart", e.target.value)} /></Field>
-        <Field label="Period end *"><input type="date" required min={values.periodStart || undefined} className={inputClass} value={values.periodEnd} onChange={e => change("periodEnd", e.target.value)} /></Field>
-        <Field label="Reported vehicle category *"><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory ?? ""} onChange={value => change("vehicleCategory", value)} /></Field>
-        <Field label="Reported fuel technology *"><CatalogSelect catalog={FUEL_TECHNOLOGIES} value={values.fuelTechnology ?? ""} disabled={isTrailer(values.vehicleCategory ?? "")} notApplicable={isTrailer(values.vehicleCategory ?? "")} onChange={value => change("fuelTechnology", value)} /></Field>
-        <Field label="Reported body type *"><CatalogSelect catalog={BODY_TYPES} value={values.bodyType ?? ""} onChange={value => change("bodyType", value)} /></Field>
-        <Field label="Registered as CO₂-emitting *"><select required disabled={emissionsLocked} className={inputClass} value={values.co2Registered} onChange={e => change("co2Registered", e.target.value)}><option value="" disabled>Select Yes or No</option><option value="true">Yes</option><option value="false">No</option></select></Field>
-        {DECIMAL_FIELDS.slice(0, 2).map(([key, label]) => <Field key={key} label={`${label} *`}><input required readOnly={emissionsLocked && key === "co2GramsPerKm"} inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
-        <Field label="Total CO₂ (kg, calculated)"><input readOnly aria-label="Total CO₂ (kg, calculated)" className={inputClass} value={estimatedCo2Preview(values.totalTripKm ?? "", values.co2GramsPerKm ?? "")} placeholder="Enter distance and CO₂ rate" /><span className="mt-1 block text-xs text-neutral-500">Estimate = total distance × supplier CO₂ g/km ÷ 1000. Calculated again by the backend; never submitted as an input.</span></Field>
-      </fieldset>
-      <section className="rounded-lg border border-neutral-100 p-4"><h3 className="text-sm font-medium text-neutral-900">Required statistics</h3>
-        <fieldset disabled={busy} className="mt-4 grid gap-4 sm:grid-cols-2">
-          {[["make", "Reported make *"], ["model", "Reported model *"]].map(([key, label]) => <Field key={key} label={label}><input required className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
-          <Field label="Assignment number / reference (optional)"><input className={inputClass} value={values.assignmentNumber ?? ""} onChange={e => change("assignmentNumber", e.target.value)} /></Field>
-          <Field label="Job/trip count *"><input required inputMode="numeric" className={inputClass} value={values.tripCount ?? ""} onChange={e => change("tripCount", e.target.value)} /></Field>
+        <Field label="Period start"><input type="date" required className={inputClass} value={values.periodStart} onChange={e => change("periodStart", e.target.value)} /></Field>
+        <Field label="Period end"><input type="date" required min={values.periodStart || undefined} className={inputClass} value={values.periodEnd} onChange={e => change("periodEnd", e.target.value)} /></Field>
+        <Field label="Reported vehicle category" tooltip={categoryHelp}><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory ?? ""} onChange={value => change("vehicleCategory", value)} /></Field>
+        <Field label="Reported fuel technology"><CatalogSelect catalog={FUEL_TECHNOLOGIES} value={values.fuelTechnology ?? ""} disabled={isTrailer(values.vehicleCategory ?? "")} notApplicable={isTrailer(values.vehicleCategory ?? "")} onChange={value => change("fuelTechnology", value)} /></Field>
+        <Field label="Reported body type"><CatalogSelect catalog={BODY_TYPES} value={values.bodyType ?? ""} onChange={value => change("bodyType", value)} /></Field>
+        {[["make", "Vehicle brand"], ["model", "Vehicle model"]].map(([key, label]) => <Field key={key} label={label}><input required className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
+        <Field label="Job/trip count"><input required inputMode="numeric" className={inputClass} value={values.tripCount ?? ""} onChange={e => change("tripCount", e.target.value)} /></Field>
+        <Field label="Registered as CO₂-emitting" tooltip={emissionsLocked ? "Set to No for electric or hydrogen vehicles under the reporting rules." : undefined}><select required disabled={emissionsLocked} className={inputClass} value={values.co2Registered} onChange={e => change("co2Registered", e.target.value)}><option value="" disabled>Select Yes or No</option><option value="true">Yes</option><option value="false">No</option></select></Field>
+        {DECIMAL_FIELDS.slice(0, 2).map(([key, label]) => {
+          const notApplicable = statisticNotApplicable(key, values.fuelTechnology ?? "");
+          return <Field key={key} label={label} tooltip={notApplicable ? emissionsHelp : statisticHelp[key]}><input required={!notApplicable} disabled={notApplicable} inputMode="decimal" className={inputClass} value={notApplicable ? "Not applicable" : values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>;
+        })}
+        <Field label="Total CO₂ (kg, calculated)" tooltip={emissionsLocked ? emissionsHelp : "Calculated from total distance × supplier CO₂ g/km ÷ 1000. This is an estimate, not measured emissions."}><input readOnly aria-label="Total CO₂ (kg, calculated)" className={inputClass} value={emissionsLocked ? "Not applicable" : estimatedCo2Preview(values.totalTripKm ?? "", values.co2GramsPerKm ?? "")} placeholder="Enter distance and CO₂ rate" /></Field>
           {DECIMAL_FIELDS.slice(2).map(([key, label]) => {
-            const disabled = ["averageConsumptionLitresPerKm", "fuelConsumedLitres"].includes(key) && !litresApplicable;
-            const locked = emissionsLocked && (LOCKED_EMISSION_FIELDS as readonly string[]).includes(key);
-            return <Field key={key} label={`${label}${disabled ? " (not applicable)" : locked ? " (fixed at zero)" : " *"}`}><input required={!disabled} readOnly={locked} disabled={disabled} placeholder={disabled ? "Not applicable" : undefined} inputMode="decimal" className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>;
+            const disabled = statisticNotApplicable(key, values.fuelTechnology ?? "");
+            const tooltip = disabled ? (["averageFuelConsumptionLitresPer100Km", "fuelConsumedLitres"].includes(key) ? litresHelp : emissionsHelp) : statisticHelp[key];
+            return <Field key={key} label={label} tooltip={tooltip}><input required={!disabled} disabled={disabled} inputMode="decimal" className={inputClass} value={disabled ? "Not applicable" : values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>;
           })}
           <div className="sm:col-span-2"><Field label="Comment (optional)"><textarea className={inputClass} value={values.comment ?? ""} onChange={e => change("comment", e.target.value)} /></Field></div>
-        </fieldset>
-        <p className="mt-3 text-xs text-neutral-500">NOx grams relate to the NOx-covered distance. Median CO₂ is stored as reported; its interpretation is not assumed.</p>
-      </section>
-      <p className="text-xs text-neutral-500">Saving appends statistics and automatically checks approval and SVV, reusing recent registry data. Electric/hydrogen emission values are fixed at zero by the reporting convention; coverage distances remain required and editable. Litres are not applicable for electric/hydrogen vehicles or unpowered trailers. Use a decimal point, e.g. 12.34. NOx warnings are not implemented yet.</p>
+      </fieldset>
+      <p className="text-xs text-neutral-500">Use a decimal point, e.g. 12.34. Registered distances follow the supplier’s reporting definitions; no contractual meaning is assumed here.</p>
       {overlapping && <label className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><input type="checkbox" className={checkboxClass} disabled={busy} checked={overlapAccepted} onChange={e => setOverlapAccepted(e.target.checked)} />This period overlaps existing statistics. I intend to append another row.</label>}
       <ErrorNotice error={error} />
       {!!error && <p className="text-xs text-neutral-600">If the connection failed after sending, close this form and inspect the vehicle’s statistics before resubmitting: the row may already have been saved.</p>}
@@ -107,7 +111,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
 export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { approval?: StoredApproval | null }) {
   // Revoked approvals are history; a subsequent approval starts a new record.
   const existing = approval && !approval.revokedAt ? approval : null;
-  const [values, setValues] = useState({ registrationNumber: plate ?? "", fuelTechnology: existing?.data.fuelTechnology ?? "", vehicleCategory: existing?.data.vehicleCategory ?? "", sourceName: existing?.sourceName ?? "", startDate: existing?.data.startDate ?? "", expiryDate: existing?.data.expiryDate ?? "", usedThroughoutPeriod: existing?.data.usedThroughoutPeriod == null ? "unknown" : String(existing.data.usedThroughoutPeriod) });
+  const [values, setValues] = useState({ registrationNumber: plate ?? "", fuelTechnology: existing?.data.fuelTechnology ?? "", vehicleCategory: existing?.data.vehicleCategory ?? "", sourceName: existing?.sourceName ?? "", startDate: existing?.data.startDate ?? "", expiryDate: existing?.data.expiryDate ?? "" });
   const [indefinite, setIndefinite] = useState(!existing?.data.expiryDate);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<unknown>();
@@ -141,7 +145,6 @@ export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { ap
       await save.mutateAsync([{
         registrationNumber, fuelTechnology, vehicleCategory,
         startDate: values.startDate || null, expiryDate: indefinite ? null : values.expiryDate,
-        usedThroughoutPeriod: values.usedThroughoutPeriod === "unknown" ? null : values.usedThroughoutPeriod === "true",
       }, values.sourceName.trim() || null]);
       onSaved(registrationNumber, "Approval saved. Previous check results are unchanged; run a new check to record the updated approval.");
     } catch (cause) { setError(cause); } finally { setPreparing(false); }
@@ -151,12 +154,11 @@ export function ApprovalForm({ plate, approval, onClose, onSaved }: Props & { ap
       <p className="rounded-lg bg-neutral-50 p-3 text-sm leading-5 text-neutral-600">Approval is separate from statistics. {existing ? "Saving replaces the current approval fields; clearing a field removes its value." : "Reapproving a revoked vehicle creates a new approval record."}</p>
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <Field label="Registration number *"><RegistrationNumberInput autoFocus readOnly={!!plate} value={values.registrationNumber} onChange={value => change("registrationNumber", value)} /></Field>
-        <Field label="Vehicle category *"><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory} onChange={value => change("vehicleCategory", value)} /></Field>
+        <Field label="Vehicle category *" tooltip={categoryHelp}><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory} onChange={value => change("vehicleCategory", value)} /></Field>
         <Field label="Approved fuel technology *"><CatalogSelect catalog={FUEL_TECHNOLOGIES} value={values.fuelTechnology} disabled={isTrailer(values.vehicleCategory)} notApplicable={isTrailer(values.vehicleCategory)} onChange={value => change("fuelTechnology", value)} /></Field>
-        <Field label="Used throughout the approval-sheet period"><select className={inputClass} value={values.usedThroughoutPeriod} onChange={e => change("usedThroughoutPeriod", e.target.value)}><option value="unknown">Not provided</option><option value="true">Yes</option><option value="false">No</option></select></Field>
         <Field label="Start date (blank = immediate)"><input type="date" className={inputClass} value={values.startDate} onChange={e => change("startDate", e.target.value)} /></Field>
         <Field label="Source / reference"><input className={inputClass} value={values.sourceName} onChange={e => change("sourceName", e.target.value)} /></Field>
-        <label className="flex items-start gap-2 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 sm:col-span-2"><input type="checkbox" className={checkboxClass} checked={indefinite} onChange={e => { setIndefinite(e.target.checked); setDirty(true); }} />Approved indefinitely, until manually revoked</label>
+        <div className="sm:col-span-2"><Field label="Approval duration" tooltip={indefinite ? "Approval remains valid until it is manually revoked." : undefined}><span className="flex items-start gap-2 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700"><input type="checkbox" className={checkboxClass} checked={indefinite} onChange={e => { setIndefinite(e.target.checked); setDirty(true); }} />Approved indefinitely</span></Field></div>
         {!indefinite && <Field label="Expiry date * (inclusive)"><input required type="date" min={values.startDate || undefined} className={inputClass} value={values.expiryDate} onChange={e => change("expiryDate", e.target.value)} /></Field>}
       </fieldset>
       <ErrorNotice error={error} />
