@@ -13,6 +13,15 @@ import io.ktor.server.response.respondText
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
+        exception<kotlinx.serialization.SerializationException> { call, _ ->
+            call.respond(HttpStatusCode.BadRequest, ApiError("Invalid request JSON"))
+        }
+        exception<com.tdt4290group7.backend.vehicles.FleetConflictException> { call, cause ->
+            call.respond(HttpStatusCode.Conflict, ApiError(cause.message ?: "The record changed"))
+        }
+        exception<IllegalArgumentException> { call, cause ->
+            call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid input"))
+        }
         exception<VehicleStorageBusyException> { call, _ ->
             call.application.log.warn("vehicle_storage_busy")
             call.respond(HttpStatusCode.ServiceUnavailable, ApiError("Vehicle database is busy; try again later"))

@@ -1,15 +1,10 @@
 import { apiFetch } from "./client";
-import type { ApprovalInput, ApprovalStatus, CheckHistory, StoredApproval, VehicleCheck, VehicleDetails, VehicleList, StatisticsList, StatisticsSave } from "../types/vehicle";
+import type { CheckHistory, VehicleCheck, VehicleDetails, StatisticsList, StatisticsSave, FleetOverview, FleetChange, FleetSupplier, FleetAgreement, AgreementInput, VehicleEntryInput, Vehicle } from "../types/vehicle";
 import { parseVehicleJson } from "../utils/vehicle";
 
 // Always real API calls, even when the separate login flow uses mocks.
 function vehicleFetch<T>(path: string, options?: RequestInit) {
   return apiFetch<T>(path, options, { parseResponse: parseVehicleJson<T> });
-}
-export function getVehicles(search: string, status: ApprovalStatus | "", page: number) {
-  const query = new URLSearchParams({ search, page: String(page), pageSize: "25" });
-  if (status) query.set("approvalStatus", status);
-  return vehicleFetch<VehicleList>(`/vehicles?${query}`);
 }
 export const getVehicle = (plate: string) => vehicleFetch<VehicleDetails>(`/vehicles/${encodeURIComponent(plate)}`);
 export const getHistory = (plate: string, page: number) => vehicleFetch<CheckHistory>(`/vehicles/${encodeURIComponent(plate)}/checks?page=${page}&pageSize=10`);
@@ -20,8 +15,13 @@ export const runCheck = (plate: string, forceRefresh: boolean) => vehicleFetch<V
 export const appendStatistics = (body: string) => vehicleFetch<StatisticsSave>("/trip-rows", { method: "POST", body });
 export const getStatistics = (search: string, page: number) => vehicleFetch<StatisticsList>(
   `/trip-rows?${new URLSearchParams({ search, page: String(page), pageSize: "25" })}`);
-export const saveApproval = (approval: ApprovalInput, sourceName?: string | null, existing?: StoredApproval) =>
-  existing ? vehicleFetch<StoredApproval>(`/vehicle-approvals/${encodeURIComponent(existing.id)}`, {
-    method: "PUT", body: JSON.stringify({ sourceName, approval, expectedUpdatedAt: existing.updatedAt }),
-  }) : vehicleFetch<unknown>("/vehicle-approvals", { method: "POST", body: JSON.stringify({ sourceName, approvals: [approval] }) });
-export const revokeApproval = (approvalId: string) => vehicleFetch<StoredApproval>(`/vehicle-approvals/${encodeURIComponent(approvalId)}/revoke`, { method: "POST" });
+const fleetPath = "/vehicle-fleet";
+export const getFleet = () => vehicleFetch<FleetOverview>(fleetPath);
+export const getFleetHistory = (page: number) => vehicleFetch<FleetChange[]>(`${fleetPath}/history?page=${page}`);
+export const saveSupplier = (input: { name: string; orgNumber: string }, id?: string) => vehicleFetch<FleetSupplier>(`${fleetPath}/suppliers${id ? `/${encodeURIComponent(id)}` : ""}`, { method: id ? "PUT" : "POST", body: JSON.stringify(input) });
+export const saveAgreement = (input: AgreementInput, existing?: FleetAgreement) => vehicleFetch<FleetAgreement>(`${fleetPath}/agreements${existing ? `/${existing.id}` : ""}`, { method: existing ? "PUT" : "POST", body: JSON.stringify(existing ? { agreement: input, expectedUpdatedAt: existing.updatedAt } : input) });
+export const removeAgreement = (agreement: FleetAgreement) => vehicleFetch<void>(`${fleetPath}/agreements/${agreement.id}`, { method: "DELETE", body: JSON.stringify({ expectedUpdatedAt: agreement.updatedAt }) });
+export const addVehicle = (agreementId: string, input: VehicleEntryInput) => vehicleFetch<Vehicle>(`${fleetPath}/agreements/${agreementId}/vehicles`, { method: "POST", body: JSON.stringify(input) });
+export const replaceVehicle = (vehicle: Vehicle, replacement: VehicleEntryInput) => vehicleFetch<Vehicle>(`${fleetPath}/vehicles/${encodeURIComponent(vehicle.registrationNumber)}/replace`, { method: "POST", body: JSON.stringify({ replacement, expectedUpdatedAt: vehicle.updatedAt }) });
+export const removeVehicle = (vehicle: Vehicle) => vehicleFetch<void>(`${fleetPath}/vehicles/${encodeURIComponent(vehicle.registrationNumber)}`, { method: "DELETE", body: JSON.stringify({ expectedUpdatedAt: vehicle.updatedAt }) });
+export const undoChange = (id: string) => vehicleFetch<void>(`${fleetPath}/history/${id}/undo`, { method: "POST" });

@@ -54,12 +54,12 @@ describe("vehicle input and safe status presentation", () => {
     expect(decoded.tripCount).toBe(2);
     expect(decoded.co2Registered).toBe(false);
     expect(decoded.comment).toBe('text with "co2GramsPerKm":999');
-    expect(decoded.medianCo2).toBe("0");
+    expect(decoded.medianCo2).toBeUndefined();
     expect(decoded.registrationNumber).toBe("AB12345");
   });
   it("preserves nested SVV decimals, exponent notation, nulls and ordinary JSON numbers", () => {
-    expect(parseVehicleJson('{"total":25,"items":[{"noxMgPerKm":1.23456789012345678e-2,"estimatedCo2Kg":0,"medianCo2":null}]}'))
-      .toEqual({ total: 25, items: [{ noxMgPerKm: "1.23456789012345678e-2", estimatedCo2Kg: "0", medianCo2: null }] });
+    expect(parseVehicleJson('{"total":25,"items":[{"noxMgPerKm":1.23456789012345678e-2,"estimatedCo2Kg":0,"co2GramsPerKm":null}]}'))
+      .toEqual({ total: 25, items: [{ noxMgPerKm: "1.23456789012345678e-2", estimatedCo2Kg: "0", co2GramsPerKm: null }] });
   });
   it("rejects invalid or out-of-range numeric input instead of rounding/coercing", () => {
     for (const input of ["-1", "1,2", "1e3", "NaN", "true", "0.0000000000000000001", "9223372036854775808"]) {

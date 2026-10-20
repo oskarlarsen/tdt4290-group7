@@ -14,39 +14,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class VehicleRepositoryTest {
-    @Test
-    fun concurrentApprovalsAppendIndependentOverlappingRecordsAcrossRepositories() {
-        val path = databasePath()
-        val repositories = List(8) { VehicleRepository(path) }
-
-        for (precreate in listOf(false, true)) {
-            repeat(4) { round ->
-                val plate = "AB${(if (precreate) 10100 else 10000) + round}"
-                if (precreate) repositories.first().findOrCreateVehicle(plate, Instant.now())
-                val responses = concurrently(repositories.mapIndexed { index, repository ->
-                    {
-                        repository.appendApprovals(
-                            AppendApprovalsRequest(approvals = listOf(
-                                syntheticApproval(plate, fuelTechnology = FuelTechnology.entries[index], vehicleCategory = VehicleCategory.M1),
-                            )),
-                            Instant.now(),
-                        )
-                    }
-                })
-
-                val records = responses.map { it.approvals.single() }
-                assertEquals(8, records.map { it.id }.distinct().size)
-                assertEquals(1, records.map { it.registrationNumber }.distinct().size)
-                val stored = repositories.first().approvalForVehicle(records.first().registrationNumber)!!
-                assertTrue(stored.data.fuelTechnology in records.map { it.data.fuelTechnology })
-                assertEquals(8, repositories.first().approvalsForVehicle(plate).size)
-            }
-        }
-        connection(path).use { db ->
-            assertEquals(8, count(db, "vehicles"))
-            assertEquals(64, count(db, "vehicle_approvals"))
-        }
-    }
 
     @Test
     fun concurrentTripUploadsAppendEveryRowForTheSameVehicle() {
@@ -78,17 +45,17 @@ class VehicleRepositoryTest {
     fun busyCommitRollsBackTheEntireBatchAndAllowsLaterWrites() {
         val path = databasePath()
         val repository = VehicleRepository(path)
-        val request = AppendApprovalsRequest(approvals = listOf(
-            syntheticApproval("AB12345"), syntheticApproval("CD12345"),
+        val request = AppendTripRowsRequest(rows = listOf(
+            syntheticTrip("AB12345"), syntheticTrip("CD12345"),
         ))
 
         // A reader permits BEGIN IMMEDIATE and the writes, but blocks their commit.
         connection(path).use { reader ->
             reader.createStatement().use { it.execute("BEGIN") }
             try {
-                assertEquals(0, count(reader, "vehicle_approvals"))
+                assertEquals(0, count(reader, "trip_rows"))
                 assertFailsWith<VehicleStorageBusyException> {
-                    repository.appendApprovals(request, Instant.now())
+                    repository.appendTripRows(request, Instant.now())
                 }
             } finally {
                 reader.createStatement().use { it.execute("ROLLBACK") }
@@ -97,9 +64,9 @@ class VehicleRepositoryTest {
 
         connection(path).use { db ->
             assertEquals(0, count(db, "vehicles"))
-            assertEquals(0, count(db, "vehicle_approvals"))
+            assertEquals(0, count(db, "trip_rows"))
         }
-        assertEquals(2, repository.appendApprovals(request, Instant.now()).approvalCount)
+        assertEquals(2, repository.appendTripRows(request, Instant.now()).rowCount)
     }
 
     private fun <T> concurrently(actions: List<() -> T>): List<T> {

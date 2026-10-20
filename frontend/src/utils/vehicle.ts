@@ -1,12 +1,9 @@
-import type { ApprovalStatus, CheckSummary, RegistryCode, VehicleCheck, StatisticsSave } from "../types/vehicle";
+import type { CheckSummary, RegistryCode, VehicleCheck, StatisticsSave } from "../types/vehicle";
 import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, statisticNotApplicable, emissionsNotApplicable, INAPPLICABLE_EMISSION_FIELDS } from "./vehicleCatalog";
 
-export const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
-  ACTIVE: "Approved", NOT_YET_ACTIVE: "Not yet active", EXPIRED: "Expired", REVOKED: "Revoked", NOT_APPROVED: "Not approved",
-};
 export const DECIMAL_FIELDS = [
   ["totalTripKm", "Total distance (km)"], ["co2GramsPerKm", "Supplier CO₂ (g/km)"],
-  ["medianCo2", "Median CO₂"], ["averageFuelConsumptionLitresPer100Km", "Average fuel consumption (L/100km)"],
+  ["averageFuelConsumptionLitresPer100Km", "Average fuel consumption (L/100km)"],
   ["fuelConsumedLitres", "Total fuel consumed (L)"], ["totalKmNoxRegistered", "NOx-registered distance (km)"],
   ["totalNoxRegisteredGrams", "Total registered NOx (g)"], ["totalKmCo2Registered", "CO₂-registered distance (km)"],
   ["totalKmCo2NotRegistered", "Distance without registered CO₂ (km)"],
@@ -112,7 +109,7 @@ export function checkLabel(check?: CheckSummary | null): string {
   return "No recorded deviations";
 }
 export function summaryOf(check: VehicleCheck): CheckSummary {
-  return { ...check.registry, id: check.id, checkedAt: check.checkedAt, approvalStatus: check.approvalStatus, deviations: check.deviations,
+  return { ...check.registry, id: check.id, checkedAt: check.checkedAt, deviations: check.deviations,
     highPriorityCount: (check.findings ?? []).filter(f => f.priority === "HIGH").length,
     moderatePriorityCount: (check.findings ?? []).filter(f => f.priority === "MODERATE").length };
 }
@@ -124,8 +121,15 @@ export function statisticsSaveMessage(result: StatisticsSave, plate: string): st
   const registry = checked.dataSource === "UNAVAILABLE" || checked.lookupOutcome !== "FOUND"
     ? `Statens Vegvesen verification incomplete (${humanize(checked.lookupOutcome)}).`
     : checked.dataSource === "STALE_CACHE" ? "Statens Vegvesen verification uses stale data; refresh failed." : `Statens Vegvesen data: ${humanize(checked.dataSource)}.`;
-  return `Statistics saved and automatic check recorded: ${checkLabel(checked)}. ${registry} No approval was created.`;
+  return `Statistics saved and automatic check recorded: ${checkLabel(checked)}. ${registry}`;
 }
 export function humanize(value: string): string { return value.toLowerCase().replace(/_/g, " "); }
-export function timestamp(value?: string | null): string { return value ? new Date(value).toLocaleString() : "Not available"; }
+export function timestamp(value?: string | null): string { return value ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : "Not available"; }
 export function codeLabel(value?: RegistryCode | null): string { return value ? `${value.name ?? value.code}${value.name ? ` (${value.code})` : ""}` : "Not provided"; }
+
+export function vehicleDate(value: string): string { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split("-").reverse().join(".") : value; }
+export function agreementDuration(start: string, end: string): string {
+  if (!validDate(start) || !validDate(end) || end < start) return "";
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+  return `${days} day${days === 1 ? "" : "s"}`;
+}

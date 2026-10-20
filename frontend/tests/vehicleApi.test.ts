@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { appendStatistics, getCheck, getVehicles, getStatistics, runCheck, saveApproval } from "../src/api/vehicles";
+import { appendStatistics, getCheck, getFleet, getStatistics, runCheck, saveAgreement } from "../src/api/vehicles";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("real vehicle API client", () => {
   it("uses GET for browsing, includes credentials, encodes filters and preserves decimals", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('{"total":1,"items":[{"estimatedCo2Kg":123.456789012345678}]}'));
     vi.stubGlobal("fetch", fetch);
-    const result = await getVehicles("AB10001", "ACTIVE", 2);
-    expect(fetch.mock.calls[0][0]).toContain("/vehicles?search=AB10001&page=2&pageSize=25&approvalStatus=ACTIVE");
+    const result = await getFleet();
+    expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet");
     expect(fetch.mock.calls[0][1].method).toBeUndefined();
     expect(fetch.mock.calls[0][1].credentials).toBe("include");
     expect(result.total).toBe(1);
@@ -33,10 +33,12 @@ describe("real vehicle API client", () => {
     expect(fetch.mock.calls[0][0]).toContain("/trip-rows?search=AB10001&page=2&pageSize=25");
     expect(fetch.mock.calls[0][1].method).toBeUndefined(); expect(fetch).toHaveBeenCalledTimes(1);
   });
-  it("sends all intended approval fields, including cleared expiry", async () => {
+  it("sends only the supplier agreement fields", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetch);
-    await saveApproval({ registrationNumber: "AB10001", expiryDate: null, fuelTechnology: "2", vehicleCategory: "M1" }, "Synthetic");
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ sourceName: "Synthetic", approvals: [{ registrationNumber: "AB10001", expiryDate: null, fuelTechnology: "2", vehicleCategory: "M1" }] });
+    const agreement = { supplierId: "supplier", startDate: "2026-01-01", endDate: "2026-12-31", allowedVehicles: 5, note: "" };
+    await saveAgreement(agreement);
+    expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet/agreements");
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(agreement);
   });
   it("shows the backend vehicle error and does not retry a failed write", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('{"error":"Synthetic validation error"}', { status: 400 })); vi.stubGlobal("fetch", fetch);

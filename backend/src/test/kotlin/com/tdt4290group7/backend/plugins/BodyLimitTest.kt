@@ -1,5 +1,6 @@
 package com.tdt4290group7.backend.plugins
 
+import com.tdt4290group7.backend.adminClient
 import com.tdt4290group7.backend.module
 import com.tdt4290group7.backend.vehicles.VehicleRepository
 import com.tdt4290group7.backend.vehicles.AppendTripRowsRequest
@@ -30,7 +31,7 @@ class BodyLimitTest {
                     Duration.ofDays(14),
                 )
             }
-            status = client.post(path) {
+            status = adminClient().post(path) {
                 contentType(ContentType.Application.Json)
                 if (chunked) setBody(ByteReadChannel(body.toByteArray())) else setBody(body)
             }.status
@@ -47,11 +48,7 @@ class BodyLimitTest {
                 Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip(comment = padding)))),
                 chunked,
             ))
-            assertEquals(HttpStatusCode.Created, vehicleStatusFor(
-                "/api/vehicle-approvals",
-                """{"sourceName":"$padding","approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"}]}""",
-                chunked,
-            ))
+
         }
     }
 
@@ -59,7 +56,7 @@ class BodyLimitTest {
     fun `vehicle batches reject oversized bodies including chunked uploads`() {
         val padding = "a".repeat(MAX_VEHICLE_BATCH_BODY_BYTES.toInt())
         for (chunked in listOf(false, true)) {
-            for (path in listOf("/api/trip-rows", "/api/vehicle-approvals")) {
+            for (path in listOf("/api/trip-rows")) {
                 assertEquals(HttpStatusCode.PayloadTooLarge,
                     vehicleStatusFor(path, """{"sourceName":"$padding"}""", chunked),
                 )
@@ -70,7 +67,7 @@ class BodyLimitTest {
     @Test
     fun `single vehicle routes retain the small request limit`() {
         val padding = "a".repeat(MAX_REQUEST_BODY_BYTES.toInt())
-        for (path in listOf("/api/vehicle-checks", "/api/vehicle-approvals/AB12345/revoke")) {
+        for (path in listOf("/api/vehicle-checks", "/api/vehicle-fleet/suppliers")) {
             assertEquals(HttpStatusCode.PayloadTooLarge,
                 vehicleStatusFor(path, """{"registrationNumber":"$padding"}"""),
             )

@@ -20,9 +20,8 @@ class VehicleReadmeContractTest {
             val root = Json.parseToJsonElement(text).jsonObject
             when {
                 "rows" in root -> { repository.appendTripRows(decodeTripRowsRequest(text), Instant.now()); validated++ }
-                "approvals" in root -> { repository.appendApprovals(decodeApprovalsRequest(text), Instant.now()); validated++ }
             }
         }
-        assertEquals(2, validated)
+        assertEquals(1, validated)
     }
 }

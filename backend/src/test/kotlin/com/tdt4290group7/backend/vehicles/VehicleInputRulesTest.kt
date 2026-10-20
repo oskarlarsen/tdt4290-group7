@@ -21,7 +21,7 @@ class VehicleInputRulesTest {
             assertNull(saved.estimatedCo2Kg)
             assertEquals(valid, repository.tripRowsForVehicle("AB12345").first { it.id == saved.id }.data)
             for (invalid in listOf(valid.copy(co2Registered = true), valid.copy(co2GramsPerKm = BigDecimal.ONE),
-                valid.copy(medianCo2 = BigDecimal.ONE), valid.copy(totalNoxRegisteredGrams = BigDecimal.ONE),
+                valid.copy(totalNoxRegisteredGrams = BigDecimal.ONE),
                 valid.copy(totalKmCo2Registered = BigDecimal.ZERO), valid.copy(totalKmNoxRegistered = BigDecimal.ZERO)))
                 assertFailsWith<IllegalArgumentException> { repository.appendTripRows(AppendTripRowsRequest(rows = listOf(invalid)), now) }
         }
@@ -38,33 +38,6 @@ class VehicleInputRulesTest {
         assertEquals("Ethanol", fuelCode("15").name)
     }
 
-    @Test
-    fun versionThreeIsRebuiltOnlyWhenEveryTableIsEmpty() {
-        val emptyPath = path()
-        VehicleRepository(emptyPath)
-        fun markVersionThree(path: Path) = DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.execute("DROP TABLE vehicle_check_approvals"); it.execute("PRAGMA user_version=3") }
-        }
-        markVersionThree(emptyPath)
-        VehicleRepository(emptyPath)
-        DriverManager.getConnection("jdbc:sqlite:${emptyPath.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(6, rows.getInt(1)) } }
-        }
-        val populatedPath = path()
-        val repository = VehicleRepository(populatedPath)
-        repository.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip())), now)
-        markVersionThree(populatedPath)
-        assertFailsWith<IllegalStateException> { VehicleRepository(populatedPath) }
-        assertEquals(1, repository.tripRowsForVehicle("AB12345").size)
-        // Empty vehicles are not enough: a supplier-only database must also be preserved.
-        val supplierPath = path()
-        VehicleRepository(supplierPath)
-        DriverManager.getConnection("jdbc:sqlite:${supplierPath.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.execute("INSERT INTO suppliers VALUES('synthetic','Synthetic','2026-01-01T00:00:00Z')") }
-        }
-        markVersionThree(supplierPath)
-        assertFailsWith<IllegalStateException> { VehicleRepository(supplierPath) }
-    }
 
     @Test
     fun ordinaryPlateRulesAcceptFourAndFiveDigitsWithoutGuessing() {
@@ -93,20 +66,6 @@ class VehicleInputRulesTest {
         }
     }
 
-    @Test
-    fun trailerFuelSentinelIsRequiredAndCannotBeUsedForPoweredVehicles() {
-        val repository = VehicleRepository(path())
-        for (category in VehicleCategory.entries) {
-            val fuel = if (category.isTrailer) FuelTechnology.NOT_APPLICABLE else FuelTechnology.DIESEL
-            repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(syntheticApproval(
-                fuelTechnology = fuel, vehicleCategory = category))), now)
-            val wrong = if (category.isTrailer) FuelTechnology.DIESEL else FuelTechnology.NOT_APPLICABLE
-            assertFailsWith<IllegalArgumentException> {
-                repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(syntheticApproval(
-                    fuelTechnology = wrong, vehicleCategory = category))), now)
-            }
-        }
-    }
 
     @Test
     fun databaseConstraintsCannotBeBypassedByDirectSql() {
@@ -175,24 +134,5 @@ class VehicleInputRulesTest {
         }
     }
 
-    @Test
-    fun versionFourIsRebuiltOnlyWhenEmptyAndNullsAreRejectedForDiesel() {
-        for (populated in listOf(false, true)) {
-            val database = path()
-            val repository = VehicleRepository(database)
-            if (populated) repository.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip())), now)
-            DriverManager.getConnection("jdbc:sqlite:${database.toAbsolutePath()}").use { db ->
-                db.createStatement().use { it.execute("DROP TABLE vehicle_check_approvals"); it.execute("PRAGMA user_version=4") }
-            }
-            if (populated) {
-                assertFailsWith<IllegalStateException> { VehicleRepository(database) }
-                assertEquals(1, repository.tripRowsForVehicle("AB12345").size)
-            } else VehicleRepository(database)
-        }
-        val repository = VehicleRepository(path())
-        val diesel = syntheticTrip()
-        for (invalid in listOf(diesel.copy(co2GramsPerKm = null), diesel.copy(medianCo2 = null),
-            diesel.copy(totalKmCo2Registered = null), diesel.copy(totalKmNoxRegistered = null), diesel.copy(totalNoxRegisteredGrams = null)))
-            assertFailsWith<IllegalArgumentException> { repository.appendTripRows(AppendTripRowsRequest(rows = listOf(invalid)), now) }
-    }
+
 }

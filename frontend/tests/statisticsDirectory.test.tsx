@@ -9,30 +9,29 @@ import type { TripRow } from "../src/types/vehicle";
 const row: TripRow = {
   id: "synthetic-row", registrationNumber: "AB12345", createdAt: "2026-01-01T00:00:00Z", estimatedCo2Kg: "123.456789012345678",
   data: { registrationNumber: "AB12345", periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic", model: "Synthetic",
-    co2Registered: false, co2GramsPerKm: "0", medianCo2: "0", totalTripKm: "1000", totalKmCo2Registered: "1000", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "0", totalKmNoxRegistered: "1000", totalNoxRegisteredGrams: "0", tripCount: 2, averageFuelConsumptionLitresPer100Km: null, fuelConsumedLitres: null },
+    co2Registered: false, co2GramsPerKm: "0", totalTripKm: "1000", totalKmCo2Registered: "1000", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "0", totalKmNoxRegistered: "1000", totalNoxRegisteredGrams: "0", tripCount: 2, averageFuelConsumptionLitresPer100Km: null, fuelConsumedLitres: null },
 };
 
 describe("statistics directory", () => {
   it("displays each appended row separately with exact values and reporting periods", () => {
     const html = renderToStaticMarkup(<StatisticsTable rows={[row, { ...row, id: "second-row" }]} onSelect={() => {}} />);
-    expect(html).toContain("Calculated CO₂ (kg)");
+    expect(html).toContain("Estimated CO₂");
     expect(html.match(/123\.456789012345678/g)).toHaveLength(2);
-    expect(html.match(/View statistics for AB12345/g)).toHaveLength(2);
+    expect(html.match(/View details for AB12345/g)).toHaveLength(2);
     expect(html).toContain("2026-01-01"); expect(html).toContain("2026-01-31");
   });
   it("shows zero separately from not-applicable litres in read-only row details", () => {
-    const electric = { ...row, estimatedCo2Kg: null, data: { ...row.data, fuelTechnology: "5", co2GramsPerKm: null, medianCo2: null, totalNoxRegisteredGrams: null, totalKmCo2Registered: null, totalKmNoxRegistered: null } };
+    const electric = { ...row, estimatedCo2Kg: null, data: { ...row.data, fuelTechnology: "5", co2GramsPerKm: null, totalNoxRegisteredGrams: null, totalKmCo2Registered: null, totalKmNoxRegistered: null } };
     const html = renderToStaticMarkup(<StatisticsRowDetails row={electric} onClose={() => {}} onOpenVehicle={() => {}} />);
-    expect(html).toContain("Not applicable"); expect(html).toContain("Total CO₂ (kg, calculated)");
+    expect(html).toContain("Not applicable"); expect(html).toContain("Estimated CO₂");
     expect(html).toContain("5 - Electric"); expect(html).toContain("Open vehicle");
-    expect(html).not.toContain("<input"); expect(html).toContain("not measured emissions");
+    expect(html).not.toContain("<input"); expect(html).toContain("Vehicle and NOx details");
   });
-  it("places the statistics directory after vehicles and removes the standalone check action", () => {
+  it("keeps the overview focused on suppliers with statistics and history collapsed", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><MemoryRouter><Vehicles /></MemoryRouter></QueryClientProvider>);
-    expect(html.indexOf("Statistics directory")).toBeGreaterThan(html.indexOf("Vehicle directory"));
-    expect(html).not.toContain("Check a plate"); expect(html).toContain("Add statistics");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="excel-upload-placeholder"/);
-    expect(html).toContain("Upload Excel"); expect(html).toContain("Approval or statistics batches — coming soon");
-    expect(html).not.toContain('type="file"');
+    expect(html).toContain("Find supplier, organization number or vehicle");
+    expect(html).toContain("Reporting statistics"); expect(html).toContain("Change history");
+    expect(html).toContain("Add supplier"); expect(html).not.toContain("coming soon");
+    expect(html).not.toContain("Add approval period");
   });
 });

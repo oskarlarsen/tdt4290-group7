@@ -62,12 +62,12 @@ class ApplicationTest {
         val repository = VehicleRepository(path)
         application { module(repository, null, Duration.ofDays(14)) }
         startApplication()
-        val body = """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"},{"registrationNumber":"CD12345","fuelTechnology":"2","vehicleCategory":"M1"}]}"""
+        val body = Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip("AB12345"), syntheticTrip("CD12345"))))
 
         databaseConnection(path).use { blocker ->
             blocker.createStatement().use { it.execute("BEGIN IMMEDIATE") }
             try {
-                val response = postJson("/api/vehicle-approvals", body)
+                val response = postJson("/api/trip-rows", body)
                 assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
                 assertEquals(
                     """{"error":"Vehicle database is busy; try again later"}""",
@@ -79,9 +79,9 @@ class ApplicationTest {
         }
         databaseConnection(path).use { db ->
             assertEquals(0, countRows(db, "vehicles"))
-            assertEquals(0, countRows(db, "vehicle_approvals"))
+            assertEquals(0, countRows(db, "trip_rows"))
         }
-        assertEquals(HttpStatusCode.Created, postJson("/api/vehicle-approvals", body).status)
+        assertEquals(HttpStatusCode.Created, postJson("/api/trip-rows", body).status)
     }
 
     @Test
@@ -91,7 +91,7 @@ class ApplicationTest {
         databaseConnection(path).use { db ->
             db.createStatement().use { statement ->
                 statement.executeUpdate(
-                    """CREATE TRIGGER reject_second_synthetic_approval BEFORE INSERT ON vehicle_approvals
+                    """CREATE TRIGGER reject_second_synthetic_approval BEFORE INSERT ON trip_rows
                         WHEN NEW.registration_number = 'CD12345'
                         BEGIN SELECT RAISE(ABORT, 'synthetic test failure'); END""",
                 )
@@ -100,14 +100,14 @@ class ApplicationTest {
         application { module(repository, null, Duration.ofDays(14)) }
 
         val response = postJson(
-            "/api/vehicle-approvals",
-            """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"},{"registrationNumber":"CD12345","fuelTechnology":"2","vehicleCategory":"M1"}]}""",
+            "/api/trip-rows",
+            Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip("AB12345"), syntheticTrip("CD12345")))),
         )
         assertEquals(HttpStatusCode.InternalServerError, response.status)
         assertEquals("Internal server error", response.bodyAsText())
         databaseConnection(path).use { db ->
             assertEquals(0, countRows(db, "vehicles"))
-            assertEquals(0, countRows(db, "vehicle_approvals"))
+            assertEquals(0, countRows(db, "trip_rows"))
         }
     }
 
@@ -137,14 +137,6 @@ class ApplicationTest {
         assertEquals("2", tripResponse.getValue("rowCount").jsonPrimitive.content)
         assertEquals("1", tripResponse.getValue("distinctVehicleCount").jsonPrimitive.content)
 
-        val approvals = postJson(
-            "/api/vehicle-approvals",
-            """{"sourceName":"approved-sheet","approvals":[{
-                "registrationNumber":"AB12345","fuelTechnology":"5","vehicleCategory":"M1"
-            }]}""",
-        )
-        assertEquals(HttpStatusCode.Created, approvals.status)
-
         val check = postJson(
             "/api/vehicle-checks",
             """{"registrationNumber":"AB-12345"}""",
@@ -153,7 +145,6 @@ class ApplicationTest {
         val checked = Json.parseToJsonElement(check.bodyAsText()).jsonObject
         assertEquals("AB12345", checked.getValue("vehicle").jsonObject
             .getValue("registrationNumber").jsonPrimitive.content)
-        assertEquals("ACTIVE", checked.getValue("approvalStatus").jsonPrimitive.content)
         assertEquals(2, checked.getValue("tripRows").jsonArray.size)
         assertEquals("UNAVAILABLE", checked.getValue("registry").jsonObject
             .getValue("dataSource").jsonPrimitive.content)
@@ -161,45 +152,13 @@ class ApplicationTest {
             .getValue("lookupOutcome").jsonPrimitive.content)
 
         val id = checked.getValue("id").jsonPrimitive.content
-        val saved = client.get("/api/vehicle-checks/$id")
+        val saved = adminClient().get("/api/vehicle-checks/$id")
         assertEquals(HttpStatusCode.OK, saved.status)
         assertEquals(checked, Json.parseToJsonElement(saved.bodyAsText()).jsonObject)
     }
 
-    @Test
-    fun revocationIsRetainedAndReapprovalCreatesNewRecord() = testApplication {
-        application { module(testRepository(), null, Duration.ofDays(14)) }
-        val first = postJson(
-            "/api/vehicle-approvals",
-            """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1"}]}""",
-        )
-        val firstId = Json.parseToJsonElement(first.bodyAsText()).jsonObject
-            .getValue("approvals").jsonArray.single().jsonObject.getValue("id").jsonPrimitive.content
-
-        val revoked = client.post("/api/vehicle-approvals/$firstId/revoke")
-        assertEquals(HttpStatusCode.OK, revoked.status)
-        val revokedJson = Json.parseToJsonElement(revoked.bodyAsText()).jsonObject
-        assertEquals(firstId, revokedJson.getValue("id").jsonPrimitive.content)
-        revokedJson.getValue("revokedAt").jsonPrimitive.content
-
-        val revokedCheck = postJson("/api/vehicle-checks", """{"registrationNumber":"AB12345"}""")
-        assertEquals(
-            "REVOKED",
-            Json.parseToJsonElement(revokedCheck.bodyAsText()).jsonObject
-                .getValue("approvalStatus").jsonPrimitive.content,
-        )
-
-        val second = postJson(
-            "/api/vehicle-approvals",
-            """{"approvals":[{"registrationNumber":"AB12345","fuelTechnology":"2","vehicleCategory":"M1","expiryDate":"2099-12-31"}]}""",
-        )
-        val secondId = Json.parseToJsonElement(second.bodyAsText()).jsonObject
-            .getValue("approvals").jsonArray.single().jsonObject.getValue("id").jsonPrimitive.content
-        assertNotEquals(firstId, secondId)
-    }
-
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.postJson(path: String, body: String) =
-        client.post(path) {
+        (if (path.startsWith("/api/auth/")) client else adminClient()).post(path) {
             contentType(ContentType.Application.Json)
             setBody(body)
         }
@@ -238,7 +197,7 @@ class ApplicationTest {
         assertEquals(false, "id" in checked.getValue("vehicle").jsonObject)
         assertEquals("AB12345", checked.getValue("vehicle").jsonObject.getValue("registrationNumber").jsonPrimitive.content)
         val id = checked.getValue("id").jsonPrimitive.content
-        assertEquals(checked, Json.parseToJsonElement(client.get("/api/vehicle-checks/$id").bodyAsText()).jsonObject)
+        assertEquals(checked, Json.parseToJsonElement(adminClient().get("/api/vehicle-checks/$id").bodyAsText()).jsonObject)
     }
 
     private fun testRepository() = VehicleRepository(Path.of("build", "test-data", "${UUID.randomUUID()}.db"))

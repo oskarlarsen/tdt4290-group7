@@ -17,7 +17,7 @@ class VehicleRequestJsonTest {
     @Test
     fun acceptsExactJsonNumbersIncludingExponentButNotNumericStrings() {
         val input = decodeTripRowsRequest(body(""","co2GramsPerKm":123.456789,"totalTripKm":1e3,
-            "medianCo2":12.34,"totalKmNoxRegistered":1000,"totalNoxRegisteredGrams":12.345,
+            "totalKmNoxRegistered":1000,"totalNoxRegisteredGrams":12.345,
             "tripCount":3,"co2Registered":true""")).rows.single()
         assertEquals(BigDecimal("123.456789"), input.co2GramsPerKm)
         assertEquals(0, input.totalTripKm.compareTo(BigDecimal("1000")))
@@ -38,18 +38,13 @@ class VehicleRequestJsonTest {
             "\"fuelTechnology\":2", "\"fuelTechnology\":\"Diesel\"", "\"fuelTechnology\":\"999\"",
             "\"vehicleCategory\":\"light\"", "\"vehicleCategory\":\"L3e\"", "\"bodyType\":\"Station wagon\"",
         ).forEach { extra -> assertFailsWith<SerializationException>(extra) { decodeTripRowsRequest(body(extra)) } }
-        for (extra in listOf("\"vehicleGroup\":\"light\"", "\"fuelTechnology\":2", "\"fuelTechnology\":null", "\"usedThroughoutPeriod\":true")) {
-            assertFailsWith<SerializationException> {
-                decodeApprovalsRequest("{\"approvals\":[{\"registrationNumber\":\"AB12345\",\"fuelTechnology\":\"2\",\"vehicleCategory\":\"M1\",$extra}]}")
-            }
-        }
         assertFailsWith<SerializationException> { decodeVehicleCheckRequest("""{"registrationNumber":"AB12345","forceRefresh":"true"}""") }
     }
 
     @Test
     fun everyStatisticsFieldExceptReferencesCommentsAndConditionalLitresIsRequired() {
         val optional = setOf("comment", "averageFuelConsumptionLitresPer100Km", "fuelConsumedLitres")
-        val nullable = setOf("co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered")
+        val nullable = setOf("co2GramsPerKm", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered")
         baseline.keys.filterNot { it in optional }.forEach { key ->
             assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body(omit = key)) }
             if (key !in nullable) assertFailsWith<SerializationException>(key) { decodeTripRowsRequest(body("\"$key\":null")) }
@@ -60,18 +55,13 @@ class VehicleRequestJsonTest {
             val input = decodeTripRowsRequest(body("\"fuelTechnology\":\"$code\",\"averageFuelConsumptionLitresPer100Km\":null,\"fuelConsumedLitres\":null"))
             assertNull(input.rows.single().fuelConsumedLitres)
         }
-        for (key in listOf("fuelTechnology", "vehicleCategory")) {
-            val approval = Json.parseToJsonElement(Json.encodeToString(syntheticApproval())).jsonObject
-            assertFailsWith<SerializationException> {
-                decodeApprovalsRequest("{\"approvals\":[${JsonObject(approval.filterKeys { it != key })}]}")
-            }
-        }
+
     }
 
     @Test
     fun explicitNullEmissionKeysAndPerHundredKilometreUnitSurviveJson() {
         val electric = decodeTripRowsRequest(body(""""fuelTechnology":"5","co2Registered":false,
-            "co2GramsPerKm":null,"medianCo2":null,"totalNoxRegisteredGrams":null,
+            "co2GramsPerKm":null,"totalNoxRegisteredGrams":null,
             "totalKmCo2Registered":null,"totalKmNoxRegistered":null,
             "averageFuelConsumptionLitresPer100Km":null,"fuelConsumedLitres":null""")).rows.single()
         assertNull(electric.estimateCo2Kg())

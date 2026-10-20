@@ -98,7 +98,7 @@ export type BodyType = keyof typeof BODY_TYPES;
 export function isTrailer(category: string): boolean { return ["O1", "O2", "O3", "O4"].includes(category); }
 export function usesLitres(fuel: string): boolean { return !["5", "6", "NOT_APPLICABLE"].includes(fuel); }
 export function emissionsNotApplicable(fuel: string): boolean { return ["5", "6"].includes(fuel); }
-export const INAPPLICABLE_EMISSION_FIELDS = ["co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered"] as const;
+export const INAPPLICABLE_EMISSION_FIELDS = ["co2GramsPerKm", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered"] as const;
 export function statisticNotApplicable(key: string, fuel: string): boolean {
   return (["averageFuelConsumptionLitresPer100Km", "fuelConsumedLitres"].includes(key) && !usesLitres(fuel)) ||
     ((INAPPLICABLE_EMISSION_FIELDS as readonly string[]).includes(key) && emissionsNotApplicable(fuel));

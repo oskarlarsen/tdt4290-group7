@@ -19,31 +19,27 @@ class VehicleCheckService(
 
     suspend fun check(request: VehicleCheckRequest): VehicleCheckResponse {
         val now = Instant.now(clock)
-        val vehicle = repository.findOrCreateVehicle(request.registrationNumber, now)
-        val approvals = repository.approvalsForVehicle(vehicle.registrationNumber)
-        val approval = representativeApproval(approvals, LocalDate.now(clock))
-        val approvalStatus = approvalStatus(approval, LocalDate.now(clock))
-        val tripRows = repository.tripRowsForVehicle(vehicle.registrationNumber)
-        val cached = repository.latestSnapshot(vehicle.registrationNumber)
+        repository.findOrCreateVehicle(request.registrationNumber, now)
+        // Read the vehicle, agreement, statistics and cache in one SQLite snapshot.
+        val state = requireNotNull(repository.vehicleDetails(request.registrationNumber))
+        val vehicle = state.vehicle
+        val agreement = state.agreement
+        val tripRows = state.tripRows
+        val cached = state.latestSnapshot
         val (registryResult, newSnapshot) = registryResult(vehicle, cached, request.forceRefresh, now)
-        val findings = approvalDeviations(approvalStatus).map { code ->
-            DeviationFinding(code, DeviationPriority.HIGH, DeviationOrigin.APPROVAL,
-                "Approval as of ${LocalDate.now(clock)}: ${approvalStatus.name.lowercase().replace('_', ' ')}. Historical reporting-period coverage is evaluated separately.", approvalId = approval?.id)
-        } + registryResult.deviations.map { code ->
+        val findings = registryResult.deviations.map { code ->
             DeviationFinding(code, if (code == VehicleDeviation.UNKNOWN_REGISTRATION_STATUS) DeviationPriority.MODERATE else DeviationPriority.HIGH,
-                DeviationOrigin.REGISTRY, "Retrieved registration status: ${registryResult.registrationStatus ?: "missing"}, fetched ${registryResult.fetchedAt}. This does not establish historical registration status.")
-        } + evaluateDeviationRules(approvals, tripRows, registryResult, LocalDate.now(clock))
+                DeviationOrigin.REGISTRY, "Statens Vegvesen registration status: ${registryResult.registrationStatus ?: "not available"}.")
+        } + evaluateDeviationRules(agreement, vehicle, tripRows, registryResult, LocalDate.now(clock))
         val deviations = findings.map { it.code }.distinct()
         val response = VehicleCheckResponse(
             id = UUID.randomUUID().toString(),
             checkedAt = now.storageTimestamp(),
             vehicle = vehicle,
-            approvalStatus = approvalStatus,
-            approval = approval,
+            agreement = agreement,
             tripRows = tripRows,
             registry = registryResult.copy(deviations = findings.filter { it.origin == DeviationOrigin.REGISTRY }.map { it.code }.distinct()),
             deviations = deviations,
-            approvals = approvals,
             findings = findings,
         )
         repository.saveCheck(response, newSnapshot)
@@ -105,14 +101,6 @@ class VehicleCheckService(
         refreshFailure = refreshFailure,
     )
 
-    private fun approvalDeviations(status: ApprovalStatus): List<VehicleDeviation> = when (status) {
-        ApprovalStatus.ACTIVE -> emptyList()
-        ApprovalStatus.NOT_APPROVED -> listOf(VehicleDeviation.NOT_ON_APPROVED_LIST)
-        ApprovalStatus.NOT_YET_ACTIVE -> listOf(VehicleDeviation.APPROVAL_NOT_YET_ACTIVE)
-        ApprovalStatus.EXPIRED -> listOf(VehicleDeviation.APPROVAL_EXPIRED)
-        ApprovalStatus.REVOKED -> listOf(VehicleDeviation.APPROVAL_REVOKED)
-    }
-
     private fun deviationsForRegistrationStatus(status: String?): List<VehicleDeviation> =
         when (status?.uppercase()) {
             "REGISTRERT" -> emptyList()
@@ -122,17 +110,4 @@ class VehicleCheckService(
             "UREGISTRERT" -> listOf(VehicleDeviation.UNREGISTERED)
             else -> listOf(VehicleDeviation.UNKNOWN_REGISTRATION_STATUS)
         }
-}
-
-/** Shared by current read views and check evaluation; expiry today is still active. */
-internal fun approvalStatus(approval: StoredApproval?, today: LocalDate): ApprovalStatus {
-    if (approval == null) return ApprovalStatus.NOT_APPROVED
-    if (approval.revokedAt?.let { Instant.parse(it).atZone(ZoneId.of("Europe/Oslo")).toLocalDate() <= today } == true) return ApprovalStatus.REVOKED
-    val start = approvalStart(approval)
-    val expiry = approval.data.expiryDate?.let(LocalDate::parse)
-    return when {
-        start.isAfter(today) -> ApprovalStatus.NOT_YET_ACTIVE
-        expiry != null && expiry.isBefore(today) -> ApprovalStatus.EXPIRED
-        else -> ApprovalStatus.ACTIVE
-    }
 }

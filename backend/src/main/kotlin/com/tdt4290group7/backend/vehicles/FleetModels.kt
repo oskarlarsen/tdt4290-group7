@@ -1,0 +1,46 @@
+package com.tdt4290group7.backend.vehicles
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class FleetSupplier(val id: String, val name: String, val orgNumber: String, val active: Boolean = true)
+
+@Serializable
+data class SupplierInput(val name: String, val orgNumber: String)
+
+@Serializable
+data class AgreementInput(val supplierId: String, val startDate: String, val endDate: String,
+    val allowedVehicles: Int, val note: String = "")
+
+@Serializable
+data class FleetAgreement(val id: String, val supplierId: String, val startDate: String, val endDate: String,
+    val allowedVehicles: Int, val note: String, val updatedAt: String, val active: Boolean = true)
+
+@Serializable
+data class AgreementUpdate(val agreement: AgreementInput, val expectedUpdatedAt: String)
+
+@Serializable
+data class VehicleEntryInput(val registrationNumber: String? = null, val planned: Boolean = false)
+
+@Serializable
+data class VehicleChangeRequest(val expectedUpdatedAt: String)
+
+@Serializable
+data class ReplacementRequest(val replacement: VehicleEntryInput, val expectedUpdatedAt: String)
+
+/** Frozen evidence; subsequent agreement edits never rewrite a saved check. */
+@Serializable
+data class AgreementEvidence(val agreement: FleetAgreement, val supplier: FleetSupplier)
+
+@Serializable
+data class FleetChange(val id: String, val occurredAt: String, val actorName: String, val description: String,
+    val agreementId: String? = null, val reversedBy: String? = null, val undoOf: String? = null,
+    val canUndo: Boolean = false)
+
+@Serializable
+data class FleetOverview(val suppliers: List<FleetSupplier>, val agreements: List<FleetAgreement>,
+    val vehicles: List<Vehicle>, val changes: List<FleetChange>)
+
+data class ChangeActor(val id: String, val name: String)
+
+class FleetConflictException(message: String) : RuntimeException(message)

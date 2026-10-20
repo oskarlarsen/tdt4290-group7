@@ -1,4 +1,5 @@
-import type { DeviationFinding, RegistryCode, StoredApproval, VehicleCheck } from "../types/vehicle";
+import { vehicleDate } from "./vehicle";
+import type { DeviationFinding, RegistryCode, VehicleCheck } from "../types/vehicle";
 import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, catalogLabel, categoryGroup, fuelGroups, statisticNotApplicable } from "./vehicleCatalog";
 
 const missing = "Not available in this saved check";
@@ -35,30 +36,11 @@ const whole = (value: string | null | undefined, unit: string) => number(exactRa
 const fuelLabel = (value?: RegistryCode | null) => value ? FUEL_TECHNOLOGIES[value.code as keyof typeof FUEL_TECHNOLOGIES]
   ? catalogLabel(FUEL_TECHNOLOGIES, value.code) : `${value.code} — ${value.name ?? "Unrecognized fuel technology"}` : missing;
 
-function effectivePeriod(approval: StoredApproval): string {
-  const start = approval.data.startDate;
-  if (!start) return missing;
-  let end = approval.data.expiryDate;
-  if (approval.revokedAt) {
-    const instant = new Date(approval.revokedAt);
-    if (Number.isNaN(instant.getTime())) return missing;
-    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(instant);
-    const osloDate = ["year", "month", "day"].map(type => parts.find(part => part.type === type)?.value).join("-");
-    const previousDay = new Date(`${osloDate}T12:00:00Z`);
-    previousDay.setUTCDate(previousDay.getUTCDate() - 1);
-    const revokedEnd = previousDay.toISOString().slice(0, 10);
-    if (!end || revokedEnd < end) end = revokedEnd;
-  }
-  return end && end < start ? "No effective coverage — revoked before the period started" : `${start} to ${end ?? "indefinite"}`;
-}
-
 const titles: Record<string, string> = {
-  NOT_ON_APPROVED_LIST: "No approval recorded", APPROVAL_NOT_YET_ACTIVE: "Approval has not started",
-  APPROVAL_EXPIRED: "Approval has expired", APPROVAL_REVOKED: "Approval was revoked",
-  APPROVAL_PERIOD_NOT_COVERED: "Reporting period is not fully approved", APPROVAL_CONFLICT: "Overlapping approvals disagree",
-  APPROVAL_FUEL_MISMATCH: "Fuel technology is not approved for the full period", APPROVAL_CATEGORY_MISMATCH: "Vehicle category is not approved for the full period",
+  NOT_ON_AGREEMENT_LIST: "Vehicle is not in the agreement's vehicle list", AGREEMENT_NOT_STARTED: "Supplier agreement has not started",
+  AGREEMENT_EXPIRED: "Supplier agreement has ended", AGREEMENT_PERIOD_NOT_COVERED: "Reporting period extends outside the agreement",
   FUEL_MISMATCH: "Fuel technologies do not match", CATEGORY_MISMATCH: "Vehicle categories do not match",
-  BODY_TYPE_MISMATCH: "Body styles do not match", BRAND_MISMATCH: "Vehicle brands do not match", MODEL_MISMATCH: "Vehicle models do not match",
+  BODY_TYPE_MISMATCH: "Reported body type differs from Statens Vegvesen", BRAND_MISMATCH: "Vehicle brands do not match", MODEL_MISMATCH: "Vehicle models do not match",
   CO2_CLASSIFICATION_MISMATCH: "CO₂-emitting classification does not match", CO2_MISMATCH: "Reported CO₂ rate does not match",
   REGISTRY_CO2_DISAGREEMENT: "Registry CO₂ measurements differ", NOX_MISMATCH: "NOx rates do not match",
   CONSUMPTION_MISMATCH: "Fuel consumption figures do not agree", OVERLAPPING_STATISTICS: "Reporting periods overlap",
@@ -70,8 +52,6 @@ const titles: Record<string, string> = {
 export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck): DeviationAnalysis {
   const row = check.tripRows.find(r => r.id === finding.tripRowId);
   const otherRow = check.tripRows.find(r => r.id === finding.relatedTripRowId);
-  const a = check.approvals.find(item => item.id === finding.approvalId);
-  const b = check.approvals.find(item => item.id === finding.relatedApprovalId);
   const data = check.registry.data;
   const fuel = finding.fuelIndex == null ? undefined : data?.fuels[finding.fuelIndex];
   const measurement = finding.measurementIndex == null ? undefined : fuel?.measurements[finding.measurementIndex];
@@ -79,9 +59,7 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
   const result: DeviationAnalysis = { title: titles[finding.code] ?? finding.code.toLowerCase().replace(/_/g, " "),
     explanation: finding.description, comparison: { leftLabel: "Reported / expected", rightLabel: "Saved reference", rows: [] } };
   const compare = (label: string, left: string | null | undefined, right: string | null | undefined) => result.comparison.rows.push({ label, left: left ?? missing, right: right ?? missing });
-  const period = (start?: string | null, end?: string | null) => start ? `${start} to ${end ?? "indefinite"}` : missing;
-  const approvals = check.approvals.filter(item => !row || (item.data.startDate! <= row.data.periodEnd && (!item.data.expiryDate || item.data.expiryDate >= row.data.periodStart)));
-  const approvalPeriods = approvals.map(item => `${effectivePeriod(item)}${item.revokedAt ? ` (revoked ${item.revokedAt})` : ""}`).join("\n") || "No approval periods recorded";
+  const period = (start?: string | null, end?: string | null) => start ? `${vehicleDate(start)} to ${end ? vehicleDate(end) : "indefinite"}` : missing;
   switch (finding.code) {
     case "NOX_MISMATCH": {
       result.explanation = "The supplier's total NOx is converted from grams into milligrams per kilometer, then compared with the registry rate.";
@@ -114,13 +92,13 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
       compare("Body style", row ? catalogLabel(BODY_TYPES, row.data.bodyType) : null, data?.bodyType ? catalogLabel(BODY_TYPES, data.bodyType.code) : null);
       break;
     case "FUEL_MISMATCH":
-      result.comparison.leftLabel = a ? "Approved fuel technology" : "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
-      compare("Fuel technology", row || a ? catalogLabel(FUEL_TECHNOLOGIES, row?.data.fuelTechnology ?? a?.data.fuelTechnology) : null, data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
+      compare("Fuel technology", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
       result.note = "The agreed gas variants are grouped, but CNG and LNG stay separate. The registry's original codes are retained.";
       break;
     case "CATEGORY_MISMATCH":
-      result.comparison.leftLabel = a ? "Approved category" : "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
-      compare("Vehicle category", row || a ? catalogLabel(VEHICLE_CATEGORIES, row?.data.vehicleCategory ?? a?.data.vehicleCategory) : null, data?.vehicleCategory ? catalogLabel(VEHICLE_CATEGORIES, categoryGroup(data.vehicleCategory.code)) : null);
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
+      compare("Vehicle category", row ? catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory) : null, data?.vehicleCategory ? catalogLabel(VEHICLE_CATEGORIES, categoryGroup(data.vehicleCategory.code)) : null);
       if (data?.vehicleCategory) compare("Original registry code", "Compared using its normalized category", data.vehicleCategory.code);
       break;
     case "BRAND_MISMATCH": case "MODEL_MISMATCH":
@@ -128,21 +106,9 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
       compare(finding.code === "BRAND_MISMATCH" ? "Vehicle brand" : "Vehicle model", finding.code === "BRAND_MISMATCH" ? row?.data.make : row?.data.model, finding.code === "BRAND_MISMATCH" ? data?.make : data?.model);
       result.note = "Case, spacing and punctuation are ignored. Naming differences may still explain this finding.";
       break;
-    case "APPROVAL_CONFLICT":
-      result.explanation = "These approval periods overlap but specify different fuel technologies or vehicle categories.";
-      result.comparison.leftLabel = "Approval period 1"; result.comparison.rightLabel = "Approval period 2";
-      compare("Period", period(a?.data.startDate, a?.data.expiryDate), period(b?.data.startDate, b?.data.expiryDate));
-      compare("Effective coverage", a ? effectivePeriod(a) : null, b ? effectivePeriod(b) : null);
-      compare("Fuel technology", a ? catalogLabel(FUEL_TECHNOLOGIES, a.data.fuelTechnology) : null, b ? catalogLabel(FUEL_TECHNOLOGIES, b.data.fuelTechnology) : null);
-      compare("Vehicle category", a ? catalogLabel(VEHICLE_CATEGORIES, a.data.vehicleCategory) : null, b ? catalogLabel(VEHICLE_CATEGORIES, b.data.vehicleCategory) : null);
-      compare("Revoked", a?.revokedAt ?? "No", b?.revokedAt ?? "No");
-      break;
-    case "APPROVAL_PERIOD_NOT_COVERED": case "APPROVAL_FUEL_MISMATCH": case "APPROVAL_CATEGORY_MISMATCH":
-      result.comparison.leftLabel = "Supplier reporting row"; result.comparison.rightLabel = "Saved approval records";
-      compare("Period", period(row?.data.periodStart, row?.data.periodEnd), approvalPeriods);
-      compare("Fuel technology", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, approvals.map(item => catalogLabel(FUEL_TECHNOLOGIES, item.data.fuelTechnology)).join("\n") || "None recorded");
-      compare("Vehicle category", row ? catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory) : null, approvals.map(item => catalogLabel(VEHICLE_CATEGORIES, item.data.vehicleCategory)).join("\n") || "None recorded");
-      result.note = "The whole reporting period must be covered without gaps, including its fuel/category requirements. Revocation ends coverage from its Oslo date.";
+    case "AGREEMENT_PERIOD_NOT_COVERED":
+      result.comparison.leftLabel = "Supplier reporting period"; result.comparison.rightLabel = "Agreement / vehicle list";
+      compare("Period", period(row?.data.periodStart, row?.data.periodEnd), check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "No agreement linked");
       break;
     case "OVERLAPPING_STATISTICS":
       result.comparison.leftLabel = "Reporting row 1"; result.comparison.rightLabel = "Reporting row 2";
@@ -185,10 +151,6 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
       compare("Registry lookup", "A successful lookup with the required reference facts", check.registry.lookupOutcome);
       compare("Registry data source", "Usable reference data", check.registry.dataSource);
       compare("Registry fetched (UTC)", "Reference facts available at the saved check time", check.registry.fetchedAt);
-      if (a) {
-        compare("Approved fuel technology", catalogLabel(FUEL_TECHNOLOGIES, a.data.fuelTechnology), data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
-        if (!data?.vehicleCategory) compare("Approved vehicle category", catalogLabel(VEHICLE_CATEGORIES, a.data.vehicleCategory), null);
-      }
       if (row) {
         compare("Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology), data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
         result.inputs = [["Total distance", number(row.data.totalTripKm, "km")], ["NOx-registered distance", statisticNotApplicable("totalKmNoxRegistered", row.data.fuelTechnology) ? "Not applicable" : number(row.data.totalKmNoxRegistered, "km")], ["Total NOx", statisticNotApplicable("totalNoxRegisteredGrams", row.data.fuelTechnology) ? "Not applicable" : number(row.data.totalNoxRegisteredGrams, "g")]];
@@ -205,11 +167,14 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
       break;
     }
     default:
-      if (finding.origin === "APPROVAL") {
-        compare("Approval status at check time", "An active approval", check.approvalStatus);
-        compare("Approval period", "Covers the check date", a ? period(a.data.startDate, a.data.expiryDate) : "No approval record saved");
-        if (a?.revokedAt) compare("Revocation", "Not revoked on the check date", a.revokedAt);
-      } else compare("Registration status", "REGISTRERT — Registered", data?.registrationStatus ?? check.registry.registrationStatus);
+      if (finding.origin === "AGREEMENT") {
+        result.comparison.leftLabel = "Vehicle"; result.comparison.rightLabel = "Supplier agreement";
+        compare("Listed", check.vehicle.registrationNumber, check.vehicle.listed ? "In vehicle list" : "Not in vehicle list");
+        compare("Agreement period", "Covers the check date", check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "No agreement linked");
+      } else {
+        result.comparison.leftLabel = "Expected registration"; result.comparison.rightLabel = "Statens Vegvesen";
+        compare("Registration status", "Registered", data?.registrationStatus ?? check.registry.registrationStatus);
+      }
   }
   return result;
 }
