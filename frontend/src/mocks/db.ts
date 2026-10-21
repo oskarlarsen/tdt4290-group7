@@ -5,6 +5,7 @@ import { buildSupplierPortfolioSummary } from "./supplierSummary";
 import { formatSyncTime } from "../utils/formatSyncTime";
 import type { Notification, NotificationSeverity } from "../types/notification";
 import type { ContractStatus, DerivedContract } from "../types/contract";
+import type { Certificate } from "../types/certificate";
 
 // Keep modeled suppliers separate from aggregate data for suppliers without mock records.
 // Changes to a modeled supplier's risk or record count update the portfolio summary automatically.
@@ -308,4 +309,32 @@ export function getDerivedContracts(): DerivedContract[] {
       environmentalActual: mock.environmentalActual,
     };
   });
+}
+
+// Demo dates stay current; certificate status is derived from validUntil, not stored.
+// Supplier B's mainIssue is manually aligned with cert-001, and certificate status does not affect supplier risk.
+// TODO: Connect Mercell contract attachments and certification-body registries.
+function isoDateFromToday(offsetDays: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+const MOCK_CERTIFICATES: Certificate[] = [
+  { id: "cert-001", standard: "iso-14001", certificateNumber: "DEMO-CERT-001", contractId: "sup-b", validUntil: isoDateFromToday(-14) },
+  { id: "cert-002", standard: "gront-punkt-norge", certificateNumber: "DEMO-CERT-002", contractId: "sup-b", validUntil: isoDateFromToday(420) },
+  { id: "cert-003", standard: "iso-14001", certificateNumber: "DEMO-CERT-003", contractId: "sup-a", validUntil: isoDateFromToday(310) },
+  { id: "cert-004", standard: "eco-driving-course", certificateNumber: "DEMO-CERT-004", contractId: "sup-a", validUntil: isoDateFromToday(18) },
+  { id: "cert-005", standard: "miljofyrtarn", certificateNumber: null, contractId: "sup-c", validUntil: null },
+  { id: "cert-006", standard: "retura", certificateNumber: "DEMO-CERT-006", contractId: "sup-c", validUntil: isoDateFromToday(42) },
+  { id: "cert-007", standard: "eco-driving-course", certificateNumber: "DEMO-CERT-007", contractId: "sup-d", validUntil: isoDateFromToday(150) },
+  { id: "cert-008", standard: "emas", certificateNumber: "DEMO-CERT-008", contractId: "sup-d", validUntil: isoDateFromToday(520) },
+  { id: "cert-009", standard: "iso-14001", certificateNumber: "DEMO-CERT-009", contractId: "sup-e", validUntil: isoDateFromToday(600) },
+  { id: "cert-010", standard: "miljofyrtarn", certificateNumber: "DEMO-CERT-010", contractId: "sup-e", validUntil: isoDateFromToday(260) },
+];
+
+export function getCertificates(): Certificate[] {
+  return MOCK_CERTIFICATES;
 }

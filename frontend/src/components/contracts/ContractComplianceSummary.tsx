@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Mail, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
+import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
 import type { DerivedContract } from "../../types/contract";
 
 const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2 };
@@ -128,84 +129,18 @@ export function ContractComplianceSummary({
       </div>
 
       {isSendNoticeInfoOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/30 p-4"
-          onClick={() => setIsSendNoticeInfoOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="send-notice-title"
-            className="w-full max-w-md rounded-xl border border-neutral-100 bg-white p-4 shadow-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="send-notice-title" className="font-headline text-lg font-semibold text-neutral-900">
-                  Review notice
-                </h2>
-                <dl className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-neutral-500">Contract</dt>
-                    <dd className="text-right font-medium text-neutral-900">{current.contractName}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-neutral-500">Supplier</dt>
-                    <dd className="text-right font-medium text-neutral-900">{current.supplierName}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-neutral-500">Reason</dt>
-                    <dd className="text-right font-medium text-neutral-900">{noticeReason}</dd>
-                  </div>
-                </dl>
-                <div className="mt-3 rounded-lg bg-neutral-50 p-3">
-                  <label
-                    htmlFor="notice-message"
-                    className="text-xs font-medium text-neutral-500"
-                  >
-                    Notice message
-                  </label>
-                  <textarea
-                    id="notice-message"
-                    value={noticeMessageDraft}
-                    onChange={(event) => setNoticeMessageDraft(event.target.value)}
-                    rows={4}
-                    className="mt-1 w-full resize-y rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-sm leading-5 text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-                  />
-                </div>
-                <p className="mt-3 text-xs leading-5 text-neutral-500">
-                  Demo only — no email will be sent.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsSendNoticeInfoOpen(false)}
-                aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsSendNoticeInfoOpen(false)}
-                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSendNoticeInfoOpen(false);
-                  setIsNoticeRecorded(true);
-                }}
-                className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-              >
-                Send Notice
-              </button>
-            </div>
-          </div>
-        </div>
+        <NoticeReviewDialog
+          contractName={current.contractName}
+          supplierName={current.supplierName}
+          reason={noticeReason}
+          message={noticeMessageDraft}
+          onMessageChange={setNoticeMessageDraft}
+          onCancel={() => setIsSendNoticeInfoOpen(false)}
+          onConfirm={() => {
+            setIsSendNoticeInfoOpen(false);
+            setIsNoticeRecorded(true);
+          }}
+        />
       )}
 
       {isNoticeRecorded && (
