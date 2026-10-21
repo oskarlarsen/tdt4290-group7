@@ -6,6 +6,7 @@ import { formatSyncTime } from "../utils/formatSyncTime";
 import type { Notification, NotificationSeverity } from "../types/notification";
 import type { ContractStatus, DerivedContract } from "../types/contract";
 import type { Certificate } from "../types/certificate";
+import type { EnergyData, EnergyRecord, EnergyRequirement } from "../types/energy";
 
 // Keep modeled suppliers separate from aggregate data for suppliers without mock records.
 // Changes to a modeled supplier's risk or record count update the portfolio summary automatically.
@@ -337,4 +338,30 @@ const MOCK_CERTIFICATES: Certificate[] = [
 
 export function getCertificates(): Certificate[] {
   return MOCK_CERTIFICATES;
+}
+
+// Energy & fuel 
+function latestCompletedQuarterLabel(now: Date = new Date()): string {
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1; // 1..4
+  return currentQuarter === 1
+    ? `Q4 ${now.getFullYear() - 1}`
+    : `Q${currentQuarter - 1} ${now.getFullYear()}`;
+}
+
+const MOCK_ENERGY_PERIOD = latestCompletedQuarterLabel();
+
+const MOCK_ENERGY_REQUIREMENTS: EnergyRequirement[] = [
+  { contractId: "sup-a", minRenewableSharePercent: 50 },
+  { contractId: "sup-c", minRenewableSharePercent: 80 },
+  { contractId: "sup-d", minRenewableSharePercent: 80 },
+];
+
+const MOCK_ENERGY_RECORDS: EnergyRecord[] = [
+  { id: "energy-001", contractId: "sup-a", period: MOCK_ENERGY_PERIOD, consumptionKwh: { electric: 180000, biogas: 110000, fossil: 210000 } },
+  { id: "energy-002", contractId: "sup-c", period: MOCK_ENERGY_PERIOD, consumptionKwh: { electric: 0, biogas: 384000, fossil: 216000 } },
+  { id: "energy-003", contractId: "sup-d", period: MOCK_ENERGY_PERIOD, consumptionKwh: { electric: 434000, biogas: 0, fossil: 266000 } },
+];
+
+export function getEnergyData(): EnergyData {
+  return { requirements: MOCK_ENERGY_REQUIREMENTS, records: MOCK_ENERGY_RECORDS };
 }

@@ -9,6 +9,7 @@ type Props = {
   onCancel: () => void;
   onConfirm: () => void;
   showDemoNote?: boolean;
+  wrapReason?: boolean;
 };
 
 export function NoticeReviewDialog({
@@ -20,6 +21,7 @@ export function NoticeReviewDialog({
   onCancel,
   onConfirm,
   showDemoNote = true,
+  wrapReason = false,
 }: Props) {
   return (
     <div
@@ -34,22 +36,52 @@ export function NoticeReviewDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className={wrapReason ? "min-w-0 flex-1" : ""}>
             <h2 id="send-notice-title" className="font-headline text-lg font-semibold text-neutral-900">
               Review notice
             </h2>
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-4">
+            <dl
+              className={`mt-3 text-sm ${
+                wrapReason
+                  ? "grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2"
+                  : "space-y-2"
+              }`}
+            >
+              <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
                 <dt className="text-neutral-500">Contract</dt>
-                <dd className="text-right font-medium text-neutral-900">{contractName}</dd>
+                <dd
+                  className={
+                    wrapReason
+                      ? "min-w-0 flex-1 break-words text-left font-medium leading-5 text-neutral-900"
+                      : "text-right font-medium text-neutral-900"
+                  }
+                >
+                  {contractName}
+                </dd>
               </div>
-              <div className="flex justify-between gap-4">
+              <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
                 <dt className="text-neutral-500">Supplier</dt>
-                <dd className="text-right font-medium text-neutral-900">{supplierName}</dd>
+                <dd
+                  className={
+                    wrapReason
+                      ? "min-w-0 flex-1 break-words text-left font-medium leading-5 text-neutral-900"
+                      : "text-right font-medium text-neutral-900"
+                  }
+                >
+                  {supplierName}
+                </dd>
               </div>
-              <div className="flex justify-between gap-4">
+              <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
                 <dt className="text-neutral-500">Reason</dt>
-                <dd className="text-right font-medium text-neutral-900">{reason}</dd>
+                <dd
+                  className={
+                    wrapReason
+                      ? "min-w-0 flex-1 break-words whitespace-pre-line text-left font-medium leading-5 text-neutral-900"
+                      : "text-right font-medium text-neutral-900"
+                  }
+                >
+                  {reason}
+                </dd>
               </div>
             </dl>
             <div className="mt-3 rounded-lg bg-neutral-50 p-3">
