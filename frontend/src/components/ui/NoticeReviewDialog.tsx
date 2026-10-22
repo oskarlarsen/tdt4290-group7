@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 
 type Props = {
+  riskIndicator?: string;
   contractName: string;
   supplierName: string;
   reason: string;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function NoticeReviewDialog({
+  riskIndicator,
   contractName,
   supplierName,
   reason,
@@ -47,6 +49,20 @@ export function NoticeReviewDialog({
                   : "space-y-2"
               }`}
             >
+              {riskIndicator && (
+                <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
+                  <dt className="text-neutral-500">Risk / Risk Indicator</dt>
+                  <dd
+                    className={
+                      wrapReason
+                        ? "min-w-0 flex-1 break-words text-left font-medium leading-5 text-neutral-900"
+                        : "text-right font-medium text-neutral-900"
+                    }
+                  >
+                    {riskIndicator}
+                  </dd>
+                </div>
+              )}
               <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
                 <dt className="text-neutral-500">Contract</dt>
                 <dd
