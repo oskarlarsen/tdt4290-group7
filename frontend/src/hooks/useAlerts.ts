@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-// import { getAlerts } from "../api/alerts";
+import { getAlerts } from "../api/alerts";
 
-// TODO: call the real API client once the backend contract is agreed
+// The key deliberately starts with "dashboard-summary". The existing dismiss/restore
+// mutations invalidate that prefix, so this list refreshes automatically after any
+// dismiss or restore, whether it happens here or on the Dashboard.
 export function useAlerts() {
   return useQuery({
-    queryKey: ["Alerts"],
-    queryFn: async () => {
-      throw new Error("useAlerts: not yet implemented");
-    },
+    queryKey: ["dashboard-summary", "alerts"],
+    queryFn: getAlerts,
+    staleTime: 60_000,
   });
 }
