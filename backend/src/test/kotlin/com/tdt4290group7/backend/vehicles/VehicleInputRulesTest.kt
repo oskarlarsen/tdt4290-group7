@@ -84,7 +84,7 @@ class VehicleInputRulesTest {
             val invalid = listOf(
                 "fuel_technology" to "'999'", "fuel_technology" to "'Diesel'", "vehicle_category" to "'light'",
                 "body_type" to "'Station wagon'", "make" to "''", "model" to "'   '", "co2_registered" to "2",
-                "co2_registered" to "NULL", "trip_count" to "NULL", "trip_count" to "'bad'", "trip_count" to "2147483648",
+                "co2_registered" to "NULL",
                 "total_trip_km_unscaled" to "NULL", "total_trip_km_unscaled" to "-1", "total_trip_km_scale" to "19",
                 "fuel_consumed_litres_unscaled" to "NULL", "period_start" to "'2026-02-30'",
                 "period_end" to "'2025-12-31'", "registration_number" to "'CD12345'",
@@ -115,24 +115,30 @@ class VehicleInputRulesTest {
     }
 
     @Test
-    fun versionTwoIsRefusedWithoutReinterpretingOrDeletingRecords() {
-        val path = path()
-        java.nio.file.Files.createDirectories(path.parent)
-        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
-            db.createStatement().use {
-                it.execute("CREATE TABLE vehicles(registration_number TEXT PRIMARY KEY)")
-                it.execute("INSERT INTO vehicles VALUES('TEST01')")
-                it.execute("PRAGMA user_version=2")
+    fun incompatibleSchemasRequireAnExplicitResetWithoutChangingRecords() {
+        for (version in listOf(2, 7)) {
+            val path = path()
+            java.nio.file.Files.createDirectories(path.parent)
+            DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+                db.createStatement().use {
+                    it.execute("CREATE TABLE vehicles(registration_number TEXT PRIMARY KEY)")
+                    it.execute("INSERT INTO vehicles VALUES('TEST01')")
+                    it.execute("PRAGMA user_version=$version")
+                }
+            }
+            val error = assertFailsWith<IllegalStateException> { VehicleRepository(path) }
+            assertTrue(error.message!!.contains("reset-vehicle-data.ps1"))
+            DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+                db.createStatement().use { it.executeQuery("SELECT registration_number FROM vehicles").use { rows ->
+                    assertTrue(rows.next()); assertEquals("TEST01", rows.getString(1)); assertFalse(rows.next())
+                } }
+                db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
+                    rows.next(); assertEquals(version, rows.getInt(1))
+                } }
             }
         }
-        assertFailsWith<IllegalStateException> { VehicleRepository(path) }
-        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
-            db.createStatement().use { it.executeQuery("SELECT registration_number FROM vehicles").use { rows ->
-                assertTrue(rows.next()); assertEquals("TEST01", rows.getString(1)); assertFalse(rows.next())
-            } }
-            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows -> rows.next(); assertEquals(2, rows.getInt(1)) } }
-        }
     }
+
 
 
 }

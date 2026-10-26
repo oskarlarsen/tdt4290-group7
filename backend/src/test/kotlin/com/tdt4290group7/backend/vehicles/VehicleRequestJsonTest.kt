@@ -18,10 +18,9 @@ class VehicleRequestJsonTest {
     fun acceptsExactJsonNumbersIncludingExponentButNotNumericStrings() {
         val input = decodeTripRowsRequest(body(""","co2GramsPerKm":123.456789,"totalTripKm":1e3,
             "totalKmNoxRegistered":1000,"totalNoxRegisteredGrams":12.345,
-            "tripCount":3,"co2Registered":true""")).rows.single()
+            "co2Registered":true""")).rows.single()
         assertEquals(BigDecimal("123.456789"), input.co2GramsPerKm)
         assertEquals(0, input.totalTripKm.compareTo(BigDecimal("1000")))
-        assertEquals(3, input.tripCount)
         val output = Json.encodeToString(StoredTripRow("row", "AB12345", createdAt = "2026-01-01T00:00:00Z", data = input))
         assertTrue("123.456789" in output && "\"estimatedCo2Kg\":123.456789" in output)
     }
@@ -32,7 +31,7 @@ class VehicleRequestJsonTest {
             "\"fuel\":\"Diesel\"", "\"vehicleType\":\"Sedan\"", "\"hybridCategory\":\"INGEN\"",
             "\"estimatedCo2Kg\":123", "\"additionalFields\":{}", "\"co2GramsPerKm\":\"123.45\"",
             "\"assignmentNumber\":\"job\"", "\"averageConsumptionLitresPerKm\":0.08",
-            "\"co2Registered\":\"true\"", "\"tripCount\":\"3\"", "\"tripCount\":3.0",
+            "\"co2Registered\":\"true\"", "\"tripCount\":\"3\"", "\"tripCount\":3.0", "\"tripCount\":3",
             "\"make\":123", "\"periodStart\":123", "\"co2GramsPerKm\":-1",
             "\"co2GramsPerKm\":1e1000000", "\"co2GramsPerKm\":0.0000000000000000001",
             "\"fuelTechnology\":2", "\"fuelTechnology\":\"Diesel\"", "\"fuelTechnology\":\"999\"",

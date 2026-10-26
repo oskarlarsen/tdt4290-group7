@@ -91,9 +91,6 @@ export function statisticsBody(values: Record<string, string>): string {
       row.push(`${JSON.stringify(key)}:${decimalLiteral(values[key], label)}`);
     }
   }
-  if (!values.tripCount?.trim()) throw new Error("Job/trip count is required.");
-  if (!/^\d+$/.test(values.tripCount.trim()) || BigInt(values.tripCount.trim()) > 2147483647n) throw new Error("Job/trip count must be a whole number between 0 and 2147483647.");
-  row.push(`"tripCount":${Number(values.tripCount)}`);
   if (!["true", "false"].includes(values.co2Registered)) throw new Error("Select whether the vehicle is registered as CO₂-emitting.");
   row.push(`"co2Registered":${values.co2Registered === "true"}`);
   return `{"sourceName":${JSON.stringify(values.sourceName?.trim() || null)},"rows":[{${row.join(",")}}]}`;
@@ -119,8 +116,8 @@ export function statisticsSaveMessage(result: StatisticsSave, plate: string): st
   if (!outcome?.check) return "Statistics saved, but verification was not returned. Run a check from vehicle details; do not resubmit statistics.";
   const checked = outcome.check;
   const registry = checked.dataSource === "UNAVAILABLE" || checked.lookupOutcome !== "FOUND"
-    ? `Statens Vegvesen verification incomplete (${humanize(checked.lookupOutcome)}).`
-    : checked.dataSource === "STALE_CACHE" ? "Statens Vegvesen verification uses stale data; refresh failed." : `Statens Vegvesen data: ${humanize(checked.dataSource)}.`;
+    ? `Statens vegvesen verification incomplete (${humanize(checked.lookupOutcome)}).`
+    : checked.dataSource === "STALE_CACHE" ? "Statens vegvesen verification uses stale data; refresh failed." : `Statens vegvesen data: ${humanize(checked.dataSource)}.`;
   return `Statistics saved and automatic check recorded: ${checkLabel(checked)}. ${registry}`;
 }
 export function humanize(value: string): string { return value.toLowerCase().replace(/_/g, " "); }

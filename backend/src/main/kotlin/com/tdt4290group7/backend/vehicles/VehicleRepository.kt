@@ -109,7 +109,6 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                     "fuel_technology" to input.fuelTechnology.code, "make" to input.make,
                     "body_type" to input.bodyType.name, "vehicle_category" to input.vehicleCategory.name,
                     "model" to input.model, "co2_registered" to input.co2Registered.asInteger(),
-                    "trip_count" to input.tripCount,
                     "comment" to input.comment,
                 )
                 tripDecimalColumns.forEach { values.putDecimal(it.name, it.value(input)) }
@@ -133,7 +132,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
 
     override fun saveCheck(check: VehicleCheckResponse, newSnapshot: RegistrySnapshot?) {
         writeTransaction { db ->
-            if (newSnapshot != null) insertSnapshot(db, newSnapshot)
+            if (newSnapshot != null) database.insertRegistrySnapshot(db, newSnapshot)
             val evidence = check.agreement
             val agreement = evidence?.agreement
             insert(db, "vehicle_checks", mapOf(
@@ -189,34 +188,6 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }.firstOrNull()
     }
 
-    private fun insertSnapshot(db: Connection, snapshot: RegistrySnapshot) {
-        require(snapshot.registrationNumber == snapshot.data.registrationNumber) { "Snapshot vehicle mismatch" }
-        val data = snapshot.data
-        val values = linkedMapOf<String, Any?>(
-            "id" to snapshot.id, "registration_number" to snapshot.registrationNumber,
-            "fetched_at" to snapshot.fetchedAt, "source" to snapshot.source,
-            "registration_status" to data.registrationStatus, "make" to data.make, "model" to data.model,
-        )
-        values.putCode("vehicle_category", data.vehicleCategory)
-        values.putCode("body_type", data.bodyType)
-        values.putCode("euro_class", data.euroClass)
-        insert(db, "svv_snapshots", values)
-        data.fuels.forEachIndexed { fuelIndex, fuel ->
-            val fuelValues = linkedMapOf<String, Any?>("snapshot_id" to snapshot.id, "fuel_index" to fuelIndex)
-            fuelValues.putCode("fuel_technology", fuel.fuelTechnology)
-            insert(db, "svv_snapshot_fuels", fuelValues)
-            fuel.measurements.forEachIndexed { measurementIndex, measurement ->
-                val measurementValues = linkedMapOf<String, Any?>(
-                    "snapshot_id" to snapshot.id, "fuel_index" to fuelIndex, "measurement_index" to measurementIndex,
-                )
-                measurementValues.putCode("measurement_method", measurement.measurementMethod)
-                measurementValues.putDecimal("co2_grams_per_km", measurement.co2GramsPerKm)
-                measurementValues.putDecimal("nox_mg_per_km", measurement.noxMgPerKm)
-                insert(db, "svv_emission_measurements", measurementValues)
-            }
-        }
-    }
-
     private fun snapshotFrom(db: Connection, row: ResultSet): RegistrySnapshot {
         val id = row.getString("id")
         val plate = row.getString("registration_number")
@@ -230,7 +201,8 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }
         return RegistrySnapshot(id, plate, row.getString("fetched_at"), row.getString("source"),
             RegistryVehicleData(plate, row.getString("registration_status"), row.getString("make"), row.getString("model"),
-                row.code("vehicle_category"), row.code("body_type"), row.code("euro_class"), fuels))
+                row.code("vehicle_category"), row.code("body_type"), row.code("euro_class"), fuels,
+                row.getString("last_approved_inspection_date"), row.getString("next_inspection_due_date")))
     }
 
     private fun tripFrom(row: ResultSet): StoredTripRow {
@@ -249,7 +221,6 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 totalKmFuelRegistered = row.decimal("total_km_fuel_registered")!!,
                 totalKmNoxRegistered = row.decimal("total_km_nox_registered"),
                 totalNoxRegisteredGrams = row.decimal("total_nox_registered_grams"),
-                tripCount = row.getInt("trip_count"),
                 averageFuelConsumptionLitresPer100Km = row.decimal("average_fuel_consumption_litres_per_100_km"),
                 fuelConsumedLitres = row.decimal("fuel_consumed_litres"), comment = row.getString("comment"),
             ))
@@ -271,7 +242,6 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         val end = validatedDate(input.periodEnd, "rows[$index].periodEnd")
         require(!end.isBefore(start)) { "rows[$index].periodEnd must not be before periodStart" }
         require(input.make.isNotBlank() && input.model.isNotBlank()) { "rows[$index].make and model must not be blank" }
-        require(input.tripCount >= 0) { "rows[$index].tripCount must be non-negative" }
         if (input.fuelTechnology.emissionsNotApplicable) {
             require(!input.co2Registered && tripDecimalColumns.filter { it.name in inapplicableEmissionColumns }.all { it.value(input) == null }) {
                 "rows[$index] must report co2Registered=false and null CO2/NOx measurements and registered distances for electric/hydrogen vehicles"
@@ -329,17 +299,5 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
     private fun ResultSet.decimal(column: String): BigDecimal? = getObject(column + "_unscaled")?.let {
         BigDecimal(BigInteger.valueOf(getLong(column + "_unscaled")), getInt(column + "_scale"))
     }
-
-    private fun MutableMap<String, Any?>.putCode(column: String, code: RegistryCode?) {
-        this[column] = code?.code
-        this[column + "_name"] = code?.name
-    }
-
-    private fun MutableMap<String, Any?>.putDecimal(column: String, value: BigDecimal?) {
-        val parts = value?.let(::decimalParts)
-        this[column + "_unscaled"] = parts?.unscaled
-        this[column + "_scale"] = parts?.scale
-    }
-
 
 }

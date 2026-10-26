@@ -50,7 +50,7 @@ internal fun evaluateDeviationRules(agreement: AgreementEvidence?, vehicle: Vehi
             val co2 = fuel.measurements.mapNotNull { m -> m.co2GramsPerKm?.let { "${m.measurementMethod?.code ?: "unknown method"}: ${it.toPlainString()} g/km (rounded ${rounded(it)})" } }
             if (fuel.measurements.mapNotNull { it.co2GramsPerKm?.let(::rounded) }.distinct().size > 1)
                 finding(VehicleDeviation.REGISTRY_CO2_DISAGREEMENT,
-                    "Review: Statens Vegvesen CO₂ measurements differ for fuel ${fuel.fuelTechnology?.code ?: "unknown"}: ${co2.joinToString("; ")}. Different methods may explain the discrepancy.",
+                    "Review: Statens vegvesen CO₂ measurements differ for fuel ${fuel.fuelTechnology?.code ?: "unknown"}: ${co2.joinToString("; ")}. Different methods may explain the discrepancy.",
                     DeviationOrigin.REGISTRY, fuelIndex = fi)
         }
     }

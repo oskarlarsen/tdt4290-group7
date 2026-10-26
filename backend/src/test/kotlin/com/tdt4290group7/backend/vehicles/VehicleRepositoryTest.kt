@@ -23,8 +23,8 @@ class VehicleRepositoryTest {
             {
                 repository.appendTripRows(
                     AppendTripRowsRequest(rows = listOf(
-                        syntheticTrip("AB 12345", "2026-01-01", "2026-01-31", tripCount = index),
-                        syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", tripCount = index),
+                        syntheticTrip("AB 12345", "2026-01-01", "2026-01-31", comment = "batch-$index"),
+                        syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", comment = "batch-$index"),
                     )),
                     Instant.now(),
                 )
@@ -37,7 +37,7 @@ class VehicleRepositoryTest {
         val stored = repositories.first().tripRowsForVehicle(vehicleIds.single())
         assertEquals(16, stored.size)
         assertEquals(16, stored.map { it.id }.distinct().size)
-        assertEquals((0..7).associate { it to 2 }, stored.groupingBy { requireNotNull(it.data.tripCount) }.eachCount())
+        assertEquals((0..7).associate { "batch-$it" to 2 }, stored.groupingBy { requireNotNull(it.data.comment) }.eachCount())
         connection(path).use { db -> assertEquals(1, count(db, "vehicles")) }
     }
 

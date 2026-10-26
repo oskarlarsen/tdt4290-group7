@@ -6,6 +6,7 @@ import { agreementDuration, validDate, validPlate } from "../../utils/vehicle";
 import { VehicleDialog, Field, ErrorNotice, buttonClass, primaryClass, inputClass } from "./VehicleDialog";
 import { RegistrationNumberInput } from "./VehicleInputs";
 import { FieldTooltip } from "./FieldTooltip";
+import { ConfirmAction } from "./ConfirmAction";
 
 function FormFooter({ busy, label, onClose }: { busy: boolean; label: string; onClose: () => void }) {
   return <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
@@ -54,23 +55,37 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
 export function VehicleEntryForm({ agreementId, replacing, onClose, onSaved }: { agreementId: string; replacing?: Vehicle; onClose: () => void; onSaved: () => void }) {
   const [planned, setPlanned] = useState(false);
   const [plate, setPlate] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [validationError, setValidationError] = useState<unknown>();
   const save = useMutation({ mutationFn: () => {
     const input = planned ? { planned: true } : { planned: false, registrationNumber: validPlate(plate) };
     return replacing ? api.replaceVehicle(replacing, input) : api.addVehicle(agreementId, input);
-  }, onSuccess: onSaved, retry: false });
+  }, onSuccess: () => { setConfirming(false); onSaved(); }, retry: false });
   const title = replacing?.planned ? "Register vehicle" : replacing ? `Replace ${replacing.registrationNumber}` : "Add vehicle";
-  function submit(event: FormEvent) { event.preventDefault(); save.mutate(); }
-  return <VehicleDialog title={title} onClose={onClose} busy={save.isPending}>
+  function submit(event: FormEvent) {
+    event.preventDefault(); if (save.isPending) return;
+    setValidationError(undefined); save.reset();
+    try { if (!planned) validPlate(plate); } catch (error) { setValidationError(error); return; }
+    if (replacing && !replacing.planned) setConfirming(true); else save.mutate();
+  }
+  return <><VehicleDialog title={title} onClose={onClose} busy={save.isPending}>
     <form className="space-y-5" onSubmit={submit}>
       {!replacing?.planned && <div className="relative flex items-center gap-3 pr-8">
         <button type="button" role="switch" aria-checked={planned} aria-label="Registration pending" disabled={save.isPending} onClick={() => setPlanned(!planned)} className={`relative h-6 w-11 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2 ${planned ? "bg-primary-900" : "bg-neutral-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${planned ? "left-0.5 translate-x-5" : "left-0.5"}`} /></button>
         <span className="text-sm">Registration pending</span>
         <FieldTooltip label="Registration pending" text="Reserves one vehicle place until the registration number is available." />
       </div>}
-      <Field label={planned ? "Planned identifier" : "Registration number"}>
+      <fieldset disabled={save.isPending}><Field label={planned ? "Planned identifier" : "Registration number"}>
         {planned ? <input disabled className={`${inputClass} text-neutral-400`} value="Assigned automatically" /> : <RegistrationNumberInput autoFocus value={plate} onChange={setPlate} />}
-      </Field>
-      <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label={replacing?.planned ? "Register vehicle" : replacing ? "Replace vehicle" : "Add vehicle"} onClose={onClose} />
+      </Field></fieldset>
+      {save.isPending && !planned && <p role="status" className="text-sm text-neutral-500">Checking registration with Statens vegvesen…</p>}
+      <ErrorNotice error={validationError ?? save.error} /><FormFooter busy={save.isPending} label={save.isError ? "Try again" : replacing?.planned ? "Register vehicle" : replacing ? "Replace vehicle" : "Add vehicle"} onClose={onClose} />
     </form>
-  </VehicleDialog>;
+  </VehicleDialog>
+    {confirming && replacing && <ConfirmAction title={`Replace ${replacing.registrationNumber} with ${planned ? "a vehicle with registration pending" : validPlate(plate)}?`}
+      label="Replace vehicle" busy={save.isPending} error={save.error} onCancel={() => setConfirming(false)} onConfirm={() => save.mutate()}>
+      <p>The replacement takes effect immediately. The existing vehicle’s reports and history are kept.</p>
+      <p className="mt-2">You can undo this from Change history.</p>
+    </ConfirmAction>}
+  </>;
 }

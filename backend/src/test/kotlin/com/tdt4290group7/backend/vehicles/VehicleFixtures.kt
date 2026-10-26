@@ -11,11 +11,11 @@ fun syntheticTrip(
     totalTripKm: BigDecimal = BigDecimal.ZERO, totalKmCo2Registered: BigDecimal? = if (fuelTechnology.emissionsNotApplicable) null else BigDecimal.ZERO,
     totalKmCo2NotRegistered: BigDecimal = BigDecimal.ZERO, kmFuelNotRegistered: BigDecimal = BigDecimal.ZERO,
     totalKmFuelRegistered: BigDecimal = BigDecimal.ZERO, totalKmNoxRegistered: BigDecimal? = if (fuelTechnology.emissionsNotApplicable) null else BigDecimal.ZERO,
-    totalNoxRegisteredGrams: BigDecimal? = if (fuelTechnology.emissionsNotApplicable) null else BigDecimal.ZERO, tripCount: Int = 0,
+    totalNoxRegisteredGrams: BigDecimal? = if (fuelTechnology.emissionsNotApplicable) null else BigDecimal.ZERO,
     averageFuelConsumptionLitresPer100Km: BigDecimal? = if (fuelTechnology.usesLitres) BigDecimal.ZERO else null,
     fuelConsumedLitres: BigDecimal? = if (fuelTechnology.usesLitres) BigDecimal.ZERO else null,
     comment: String? = null, vehicleCategory: VehicleCategory = VehicleCategory.M1,
 ) = TripRowInput(registrationNumber, periodStart, periodEnd, fuelTechnology, make, bodyType, model,
     co2Registered, co2GramsPerKm, totalTripKm, totalKmCo2Registered, totalKmCo2NotRegistered,
     kmFuelNotRegistered, totalKmFuelRegistered, totalKmNoxRegistered, totalNoxRegisteredGrams,
-    tripCount, vehicleCategory, averageFuelConsumptionLitresPer100Km, fuelConsumedLitres, comment)
+    vehicleCategory, averageFuelConsumptionLitresPer100Km, fuelConsumedLitres, comment)

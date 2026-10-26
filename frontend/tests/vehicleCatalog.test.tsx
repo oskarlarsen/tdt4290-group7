@@ -39,10 +39,10 @@ describe("official vehicle catalogues and required form inputs", () => {
 
   it("starts with the reporting summary and groups technical inputs under details", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><StatisticsForm onClose={() => {}} onSaved={() => {}} /></QueryClientProvider>);
-    expect(html).toContain("Add reporting statistics"); expect(html).toContain("Reporting period start");
+    expect(html).toContain("Add reported data"); expect(html).toContain("Reporting period start");
     expect(html.indexOf("Estimated CO\u2082")).toBeLessThan(html.indexOf("<details"));
     expect(html.indexOf("NOx-registered distance")).toBeGreaterThan(html.indexOf("<details"));
-    expect(html).toContain("Vehicle, fuel and NOx details"); expect(html).not.toContain("Median");
+    expect(html).toContain("Additional details"); expect(html).not.toContain("Median");
     expect(html).not.toContain("Source / reference"); expect(html).toContain("Save and check");
   });
 });

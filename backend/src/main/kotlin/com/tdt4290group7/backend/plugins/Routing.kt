@@ -4,6 +4,7 @@ import com.tdt4290group7.backend.vehicles.decodeTripRowsRequest
 import com.tdt4290group7.backend.vehicles.decodeVehicleCheckRequest
 import com.tdt4290group7.backend.vehicles.VehicleCheckService
 import com.tdt4290group7.backend.vehicles.VehicleRegistryClient
+import com.tdt4290group7.backend.vehicles.VehicleRegistryLookup
 import com.tdt4290group7.backend.vehicles.VehicleStore
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -41,7 +42,8 @@ fun Application.configureRouting(
     registry: VehicleRegistryClient?,
     cacheTtl: Duration,
 ) {
-    val checks = VehicleCheckService(repository, registry, cacheTtl)
+    val registryLookup = VehicleRegistryLookup(registry, cacheTtl)
+    val checks = VehicleCheckService(repository, registry, cacheTtl, registryLookup = registryLookup)
     routing {
         get("/health") {
             call.respond(HealthStatus())
@@ -52,7 +54,7 @@ fun Application.configureRouting(
         }
 
         authenticate(AUTH_JWT) {
-            if (repository is VehicleRepository) fleetRoutes(repository.fleet)
+            if (repository is VehicleRepository) fleetRoutes(repository.fleet, registryLookup)
             get("/api/vehicles/{registrationNumber}") {
                 if (call.adminActor() == null) return@get
                 val result = try {

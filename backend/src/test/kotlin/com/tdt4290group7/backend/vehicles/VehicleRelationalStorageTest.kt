@@ -57,7 +57,7 @@ class VehicleRelationalStorageTest {
         val input = syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", FuelTechnology.DIESEL,
             "Make", BodyType.AA, "Model", true, BigDecimal("123.456789"),
             BigDecimal("1000"), BigDecimal("900"), BigDecimal("100"), BigDecimal("50"),
-            BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"), 3,
+            BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"),
             BigDecimal("12.3456"), BigDecimal("123.456"), "Synthetic comment")
         val stored = repository.appendTripRows(AppendTripRowsRequest("source", listOf(input)), now).rows.single()
         val loaded = repository.tripRowsForVehicle("AB12345").single()
@@ -76,7 +76,7 @@ class VehicleRelationalStorageTest {
         val invalid = listOf(
             valid.copy(periodStart = "2026-1-01"), valid.copy(periodEnd = "2026-02-30"),
             valid.copy(periodEnd = "2025-12-31"), valid.copy(totalTripKm = BigDecimal("-1")),
-            valid.copy(tripCount = -1), valid.copy(co2GramsPerKm = BigDecimal("0.0000000000000000001")),
+            valid.copy(co2GramsPerKm = BigDecimal("0.0000000000000000001")),
             valid.copy(totalTripKm = BigDecimal("9223372036854775808")),
         )
         invalid.forEach {

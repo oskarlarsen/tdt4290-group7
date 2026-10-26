@@ -55,7 +55,6 @@ internal val vehicleSchemaStatements = fleetSchemaStatements + listOf(
         make TEXT NOT NULL CHECK (length(trim(make)) > 0),
         model TEXT NOT NULL CHECK (length(trim(model)) > 0),
         ${booleanColumn("co2_registered", true)},
-        trip_count INTEGER NOT NULL CHECK (trip_count BETWEEN 0 AND 2147483647),
         comment TEXT,
         ${tripDecimalColumns.joinToString(",\n") { decimalColumns(it.name, it.name !in inapplicableEmissionColumns && it.name !in listOf("average_fuel_consumption_litres_per_100_km", "fuel_consumed_litres")) }},
         CHECK ((vehicle_category IN ('O1','O2','O3','O4')) = (fuel_technology = 'NOT_APPLICABLE')),
@@ -78,6 +77,7 @@ internal val vehicleSchemaStatements = fleetSchemaStatements + listOf(
         vehicle_category TEXT, vehicle_category_name TEXT,
         body_type TEXT, body_type_name TEXT,
         euro_class TEXT, euro_class_name TEXT,
+        ${dateColumn("last_approved_inspection_date")}, ${dateColumn("next_inspection_due_date")},
         UNIQUE (id, registration_number)
     ) STRICT""",
     "CREATE INDEX IF NOT EXISTS idx_svv_snapshots_vehicle_time ON svv_snapshots(registration_number, fetched_at DESC, id DESC)",

@@ -128,8 +128,8 @@ class ApplicationTest {
         val trips = postJson(
             "/api/trip-rows",
             Json.encodeToString(AppendTripRowsRequest("trip-sheet", listOf(
-                syntheticTrip("AB 12345", tripCount = 3, totalTripKm = "45.5".toBigDecimal()),
-                syntheticTrip("AB12345", tripCount = 7, totalTripKm = "62".toBigDecimal()),
+                syntheticTrip("AB 12345", totalTripKm = "45.5".toBigDecimal()),
+                syntheticTrip("AB12345", totalTripKm = "62".toBigDecimal()),
             ))),
         )
         assertEquals(HttpStatusCode.Created, trips.status)

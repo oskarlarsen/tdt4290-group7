@@ -5,6 +5,7 @@ import { useVehicle, useVehicleCheck, useVehicleHistory, useRefreshVehicles } fr
 import { timestamp, vehicleDate, checkLabel } from "../../utils/vehicle";
 import { StatisticsForm } from "./VehicleForms";
 import { StatisticsCard } from "./StatisticsCard";
+import { RegistryStatistics } from "./RegistryStatistics";
 import { VehicleCheckResult } from "./VehicleCheckResult";
 import { VehicleDialog, ErrorNotice, Paging, buttonClass, primaryClass } from "./VehicleDialog";
 
@@ -19,8 +20,8 @@ export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () 
   const history = useVehicleHistory(plate, historyPage);
   const check = useVehicleCheck(selectedCheck ?? detail.data?.latestCheck?.id);
   const refresh = useRefreshVehicles();
-  const run = useMutation({ mutationFn: () => api.runCheck(plate, false), retry: false, onSuccess: result => {
-    setSelectedCheck(result.id); setTab("Deviations"); void refresh();
+  const run = useMutation({ mutationFn: (forceRefresh: boolean) => api.runCheck(plate, forceRefresh), retry: false, onSuccess: (result, forceRefresh) => {
+    setSelectedCheck(result.id); if (!forceRefresh) setTab("Deviations"); void refresh();
   } });
   const data = detail.data;
   return <>
@@ -35,7 +36,7 @@ export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () 
             {data.agreement && <p className="mt-1 text-xs text-neutral-500">{vehicleDate(data.agreement.agreement.startDate)} – {vehicleDate(data.agreement.agreement.endDate)}</p>}
             {!data.vehicle.listed && <p className="mt-1 text-xs text-red-700">Not in the agreement’s current vehicle list</p>}
           </div>
-          <div className="flex gap-2"><button className={buttonClass} onClick={() => setAddingStatistics(true)}>Add statistics</button><button className={primaryClass} disabled={run.isPending} onClick={() => run.mutate()}>{run.isPending ? "Checking…" : "Check for deviations"}</button></div>
+          <div className="flex gap-2"><button className={buttonClass} onClick={() => setAddingStatistics(true)}>Add statistics</button><button className={primaryClass} disabled={run.isPending} onClick={() => run.mutate(false)}>{run.isPending ? "Checking…" : "Check for deviations"}</button></div>
         </div>
         <div role="tablist" aria-label="Vehicle information" className="flex gap-1 border-b border-neutral-200">
           {["Statistics", "Deviations", "History"].map((name, index, tabs) => <button key={name} role="tab" id={`vehicle-tab-${name}`} aria-selected={tab === name} tabIndex={tab === name ? 0 : -1} aria-controls="vehicle-panel" onClick={() => setTab(name)} onKeyDown={event => {
@@ -44,11 +45,18 @@ export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () 
           }} className={`border-b-2 px-3 py-2 text-sm focus-visible:outline-primary-700 ${tab === name ? "border-primary-900 font-medium text-primary-900" : "border-transparent text-neutral-500"}`}>{name}</button>)}
         </div>
         <div id="vehicle-panel" role="tabpanel" aria-labelledby={`vehicle-tab-${tab}`} className="space-y-4">
-          {tab === "Statistics" && <>{data.tripRows.map(row => <StatisticsCard key={row.id} row={row} highlight={row.id === selectedRow} />)}{!data.tripRows.length && <p className="text-sm text-neutral-500">No reporting statistics yet.</p>}</>}
+          {tab === "Statistics" && <>
+            <RegistryStatistics snapshot={data.latestSnapshot} busy={run.isPending} onRefresh={() => run.mutate(true)}
+              refreshFailed={!!data.latestCheck && (!data.latestSnapshot || data.latestCheck.checkedAt >= data.latestSnapshot.fetchedAt) && ["STALE_CACHE", "UNAVAILABLE"].includes(data.latestCheck.dataSource)} />
+            <section aria-label="Reported data" className="space-y-4"><h3 className="text-sm font-semibold">Reported data</h3>
+              {data.tripRows.map(row => <StatisticsCard key={row.id} row={row} highlight={row.id === selectedRow} />)}
+              {!data.tripRows.length && <p className="text-sm text-neutral-500">No reported data yet.</p>}
+            </section>
+          </>}
           {tab === "Deviations" && <>
             {check.isLoading && <p role="status">Loading check…</p>}<ErrorNotice error={check.error} />
             {check.data && <VehicleCheckResult check={check.data} historical={check.data.id !== data.latestCheck?.id} onViewRow={id => { setSelectedRow(id); setTab("Statistics"); }} />}
-            {!data.latestCheck && !selectedCheck && <p className="text-sm text-neutral-500">Run a check to compare this vehicle with the agreement and Statens Vegvesen.</p>}
+            {!data.latestCheck && !selectedCheck && <p className="text-sm text-neutral-500">Run a check to compare this vehicle with the agreement and Statens vegvesen.</p>}
           </>}
           {tab === "History" && <>
             {history.isLoading && <p role="status">Loading previous checks…</p>}<ErrorNotice error={history.error} />

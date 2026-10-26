@@ -79,12 +79,13 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             writer.save("agreements", previous + ("active" to 0))
         }
 
-    fun addVehicle(agreementId: String, input: VehicleEntryInput, actor: ChangeActor, now: Instant): Vehicle =
+    fun addVehicle(agreementId: String, input: VehicleEntryInput, actor: ChangeActor, now: Instant, snapshot: RegistrySnapshot? = null): Vehicle =
         change(actor, now, agreementId, "Added vehicle") { writer ->
             val agreement = requireActive(writer.db, "agreements", agreementId)
             val count = database.query(writer.db, "SELECT count(*) FROM vehicles WHERE agreement_id = ? AND listed = 1", listOf(agreementId)) { it.getInt(1) }.single()
             if (count >= (agreement["allowed_vehicles"] as Number).toInt()) throw FleetConflictException("Vehicle allowance reached")
             val result = addEntry(writer, agreementId, input, now)
+            saveVerifiedSnapshot(writer.db, result, snapshot)
             writer.description = "Added ${result.registrationNumber}"
             result
         }
@@ -97,7 +98,7 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             writer.save("vehicles", previous + ("listed" to 0))
         }
 
-    fun replaceVehicle(plate: String, request: ReplacementRequest, actor: ChangeActor, now: Instant): Vehicle =
+    fun replaceVehicle(plate: String, request: ReplacementRequest, actor: ChangeActor, now: Instant, snapshot: RegistrySnapshot? = null): Vehicle =
         change(actor, now, null, "Replaced $plate") { writer ->
             val previous = requireListed(writer.db, plate)
             expect(previous, request.expectedUpdatedAt)
@@ -105,6 +106,7 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             requireActive(writer.db, "agreements", agreementId)
             writer.agreementId = agreementId
             val next = addEntry(writer, agreementId, request.replacement, now)
+            saveVerifiedSnapshot(writer.db, next, snapshot)
             writer.save("vehicles", previous + ("listed" to 0))
             writer.description = if ((previous["planned"] as Number).toInt() == 1 && !next.planned)
                 "Registered ${next.registrationNumber} for $plate" else "Replaced $plate with ${next.registrationNumber}"
@@ -112,12 +114,8 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         }
 
     private fun addEntry(writer: Writer, agreementId: String, input: VehicleEntryInput, now: Instant): Vehicle {
-        require(input.planned || input.registrationNumber != null) { "Enter the registration number" }
-        require(!input.planned || input.registrationNumber.isNullOrBlank()) { "Planned identifiers are generated automatically" }
-        val plate = if (input.planned) "PLAN" + UUID.randomUUID().toString().replace("-", "").take(12).uppercase()
-            else normalizeRegistrationNumber(input.registrationNumber!!).also {
-                require(it.matches(Regex("[A-Z]{2}[1-9][0-9]{3,4}"))) { "Enter a valid registration number" }
-            }
+        val plate = input.validatedRegistrationNumber()
+            ?: "PLAN" + UUID.randomUUID().toString().replace("-", "").take(12).uppercase()
         val previous = row(writer.db, "vehicles", plate)
         if (previous != null) {
             if ((previous["listed"] as Number).toInt() == 1) throw FleetConflictException("This vehicle is already listed")
@@ -129,6 +127,12 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             "created_at" to (previous?.get("created_at") ?: now.storageTimestamp()), "updated_at" to now.storageTimestamp())
         writer.save("vehicles", next)
         return vehicle(next)
+    }
+
+    private fun saveVerifiedSnapshot(db: Connection, vehicle: Vehicle, snapshot: RegistrySnapshot?) {
+        if (snapshot == null) return
+        require(!vehicle.planned && snapshot.registrationNumber == vehicle.registrationNumber) { "Snapshot vehicle mismatch" }
+        database.insertRegistrySnapshot(db, snapshot)
     }
 
     fun undo(id: String, actor: ChangeActor, now: Instant) = database.write { db ->

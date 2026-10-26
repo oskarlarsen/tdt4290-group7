@@ -53,7 +53,7 @@ export default function Vehicles() {
       </details>;
     })}</div>
     {data && !suppliers?.length && <p className="rounded-xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">{query ? "No matching suppliers or vehicles." : "Add a supplier to create your first agreement."}</p>}
-    <details onToggle={event => setShowStatistics(event.currentTarget.open)} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium">Reporting statistics</summary>{showStatistics && <div className="mt-4"><StatisticsDirectory onOpenVehicle={open} /></div>}</details>
+    <details onToggle={event => setShowStatistics(event.currentTarget.open)} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium">Reported data</summary>{showStatistics && <div className="mt-4"><StatisticsDirectory onOpenVehicle={open} /></div>}</details>
     <details onToggle={event => setShowHistory(event.currentTarget.open)} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium">Change history</summary>{showHistory && <div className="mt-3"><ChangeHistory /></div>}</details>
     {plate && <VehicleDetails key={plate} plate={plate} onClose={() => setParams({})} />}
     {supplierForm && <SupplierForm supplier={supplierForm === "new" ? undefined : supplierForm} onClose={() => setSupplierForm(null)} onSaved={saved} />}

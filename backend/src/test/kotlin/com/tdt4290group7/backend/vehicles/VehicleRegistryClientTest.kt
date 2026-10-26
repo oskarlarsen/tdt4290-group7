@@ -18,7 +18,7 @@ class VehicleRegistryClientTest {
     private val payload = """{"discardedRoot":"PRIVATE_SENTINEL","kjoretoydataListe":[{
         "kjoretoyId":{"kjennemerke":"AB12345","understellsnummer":"PRIVATE_SENTINEL"},
         "registrering":{"registreringsstatus":{"kodeVerdi":"REGISTRERT"}},
-        "periodiskKjoretoyKontroll":{"kontrollfrist":"2027-01-01"},
+        "periodiskKjoretoyKontroll":{"sistGodkjent":"2025-01-10","kontrollfrist":"2027-01-01"},
         "godkjenning":{"tekniskGodkjenning":{
             "kjoretoyklassifisering":{"tekniskKode":{"kodeVerdi":"M1","kodeNavn":"Personbil"}},
             "tekniskeData":{
@@ -48,6 +48,8 @@ class VehicleRegistryClientTest {
         assertEquals(RegistryCode("AC", "Station wagon"), data.bodyType)
         assertEquals(RegistryCode("5", "Electric"), data.fuels.last().fuelTechnology)
         assertEquals("6", data.euroClass?.code)
+        assertEquals("2025-01-10", data.lastApprovedInspectionDate)
+        assertEquals("2027-01-01", data.nextInspectionDueDate)
         assertEquals(2, data.fuels.size)
         val measurements = data.fuels.first().measurements
         assertEquals(2, measurements.size)
@@ -67,6 +69,22 @@ class VehicleRegistryClientTest {
         val invalid = payload.replace("123.456789", "-123.456789")
         val invalidVehicle = (Json.parseToJsonElement(invalid).jsonObject.getValue("kjoretoydataListe") as kotlinx.serialization.json.JsonArray).single()
         assertFails { projectRegistryVehicle(invalidVehicle, "AB12345") }
+    }
+
+    @Test
+    fun inspectionDatesAreNullableAndMustBeRealDatesFromTheInspectionFields() {
+        fun project(body: String) = projectRegistryVehicle(
+            (Json.parseToJsonElement(body).jsonObject.getValue("kjoretoydataListe") as kotlinx.serialization.json.JsonArray).single(), "AB12345")
+        val absent = project(payload.replace("\"sistGodkjent\":\"2025-01-10\",", "")
+            .replace("\"kontrollfrist\":\"2027-01-01\"", "\"kontrollfrist\":null"))
+        kotlin.test.assertNull(absent.lastApprovedInspectionDate)
+        kotlin.test.assertNull(absent.nextInspectionDueDate)
+        for (invalid in listOf("2025-02-30", "2025-1-10", "not-a-date")) {
+            assertFails { project(payload.replace("2025-01-10", invalid)) }
+        }
+        val unrelated = payload.replace("\"periodiskKjoretoyKontroll\"", "\"unselectedInspectionData\"")
+        kotlin.test.assertNull(project(unrelated).lastApprovedInspectionDate)
+        kotlin.test.assertNull(project(unrelated).nextInspectionDueDate)
     }
 
     @Test

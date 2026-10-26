@@ -1,4 +1,4 @@
-// Official Statens Vegvesen codes with application-owned English labels. Keep in sync with VehicleCatalog.kt.
+// Official Statens vegvesen codes with application-owned English labels. Keep in sync with VehicleCatalog.kt.
 export const FUEL_TECHNOLOGIES = {
   "1": "Gasoline",
   "2": "Diesel",

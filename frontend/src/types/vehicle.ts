@@ -17,7 +17,6 @@ export type TripData = {
   totalTripKm: Decimal; totalKmCo2Registered: Decimal | null; totalKmCo2NotRegistered: Decimal;
   kmFuelNotRegistered: Decimal; totalKmFuelRegistered: Decimal;
   totalKmNoxRegistered: Decimal | null; totalNoxRegisteredGrams: Decimal | null;
-  tripCount: number;
   averageFuelConsumptionLitresPer100Km?: Decimal | null; fuelConsumedLitres?: Decimal | null; comment?: string | null;
 };
 export type TripRow = { id: string; registrationNumber: string; sourceName?: string | null; createdAt: string; data: TripData; estimatedCo2Kg: Decimal | null };
@@ -25,6 +24,7 @@ export type RegistryCode = { code: string; name?: string | null };
 export type RegistryData = {
   registrationNumber: string; registrationStatus?: string | null; make?: string | null; model?: string | null;
   vehicleCategory?: RegistryCode | null; bodyType?: RegistryCode | null; euroClass?: RegistryCode | null;
+  lastApprovedInspectionDate?: string | null; nextInspectionDueDate?: string | null;
   fuels: { fuelTechnology?: RegistryCode | null; measurements: {
     measurementMethod?: RegistryCode | null; co2GramsPerKm?: Decimal | null; noxMgPerKm?: Decimal | null;
   }[] }[];

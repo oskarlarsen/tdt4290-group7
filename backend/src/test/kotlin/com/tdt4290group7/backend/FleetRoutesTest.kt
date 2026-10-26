@@ -16,9 +16,81 @@ import kotlin.test.*
 class FleetRoutesTest {
     private fun repository() = VehicleRepository(Path.of("build", "test-data", "fleet-routes-${UUID.randomUUID()}.db"))
 
+    private fun agreement(repo: VehicleRepository, allowance: Int = 3): FleetAgreement {
+        val now = java.time.Instant.now()
+        val actor = ChangeActor("test", "Test")
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Test", "123456789"), actor, now)
+        return repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2027-12-31", allowance), null, actor, now)
+    }
+
+    @Test fun addingRequiresLiveRegistrySuccessAndPersistsSnapshotWithoutCreatingACheck() = testApplication {
+        val repo = repository(); val agreement = agreement(repo); var calls = 0
+        var outcome: RegistryLookup = RegistryLookup.Failed(LookupOutcome.NOT_FOUND)
+        application { module(repo, VehicleRegistryClient { calls++; outcome }) }
+        val admin = adminClient()
+        suspend fun add() = admin.post("/api/vehicle-fleet/agreements/${agreement.id}/vehicles") {
+            contentType(ContentType.Application.Json); setBody("""{"registrationNumber":"ab 12345"}""")
+        }
+        val before = repo.fleet.overview()
+        for (failure in listOf(LookupOutcome.NOT_FOUND, LookupOutcome.TEMPORARILY_UNAVAILABLE, LookupOutcome.ACCESS_DENIED,
+            LookupOutcome.QUOTA_EXHAUSTED, LookupOutcome.INVALID_RESPONSE, LookupOutcome.NOT_CONFIGURED)) {
+            outcome = RegistryLookup.Failed(failure)
+            val response = add()
+            assertEquals(if (failure == LookupOutcome.NOT_FOUND) HttpStatusCode.BadRequest else HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("Statens vegvesen"))
+            assertEquals(before, repo.fleet.overview())
+            assertNull(repo.vehicleDetails("AB12345"))
+        }
+        val data = RegistryVehicleData("AB12345", make = "Test", euroClass = RegistryCode("6"),
+            lastApprovedInspectionDate = "2025-02-01", nextInspectionDueDate = "2027-02-01")
+        outcome = RegistryLookup.Found(data)
+        assertEquals(HttpStatusCode.Created, add().status)
+        val details = repo.vehicleDetails("AB12345")!!
+        assertEquals(data, details.latestSnapshot!!.data)
+        assertTrue(details.tripRows.isEmpty()); assertNull(details.latestCheck)
+        assertEquals(7, calls)
+        // A previously cached success cannot bypass a failed live lookup when re-adding.
+        repo.fleet.removeVehicle("AB12345", details.vehicle.updatedAt, ChangeActor("test", "Test"), java.time.Instant.now())
+        outcome = RegistryLookup.Failed(LookupOutcome.TEMPORARILY_UNAVAILABLE)
+        assertEquals(HttpStatusCode.ServiceUnavailable, add().status)
+        assertFalse(repo.vehicleDetails("AB12345")!!.vehicle.listed)
+    }
+
+    @Test fun failedReplacementKeepsOriginalAndPlannedEntrySkipsLookup() = testApplication {
+        val repo = repository(); val agreement = agreement(repo); var calls = 0
+        application { module(repo, VehicleRegistryClient { calls++; RegistryLookup.Failed(LookupOutcome.NOT_FOUND) }) }
+        val admin = adminClient()
+        val added = admin.post("/api/vehicle-fleet/agreements/${agreement.id}/vehicles") {
+            contentType(ContentType.Application.Json); setBody("""{"planned":true}""")
+        }
+        assertEquals(HttpStatusCode.Created, added.status); assertEquals(0, calls)
+        val planned = repo.fleet.overview().vehicles.single()
+        val before = repo.fleet.overview()
+        val failed = admin.post("/api/vehicle-fleet/vehicles/${planned.registrationNumber}/replace") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"replacement":{"registrationNumber":"CD12345"},"expectedUpdatedAt":"${planned.updatedAt}"}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, failed.status)
+        assertEquals(before, repo.fleet.overview()); assertNull(repo.vehicleDetails("CD12345")); assertEquals(1, calls)
+    }
+
+    @Test fun capacityIsRecheckedAfterRemoteLookupAndFailureDoesNotSaveSnapshot() = testApplication {
+        val repo = repository(); val agreement = agreement(repo, 1)
+        application { module(repo, VehicleRegistryClient {
+            repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, agreement.endDate, 0),
+                agreement.updatedAt, ChangeActor("test", "Concurrent administrator"), java.time.Instant.now())
+            RegistryLookup.Found(RegistryVehicleData(it))
+        }) }
+        val response = adminClient().post("/api/vehicle-fleet/agreements/${agreement.id}/vehicles") {
+            contentType(ContentType.Application.Json); setBody("""{"registrationNumber":"AB12345"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, response.status)
+        assertNull(repo.vehicleDetails("AB12345")); assertNull(repo.latestSnapshot("AB12345"))
+    }
+
     @Test fun adminCanCreateAgreementReplaceWithPlannedEntryAndUndo() = testApplication {
         val repo = repository()
-        application { module(repo, null) }
+        application { module(repo, VehicleRegistryClient { RegistryLookup.Found(RegistryVehicleData(it)) }) }
         val admin = adminClient()
         suspend fun post(path: String, body: String): JsonObject {
             val response = admin.post(path) { contentType(ContentType.Application.Json); setBody(body) }

@@ -8,8 +8,10 @@ import { VehicleDialog, Field, ErrorNotice, inputClass, buttonClass, primaryClas
 import { CatalogSelect, RegistrationNumberInput } from "./VehicleInputs";
 import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, emissionsNotApplicable, INAPPLICABLE_EMISSION_FIELDS, statisticNotApplicable } from "../../utils/vehicleCatalog";
 
+import { ConfirmAction } from "./ConfirmAction";
+
 const statisticHelp: Record<string, string> = {
-  co2GramsPerKm: "Enter the supplier’s reported value. Statens Vegvesen measurements are retrieved separately for comparison.",
+  co2GramsPerKm: "Enter the supplier’s reported value. Statens vegvesen measurements are retrieved separately for comparison.",
   averageFuelConsumptionLitresPer100Km: "Liters used per 100 kilometers",
 };
 const emissionsHelp = "Not applicable under the reporting rules for electric or hydrogen vehicles.";
@@ -30,6 +32,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
   const [overlapAccepted, setOverlapAccepted] = useState(false);
   const [rows, setRows] = useState(existingRows);
   const [preparing, setPreparing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const save = useMutation({ mutationFn: api.appendStatistics, retry: false });
   const busy = preparing || save.isPending;
   const overlapping = rows.some(row => values.periodStart && values.periodEnd && row.data.periodStart <= values.periodEnd && row.data.periodEnd >= values.periodStart);
@@ -41,13 +44,9 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
       else if (next.fuelTechnology === "NOT_APPLICABLE") next.fuelTechnology = "";
     }
     if (!usesLitres(next.fuelTechnology ?? "")) {
-      if ((values.averageFuelConsumptionLitresPer100Km || values.fuelConsumedLitres) &&
-        !window.confirm("This selection makes litres not applicable. Clear the litres values you entered?")) return;
       next.averageFuelConsumptionLitresPer100Km = ""; next.fuelConsumedLitres = "";
     }
     if (emissionsNotApplicable(next.fuelTechnology ?? "")) {
-      if (!emissionsLocked && (values.co2Registered === "true" || INAPPLICABLE_EMISSION_FIELDS.some(field => values[field])) &&
-          !window.confirm("CO₂ and NOx values and registered distances are not applicable for electric or hydrogen vehicles. Clear the values you entered?")) return;
       next.co2Registered = "false";
       for (const field of INAPPLICABLE_EMISSION_FIELDS) next[field] = "";
     } else if (emissionsLocked) {
@@ -57,7 +56,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
     setValues(next); setDirty(true); setError(undefined); setOverlapAccepted(false);
     if (key === "registrationNumber") setRows([]);
   }
-  function close() { if (!busy && (!dirty || window.confirm("Discard the statistics you have entered?"))) onClose(); }
+  function close() { if (!busy) { if (dirty) setDiscarding(true); else onClose(); } }
   async function submit(event: FormEvent) {
     event.preventDefault(); if (busy) return; setError(undefined); setPreparing(true);
     try {
@@ -75,7 +74,7 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
     const disabled = statisticNotApplicable(key, values.fuelTechnology ?? "");
     return <Field key={key} label={label} tooltip={disabled ? emissionsHelp : statisticHelp[key]}><input required={!disabled} disabled={disabled} inputMode="decimal" className={inputClass} value={disabled ? "Not applicable" : values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>;
   }
-  return <VehicleDialog title="Add reporting statistics" onClose={close} busy={busy}>
+  return <><VehicleDialog title="Add reported data" onClose={close} busy={busy}>
     <form onSubmit={submit} onInvalidCapture={event => { const disclosure = (event.target as HTMLElement).closest("details"); if (disclosure) disclosure.open = true; }} className="space-y-5">
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <Field label="Registration number"><RegistrationNumberInput autoFocus readOnly={!!plate} value={values.registrationNumber} onChange={value => change("registrationNumber", value)} /></Field>
@@ -85,12 +84,11 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
         {DECIMAL_FIELDS.filter(([key]) => ["totalTripKm", "co2GramsPerKm"].includes(key)).map(([key, label]) => decimalField(key, label))}
         <Field label="Estimated CO₂ (kg)" tooltip="Calculated as distance × reported CO₂ rate ÷ 1000."><input readOnly className={inputClass} value={emissionsLocked ? "Not applicable" : estimatedCo2Preview(values.totalTripKm ?? "", values.co2GramsPerKm ?? "")} /></Field>
       </fieldset>
-      <details className="rounded-xl border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">Vehicle, fuel and NOx details</summary>
+      <details className="rounded-xl border border-neutral-200 p-4"><summary className="cursor-pointer text-sm font-medium">Additional details</summary>
         <fieldset disabled={busy} className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Reported vehicle type"><CatalogSelect catalog={VEHICLE_CATEGORIES} value={values.vehicleCategory ?? ""} onChange={value => change("vehicleCategory", value)} /></Field>
           <Field label="Reported body type"><CatalogSelect catalog={BODY_TYPES} value={values.bodyType ?? ""} onChange={value => change("bodyType", value)} /></Field>
           {[["make", "Brand"], ["model", "Model"]].map(([key, label]) => <Field key={key} label={label}><input required className={inputClass} value={values[key] ?? ""} onChange={e => change(key, e.target.value)} /></Field>)}
-          <Field label="Jobs/trips"><input required inputMode="numeric" className={inputClass} value={values.tripCount ?? ""} onChange={e => change("tripCount", e.target.value)} /></Field>
           <Field label="Reported as CO₂-emitting"><select required disabled={emissionsLocked} className={inputClass} value={values.co2Registered} onChange={e => change("co2Registered", e.target.value)}><option value="" disabled>Select</option><option value="true">Yes</option><option value="false">No</option></select></Field>
           {DECIMAL_FIELDS.filter(([key]) => !["totalTripKm", "co2GramsPerKm"].includes(key)).map(([key, label]) => decimalField(key, label))}
           <div className="sm:col-span-2"><Field label="Comment (optional)"><textarea className={inputClass} value={values.comment ?? ""} onChange={e => change("comment", e.target.value)} /></Field></div>
@@ -101,5 +99,9 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
       {!!error && <p className="text-xs text-neutral-500">If saving was interrupted, check existing statistics before trying again.</p>}
       <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} disabled={busy} onClick={close}>Cancel</button><button className={primaryClass} disabled={busy || (overlapping && !overlapAccepted)}>{busy ? "Saving and checking..." : "Save and check"}</button></footer>
     </form>
-  </VehicleDialog>;
+  </VehicleDialog>
+    {discarding && <ConfirmAction title="Discard reported data?" label="Discard data" onCancel={() => setDiscarding(false)} onConfirm={onClose}>
+      <p>The data entered in this form has not been saved.</p>
+    </ConfirmAction>}
+  </>;
 }

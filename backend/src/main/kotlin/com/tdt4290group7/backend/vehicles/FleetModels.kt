@@ -22,6 +22,16 @@ data class AgreementUpdate(val agreement: AgreementInput, val expectedUpdatedAt:
 @Serializable
 data class VehicleEntryInput(val registrationNumber: String? = null, val planned: Boolean = false)
 
+internal fun VehicleEntryInput.validatedRegistrationNumber(): String? {
+    if (planned) {
+        require(registrationNumber.isNullOrBlank()) { "Planned identifiers are generated automatically" }
+        return null
+    }
+    return normalizeRegistrationNumber(requireNotNull(registrationNumber) { "Enter the registration number" }).also {
+        require(it.matches(Regex("[A-Z]{2}[1-9][0-9]{3,4}"))) { "Enter a valid registration number" }
+    }
+}
+
 @Serializable
 data class VehicleChangeRequest(val expectedUpdatedAt: String)
 

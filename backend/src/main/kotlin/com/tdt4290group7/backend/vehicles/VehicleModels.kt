@@ -36,7 +36,6 @@ data class TripRowInput(
     val totalKmFuelRegistered: BigDecimal,
     val totalKmNoxRegistered: BigDecimal?,
     val totalNoxRegisteredGrams: BigDecimal?,
-    val tripCount: Int,
     val vehicleCategory: VehicleCategory,
     val averageFuelConsumptionLitresPer100Km: BigDecimal? = null,
     val fuelConsumedLitres: BigDecimal? = null,
@@ -116,6 +115,8 @@ data class RegistryVehicleData(
     val bodyType: RegistryCode? = null,
     val euroClass: RegistryCode? = null,
     val fuels: List<RegistryFuel> = emptyList(),
+    val lastApprovedInspectionDate: String? = null,
+    val nextInspectionDueDate: String? = null,
 )
 
 @Serializable

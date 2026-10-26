@@ -210,7 +210,7 @@ One statistics row describes a vehicle over a reporting period, not an individua
     "totalKmCo2NotRegistered": 0, "kmFuelNotRegistered": 0,
     "totalKmFuelRegistered": 1000, "totalKmNoxRegistered": 1000,
     "totalNoxRegisteredGrams": 25,
-    "tripCount": 10, "averageFuelConsumptionLitresPer100Km": 8,
+    "averageFuelConsumptionLitresPer100Km": 8,
     "fuelConsumedLitres": 80
   }]
 }
@@ -220,16 +220,25 @@ Electric/hydrogen rows require `co2Registered=false` and explicit null CO2/NOx m
 
 Checks compare current list membership, agreement dates and supplier statistics against available SVV facts. List changes use exact timestamps in the audit trail. Vehicles have no individual approval periods. Saved checks freeze the agreement, supplier, list membership, selected statistics and registry snapshot; edits and undo never rewrite them.
 
-SVV success is cached for 14 days by default. A failed refresh keeps older data with `STALE_CACHE` and `refreshFailure`, or returns `UNAVAILABLE` without a snapshot. Registry methods remain separate and all relevant emission measurements are compared after exact whole-number rounding. Usage prohibition remains unknown. These are comparison findings, not proof of complete compliance.
+Adding a registered vehicle, replacing a vehicle, or registering a planned entry requires a successful live Statens vegvesen lookup. Confirmed unknown registrations return 400; lookup outages, missing configuration, access errors, invalid responses and quota failures return 503. No vehicle-list or audit changes are committed on lookup failure, and cached success cannot bypass this requirement. Planned placeholders skip the lookup. The verified snapshot and vehicle change are saved atomically after checking membership, version and capacity again. Remote lookups never hold a database write lock.
 
-### Development reset and tests
+Deviation checks cache SVV success for 14 days by default. A failed refresh keeps older data with `STALE_CACHE` and `refreshFailure`, or returns `UNAVAILABLE` without a snapshot. Registry methods remain separate and all relevant emission measurements are compared after exact whole-number rounding. Usage prohibition remains unknown. These are comparison findings, not proof of complete compliance.
 
-The new schema is version 7. Existing vehicle data is intentionally reset for this change; startup never silently wipes a database. Stop the backend, then run from `backend`:
+Statistics shows **Vehicle data (Statens vegvesen)** once, above period-based **Reported data**. Registered CO2/NOx rates retain their measurement methods. Reported NOx is calculated in mg/km from reported grams and NOx-registered distance; zero distance does not imply a zero rate. General registry data is no longer duplicated under Deviations, while each saved finding keeps its original comparison evidence. Jobs/trips count is no longer accepted or stored.
+
+Inspection dates are allowlisted from `periodiskKjoretoyKontroll.sistGodkjent` (last approved inspection) and `.kontrollfrist` (next inspection deadline), not from vehicle first registration, technical approval or agreement dates. Both are `format: date` in the [official Statens vegvesen OpenAPI schema](https://akfell-datautlevering.atlas.vegvesen.no/v3/api-docs), under `PeriodiskKjoretoyKontroll`. They are nullable ISO dates in storage/API and displayed as dd.mm.yyyy. Missing fields show Not available. Euro class uses `miljodata.euroKlasse`. Existing snapshots remain unchanged; use Refresh vehicle data to retrieve the new fields.
+
+### Database reset and tests
+
+The vehicle database is disposable development data. Startup creates the current schema (version 8) for an empty database and refuses incompatible schemas with a reset instruction. It does not migrate or silently wipe existing data. Before future schema changes, agree with the project owner whether existing data should be wiped or preserved.
+
+For an approved reset, stop the backend and run `./scripts/reset-vehicle-data.ps1` from `backend`. This removes only `backend/data/vehicles.db` and its SQLite sidecars. A custom `.db` path inside `backend/data` can be selected using `-DatabasePath`. The next backend startup creates an empty database with the current schema.
+
+From `backend`:
 
 ```powershell
-./scripts/reset-vehicle-data.ps1
 ./gradlew.bat test --console=plain
 ./gradlew.bat run
 ```
 
-The reset is restricted to a selected `.db` file inside `backend/data`, including its SQLite sidecar files. For a custom local database, pass `-DatabasePath` with its absolute path. User accounts and other application data are separate. Tests use isolated files under `backend/build/test-data` and no live SVV key.
+Tests use isolated files under `backend/build/test-data` and no live SVV key. User accounts and other application data are separate from this reset.

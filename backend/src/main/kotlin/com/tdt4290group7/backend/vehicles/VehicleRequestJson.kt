@@ -36,10 +36,6 @@ fun decodeTripRowsRequest(text: String): AppendTripRowsRequest {
         row.textFields("registrationNumber", "periodStart", "periodEnd", "fuelTechnology",
             "make", "bodyType", "vehicleCategory", "model", "comment")
         row.booleanFields("co2Registered")
-        row["tripCount"]?.takeUnless { it == JsonNull }?.let {
-            val value = it as? JsonPrimitive ?: invalidType()
-            if (value.isString || !value.content.matches(Regex("-?(0|[1-9][0-9]*)"))) invalidType()
-        }
     }
     return requestJson.decodeFromJsonElement(root)
 }

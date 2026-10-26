@@ -26,6 +26,9 @@ fun Application.configureStatusPages() {
             call.application.log.warn("vehicle_storage_busy")
             call.respond(HttpStatusCode.ServiceUnavailable, ApiError("Vehicle database is busy; try again later"))
         }
+        exception<com.tdt4290group7.backend.vehicles.RegistryUnavailableException> { call, cause ->
+            call.respond(HttpStatusCode.ServiceUnavailable, ApiError(cause.message!!))
+        }
         // Client errors: answer them as such instead of logging a server stack trace for each.
         exception<PayloadTooLargeException> { call, _ ->
             call.respondText(text = "Request body too large", status = HttpStatusCode.PayloadTooLarge)

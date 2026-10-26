@@ -40,7 +40,7 @@ const titles: Record<string, string> = {
   NOT_ON_AGREEMENT_LIST: "Vehicle is not in the agreement's vehicle list", AGREEMENT_NOT_STARTED: "Supplier agreement has not started",
   AGREEMENT_EXPIRED: "Supplier agreement has ended", AGREEMENT_PERIOD_NOT_COVERED: "Reporting period extends outside the agreement",
   FUEL_MISMATCH: "Fuel technologies do not match", CATEGORY_MISMATCH: "Vehicle categories do not match",
-  BODY_TYPE_MISMATCH: "Reported body type differs from Statens Vegvesen", BRAND_MISMATCH: "Vehicle brands do not match", MODEL_MISMATCH: "Vehicle models do not match",
+  BODY_TYPE_MISMATCH: "Reported body type differs from Statens vegvesen", BRAND_MISMATCH: "Vehicle brands do not match", MODEL_MISMATCH: "Vehicle models do not match",
   CO2_CLASSIFICATION_MISMATCH: "CO₂-emitting classification does not match", CO2_MISMATCH: "Reported CO₂ rate does not match",
   REGISTRY_CO2_DISAGREEMENT: "Registry CO₂ measurements differ", NOX_MISMATCH: "NOx rates do not match",
   CONSUMPTION_MISMATCH: "Fuel consumption figures do not agree", OVERLAPPING_STATISTICS: "Reporting periods overlap",
@@ -63,7 +63,7 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
   switch (finding.code) {
     case "NOX_MISMATCH": {
       result.explanation = "The supplier's total NOx is converted from grams into milligrams per kilometer, then compared with the registry rate.";
-      result.comparison.leftLabel = "Supplier statistics (calculated)"; result.comparison.rightLabel = `Statens Vegvesen (${method})`;
+      result.comparison.leftLabel = "Supplier statistics (calculated)"; result.comparison.rightLabel = `Statens vegvesen (${method})`;
       const calculated = exactRatio(row?.data.totalNoxRegisteredGrams, row?.data.totalKmNoxRegistered, 1000n);
       compare("NOx rate", number(calculated, "mg/km"), number(measurement?.noxMgPerKm, "mg/km"));
       compare("Values used for comparison (rounded)", number(exactRatio(row?.data.totalNoxRegisteredGrams, row?.data.totalKmNoxRegistered, 1000n, 0), "mg/km"), whole(measurement?.noxMgPerKm, "mg/km"));
@@ -73,7 +73,7 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
     }
     case "CO2_MISMATCH":
       result.explanation = "The supplier's CO₂ rate and this registry measurement round to different whole numbers.";
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = `Statens Vegvesen (${method})`;
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = `Statens vegvesen (${method})`;
       compare("CO₂ rate", number(row?.data.co2GramsPerKm, "g/km"), number(measurement?.co2GramsPerKm, "g/km"));
       compare("Values used for comparison (rounded)", whole(row?.data.co2GramsPerKm, "g/km"), whole(measurement?.co2GramsPerKm, "g/km"));
       result.note = "Every relevant registry measurement is checked, even if another one matches. Different measurement methods may explain a discrepancy.";
@@ -88,21 +88,21 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
       break;
     case "BODY_TYPE_MISMATCH":
       result.explanation = "The reported body style differs from the registered body style. Body style is separate from the technical vehicle category.";
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
       compare("Body style", row ? catalogLabel(BODY_TYPES, row.data.bodyType) : null, data?.bodyType ? catalogLabel(BODY_TYPES, data.bodyType.code) : null);
       break;
     case "FUEL_MISMATCH":
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
       compare("Fuel technology", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
       result.note = "The agreed gas variants are grouped, but CNG and LNG stay separate. The registry's original codes are retained.";
       break;
     case "CATEGORY_MISMATCH":
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
       compare("Vehicle category", row ? catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory) : null, data?.vehicleCategory ? catalogLabel(VEHICLE_CATEGORIES, categoryGroup(data.vehicleCategory.code)) : null);
       if (data?.vehicleCategory) compare("Original registry code", "Compared using its normalized category", data.vehicleCategory.code);
       break;
     case "BRAND_MISMATCH": case "MODEL_MISMATCH":
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens Vegvesen";
+      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
       compare(finding.code === "BRAND_MISMATCH" ? "Vehicle brand" : "Vehicle model", finding.code === "BRAND_MISMATCH" ? row?.data.make : row?.data.model, finding.code === "BRAND_MISMATCH" ? data?.make : data?.model);
       result.note = "Case, spacing and punctuation are ignored. Naming differences may still explain this finding.";
       break;
@@ -172,7 +172,7 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
         compare("Listed", check.vehicle.registrationNumber, check.vehicle.listed ? "In vehicle list" : "Not in vehicle list");
         compare("Agreement period", "Covers the check date", check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "No agreement linked");
       } else {
-        result.comparison.leftLabel = "Expected registration"; result.comparison.rightLabel = "Statens Vegvesen";
+        result.comparison.leftLabel = "Expected registration"; result.comparison.rightLabel = "Statens vegvesen";
         compare("Registration status", "Registered", data?.registrationStatus ?? check.registry.registrationStatus);
       }
   }

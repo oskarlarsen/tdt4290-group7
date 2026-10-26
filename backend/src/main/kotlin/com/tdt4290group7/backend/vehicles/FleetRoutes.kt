@@ -28,7 +28,7 @@ internal suspend fun ApplicationCall.adminActor(): ChangeActor? {
     return ChangeActor(user.id, user.name)
 }
 
-fun Route.fleetRoutes(fleet: FleetRepository) {
+fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     get("/api/vehicle-fleet") { if (call.adminActor() != null) call.respond(fleet.overview()) }
     get("/api/vehicle-fleet/history") {
         if (call.adminActor() == null) return@get
@@ -61,7 +61,10 @@ fun Route.fleetRoutes(fleet: FleetRepository) {
     }
     post("/api/vehicle-fleet/agreements/{id}/vehicles") {
         val actor = call.adminActor() ?: return@post
-        call.respond(HttpStatusCode.Created, fleet.addVehicle(call.parameters["id"]!!, decodeFleetRequest(call.receiveText(), VehicleEntryInput.serializer()), actor, Instant.now()))
+        val input = decodeFleetRequest(call.receiveText(), VehicleEntryInput.serializer())
+        // Never hold a SQLite write lock during a remote lookup. Capacity is checked at commit time.
+        val snapshot = registry.verifyEntry(input)
+        call.respond(HttpStatusCode.Created, fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot))
     }
     delete("/api/vehicle-fleet/vehicles/{plate}") {
         val actor = call.adminActor() ?: return@delete
@@ -71,7 +74,9 @@ fun Route.fleetRoutes(fleet: FleetRepository) {
     }
     post("/api/vehicle-fleet/vehicles/{plate}/replace") {
         val actor = call.adminActor() ?: return@post
-        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, decodeFleetRequest(call.receiveText(), ReplacementRequest.serializer()), actor, Instant.now()))
+        val request = decodeFleetRequest(call.receiveText(), ReplacementRequest.serializer())
+        val snapshot = registry.verifyEntry(request.replacement)
+        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot))
     }
     post("/api/vehicle-fleet/history/{id}/undo") {
         val actor = call.adminActor() ?: return@post

@@ -7,7 +7,7 @@ import type { DeviationFinding, TripRow, VehicleCheck } from "../src/types/vehic
 
 const row: TripRow = { id: "synthetic-row", registrationNumber: "AB12345", createdAt: "2026-01-01T00:00:00Z", estimatedCo2Kg: "72",
   data: { registrationNumber: "AB12345", periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic", model: "Synthetic",
-    co2Registered: true, co2GramsPerKm: "120", totalTripKm: "600", totalKmCo2Registered: "600", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "600", totalKmNoxRegistered: "600", totalNoxRegisteredGrams: "18", tripCount: 1, averageFuelConsumptionLitresPer100Km: "8", fuelConsumedLitres: "48" } };
+    co2Registered: true, co2GramsPerKm: "120", totalTripKm: "600", totalKmCo2Registered: "600", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "600", totalKmNoxRegistered: "600", totalNoxRegisteredGrams: "18", averageFuelConsumptionLitresPer100Km: "8", fuelConsumedLitres: "48" } };
 const check: VehicleCheck = { id: "synthetic-check", checkedAt: "2026-02-01T00:00:00Z", vehicle: { registrationNumber: "AB12345", createdAt: "synthetic", updatedAt: "synthetic", agreementId: null, listed: false, planned: false }, agreement: null, tripRows: [row], deviations: [], findings: [],
   registry: { dataSource: "LIVE", lookupOutcome: "FOUND", fetchedAt: "2026-02-01T00:00:00Z", deviations: [], usageProhibitionState: "UNKNOWN", data: { registrationNumber: "AB12345", bodyType: { code: "AB", name: "ignored untranslated label" }, fuels: [{ fuelTechnology: { code: "2" }, measurements: [{ measurementMethod: { code: "WLTP" }, co2GramsPerKm: "140", noxMgPerKm: "40" }] }] } } };
 const finding = (code: string): DeviationFinding => ({ code, priority: "MODERATE", origin: "REGISTRY", description: "Synthetic saved reason", tripRowId: row.id, fuelIndex: 0, measurementIndex: 0 });
@@ -70,14 +70,14 @@ describe("saved deviation fact comparisons", () => {
   it("renders a keyboard-operable fact expander with source labels and readable units", () => {
     const html = renderToStaticMarkup(<DeviationFacts finding={finding("NOX_MISMATCH")} check={check} />);
     expect(html).toContain("<details"); expect(html).toContain("See compared values");
-    expect(html).toContain("Supplier statistics (calculated)"); expect(html).toContain("Statens Vegvesen (WLTP)");
+    expect(html).toContain("Supplier statistics (calculated)"); expect(html).toContain("Statens vegvesen (WLTP)");
     expect(html).toContain("30 mg/km"); expect(html).toContain("40 mg/km");
     expect(html).toContain("18 g"); expect(html).toContain("600 km");
   });
   it("identifies the comparison source without exposing priority controls by default", () => {
     const populated = { ...check, findings: [finding("NOX_MISMATCH")] };
     const html = renderToStaticMarkup(<DeviationList check={populated} />);
-    expect(html).toContain("Compared with Statens Vegvesen");
+    expect(html).toContain("Compared with Statens vegvesen");
     expect(html).toContain("NOx rates do not match"); expect(html).toContain("See compared values");
     expect(html).not.toContain("Deviation priority");
   });
