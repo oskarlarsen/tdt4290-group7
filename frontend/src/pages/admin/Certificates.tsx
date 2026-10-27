@@ -15,6 +15,7 @@ export default function Certificates() {
   const remove = useDeleteCertificate();
   const fileInput = useRef<HTMLInputElement>(null);
   const [supplierName, setSupplierName] = useState("");
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [editing, setEditing] = useState<Certificate | null>(null);
 
   function submitUpload(event: FormEvent<HTMLFormElement>) {
@@ -25,6 +26,7 @@ export default function Certificates() {
       onSuccess: () => {
         setSupplierName("");
         if (fileInput.current) fileInput.current.value = "";
+        setSelectedFileName("");
       },
     });
   }
@@ -77,16 +79,33 @@ export default function Certificates() {
               placeholder="Supplier name"
             />
           </label>
-          <label className="min-w-60 flex-1 space-y-1.5 text-xs font-medium text-neutral-600">
-            Certificate PDF
+          <div className="min-w-60 flex-1 space-y-1.5 text-xs font-medium text-neutral-600">
+            <label htmlFor="certificate-pdf" className="block">Certificate PDF</label>
             <input
               ref={fileInput}
+              id="certificate-pdf"
               required
               type="file"
               accept="application/pdf,.pdf"
-              className="block w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm font-normal text-neutral-700 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1 file:text-xs"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(event) => setSelectedFileName(event.currentTarget.files?.[0]?.name ?? "")}
+              className="sr-only"
             />
-          </label>
+            <div className="flex min-h-10 items-center gap-3 rounded-lg border border-neutral-200 px-2 py-1.5">
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                aria-label="Choose certificate PDF"
+                className="shrink-0 rounded-md bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/40"
+              >
+                Choose file
+              </button>
+              <span className="truncate text-sm font-normal text-neutral-600" aria-live="polite">
+                {selectedFileName || "No file selected"}
+              </span>
+            </div>
+          </div>
           <button
             type="submit"
             disabled={upload.isPending}
