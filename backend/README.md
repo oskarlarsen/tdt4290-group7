@@ -183,6 +183,15 @@ Dates use ISO `yyyy-MM-dd`; either date and `contractId` may be `null`. The issu
 
 The original PDF is not retained. Extracted metadata is stored in a separate SQLite file beside the configured vehicle database (for example, `vehicles-certificates.db`); status is recalculated from the expiry date on each read. A missing expiry is marked `MISSING_DOCUMENTATION`; parser results must be reviewed before being used as compliance evidence. Supplier and contract records are not yet linked to this certificate list.
 
+Generate synthetic, clearly marked PDF samples for local testing from the `backend/` directory:
+
+```powershell
+.\gradlew.bat runCertificateGenerator
+.\gradlew.bat runCertificateGenerator --args="20 4290"
+```
+
+The optional arguments are sample count (1–60) and random seed; reusing a seed reproduces the same cases. PDFs are written under `backend/build/generated-certificate-samples/seed-<seed>/`. The generator tests supported certificate types, date labels/formats, validity ranges and expiry statuses, then extracts its generated PDFs and compares parsed results with known expected values. These sample files contain no real data, are visibly marked as invalid test documents, and should only be uploaded to a local development instance.
+
 ## Vehicle API
 
 Base URL: `http://localhost:8080`. Vehicle endpoints use JSON and currently have **no backend authorization**; keep them local.

@@ -1,6 +1,7 @@
 package com.tdt4290group7.backend.certificates
 
 import com.tdt4290group7.backend.pdf.extractTextWithOcr
+import com.tdt4290group7.backend.pdf.extractText
 import java.io.File
 import java.time.LocalDate
 import kotlin.test.Test
@@ -173,6 +174,77 @@ class CertificateParserTest {
     }
 
     @Test
+    fun parsesReproducibleRandomSyntheticSamplesAcrossSupportedFormatsAndStatuses() {
+        val today = LocalDate.of(2026, 10, 27)
+        val samples = createSyntheticCertificateSamples(count = 60, seed = 4290L, today = today)
+
+        samples.forEach { sample ->
+            val parsed = CertificateParser.parse(sample.text, sample.sourceFile)
+            assertEquals(sample.expectedType, parsed.certificateType, sample.sourceFile)
+            assertEquals(sample.issueDate, parsed.issueDate, sample.sourceFile)
+            assertEquals(sample.expiryDate, parsed.expiryDate, sample.sourceFile)
+            assertEquals(sample.expiryDate == null, parsed.missingData, sample.sourceFile)
+        }
+
+        assertEquals(
+            setOf("dd MMMM yyyy", "MMMM d, yyyy", "dd-MM-yyyy", "dd.MM.yyyy", "dd/MM/yyyy", "yyyy-MM-dd"),
+            samples.map { it.dateFormat }.toSet(),
+        )
+        assertEquals(syntheticCertificateTypesForTesting, samples.map { it.expectedType }.toSet())
+        assertEquals(
+            setOf(
+                CertificateStatus.EXPIRED,
+                CertificateStatus.EXPIRES_30D,
+                CertificateStatus.EXPIRES_90D,
+                CertificateStatus.EXPIRES_180D,
+                CertificateStatus.VALID,
+                CertificateStatus.MISSING_DOCUMENTATION,
+            ),
+            samples.map { calculateStatus(it.expiryDate, today) }.toSet(),
+        )
+        val exactBoundaryStatuses = samples.mapNotNull { sample ->
+            sample.expiryDate?.let { expiry ->
+                java.time.temporal.ChronoUnit.DAYS.between(today, expiry) to calculateStatus(expiry, today)
+            }
+        }.toMap()
+        assertEquals(CertificateStatus.EXPIRED, exactBoundaryStatuses[-1L])
+        assertEquals(CertificateStatus.EXPIRES_30D, exactBoundaryStatuses[0L])
+        assertEquals(CertificateStatus.EXPIRES_30D, exactBoundaryStatuses[30L])
+        assertEquals(CertificateStatus.EXPIRES_90D, exactBoundaryStatuses[31L])
+        assertEquals(CertificateStatus.EXPIRES_90D, exactBoundaryStatuses[90L])
+        assertEquals(CertificateStatus.EXPIRES_180D, exactBoundaryStatuses[91L])
+        assertEquals(CertificateStatus.EXPIRES_180D, exactBoundaryStatuses[180L])
+        assertEquals(CertificateStatus.VALID, exactBoundaryStatuses[181L])
+        assertTrue(samples.any {
+            it.expiryDate == null && calculateStatus(it.expiryDate, today) == CertificateStatus.MISSING_DOCUMENTATION
+        })
+        assertTrue(samples.any { it.usesValidityRange })
+    }
+
+    @Test
+    fun generatedPdfSamplesSurvivePdfTextExtractionAndParsing() {
+        val today = LocalDate.of(2026, 10, 27)
+        val samples = createSyntheticCertificateSamples(count = 12, seed = 21L, today = today)
+        val temporaryDirectory = java.nio.file.Files.createTempDirectory("synthetic-certificates-")
+
+        try {
+            samples.forEach { sample ->
+                val pdf = temporaryDirectory.resolve(sample.sourceFile)
+                writeSyntheticCertificatePdf(sample, pdf)
+                val extracted = extractText(pdf.toFile())
+                val parsed = CertificateParser.parse(extracted, sample.sourceFile)
+
+                assertTrue(extracted.contains("NOT A VALID CERTIFICATE"), sample.sourceFile)
+                assertEquals(sample.expectedType, parsed.certificateType, sample.sourceFile)
+                assertEquals(sample.issueDate, parsed.issueDate, sample.sourceFile)
+                assertEquals(sample.expiryDate, parsed.expiryDate, sample.sourceFile)
+            }
+        } finally {
+            temporaryDirectory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun extractsAvailableCertificatePdfFixtures() {
         certificateFixtures.forEach { (fileName, expectedType) ->
             val extractedText = extractFixtureText(fileName)
@@ -181,6 +253,15 @@ class CertificateParserTest {
         }
     }
 }
+
+private val syntheticCertificateTypesForTesting = setOf(
+    "Miljøfyrtårn",
+    "ISO 14001",
+    "Grønt Punkt Norge",
+    "Retura",
+    "Kurs i økonomisk kjøring",
+    "Unknown",
+)
 
 private fun extractFixtureText(fileName: String): String {
     val resource = object {}.javaClass.classLoader.getResourceAsStream("test-pdf/$fileName")
