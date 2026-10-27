@@ -2,9 +2,8 @@ import { getEnvironmentalComplianceLabel } from "../types/contract";
 import { CERTIFICATE_STANDARD_LABELS, getCertificateStatus } from "../types/certificate";
 import { analyzeEnergy, getTotalKwh } from "../types/energy";
 import { RISK_PRIORITY_INFO } from "../types/riskOutlook";
-import type { VehicleOverview } from "../types/vehicle";
-import { APPROVAL_LABELS, checkLabel } from "./vehicle";
-import { FUEL_TECHNOLOGIES, catalogLabel } from "./vehicleCatalog";
+import type { VehicleDetails } from "../types/vehicle";
+import { checkLabel } from "./vehicle";
 import type { Certificate } from "../types/certificate";
 import type { DerivedContract } from "../types/contract";
 import type { RecentAlert, TopRiskSupplier } from "../types/dashboard";
@@ -15,7 +14,7 @@ import type { RiskOutlookRow } from "../types/riskOutlook";
 export type ReportSources = {
   suppliers: TopRiskSupplier[];
   contracts: DerivedContract[];
-  vehicles: VehicleOverview[];
+  vehicles: VehicleDetails[];
   certificates: Certificate[];
   energy: EnergyData;
   riskOutlook: RiskOutlookRow[];
@@ -53,14 +52,12 @@ export function buildReportRows(id: ReportId, sources: ReportSources): ReportRow
 
     case "vehicles":
       return sources.vehicles.map((overview) => {
-        const { vehicle, approval, approvalStatus, latestCheck } = overview;
+        const { vehicle, agreement, latestCheck } = overview;
         return {
           "Registration number": vehicle.registrationNumber,
-          "Supplier ID": vehicle.supplierId ?? "",
-          "Approval status": APPROVAL_LABELS[approvalStatus],
-          "Fuel technology on approval": approval
-            ? catalogLabel(FUEL_TECHNOLOGIES, approval.data.fuelTechnology)
-            : "Not available",
+          "Supplier ID": agreement?.supplier.id ?? "",
+          "Agreement start": agreement?.agreement.startDate ?? "",
+          "Agreement end": agreement?.agreement.endDate ?? "",
           "Latest check": checkLabel(latestCheck),
           "Recorded deviations": latestCheck?.deviations.join("; ") ?? "",
         };

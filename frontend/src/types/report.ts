@@ -8,6 +8,7 @@ export type ReportId =
   | "alerts";
 
 export type ReportCategory = "suppliers-contracts" | "monitoring" | "risk-alerts";
+export const VEHICLE_REPORT_LIMIT = 25;
 export type ReportStatus = "drafting" | "published" | "under-review" | "scheduled";
 
 // One CSV row. Matches the shape utils/csv.ts's toCsv() accepts.
@@ -69,10 +70,10 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   {
     id: "vehicles",
     title: "Vehicle compliance",
-    description: "Tracked vehicles with supplier ID, approval status, approval fuel technology and latest check findings.",
+    description: "Listed vehicles with supplier ID, agreement dates and latest check findings.",
     category: "monitoring",
     unit: "vehicle",
-    scopeNote: "Vehicles on the first directory page (up to 25)",
+    scopeNote: `Up to ${VEHICLE_REPORT_LIMIT} listed registered vehicles; pending registrations excluded`,
     sourceLabel: "Vehicles",
     sourcePath: "/admin/vehicles",
     status: "drafting",

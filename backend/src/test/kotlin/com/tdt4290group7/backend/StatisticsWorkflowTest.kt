@@ -22,22 +22,22 @@ class StatisticsWorkflowTest {
         application { module(repository, null, Duration.ofDays(14)) }
         for (fuel in listOf(FuelTechnology.ELECTRIC, FuelTechnology.HYDROGEN)) {
             val input = syntheticTrip(fuelTechnology = fuel, totalKmCo2NotRegistered = "7.5".toBigDecimal())
-            val response = client.post("/api/trip-rows") {
+            val response = adminClient().post("/api/trip-rows") {
                 contentType(ContentType.Application.Json)
                 setBody(Json.encodeToString(AppendTripRowsRequest(rows = listOf(input))))
             }
             assertEquals(HttpStatusCode.Created, response.status)
             val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
             val checkId = result.getValue("checks").jsonArray.single().jsonObject.getValue("check").jsonObject.getValue("id").jsonPrimitive.content
-            val historical = Json.parseToJsonElement(client.get("/api/vehicle-checks/$checkId").bodyAsText()).jsonObject.getValue("tripRows").jsonArray
-            val listed = Json.parseToJsonElement(client.get("/api/trip-rows").bodyAsText()).jsonObject.getValue("items").jsonArray
+            val historical = Json.parseToJsonElement(adminClient().get("/api/vehicle-checks/$checkId").bodyAsText()).jsonObject.getValue("tripRows").jsonArray
+            val listed = Json.parseToJsonElement(adminClient().get("/api/trip-rows").bodyAsText()).jsonObject.getValue("items").jsonArray
             for (row in result.getValue("rows").jsonArray + historical + listed) {
                 val stored = row.jsonObject
                 assertEquals(JsonNull, stored.getValue("estimatedCo2Kg"))
                 val data = stored.getValue("data").jsonObject
                 assertFalse(data.getValue("co2Registered").jsonPrimitive.boolean)
                 assertEquals("7.5", data.getValue("totalKmCo2NotRegistered").jsonPrimitive.content)
-                for (field in listOf("co2GramsPerKm", "medianCo2", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered"))
+                for (field in listOf("co2GramsPerKm", "totalNoxRegisteredGrams", "totalKmCo2Registered", "totalKmNoxRegistered"))
                     assertEquals(JsonNull, data.getValue(field))
             }
         }
@@ -56,7 +56,7 @@ class StatisticsWorkflowTest {
         }
         application { module(repository, registry, Duration.ofDays(14)) }
         suspend fun append(rows: List<TripRowInput>): JsonObject {
-            val response = client.post("/api/trip-rows") {
+            val response = adminClient().post("/api/trip-rows") {
                 contentType(ContentType.Application.Json)
                 setBody(Json.encodeToString(AppendTripRowsRequest(rows = rows)))
             }
@@ -82,7 +82,7 @@ class StatisticsWorkflowTest {
             override suspend fun lookup(registrationNumber: String): RegistryLookup = error("Sensitive synthetic upstream detail")
         }
         application { module(repository, registry, Duration.ofDays(14)) }
-        val response = client.post("/api/trip-rows") {
+        val response = adminClient().post("/api/trip-rows") {
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip()))))
         }
@@ -98,7 +98,7 @@ class StatisticsWorkflowTest {
     fun absentSvvConfigurationStillSavesAnIncompleteCheck() = testApplication {
         val repository = repository()
         application { module(repository, null, Duration.ofDays(14)) }
-        val response = client.post("/api/trip-rows") {
+        val response = adminClient().post("/api/trip-rows") {
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip()))))
         }
@@ -120,7 +120,7 @@ class StatisticsWorkflowTest {
         application { module(repository, object : VehicleRegistryClient {
             override suspend fun lookup(registrationNumber: String): RegistryLookup { lookups++; return RegistryLookup.Failed(LookupOutcome.NOT_FOUND) }
         }, Duration.ofDays(14)) }
-        suspend fun read(query: String) = Json.parseToJsonElement(client.get("/api/trip-rows$query").bodyAsText()).jsonObject
+        suspend fun read(query: String) = Json.parseToJsonElement(adminClient().get("/api/trip-rows$query").bodyAsText()).jsonObject
         val first = read("?pageSize=2")
         assertEquals(3, first.getValue("total").jsonPrimitive.int)
         assertEquals("CD10001", first.getValue("items").jsonArray.first().jsonObject.getValue("registrationNumber").jsonPrimitive.content)
@@ -129,7 +129,7 @@ class StatisticsWorkflowTest {
         assertEquals(2, read("?search=ab-10001").getValue("total").jsonPrimitive.int)
         assertTrue(read("?page=100").getValue("items").jsonArray.isEmpty())
         for (query in listOf("page=0", "page=abc", "pageSize=101", "pageSize=0", "search=%25"))
-            assertEquals(HttpStatusCode.BadRequest, client.get("/api/trip-rows?$query").status)
+            assertEquals(HttpStatusCode.BadRequest, adminClient().get("/api/trip-rows?$query").status)
         assertEquals(0, lookups)
         assertEquals(0, repository.checkHistory("AB10001", 1, 10)!!.total)
     }

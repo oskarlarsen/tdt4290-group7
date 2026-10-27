@@ -1,11 +1,14 @@
 import { useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { getVehicle } from "../api/vehicles";
 import { useAlerts } from "./useAlerts";
 import { useCertificates } from "./useCertificates";
 import { useContracts } from "./useContracts";
 import { useDashboardSummary } from "./useDashboardSummary";
 import { useEnergy } from "./useEnergy";
 import { useRiskOutlook } from "./useRiskOutlook";
-import { useVehicles } from "./useVehicles";
+import { useFleet } from "./useVehicles";
+import { VEHICLE_REPORT_LIMIT } from "../types/report";
 import type { ReportSources } from "../utils/reportBuilders";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
@@ -16,15 +19,26 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 export function useReportSources() {
   const dashboard = useDashboardSummary();
   const contracts = useContracts();
-  // The legacy vehicle fixture doesn't match VehicleOverview, so don't request or coerce it in mock mode.
-  const vehicles = useVehicles("", "", 1, !USE_MOCKS);
+  // Preserve the PR's mock-mode behavior and report limit, using the current fleet API.
+  const fleet = useFleet(!USE_MOCKS);
+  const vehicles = useQueries({
+    queries: (USE_MOCKS ? [] : fleet.data?.vehicles ?? [])
+      .filter((vehicle) => vehicle.listed && !vehicle.planned)
+      .slice(0, VEHICLE_REPORT_LIMIT)
+      .map((vehicle) => ({
+        queryKey: ["vehicles", "detail", vehicle.registrationNumber],
+        queryFn: () => getVehicle(vehicle.registrationNumber),
+        retry: false,
+      })),
+  });
   const certificates = useCertificates();
   const energy = useEnergy();
   const alerts = useAlerts();
   const riskOutlook = useRiskOutlook();
 
   const sources = useMemo<ReportSources | undefined>(() => {
-    const vehicleItems = USE_MOCKS ? [] : vehicles.data?.items;
+    const vehicleItems = USE_MOCKS ? [] : fleet.data && vehicles.every((vehicle) => vehicle.data)
+      ? vehicles.map((vehicle) => vehicle.data!) : undefined;
     if (
       !dashboard.data ||
       !contracts.data ||
@@ -48,19 +62,20 @@ export function useReportSources() {
   }, [
     dashboard.data,
     contracts.data,
-    vehicles.data,
+    fleet.data,
+    vehicles,
     certificates.data,
     energy.data,
     alerts.data,
     riskOutlook.rows,
   ]);
 
-  const queries = [dashboard, contracts, certificates, energy, alerts];
+  const queries = [dashboard, contracts, certificates, energy, alerts, ...(!USE_MOCKS ? [fleet, ...vehicles] : [])];
   return {
     sources,
     isLoading:
-      queries.some((q) => q.isLoading) || (!USE_MOCKS && vehicles.isLoading) || riskOutlook.isLoading,
+      queries.some((q) => q.isLoading) || riskOutlook.isLoading,
     isError:
-      queries.some((q) => q.isError) || (!USE_MOCKS && vehicles.isError) || riskOutlook.isError,
+      queries.some((q) => q.isError) || riskOutlook.isError,
   };
 }

@@ -3,35 +3,8 @@ package com.tdt4290group7.backend.vehicles
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.Normalizer
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Locale
-
-private val oslo = ZoneId.of("Europe/Oslo")
-internal fun approvalStart(approval: StoredApproval): LocalDate = approval.data.startDate?.let(LocalDate::parse)
-    ?: Instant.parse(approval.createdAt).atZone(oslo).toLocalDate()
-internal fun approvalEnd(approval: StoredApproval): LocalDate = minOf(
-    approval.data.expiryDate?.let(LocalDate::parse) ?: LocalDate.MAX,
-    approval.revokedAt?.let { Instant.parse(it).atZone(oslo).toLocalDate().minusDays(1) } ?: LocalDate.MAX,
-)
-internal fun representativeApproval(approvals: List<StoredApproval>, today: LocalDate): StoredApproval? =
-    approvals.sortedWith(compareBy<StoredApproval> { when (approvalStatus(it, today)) {
-        ApprovalStatus.ACTIVE -> 0; ApprovalStatus.NOT_YET_ACTIVE -> 1; ApprovalStatus.EXPIRED -> 2; else -> 3
-    } }.thenByDescending { approvalStart(it) }.thenByDescending { it.createdAt }.thenByDescending { it.id }).firstOrNull()
-
-/** Merge intervals, rather than iterating each day. Dates and both boundaries are inclusive. */
-internal fun approvalCovers(start: LocalDate, end: LocalDate, approvals: List<StoredApproval>): Boolean {
-    var next = start
-    for (approval in approvals.sortedBy(::approvalStart)) {
-        val first = approvalStart(approval); val last = approvalEnd(approval)
-        if (last < first || last < next) continue
-        if (first > next) return false
-        if (last >= end) return true
-        next = last.plusDays(1)
-    }
-    return false
-}
 
 /** Round only comparisons. Stored supplier/registry numbers retain their exact precision. */
 internal fun rounded(value: BigDecimal) = value.setScale(0, RoundingMode.HALF_UP)
@@ -41,29 +14,22 @@ private fun normalizedText(value: String) = Normalizer.normalize(value, Normaliz
 private fun sameText(reported: String, registry: String) = registry.split(';').any { normalizedText(it) == normalizedText(reported) }
 private fun knownFuel(code: String?) = code?.toIntOrNull()?.let { it in 1..22 } == true
 
-internal fun evaluateDeviationRules(approvals: List<StoredApproval>, rows: List<StoredTripRow>,
+internal fun evaluateDeviationRules(agreement: AgreementEvidence?, vehicle: Vehicle, rows: List<StoredTripRow>,
     registry: RegistryCheckResult, today: LocalDate): List<DeviationFinding> = buildList {
     fun finding(code: VehicleDeviation, description: String, origin: DeviationOrigin = DeviationOrigin.STATISTICS,
         priority: DeviationPriority = DeviationPriority.MODERATE, row: StoredTripRow? = null,
-        relatedRow: StoredTripRow? = null, approval: StoredApproval? = null, relatedApproval: StoredApproval? = null,
+        relatedRow: StoredTripRow? = null,
         fuelIndex: Int? = null, measurementIndex: Int? = null) {
-        add(DeviationFinding(code, priority, origin, description, row?.id, relatedRow?.id, approval?.id,
-            relatedApproval?.id, fuelIndex, measurementIndex))
+        add(DeviationFinding(code, priority, origin, description, row?.id, relatedRow?.id, fuelIndex, measurementIndex))
     }
-    // Compatible overlaps are harmless; contradictory overlaps are still findings even if one record matches.
-    // One representative conflict per later approval, not an unbounded quadratic list of all pairs.
-    val activeByClassification = mutableMapOf<Pair<FuelTechnology, VehicleCategory>, StoredApproval>()
-    for (b in approvals.sortedBy(::approvalStart)) {
-        val key = b.data.fuelTechnology to b.data.vehicleCategory
-        if (approvalEnd(b) < approvalStart(b)) continue
-        val a = activeByClassification.entries.firstOrNull { it.key != key && approvalEnd(it.value) >= approvalStart(b) }?.value
-        if (a != null) {
-            val first = maxOf(approvalStart(a), approvalStart(b)); val last = minOf(approvalEnd(a), approvalEnd(b))
-            finding(VehicleDeviation.APPROVAL_CONFLICT,
-                "Conflicting approvals overlap from $first to ${if (last == LocalDate.MAX) "indefinitely" else last}: fuel/category ${a.data.fuelTechnology.code}/${a.data.vehicleCategory} versus ${b.data.fuelTechnology.code}/${b.data.vehicleCategory}.",
-                DeviationOrigin.APPROVAL, DeviationPriority.HIGH, approval = a, relatedApproval = b)
-        }
-        if (activeByClassification[key]?.let { approvalEnd(it) < approvalEnd(b) } != false) activeByClassification[key] = b
+    val dates = agreement?.agreement
+    when {
+        dates == null || !dates.active || !vehicle.listed -> finding(VehicleDeviation.NOT_ON_AGREEMENT_LIST,
+            "${vehicle.registrationNumber} is not in the agreement's current vehicle list.", DeviationOrigin.AGREEMENT, DeviationPriority.HIGH)
+        today.toString() < dates.startDate -> finding(VehicleDeviation.AGREEMENT_NOT_STARTED,
+            "The supplier's agreement starts on ${dates.startDate}.", DeviationOrigin.AGREEMENT, DeviationPriority.HIGH)
+        today.toString() > dates.endDate -> finding(VehicleDeviation.AGREEMENT_EXPIRED,
+            "The supplier's agreement ended on ${dates.endDate}.", DeviationOrigin.AGREEMENT, DeviationPriority.HIGH)
     }
     val orderedRows = rows.sortedBy { it.data.periodStart }
     var furthest: StoredTripRow? = null
@@ -84,35 +50,14 @@ internal fun evaluateDeviationRules(approvals: List<StoredApproval>, rows: List<
             val co2 = fuel.measurements.mapNotNull { m -> m.co2GramsPerKm?.let { "${m.measurementMethod?.code ?: "unknown method"}: ${it.toPlainString()} g/km (rounded ${rounded(it)})" } }
             if (fuel.measurements.mapNotNull { it.co2GramsPerKm?.let(::rounded) }.distinct().size > 1)
                 finding(VehicleDeviation.REGISTRY_CO2_DISAGREEMENT,
-                    "Review: Statens Vegvesen CO₂ measurements differ for fuel ${fuel.fuelTechnology?.code ?: "unknown"}: ${co2.joinToString("; ")}. Different methods may explain the discrepancy.",
+                    "Review: Statens vegvesen CO₂ measurements differ for fuel ${fuel.fuelTechnology?.code ?: "unknown"}: ${co2.joinToString("; ")}. Different methods may explain the discrepancy.",
                     DeviationOrigin.REGISTRY, fuelIndex = fi)
-        }
-        // Only today's approvals can be compared with current registry facts as approval requirements.
-        for (a in approvals.filter { approvalStatus(it, today) == ApprovalStatus.ACTIVE }) {
-            val known = data.fuels.mapNotNull { it.fuelTechnology?.code }
-            if (a.data.fuelTechnology != FuelTechnology.NOT_APPLICABLE && (known.isEmpty() || data.fuels.any { !knownFuel(it.fuelTechnology?.code) }))
-                finding(VehicleDeviation.UNABLE_TO_VERIFY, "Unable to fully verify approved fuel: registry fuel is missing or unrecognized.", DeviationOrigin.REGISTRY, approval = a)
-            else if (a.data.fuelTechnology != FuelTechnology.NOT_APPLICABLE && known.none { fuelGroups(it).contains(a.data.fuelTechnology.code) })
-                finding(VehicleDeviation.FUEL_MISMATCH, "Approved fuel ${a.data.fuelTechnology.code} differs from registry fuels ${known.joinToString()}. This compares today's approval with the retrieved registry snapshot.", DeviationOrigin.REGISTRY, DeviationPriority.HIGH, approval = a)
-            data.vehicleCategory?.code?.let { code ->
-                if (categoryGroup(code) != a.data.vehicleCategory.name) finding(VehicleDeviation.CATEGORY_MISMATCH,
-                    "Approved category ${a.data.vehicleCategory} differs from registry category $code (group ${categoryGroup(code)}).", DeviationOrigin.REGISTRY, DeviationPriority.HIGH, approval = a)
-            } ?: finding(VehicleDeviation.UNABLE_TO_VERIFY, "Unable to verify approved category: registry category is missing.", DeviationOrigin.REGISTRY, approval = a)
         }
     }
     for (row in rows) {
-        val input = row.data; val start = LocalDate.parse(input.periodStart); val end = LocalDate.parse(input.periodEnd)
-        if (!approvalCovers(start, end, approvals)) finding(VehicleDeviation.APPROVAL_PERIOD_NOT_COVERED,
-            "Approval records do not cover the entire reported period $start–$end without gaps. This checks recorded approval coverage, not actual movements.",
-            DeviationOrigin.APPROVAL, DeviationPriority.HIGH, row)
-        else {
-            if (!approvalCovers(start, end, approvals.filter { it.data.fuelTechnology == input.fuelTechnology }))
-                finding(VehicleDeviation.APPROVAL_FUEL_MISMATCH, "Reported fuel ${input.fuelTechnology.code} is not approved throughout $start–$end.", DeviationOrigin.APPROVAL, DeviationPriority.HIGH, row)
-            if (!approvalCovers(start, end, approvals.filter { it.data.vehicleCategory == input.vehicleCategory }))
-                finding(VehicleDeviation.APPROVAL_CATEGORY_MISMATCH, "Reported category ${input.vehicleCategory} is not approved throughout $start–$end.", DeviationOrigin.APPROVAL, DeviationPriority.HIGH, row)
-            if (!approvalCovers(start, end, approvals.filter { it.data.fuelTechnology == input.fuelTechnology && it.data.vehicleCategory == input.vehicleCategory }))
-                finding(VehicleDeviation.APPROVAL_PERIOD_NOT_COVERED, "No uninterrupted approval coverage matches both reported fuel and category throughout $start–$end.", DeviationOrigin.APPROVAL, DeviationPriority.HIGH, row)
-        }
+        val input = row.data
+        if (dates != null && (input.periodStart < dates.startDate || input.periodEnd > dates.endDate))
+            finding(VehicleDeviation.AGREEMENT_PERIOD_NOT_COVERED, "The reporting period ${input.periodStart} to ${input.periodEnd} extends outside the agreement's dates.", DeviationOrigin.AGREEMENT, DeviationPriority.HIGH, row)
         if (input.fuelTechnology.usesLitres) {
             if (input.totalTripKm.signum() > 0) {
                 val computed = ratio(input.fuelConsumedLitres!!.multiply(BigDecimal("100")), input.totalTripKm)
