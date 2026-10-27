@@ -20,21 +20,31 @@ class VehicleCheckService(
     suspend fun check(request: VehicleCheckRequest): VehicleCheckResponse {
         val now = Instant.now(clock)
         val vehicle = repository.findOrCreateVehicle(request.registrationNumber, now)
-        val approval = repository.approvalForVehicle(vehicle.id)
+        val approvals = repository.approvalsForVehicle(vehicle.registrationNumber)
+        val approval = representativeApproval(approvals, LocalDate.now(clock))
         val approvalStatus = approvalStatus(approval, LocalDate.now(clock))
-        val tripRows = repository.tripRowsForVehicle(vehicle.id)
-        val cached = repository.latestSnapshot(vehicle.id)
+        val tripRows = repository.tripRowsForVehicle(vehicle.registrationNumber)
+        val cached = repository.latestSnapshot(vehicle.registrationNumber)
         val (registryResult, newSnapshot) = registryResult(vehicle, cached, request.forceRefresh, now)
-        val deviations = (approvalDeviations(approvalStatus) + registryResult.deviations).distinct()
+        val findings = approvalDeviations(approvalStatus).map { code ->
+            DeviationFinding(code, DeviationPriority.HIGH, DeviationOrigin.APPROVAL,
+                "Approval as of ${LocalDate.now(clock)}: ${approvalStatus.name.lowercase().replace('_', ' ')}. Historical reporting-period coverage is evaluated separately.", approvalId = approval?.id)
+        } + registryResult.deviations.map { code ->
+            DeviationFinding(code, if (code == VehicleDeviation.UNKNOWN_REGISTRATION_STATUS) DeviationPriority.MODERATE else DeviationPriority.HIGH,
+                DeviationOrigin.REGISTRY, "Retrieved registration status: ${registryResult.registrationStatus ?: "missing"}, fetched ${registryResult.fetchedAt}. This does not establish historical registration status.")
+        } + evaluateDeviationRules(approvals, tripRows, registryResult, LocalDate.now(clock))
+        val deviations = findings.map { it.code }.distinct()
         val response = VehicleCheckResponse(
             id = UUID.randomUUID().toString(),
-            checkedAt = now.toString(),
+            checkedAt = now.storageTimestamp(),
             vehicle = vehicle,
             approvalStatus = approvalStatus,
             approval = approval,
             tripRows = tripRows,
-            registry = registryResult,
+            registry = registryResult.copy(deviations = findings.filter { it.origin == DeviationOrigin.REGISTRY }.map { it.code }.distinct()),
             deviations = deviations,
+            approvals = approvals,
+            findings = findings,
         )
         repository.saveCheck(response, newSnapshot)
         return response
@@ -50,17 +60,16 @@ class VehicleCheckService(
             return resultFromSnapshot(cached, RegistryDataSource.CACHE) to null
         }
 
-        val lookup = registry?.lookup(vehicle.normalizedRegistrationNumber)
+        val lookup = registry?.lookup(vehicle.registrationNumber)
             ?: RegistryLookup.Failed(LookupOutcome.NOT_CONFIGURED)
         return when (lookup) {
             is RegistryLookup.Found -> {
-                val status = lookup.data.registrationStatus()
+                require(lookup.data.registrationNumber == vehicle.registrationNumber) { "Registry vehicle mismatch" }
                 val snapshot = RegistrySnapshot(
                     id = UUID.randomUUID().toString(),
-                    vehicleId = vehicle.id,
-                    fetchedAt = now.toString(),
+                    registrationNumber = vehicle.registrationNumber,
+                    fetchedAt = now.storageTimestamp(),
                     source = "STATENS_VEGVESEN_ENKELTOPPSLAG",
-                    registrationStatus = status,
                     data = lookup.data,
                 )
                 resultFromSnapshot(snapshot, RegistryDataSource.LIVE) to snapshot
@@ -89,24 +98,12 @@ class VehicleCheckService(
         dataSource = source,
         lookupOutcome = LookupOutcome.FOUND,
         fetchedAt = snapshot.fetchedAt,
-        registrationStatus = snapshot.registrationStatus,
+        registrationStatus = snapshot.data.registrationStatus,
         data = snapshot.data,
-        deviations = deviationsForRegistrationStatus(snapshot.registrationStatus),
+        deviations = deviationsForRegistrationStatus(snapshot.data.registrationStatus),
         snapshotId = snapshot.id,
         refreshFailure = refreshFailure,
     )
-
-    private fun approvalStatus(approval: StoredApproval?, today: LocalDate): ApprovalStatus {
-        if (approval == null) return ApprovalStatus.NOT_APPROVED
-        if (approval.revokedAt != null) return ApprovalStatus.REVOKED
-        val start = approval.data.startDate?.let(LocalDate::parse)
-        val expiry = approval.data.expiryDate?.let(LocalDate::parse)
-        return when {
-            start != null && start.isAfter(today) -> ApprovalStatus.NOT_YET_ACTIVE
-            expiry != null && expiry.isBefore(today) -> ApprovalStatus.EXPIRED
-            else -> ApprovalStatus.ACTIVE
-        }
-    }
 
     private fun approvalDeviations(status: ApprovalStatus): List<VehicleDeviation> = when (status) {
         ApprovalStatus.ACTIVE -> emptyList()
@@ -125,4 +122,17 @@ class VehicleCheckService(
             "UREGISTRERT" -> listOf(VehicleDeviation.UNREGISTERED)
             else -> listOf(VehicleDeviation.UNKNOWN_REGISTRATION_STATUS)
         }
+}
+
+/** Shared by current read views and check evaluation; expiry today is still active. */
+internal fun approvalStatus(approval: StoredApproval?, today: LocalDate): ApprovalStatus {
+    if (approval == null) return ApprovalStatus.NOT_APPROVED
+    if (approval.revokedAt?.let { Instant.parse(it).atZone(ZoneId.of("Europe/Oslo")).toLocalDate() <= today } == true) return ApprovalStatus.REVOKED
+    val start = approvalStart(approval)
+    val expiry = approval.data.expiryDate?.let(LocalDate::parse)
+    return when {
+        start.isAfter(today) -> ApprovalStatus.NOT_YET_ACTIVE
+        expiry != null && expiry.isBefore(today) -> ApprovalStatus.EXPIRED
+        else -> ApprovalStatus.ACTIVE
+    }
 }

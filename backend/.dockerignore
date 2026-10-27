@@ -6,5 +6,7 @@ out/
 .kotlin/
 .git/
 .env
+.env.*
+.env-backups/
 data/
 .DS_Store

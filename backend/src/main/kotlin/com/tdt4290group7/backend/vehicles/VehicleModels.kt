@@ -1,60 +1,63 @@
+@file:kotlinx.serialization.UseSerializers(DecimalSerializer::class)
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.tdt4290group7.backend.vehicles
 
-import kotlinx.serialization.SerialName
+import java.math.BigDecimal
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class Vehicle(
-    val id: String,
-    val normalizedRegistrationNumber: String,
-    /** Reserved for the future supplier model. Vehicles may currently have no supplier. */
+    val registrationNumber: String,
+    /** Reserved for the future supplier model. */
     val supplierId: String? = null,
     val createdAt: String,
 )
 
-/** One statistics row, not one unique vehicle. Repeated plates remain separate rows. */
+/** Supplier observations for a period, not one individual journey or unique vehicle. */
 @Serializable
 data class TripRowInput(
     val registrationNumber: String,
-    val fuel: String? = null,
-    val make: String? = null,
-    val vehicleType: String? = null,
-    val model: String? = null,
-    val co2Registered: Boolean? = null,
-    val co2GramsPerKm: String? = null,
-    val medianCo2: String? = null,
-    val totalTripKm: String? = null,
-    val totalKmCo2Registered: String? = null,
-    val totalKmCo2NotRegistered: String? = null,
-    val kmFuelNotRegistered: String? = null,
-    val totalKmFuelRegistered: String? = null,
-    val tripCount: String? = null,
-    val assignmentNumber: String? = null,
-    val averageConsumptionLitresPerKm: String? = null,
-    val kmPerBus: String? = null,
-    val fuelConsumptionLitresPerBus: String? = null,
+    val periodStart: String,
+    val periodEnd: String,
+    /** Supplier's reported technology; not the approval or SVV observation. */
+    val fuelTechnology: FuelTechnology,
+    val make: String,
+    val bodyType: BodyType,
+    val model: String,
+    val co2Registered: Boolean,
+    val co2GramsPerKm: BigDecimal?,
+    val medianCo2: BigDecimal?,
+    val totalTripKm: BigDecimal,
+    val totalKmCo2Registered: BigDecimal?,
+    val totalKmCo2NotRegistered: BigDecimal,
+    val kmFuelNotRegistered: BigDecimal,
+    val totalKmFuelRegistered: BigDecimal,
+    val totalKmNoxRegistered: BigDecimal?,
+    val totalNoxRegisteredGrams: BigDecimal?,
+    val tripCount: Int,
+    val vehicleCategory: VehicleCategory,
+    val averageFuelConsumptionLitresPer100Km: BigDecimal? = null,
+    val fuelConsumedLitres: BigDecimal? = null,
     val comment: String? = null,
-    val additionalFields: Map<String, String> = emptyMap(),
 )
 
+fun TripRowInput.estimateCo2Kg(): BigDecimal? =
+    co2GramsPerKm?.let { totalTripKm.multiply(it).movePointLeft(3).stripTrailingZeros() }
+
 @Serializable
-data class AppendTripRowsRequest(
-    val sourceName: String? = null,
-    val rows: List<TripRowInput>,
-)
+data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>)
 
 @Serializable
 data class StoredTripRow(
     val id: String,
-    val vehicleId: String,
+    val registrationNumber: String,
     val sourceName: String? = null,
     val createdAt: String,
     val data: TripRowInput,
+    /** Read-only supplier-based estimate; null when emissions are not applicable. */
+    @kotlinx.serialization.EncodeDefault
+    val estimatedCo2Kg: BigDecimal? = data.estimateCo2Kg(),
 )
 
 @Serializable
@@ -63,31 +66,43 @@ data class AppendTripRowsResponse(
     val rowCount: Int,
     val distinctVehicleCount: Int,
     val rows: List<StoredTripRow>,
+    /** One result per distinct plate, populated by the HTTP save workflow after persistence. */
+    @kotlinx.serialization.EncodeDefault
+    val checks: List<StatisticsCheckResult> = emptyList(),
+)
+
+@Serializable
+data class StatisticsCheckResult(
+    val registrationNumber: String,
+    val check: VehicleCheckSummary? = null,
+    /** Safe generic error: statistics remain saved when checking fails. */
+    val error: String? = null,
+)
+
+@Serializable
+data class TripRowsListResponse(
+    val items: List<StoredTripRow>, val total: Int, val page: Int, val pageSize: Int,
 )
 
 @Serializable
 data class ApprovalInput(
     val registrationNumber: String,
-    val fuelTechnology: String? = null,
-    val usedThroughoutPeriod: Boolean? = null,
-    /** Missing means effective immediately. */
+    /** Official fuel code, separate from supplier/SVV observations. */
+    val fuelTechnology: FuelTechnology,
+    val vehicleCategory: VehicleCategory,
+    /** On creation, missing becomes the explicit Oslo creation date. */
     val startDate: String? = null,
     /** Missing means approved indefinitely, until manually revoked. */
     val expiryDate: String? = null,
-    val vehicleGroup: String? = null,
-    val additionalFields: Map<String, String> = emptyMap(),
 )
 
 @Serializable
-data class UpsertApprovalsRequest(
-    val sourceName: String? = null,
-    val approvals: List<ApprovalInput>,
-)
+data class AppendApprovalsRequest(val sourceName: String? = null, val approvals: List<ApprovalInput>)
 
 @Serializable
 data class StoredApproval(
     val id: String,
-    val vehicleId: String,
+    val registrationNumber: String,
     val sourceName: String? = null,
     val createdAt: String,
     val updatedAt: String,
@@ -96,73 +111,58 @@ data class StoredApproval(
 )
 
 @Serializable
-data class UpsertApprovalsResponse(
+data class AppendApprovalsResponse(
     val updatedAt: String,
     val approvalCount: Int,
     val approvals: List<StoredApproval>,
 )
 
 @Serializable
+data class UpdateApprovalRequest(val approval: ApprovalInput, val expectedUpdatedAt: String, val sourceName: String? = null)
+
+@Serializable
 enum class ApprovalStatus { ACTIVE, NOT_YET_ACTIVE, EXPIRED, REVOKED, NOT_APPROVED }
 
 @Serializable
-data class VehicleCheckRequest(
-    val registrationNumber: String,
-    val forceRefresh: Boolean = false,
+data class VehicleCheckRequest(val registrationNumber: String, val forceRefresh: Boolean = false)
+
+@Serializable
+data class RegistryCode(val code: String, val name: String? = null)
+
+@Serializable
+data class RegistryEmissionMeasurement(
+    val measurementMethod: RegistryCode? = null,
+    val co2GramsPerKm: BigDecimal? = null,
+    val noxMgPerKm: BigDecimal? = null,
 )
 
-/** A lossless, application-owned tree containing every field returned by SVV. */
 @Serializable
-sealed interface RegistryValue {
-    @Serializable
-    @SerialName("object")
-    data class ObjectValue(val fields: Map<String, RegistryValue>) : RegistryValue
+data class RegistryFuel(
+    /** SVV's code/name, not a supplier observation or approval requirement. */
+    val fuelTechnology: RegistryCode? = null,
+    val measurements: List<RegistryEmissionMeasurement> = emptyList(),
+)
 
-    @Serializable
-    @SerialName("array")
-    data class ArrayValue(val items: List<RegistryValue>) : RegistryValue
-
-    @Serializable
-    @SerialName("string")
-    data class StringValue(val value: String) : RegistryValue
-
-    @Serializable
-    @SerialName("number")
-    data class NumberValue(val value: String) : RegistryValue
-
-    @Serializable
-    @SerialName("boolean")
-    data class BooleanValue(val value: Boolean) : RegistryValue
-
-    @Serializable
-    @SerialName("null")
-    data object NullValue : RegistryValue
-}
-
-fun JsonElement.toRegistryValue(): RegistryValue = when (this) {
-    is JsonObject -> RegistryValue.ObjectValue(mapValues { (_, value) -> value.toRegistryValue() })
-    is JsonArray -> RegistryValue.ArrayValue(map { it.toRegistryValue() })
-    JsonNull -> RegistryValue.NullValue
-    is JsonPrimitive -> when {
-        isString -> RegistryValue.StringValue(content)
-        content == "true" || content == "false" -> RegistryValue.BooleanValue(content.toBoolean())
-        else -> RegistryValue.NumberValue(content)
-    }
-}
-
-fun RegistryValue.field(name: String): RegistryValue? =
-    (this as? RegistryValue.ObjectValue)?.fields?.get(name)
-
-fun RegistryValue.text(): String? = (this as? RegistryValue.StringValue)?.value
+/** Allowlisted projection only: never a raw SVV response or arbitrary-field map. */
+@Serializable
+data class RegistryVehicleData(
+    val registrationNumber: String,
+    val registrationStatus: String? = null,
+    val make: String? = null,
+    val model: String? = null,
+    val vehicleCategory: RegistryCode? = null,
+    val bodyType: RegistryCode? = null,
+    val euroClass: RegistryCode? = null,
+    val fuels: List<RegistryFuel> = emptyList(),
+)
 
 @Serializable
 data class RegistrySnapshot(
     val id: String,
-    val vehicleId: String,
+    val registrationNumber: String,
     val fetchedAt: String,
     val source: String,
-    val registrationStatus: String? = null,
-    val data: RegistryValue,
+    val data: RegistryVehicleData,
 )
 
 @Serializable
@@ -173,16 +173,28 @@ enum class LookupOutcome {
 
 @Serializable
 enum class VehicleDeviation {
-    NOT_ON_APPROVED_LIST,
-    APPROVAL_NOT_YET_ACTIVE,
-    APPROVAL_EXPIRED,
-    APPROVAL_REVOKED,
-    DEREGISTERED,
-    EXPORTED,
-    SCRAPPED,
-    UNREGISTERED,
-    UNKNOWN_REGISTRATION_STATUS,
+    NOT_ON_APPROVED_LIST, APPROVAL_NOT_YET_ACTIVE, APPROVAL_EXPIRED, APPROVAL_REVOKED,
+    DEREGISTERED, EXPORTED, SCRAPPED, UNREGISTERED, UNKNOWN_REGISTRATION_STATUS,
+    APPROVAL_PERIOD_NOT_COVERED, APPROVAL_CONFLICT, APPROVAL_FUEL_MISMATCH, APPROVAL_CATEGORY_MISMATCH,
+    FUEL_MISMATCH, CATEGORY_MISMATCH, BODY_TYPE_MISMATCH, BRAND_MISMATCH, MODEL_MISMATCH,
+    CO2_CLASSIFICATION_MISMATCH, CO2_MISMATCH, REGISTRY_CO2_DISAGREEMENT, NOX_MISMATCH, CONSUMPTION_MISMATCH,
+    OVERLAPPING_STATISTICS, UNABLE_TO_VERIFY,
 }
+
+@Serializable
+enum class DeviationPriority { MODERATE, HIGH }
+
+@Serializable
+enum class DeviationOrigin { APPROVAL, REGISTRY, STATISTICS }
+
+/** Each occurrence is a deviation. Descriptions may explain review/verification uncertainty. */
+@Serializable
+data class DeviationFinding(
+    val code: VehicleDeviation, val priority: DeviationPriority, val origin: DeviationOrigin, val description: String,
+    val tripRowId: String? = null, val relatedTripRowId: String? = null,
+    val approvalId: String? = null, val relatedApprovalId: String? = null,
+    val fuelIndex: Int? = null, val measurementIndex: Int? = null,
+)
 
 @Serializable
 enum class UsageProhibitionState { ACTIVE, FUTURE, NONE, UNKNOWN }
@@ -196,13 +208,11 @@ data class RegistryCheckResult(
     val lookupOutcome: LookupOutcome,
     val fetchedAt: String? = null,
     val registrationStatus: String? = null,
-    /** Complete SVV response, whether it came from live lookup or a saved snapshot. */
-    val data: RegistryValue? = null,
-    /** Public Enkeltoppslag cannot establish whether a bruksforbud exists. */
+    val data: RegistryVehicleData? = null,
+    /** Enkeltoppslag cannot establish whether bruksforbud exists. */
     val usageProhibitionState: UsageProhibitionState = UsageProhibitionState.UNKNOWN,
     val deviations: List<VehicleDeviation> = emptyList(),
     val snapshotId: String? = null,
-    /** Present when a refresh failed and stale cached data was returned instead. */
     val refreshFailure: LookupOutcome? = null,
 )
 
@@ -216,7 +226,58 @@ data class VehicleCheckResponse(
     val tripRows: List<StoredTripRow>,
     val registry: RegistryCheckResult,
     val deviations: List<VehicleDeviation>,
+    @kotlinx.serialization.EncodeDefault val approvals: List<StoredApproval> = emptyList(),
+    @kotlinx.serialization.EncodeDefault val findings: List<DeviationFinding> = emptyList(),
+)
+
+/** Small historical summary: browsing never creates checks or calls SVV. */
+@Serializable
+data class VehicleCheckSummary(
+    val id: String,
+    val checkedAt: String,
+    val approvalStatus: ApprovalStatus,
+    val dataSource: RegistryDataSource,
+    val lookupOutcome: LookupOutcome,
+    val fetchedAt: String? = null,
+    val refreshFailure: LookupOutcome? = null,
+    val deviations: List<VehicleDeviation>,
+    @kotlinx.serialization.EncodeDefault val highPriorityCount: Int = 0,
+    @kotlinx.serialization.EncodeDefault val moderatePriorityCount: Int = 0,
+)
+
+internal fun VehicleCheckResponse.summary() = VehicleCheckSummary(id, checkedAt, approvalStatus, registry.dataSource,
+    registry.lookupOutcome, registry.fetchedAt, registry.refreshFailure, deviations,
+    findings.count { it.priority == DeviationPriority.HIGH }, findings.count { it.priority == DeviationPriority.MODERATE })
+
+@Serializable
+data class VehicleOverview(
+    val vehicle: Vehicle,
+    val approvalStatus: ApprovalStatus,
+    val approval: StoredApproval? = null,
+    val latestCheck: VehicleCheckSummary? = null,
+)
+
+@Serializable
+data class VehicleListResponse(
+    val items: List<VehicleOverview>, val total: Int, val page: Int, val pageSize: Int, val approvalAsOf: String,
+)
+
+@Serializable
+data class VehicleDetailsResponse(
+    val vehicle: Vehicle,
+    val approvalStatus: ApprovalStatus,
+    val approvalAsOf: String,
+    val approval: StoredApproval? = null,
+    val tripRows: List<StoredTripRow>,
+    val latestSnapshot: RegistrySnapshot? = null,
+    val latestCheck: VehicleCheckSummary? = null,
+    @kotlinx.serialization.EncodeDefault val approvals: List<StoredApproval> = emptyList(),
+)
+
+@Serializable
+data class VehicleHistoryResponse(
+    val items: List<VehicleCheckSummary>, val total: Int, val page: Int, val pageSize: Int,
 )
 
 fun normalizeRegistrationNumber(value: String): String =
-    value.uppercase().replace(Regex("[\\s-]"), "")
+    value.uppercase(java.util.Locale.ROOT).replace(Regex("[\\s-]"), "")

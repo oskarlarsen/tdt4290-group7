@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.repository
 
+import com.tdt4290group7.backend.backendSetting
+
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.tdt4290group7.backend.auth.PasswordPolicy
 import com.tdt4290group7.backend.config.requireSecret
@@ -51,7 +53,7 @@ object UserRepository {
     }
 
     private fun requireSeedPassword(envVar: String): String =
-        runCatching { requireSecret(envVar, System.getenv(envVar)) }
+        runCatching { requireSecret(envVar, backendSetting(envVar)) }
             .onFailure { logger.error(it.message) }
             .getOrThrow()
 

@@ -52,10 +52,13 @@ dependencies {
 }
 
 tasks.test {
+    // Never read the developer's shared .env, SVV key or data-path overrides in tests.
+    environment("BACKEND_ENV_FILE", layout.buildDirectory.file("test-data/no-local-config.env").get().asFile.absolutePath)
+    environment("SVV_API_KEY", "")
     // The app refuses to start without these; tests get throwaway values that never ship.
     environment("JWT_SECRET", "test-only-jwt-secret")
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
     environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
     // Auth tests now initialize the vehicle store too; keep them away from local vehicle data.
-    environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles.db").get().asFile.absolutePath)
+    environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles-v6.db").get().asFile.absolutePath)
 }

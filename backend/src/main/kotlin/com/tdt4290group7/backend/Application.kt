@@ -24,8 +24,8 @@ import java.nio.file.Path
 import java.time.Duration
 
 fun main() {
-    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
-    val host = System.getenv("HOST") ?: "127.0.0.1"
+    val port = backendSetting("PORT")?.toIntOrNull() ?: 8080
+    val host = backendSetting("HOST") ?: "127.0.0.1"
     embeddedServer(Netty, host = host, port = port, module = Application::module)
         .start(wait = true)
 }
@@ -36,8 +36,8 @@ fun Application.module(
     cacheTtl: Duration = Duration.ofDays(svvCacheTtlDays()),
 ) {
     // Read and validate config first, so a bad combination stops startup before anything runs.
-    val environment = AppEnvironment.parse(System.getenv("APP_ENV"))
-    val logResetTokens = resetTokenLoggingEnabled(environment, System.getenv("ALLOW_DEV_PASSWORD_RESET_LOG"))
+    val environment = AppEnvironment.parse(backendSetting("APP_ENV"))
+    val logResetTokens = resetTokenLoggingEnabled(environment, backendSetting("ALLOW_DEV_PASSWORD_RESET_LOG"))
     log.info("Starting in ${environment.name.lowercase()} mode")
 
     // Fail fast at startup: UserRepository's init throws if SEED_ADMIN_PASSWORD /
@@ -53,7 +53,7 @@ fun Application.module(
     configureSecurity()
     configureRateLimiting()
     val vehicleRepository = repository ?: VehicleRepository(
-        Path.of(System.getenv("VEHICLE_DB_PATH") ?: "data/vehicles.db"),
+        Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db"),
     )
     configureRouting(vehicleRepository, registry, cacheTtl)
     configureAuthRoutes(logResetTokens)

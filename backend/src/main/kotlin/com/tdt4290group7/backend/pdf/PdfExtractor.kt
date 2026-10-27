@@ -125,7 +125,7 @@ internal fun preprocessForOcr(img: BufferedImage): BufferedImage {
 }
 
 private fun runTesseract(imageFile: File, languages: String): String {
-    val executable = System.getenv("TESSERACT_PATH")
+    val executable = com.tdt4290group7.backend.backendSetting("TESSERACT_PATH")
         ?.takeIf { it.isNotBlank() }
         ?: System.getenv("ProgramFiles")
             ?.let { File(File(it, "Tesseract-OCR"), "tesseract.exe") }

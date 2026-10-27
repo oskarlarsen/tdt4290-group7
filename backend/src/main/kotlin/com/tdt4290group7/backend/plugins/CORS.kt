@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.plugins
 
+import com.tdt4290group7.backend.backendSetting
+
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.server.application.Application
@@ -12,7 +14,7 @@ data class AllowedOrigin(val scheme: String, val hostWithPort: String)
 
 fun Application.configureCORS() {
     val allowedOrigins = parseAllowedOrigins(
-        System.getenv("CORS_ALLOWED_ORIGINS")
+        backendSetting("CORS_ALLOWED_ORIGINS")
             // Falls back to the default Vite dev server origin so `npm run dev` works against
             // a locally running backend without extra setup; set CORS_ALLOWED_ORIGINS explicitly
             // everywhere else (e.g. Docker, staging, production).
