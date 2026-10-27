@@ -1,28 +1,30 @@
 # Admin vehicle and certificate pages
 
-Open `/admin/vehicles` or `/admin/certificates`. Both pages use the real backend.
-Supplier pages are unchanged.
+Open `/admin/vehicles` or `/admin/certificates`. Both pages use the real backend. Supplier pages are unchanged.
 
 ## Run locally
 
-1. Configure the root `.env` and start the backend using the [root setup guide](../README.md#backend-setup).
+1. Configure the shared root `.env` and start the backend using the [root setup guide](../README.md#backend-setup).
 2. From `frontend/`, run `npm.cmd ci`, then `npm.cmd run dev`.
-3. Use `VITE_API_BASE_URL=http://localhost:8080/api`; real backend login is the default. Set `VITE_USE_MOCK_AUTH=true` only to use mock login.
+3. Use `VITE_API_BASE_URL=http://localhost:8080/api` and `VITE_MOCK_AUTH=false` for real backend login. Keep `VITE_USE_MOCKS` independent; it only controls prototype data on other pages.
 4. Open `http://localhost:5173/admin/vehicles` or `/admin/certificates`. Use localhost for both services so login cookies work.
 
-Mock login: `admin@kommune.no` / `admin123`. It does not mock vehicle or certificate requests.
-Do not create a frontend `.env` or expose backend secrets through `VITE_` variables.
+Offline mock login (`VITE_MOCK_AUTH=true`) does not provide the administrator session required by either page. Do not expose backend secrets through `VITE_` variables.
 
-## Using the page
+## Vehicles
 
-- Search/filter the vehicle directory and open a vehicle's details. The drawer uses roughly three-quarters of desktop page width and full width on small screens.
-- Add trip/period statistics or approval periods individually. Applicable statistics are required; non-applicable electric/hydrogen inputs are locked. Consumption uses L/100km.
-- Approval periods can overlap for recertification. Edit/revoke the specific period; contradictory fuel/category values create deviations.
-- Saving statistics appends a row and checks every saved row for that plate. Repeated submissions are not deduplicated.
-- Open **Deviations**, filter by priority/reporting row, and expand **Compare facts**. It shows readable labels, units, supplier/approval values and saved registry references. Numerical calculations show their inputs.
-- **Check result** shows registry/check metadata; **History** opens earlier saved evidence. Browsing never performs a new registry lookup.
-- **Run check** saves a new result. Force refresh bypasses the normal 14-day registry cache.
-- **Upload Excel** is disabled and marked coming soon for approval/statistics batches. It does not read or upload files.
+Manage suppliers and their vehicle-use agreements inside the Vehicles page. Each agreement defines a period and maximum vehicle count; planned entries also take one place.
+
+## Workflow
+
+1. Add a supplier using its name and organization number.
+2. Expand the supplier and add an agreement with dates, maximum vehicles and an optional note.
+3. Add registered vehicles or enable **Registration pending** to reserve a place without details.
+4. Use **Replace vehicle** for immediate replacement, or **Register vehicle** when a planned vehicle receives its registration number.
+5. Open **View details** for reporting periods, CO2 rate/calculation, deviations and historical checks. NOx and supporting facts are expandable.
+6. Use **Change history** to undo eligible additions, removals, replacements, planned registrations and edits. Later dependent changes can prevent undo.
+
+An allowance reduction is permitted even when exceeded. The counter displays only `8 of 5 vehicles`, in red. New places are blocked, while replacement still works. Dates display as `dd.mm.yyyy`; date inputs retain browser-local formatting. The interface is English.
 
 ## Certificates
 
@@ -32,17 +34,13 @@ Do not create a frontend `.env` or expose backend secrets through `VITE_` variab
 - Administrators can edit supplier, certificate type, issue/expiry dates, and contract reference, or delete a certificate after confirmation. Editing metadata does not reprocess the PDF; upload the document again if its extracted details need to be refreshed.
 - Certificate routes require a real administrator login. They are not served by mock data or mock authentication.
 
-On an ambiguous save failure, inspect stored rows before trying again. Approval edits reject stale versions.
-Today's approval and historical period coverage are separate; registry snapshots do not prove past registry status.
+## Development
 
-## Developer pointers
+`npm run build` checks TypeScript and produces the app. `npm test -- --run` runs the frontend suite. The [backend guide](../backend/README.md#vehicle-agreements-and-reporting) describes API fields, exact decimals, history, and the [development database reset instructions](../backend/README.md#database-reset-and-tests).
 
-- [Vehicles.tsx](src/pages/admin/Vehicles.tsx): directory and entry actions.
-- [components/vehicles](src/components/vehicles): forms, wider drawer, approval periods and deviation comparisons.
-- [deviationAnalysis.ts](src/utils/deviationAnalysis.ts): projects saved facts and exact display calculations; no API calls or new deviation rules.
-- [api/vehicles.ts](src/api/vehicles.ts), [types/vehicle.ts](src/types/vehicle.ts): requests and response types.
-- [Certificates.tsx](src/pages/admin/Certificates.tsx), [api/certificates.ts](src/api/certificates.ts): PDF upload and certificate overview.
-- [Backend API guide](../backend/README.md#vehicle-api): JSON examples, approval lifecycle, units and check behavior.
+Agreement forms and fleet actions live in `components/vehicles/FleetForms.tsx`, `AgreementCard.tsx`, and `ChangeHistory.tsx`; the API and query hooks are shared. The Contracts page is unchanged.
 
-Verify with `npm.cmd test -- --run` and `npm.cmd run build`.
-Vehicle routes still lack backend authorization; the admin route guard is not sufficient for deployment.
+- [Vehicles.tsx](src/pages/admin/Vehicles.tsx): fleet directory and actions.
+- [components/vehicles](src/components/vehicles): agreement forms, vehicle details, and change history.
+- [Certificates.tsx](src/pages/admin/Certificates.tsx), [api/certificates.ts](src/api/certificates.ts): certificate upload and management.
+- [Backend certificate API](../backend/README.md#certificate-api).

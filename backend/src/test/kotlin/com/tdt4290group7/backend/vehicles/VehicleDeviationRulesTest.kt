@@ -14,10 +14,9 @@ import kotlin.test.*
 class VehicleDeviationRulesTest {
     private val now = Instant.parse("2026-06-01T10:00:00Z")
     private val today = LocalDate.parse("2026-06-01")
-    private fun approval(start: String, end: String? = null, fuel: FuelTechnology = FuelTechnology.DIESEL,
-        category: VehicleCategory = VehicleCategory.M1, revoked: String? = null) = StoredApproval(UUID.randomUUID().toString(),
-        "AB12345", createdAt = now.toString(), updatedAt = now.toString(), revokedAt = revoked,
-        data = syntheticApproval(startDate = start, expiryDate = end, fuelTechnology = fuel, vehicleCategory = category))
+    private val agreement = AgreementEvidence(FleetAgreement("agreement", "supplier", "2025-01-01", "2027-12-31", 10, "", now.toString()),
+        FleetSupplier("supplier", "Synthetic", "123456789"))
+    private val vehicle = Vehicle("AB12345", now.toString(), "agreement", listed = true)
     private fun row(input: TripRowInput = syntheticTrip("AB12345", "2026-01-01", "2026-01-31", co2Registered = true,
         co2GramsPerKm = BigDecimal("120"), totalTripKm = BigDecimal("1000"), totalKmNoxRegistered = BigDecimal("1000"),
         totalNoxRegisteredGrams = BigDecimal("25"), averageFuelConsumptionLitresPer100Km = BigDecimal("8"),
@@ -27,10 +26,19 @@ class VehicleDeviationRulesTest {
         fetchedAt = now.toString(), data = RegistryVehicleData("AB12345", "REGISTRERT", "Synthetic make", "Synthetic model",
             RegistryCode(category), RegistryCode(body), fuels = listOf(RegistryFuel(RegistryCode(fuel),
                 co2.mapIndexed { i, value -> RegistryEmissionMeasurement(RegistryCode(if (i == 0) "WLTP" else "NEDC"), value?.toBigDecimal(), nox?.toBigDecimal()) }))))
-    private fun evaluate(rows: List<StoredTripRow> = listOf(row()), approvals: List<StoredApproval> = listOf(approval("2025-01-01")),
-        registry: RegistryCheckResult = registry()) = evaluateDeviationRules(approvals, rows, registry, today)
+    private fun evaluate(rows: List<StoredTripRow> = listOf(row()), registry: RegistryCheckResult = registry()) =
+        evaluateDeviationRules(agreement, vehicle, rows, registry, today)
 
     @Test fun matchingNumbersCodesAndTextHaveNoFindings() { assertTrue(evaluate().isEmpty()) }
+    @Test fun agreementDatesDefineSupplierPermissionWithoutIndividualVehicleApprovalDates() {
+        val future = agreement.copy(agreement = agreement.agreement.copy(startDate = "2026-06-02"))
+        val findings = evaluateDeviationRules(future, vehicle, listOf(row()), registry(), today)
+        assertTrue(findings.any { it.code == VehicleDeviation.AGREEMENT_NOT_STARTED })
+        assertTrue(findings.any { it.code == VehicleDeviation.AGREEMENT_PERIOD_NOT_COVERED })
+        val endingToday = agreement.copy(agreement = agreement.agreement.copy(endDate = today.toString()))
+        assertFalse(evaluateDeviationRules(endingToday, vehicle, emptyList(), registry(), today).any { it.code == VehicleDeviation.AGREEMENT_EXPIRED })
+        assertTrue(evaluateDeviationRules(endingToday, vehicle, emptyList(), registry(), today.plusDays(1)).any { it.code == VehicleDeviation.AGREEMENT_EXPIRED })
+    }
     @Test fun roundingIsNearestIntegerHalfUpAndPreservesStoredNumbers() {
         assertEquals(BigDecimal("9"), rounded(BigDecimal("8.5")))
         val a = row(); val input = a.data.copy(co2GramsPerKm = BigDecimal("120.49"), averageFuelConsumptionLitresPer100Km = BigDecimal("8.49"))
@@ -63,27 +71,12 @@ class VehicleDeviationRulesTest {
     }
     @Test fun electricityNullsSkipEmissionAndLitreComparisons() {
         val input = syntheticTrip(fuelTechnology = FuelTechnology.ELECTRIC, totalTripKm = BigDecimal("1000"))
-        val results = evaluate(listOf(row(input)), listOf(approval("2025-01-01", fuel = FuelTechnology.ELECTRIC)), registry(listOf(null), nox = null, fuel = "5"))
+        val results = evaluate(listOf(row(input)), registry(listOf(null), nox = null, fuel = "5"))
         assertTrue(results.isEmpty())
     }
-    @Test fun adjacentAndCompatibleOverlappingApprovalsCoverWholePeriod() {
-        val a = approval("2026-01-01", "2026-01-15"); val b = approval("2026-01-16", "2026-12-31")
-        assertTrue(evaluate(approvals = listOf(a, b)).isEmpty())
-        assertTrue(evaluate(approvals = listOf(a, approval("2026-01-10"))).isEmpty())
-        assertTrue(evaluate(approvals = listOf(a, approval("2026-01-17"))).any { it.code == VehicleDeviation.APPROVAL_PERIOD_NOT_COVERED })
-    }
-    @Test fun conflictingOverlapsFlagEvenWhenOneApprovalCoversTheRow() {
-        val results = evaluate(approvals = listOf(approval("2025-01-01"), approval("2026-01-10", fuel = FuelTechnology.ELECTRIC)))
-        val conflict = results.single { it.code == VehicleDeviation.APPROVAL_CONFLICT }
-        assertEquals(DeviationPriority.HIGH, conflict.priority); assertNotNull(conflict.approvalId); assertNotNull(conflict.relatedApprovalId)
-        assertFalse(results.any { it.code == VehicleDeviation.APPROVAL_PERIOD_NOT_COVERED })
-    }
-    @Test fun revocationPreservesEarlierCoverageButExcludesItsEffectiveDay() {
-        val revoked = approval("2026-01-01", revoked = "2026-02-01T10:00:00Z")
-        assertTrue(evaluate(approvals = listOf(revoked)).isEmpty())
-        assertTrue(evaluate(listOf(row(row().data.copy(periodEnd = "2026-02-01"))), listOf(revoked)).any { it.code == VehicleDeviation.APPROVAL_PERIOD_NOT_COVERED })
-        assertEquals(ApprovalStatus.ACTIVE, approvalStatus(revoked, LocalDate.parse("2026-01-31")))
-    }
+
+
+
     @Test fun fuelAndCategoryMismatchesAreHighAndTextDifferencesModerate() {
         val results = evaluate(registry = registry(fuel = "1", category = "N1", body = "AC"))
         for (code in listOf(VehicleDeviation.FUEL_MISMATCH, VehicleDeviation.CATEGORY_MISMATCH))
@@ -102,30 +95,17 @@ class VehicleDeviationRulesTest {
     @Test fun manyOverlappingRowsDoNotProduceQuadraticPairOutput() {
         val electric = syntheticTrip(fuelTechnology = FuelTechnology.ELECTRIC)
         val rows = List(1000) { row(electric) }
-        val findings = evaluate(rows, listOf(approval("2025-01-01", fuel = FuelTechnology.ELECTRIC)), registry(listOf(null), nox = null, fuel = "5"))
+        val findings = evaluate(rows, registry(listOf(null), nox = null, fuel = "5"))
         assertEquals(999, findings.size)
         assertTrue(findings.all { it.code == VehicleDeviation.OVERLAPPING_STATISTICS })
     }
     @Test fun trailersDoNotRequireRegistryFuelAndUnknownFuelIsNotAConfirmedMismatch() {
         val trailer = syntheticTrip(fuelTechnology = FuelTechnology.NOT_APPLICABLE, vehicleCategory = VehicleCategory.O1)
         val reference = registry(listOf(null), nox = null, category = "O1").let { it.copy(data = it.data!!.copy(fuels = emptyList())) }
-        assertTrue(evaluate(listOf(row(trailer)), listOf(approval("2025-01-01", fuel = FuelTechnology.NOT_APPLICABLE, category = VehicleCategory.O1)), reference).isEmpty())
+        assertTrue(evaluate(listOf(row(trailer)), reference).isEmpty())
         val unknown = evaluate(registry = registry(fuel = "999"))
         assertTrue(unknown.any { it.code == VehicleDeviation.UNABLE_TO_VERIFY })
         assertFalse(unknown.any { it.code == VehicleDeviation.FUEL_MISMATCH })
     }
-    @Test fun historicalApprovalAndFindingEvidenceSurvivesEditsAndRevocations() = runBlocking {
-        val repo = VehicleRepository(Path.of("build", "test-data", "deviations-${UUID.randomUUID()}.db"))
-        val old = repo.appendApprovals(AppendApprovalsRequest(approvals = listOf(syntheticApproval(startDate = "2025-01-01"))), now).approvals.single()
-        repo.appendApprovals(AppendApprovalsRequest(approvals = listOf(syntheticApproval(startDate = "2026-01-10", fuelTechnology = FuelTechnology.ELECTRIC))), now)
-        repo.appendTripRows(AppendTripRowsRequest(rows = listOf(row().data)), now)
-        val service = VehicleCheckService(repo, VehicleRegistryClient { RegistryLookup.Found(registry(listOf("120", "140")).data!!) }, Duration.ofDays(14), Clock.fixed(now, ZoneId.of("Europe/Oslo")))
-        val check = service.check(VehicleCheckRequest("AB12345"))
-        repo.updateApproval(old.id, UpdateApprovalRequest(syntheticApproval(startDate = "2024-01-01", expiryDate = "2024-12-31"), old.updatedAt), now.plusSeconds(1))
-        repo.revokeApproval(old.id, now.plusSeconds(2))
-        assertEquals(check, repo.findCheck(check.id))
-        assertEquals(2, check.approvals.size)
-        val summary = repo.checkHistory("AB12345", 1, 10)!!.items.single()
-        assertEquals(check.findings.size, summary.highPriorityCount + summary.moderatePriorityCount)
-    }
+
 }

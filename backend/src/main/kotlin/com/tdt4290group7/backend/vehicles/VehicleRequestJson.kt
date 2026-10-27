@@ -11,6 +11,22 @@ import kotlinx.serialization.json.decodeFromJsonElement
 
 private val requestJson = Json { ignoreUnknownKeys = false; isLenient = false }
 
+/** Keep fleet requests as strict about JSON token types as reporting requests. */
+internal fun <T> decodeFleetRequest(text: String, serializer: kotlinx.serialization.DeserializationStrategy<T>): T {
+    fun validate(root: JsonObject) {
+        root.textFields("name", "orgNumber", "supplierId", "startDate", "endDate", "note", "expectedUpdatedAt", "registrationNumber")
+        root.booleanFields("planned")
+        root["allowedVehicles"]?.let {
+            val number = it as? JsonPrimitive ?: invalidType()
+            if (number.isString || !number.content.matches(Regex("-?(0|[1-9][0-9]*)"))) invalidType()
+        }
+        for (key in listOf("supplier", "agreement", "replacement")) root[key]?.let { validate(it as? JsonObject ?: invalidType()) }
+    }
+    val root = requestObject(text)
+    validate(root)
+    return requestJson.decodeFromJsonElement(serializer, root)
+}
+
 /** Kotlinx's primitive decoders can coerce quoted numbers/bools and unquoted text.
  * Check JSON token types as well as the DTO's allowed keys and value constraints. */
 fun decodeTripRowsRequest(text: String): AppendTripRowsRequest {
@@ -20,19 +36,6 @@ fun decodeTripRowsRequest(text: String): AppendTripRowsRequest {
         row.textFields("registrationNumber", "periodStart", "periodEnd", "fuelTechnology",
             "make", "bodyType", "vehicleCategory", "model", "comment")
         row.booleanFields("co2Registered")
-        row["tripCount"]?.takeUnless { it == JsonNull }?.let {
-            val value = it as? JsonPrimitive ?: invalidType()
-            if (value.isString || !value.content.matches(Regex("-?(0|[1-9][0-9]*)"))) invalidType()
-        }
-    }
-    return requestJson.decodeFromJsonElement(root)
-}
-
-fun decodeApprovalsRequest(text: String): AppendApprovalsRequest {
-    val root = requestObject(text)
-    root.textFields("sourceName")
-    root.items("approvals").forEach {
-        it.textFields("registrationNumber", "fuelTechnology", "startDate", "expiryDate", "vehicleCategory")
     }
     return requestJson.decodeFromJsonElement(root)
 }
@@ -41,14 +44,6 @@ fun decodeVehicleCheckRequest(text: String): VehicleCheckRequest {
     val root = requestObject(text)
     root.textFields("registrationNumber")
     root.booleanFields("forceRefresh")
-    return requestJson.decodeFromJsonElement(root)
-}
-
-fun decodeUpdateApprovalRequest(text: String): UpdateApprovalRequest {
-    val root = requestObject(text)
-    root.textFields("sourceName", "expectedUpdatedAt")
-    val approval = root["approval"] as? JsonObject ?: invalidType()
-    approval.textFields("registrationNumber", "fuelTechnology", "startDate", "expiryDate", "vehicleCategory")
     return requestJson.decodeFromJsonElement(root)
 }
 

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { VehicleDialog, primaryClass } from "../src/components/vehicles/VehicleDialog";
-import { ApprovalBadge } from "../src/components/vehicles/VehicleTable";
+import { VehicleAllowance } from "../src/components/vehicles/AgreementCard";
 import { Field } from "../src/components/vehicles/VehicleDialog";
 
 describe("vehicle presentation", () => {
@@ -24,21 +24,16 @@ describe("vehicle presentation", () => {
     expect(html).toContain('aria-label="Close Synthetic form"');
   });
 
-  it("retains the right-hand details drawer instead of centering it", () => {
-    const html = renderToStaticMarkup(<VehicleDialog title="Synthetic details" drawer onClose={() => {}}>Details</VehicleDialog>);
-    expect(html).toContain("inset-y-0 left-auto right-0 m-0");
-    expect(html).toContain("lg:w-[calc((100vw_-_15rem)*0.75)]");
-    expect(html).toContain("lg:min-w-[48rem]");
-    expect(html).not.toContain("max-w-3xl");
-    expect(html).not.toContain("inset-0 m-auto");
+  it("opens spacious centered vehicle details inside the application", () => {
+    const html = renderToStaticMarkup(<VehicleDialog title="Vehicle details" wide onClose={() => {}}>Details</VehicleDialog>);
+    expect(html).toContain("max-w-5xl"); expect(html).toContain("inset-0 m-auto");
+    expect(html).not.toContain("left-auto right-0");
   });
-
-  it("uses one unambiguous primary action color and the shared approval badge", () => {
+  it("shows only the count in red when an allowance is exceeded", () => {
+    const html = renderToStaticMarkup(<VehicleAllowance count={8} allowed={5} />);
+    expect(html).toContain("8 of 5 vehicles"); expect(html).toContain("text-red-700");
+    expect(html).not.toContain("above");
+    expect(renderToStaticMarkup(<VehicleAllowance count={5} allowed={5} />)).not.toContain("text-red");
     expect(primaryClass).toContain("bg-primary-900");
-    expect(primaryClass).not.toContain("bg-white");
-    const html = renderToStaticMarkup(<ApprovalBadge status="ACTIVE" />);
-    expect(html).toContain("bg-tertiary-100");
-    expect(html).toContain("font-mono");
-    expect(html).toContain("Approved");
   });
 });
