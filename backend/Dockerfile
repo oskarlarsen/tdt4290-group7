@@ -5,7 +5,7 @@ WORKDIR /app
 COPY . .
 RUN ./gradlewhttps://github.com/oskarlarsen/tdt4290-group7 buildFatJar --no-daemon
 
-FROM eclipse-temurin:25-jre-alpine@sha256:3c0a9084927a221ccd1d007fcaf614465672c0af37aaa834c5184483afe56d61
+FROM eclipse-temurin:25-jre-alpine@sha256:b7528962e65d43064d8a8b67ba175367896bc948363ea2d3fcd7f10d34e1f048
 # Run as an unprivileged user; the app only needs to read its jar and bind 8080.
 RUN addgroup -S app && adduser -S -G app -H -s /sbin/nologin app
 WORKDIR /app
