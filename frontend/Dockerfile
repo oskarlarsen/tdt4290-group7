@@ -1,6 +1,6 @@
 # Base images are pinned by digest so a rebuild can't silently pull a different image. The tag
 # is kept for readability; to update, look up the tag's new digest and bump both together.
-FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS build
+FROM node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
