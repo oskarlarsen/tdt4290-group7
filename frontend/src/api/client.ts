@@ -55,12 +55,13 @@ export async function apiFetch<T>(
   options?: RequestInit,
   { notifySessionExpired = true, parseResponse }: ApiFetchOptions<T> = {}
 ): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     // Send the auth cookie to the API, which may be on another origin
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options?.headers,
     },
   });

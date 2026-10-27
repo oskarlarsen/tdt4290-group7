@@ -156,6 +156,33 @@ Postman login example (set a local `adminPassword` variable matching the backend
 
 Postman's cookie jar retains the `auth_token` cookie from login and sends it to `/api/auth/me`; logout clears it. Do not configure a Bearer token: Authorization headers are ignored. Vehicle tests continue to use No Auth. Do not share credentials or tokens with agents.
 
+## Certificate API
+
+Certificate routes require the `auth_token` cookie from a real administrator login. Mock login is not accepted. The upload is `multipart/form-data` with a `supplierName` field and one `file` PDF; the server limits requests to 8 MB and 25 pages. Searchable text is extracted with PDFBox; scanned pages use Tesseract (`nor+eng`, 300 DPI), which must be installed locally for scanned documents.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/certificates` | List certificate metadata, sorted by urgency |
+| POST | `/api/certificates` | Parse a PDF, save metadata, and return the new record |
+| PUT | `/api/certificates/{id}` | Update supplier, type, issue/expiry dates, and optional contract reference |
+| DELETE | `/api/certificates/{id}` | Permanently delete a certificate metadata record |
+
+The update body is JSON, for example:
+
+```json
+{
+  "supplierName": "Example Transport AS",
+  "certificateType": "ISO 14001",
+  "issueDate": "2025-01-15",
+  "expiryDate": "2028-12-31",
+  "contractId": "CONTRACT-42"
+}
+```
+
+Dates use ISO `yyyy-MM-dd`; either date and `contractId` may be `null`. The issue date cannot be after the expiry date. The PDF itself is not stored, so changing extracted document details requires uploading the PDF again.
+
+The original PDF is not retained. Extracted metadata is stored in a separate SQLite file beside the configured vehicle database (for example, `vehicles-certificates.db`); status is recalculated from the expiry date on each read. A missing expiry is marked `MISSING_DOCUMENTATION`; parser results must be reviewed before being used as compliance evidence. Supplier and contract records are not yet linked to this certificate list.
+
 ## Vehicle API
 
 Base URL: `http://localhost:8080`. Vehicle endpoints use JSON and currently have **no backend authorization**; keep them local.

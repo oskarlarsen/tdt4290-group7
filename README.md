@@ -1,6 +1,6 @@
 # TDT4290 Group 7 — Environmental Monitoring & Contract Compliance
 
-TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens Vegvesen.
+TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals, checks registrations against Statens Vegvesen, and parses environmental certificate PDFs.
 
 ## Repository layout
 
@@ -9,7 +9,7 @@ TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The 
 
 See the [vehicle API guide](backend/README.md#vehicle-api) for endpoints, JSON examples and check behavior.
 
-The admin vehicle page at `/admin/vehicles` supports statistics, approval periods, saved checks and side-by-side deviation analysis. See the [frontend guide](frontend/README.md). Excel upload is a disabled placeholder; supplier vehicle pages are unchanged.
+The admin vehicle page at `/admin/vehicles` supports statistics, approval periods, saved checks and deviation analysis. `/admin/certificates` accepts PDF uploads and shows parsed certificate expiry status. See the [frontend guide](frontend/README.md). Excel batch upload remains a disabled placeholder.
 
 ## Shared local configuration
 
@@ -45,7 +45,7 @@ npm run dev
 
 Configure root `.env` first. Other commands: `npm run build`, `npm test -- --run`, and `npm run preview`.
 
-The example frontend configuration enables mock login and points at `http://localhost:8080/api`. The admin vehicle page always uses the real backend, regardless of the mock toggle. For real backend login, set `VITE_USE_MOCKS=false`; other prototype pages may still depend on their mock data layer. The backend permits the Vite origin `http://localhost:5173` by default. Authentication routes use cookies; vehicle routes are documented in the backend guide.
+The example frontend configuration uses real backend login and points at `http://localhost:8080/api`; unfinished prototype data pages still use mocks. `VITE_USE_MOCK_AUTH=true` switches login to the mock accounts, while `VITE_USE_MOCKS=true` keeps prototype data mocked. Vehicle and certificate pages always use the backend. The backend permits the Vite origin `http://localhost:5173` by default. Authentication routes use cookies; see the backend guide for vehicle and certificate APIs.
 
 ## Backend setup
 
@@ -73,7 +73,7 @@ Vehicle storage uses SQLite with explicit relationships and selected registry fi
 
 Keep the Statens Vegvesen key and authentication secrets in ignored root `.env`, never in browser-visible `VITE_` settings or vehicle request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
 
-The backend includes cookie-based JWT authentication and clears the cookie on logout. Vehicle endpoints remain unauthenticated. The default host and Compose's published backend port are bound to loopback for local development. Authentication and authorization for vehicle endpoints are pending separate work; implement them before deploying or exposing the backend to other machines.
+The backend includes cookie-based JWT authentication and clears the cookie on logout. Certificate endpoints require an authenticated administrator; vehicle endpoints remain unauthenticated and local-only. The default host and Compose's published backend port are bound to loopback for local development. Implement vehicle authorization before deploying or exposing the backend to other machines.
 
 ## Run the full stack with Docker
 
@@ -98,10 +98,12 @@ Compose retains SQLite in the `vehicle-backend-data` named volume. Authenticatio
 | Variable | Purpose |
 |---|---|
 | `VITE_API_BASE_URL` | Base URL for the real backend API (normally `http://localhost:8080/api`) |
-| `VITE_USE_MOCKS` | Enables mock login and existing prototype mock layers; does not mock the admin vehicle page |
+| `VITE_USE_MOCKS` | Enables prototype data mocks; does not mock the admin vehicle or certificate pages |
+| `VITE_USE_MOCK_AUTH` | Enables mock login; defaults to real backend authentication |
 
-Set `VITE_USE_MOCKS=true` in root `.env` to explore existing mock pages without the
-backend. The admin vehicle page still requires the backend. See [Mock data architecture](#mock-data-architecture)
+Set `VITE_USE_MOCKS=true` in root `.env` to explore existing prototype data without the
+backend. Vehicle and certificate pages still require the backend. Set `VITE_USE_MOCK_AUTH=true`
+to use mock login. See [Mock data architecture](#mock-data-architecture)
 below for how the prototype mock layers are structured.
 
 ## Test accounts (mock login)

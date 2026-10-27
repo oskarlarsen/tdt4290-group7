@@ -12,6 +12,8 @@ ARG VITE_API_BASE_URL=http://localhost:8080/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ARG VITE_USE_MOCKS=false
 ENV VITE_USE_MOCKS=$VITE_USE_MOCKS
+ARG VITE_USE_MOCK_AUTH=false
+ENV VITE_USE_MOCK_AUTH=$VITE_USE_MOCK_AUTH
 RUN npm run build
 
 # Unprivileged variant of the official nginx image: runs as the nginx user (uid 101) and
