@@ -5,8 +5,8 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.bodylimit.RequestBodyLimit
 import io.ktor.server.routing.routing
 
-// Small requests (including authentication) retain the default limit. Only the two vehicle
-// batch routes override it; their separate 10,000-entry validation still applies.
+// Small requests retain the default limit. Statistics batches have a separate
+// 4 MiB limit and validate a maximum of 10,000 rows.
 const val MAX_REQUEST_BODY_BYTES = 16L * 1024
 const val MAX_VEHICLE_BATCH_BODY_BYTES = 4L * 1024 * 1024
 

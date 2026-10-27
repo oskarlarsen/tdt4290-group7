@@ -9,9 +9,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Vehicle(
     val registrationNumber: String,
-    /** Reserved for the future supplier model. */
-    val supplierId: String? = null,
     val createdAt: String,
+    val agreementId: String? = null,
+    val planned: Boolean = false,
+    val listed: Boolean = false,
+    val updatedAt: String = createdAt,
 )
 
 /** Supplier observations for a period, not one individual journey or unique vehicle. */
@@ -27,7 +29,6 @@ data class TripRowInput(
     val model: String,
     val co2Registered: Boolean,
     val co2GramsPerKm: BigDecimal?,
-    val medianCo2: BigDecimal?,
     val totalTripKm: BigDecimal,
     val totalKmCo2Registered: BigDecimal?,
     val totalKmCo2NotRegistered: BigDecimal,
@@ -35,7 +36,6 @@ data class TripRowInput(
     val totalKmFuelRegistered: BigDecimal,
     val totalKmNoxRegistered: BigDecimal?,
     val totalNoxRegisteredGrams: BigDecimal?,
-    val tripCount: Int,
     val vehicleCategory: VehicleCategory,
     val averageFuelConsumptionLitresPer100Km: BigDecimal? = null,
     val fuelConsumedLitres: BigDecimal? = null,
@@ -85,45 +85,6 @@ data class TripRowsListResponse(
 )
 
 @Serializable
-data class ApprovalInput(
-    val registrationNumber: String,
-    /** Official fuel code, separate from supplier/SVV observations. */
-    val fuelTechnology: FuelTechnology,
-    val vehicleCategory: VehicleCategory,
-    /** On creation, missing becomes the explicit Oslo creation date. */
-    val startDate: String? = null,
-    /** Missing means approved indefinitely, until manually revoked. */
-    val expiryDate: String? = null,
-)
-
-@Serializable
-data class AppendApprovalsRequest(val sourceName: String? = null, val approvals: List<ApprovalInput>)
-
-@Serializable
-data class StoredApproval(
-    val id: String,
-    val registrationNumber: String,
-    val sourceName: String? = null,
-    val createdAt: String,
-    val updatedAt: String,
-    val revokedAt: String? = null,
-    val data: ApprovalInput,
-)
-
-@Serializable
-data class AppendApprovalsResponse(
-    val updatedAt: String,
-    val approvalCount: Int,
-    val approvals: List<StoredApproval>,
-)
-
-@Serializable
-data class UpdateApprovalRequest(val approval: ApprovalInput, val expectedUpdatedAt: String, val sourceName: String? = null)
-
-@Serializable
-enum class ApprovalStatus { ACTIVE, NOT_YET_ACTIVE, EXPIRED, REVOKED, NOT_APPROVED }
-
-@Serializable
 data class VehicleCheckRequest(val registrationNumber: String, val forceRefresh: Boolean = false)
 
 @Serializable
@@ -154,6 +115,8 @@ data class RegistryVehicleData(
     val bodyType: RegistryCode? = null,
     val euroClass: RegistryCode? = null,
     val fuels: List<RegistryFuel> = emptyList(),
+    val lastApprovedInspectionDate: String? = null,
+    val nextInspectionDueDate: String? = null,
 )
 
 @Serializable
@@ -173,9 +136,9 @@ enum class LookupOutcome {
 
 @Serializable
 enum class VehicleDeviation {
-    NOT_ON_APPROVED_LIST, APPROVAL_NOT_YET_ACTIVE, APPROVAL_EXPIRED, APPROVAL_REVOKED,
+    NOT_ON_AGREEMENT_LIST, AGREEMENT_NOT_STARTED, AGREEMENT_EXPIRED,
     DEREGISTERED, EXPORTED, SCRAPPED, UNREGISTERED, UNKNOWN_REGISTRATION_STATUS,
-    APPROVAL_PERIOD_NOT_COVERED, APPROVAL_CONFLICT, APPROVAL_FUEL_MISMATCH, APPROVAL_CATEGORY_MISMATCH,
+    AGREEMENT_PERIOD_NOT_COVERED,
     FUEL_MISMATCH, CATEGORY_MISMATCH, BODY_TYPE_MISMATCH, BRAND_MISMATCH, MODEL_MISMATCH,
     CO2_CLASSIFICATION_MISMATCH, CO2_MISMATCH, REGISTRY_CO2_DISAGREEMENT, NOX_MISMATCH, CONSUMPTION_MISMATCH,
     OVERLAPPING_STATISTICS, UNABLE_TO_VERIFY,
@@ -185,14 +148,13 @@ enum class VehicleDeviation {
 enum class DeviationPriority { MODERATE, HIGH }
 
 @Serializable
-enum class DeviationOrigin { APPROVAL, REGISTRY, STATISTICS }
+enum class DeviationOrigin { AGREEMENT, REGISTRY, STATISTICS }
 
 /** Each occurrence is a deviation. Descriptions may explain review/verification uncertainty. */
 @Serializable
 data class DeviationFinding(
     val code: VehicleDeviation, val priority: DeviationPriority, val origin: DeviationOrigin, val description: String,
     val tripRowId: String? = null, val relatedTripRowId: String? = null,
-    val approvalId: String? = null, val relatedApprovalId: String? = null,
     val fuelIndex: Int? = null, val measurementIndex: Int? = null,
 )
 
@@ -221,12 +183,10 @@ data class VehicleCheckResponse(
     val id: String,
     val checkedAt: String,
     val vehicle: Vehicle,
-    val approvalStatus: ApprovalStatus,
-    val approval: StoredApproval? = null,
+    val agreement: AgreementEvidence? = null,
     val tripRows: List<StoredTripRow>,
     val registry: RegistryCheckResult,
     val deviations: List<VehicleDeviation>,
-    @kotlinx.serialization.EncodeDefault val approvals: List<StoredApproval> = emptyList(),
     @kotlinx.serialization.EncodeDefault val findings: List<DeviationFinding> = emptyList(),
 )
 
@@ -235,7 +195,6 @@ data class VehicleCheckResponse(
 data class VehicleCheckSummary(
     val id: String,
     val checkedAt: String,
-    val approvalStatus: ApprovalStatus,
     val dataSource: RegistryDataSource,
     val lookupOutcome: LookupOutcome,
     val fetchedAt: String? = null,
@@ -245,33 +204,17 @@ data class VehicleCheckSummary(
     @kotlinx.serialization.EncodeDefault val moderatePriorityCount: Int = 0,
 )
 
-internal fun VehicleCheckResponse.summary() = VehicleCheckSummary(id, checkedAt, approvalStatus, registry.dataSource,
+internal fun VehicleCheckResponse.summary() = VehicleCheckSummary(id, checkedAt, registry.dataSource,
     registry.lookupOutcome, registry.fetchedAt, registry.refreshFailure, deviations,
     findings.count { it.priority == DeviationPriority.HIGH }, findings.count { it.priority == DeviationPriority.MODERATE })
 
 @Serializable
-data class VehicleOverview(
-    val vehicle: Vehicle,
-    val approvalStatus: ApprovalStatus,
-    val approval: StoredApproval? = null,
-    val latestCheck: VehicleCheckSummary? = null,
-)
-
-@Serializable
-data class VehicleListResponse(
-    val items: List<VehicleOverview>, val total: Int, val page: Int, val pageSize: Int, val approvalAsOf: String,
-)
-
-@Serializable
 data class VehicleDetailsResponse(
     val vehicle: Vehicle,
-    val approvalStatus: ApprovalStatus,
-    val approvalAsOf: String,
-    val approval: StoredApproval? = null,
+    val agreement: AgreementEvidence? = null,
     val tripRows: List<StoredTripRow>,
     val latestSnapshot: RegistrySnapshot? = null,
     val latestCheck: VehicleCheckSummary? = null,
-    @kotlinx.serialization.EncodeDefault val approvals: List<StoredApproval> = emptyList(),
 )
 
 @Serializable

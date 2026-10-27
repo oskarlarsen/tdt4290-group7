@@ -1,15 +1,15 @@
 # TDT4290 Group 7 — Environmental Monitoring & Contract Compliance
 
-TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens Vegvesen.
+TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and supplier agreements and checks one registration number against its agreement and Statens vegvesen.
 
 ## Repository layout
 
 - `frontend/`: React + TypeScript + Vite dashboard.
 - `backend/`: Ktor HTTP API, SQLite storage, and Statens Vegvesen integration.
 
-See the [vehicle API guide](backend/README.md#vehicle-api) for endpoints, JSON examples and check behavior.
+See the [vehicle API guide](backend/README.md#vehicle-agreements-and-reporting) for endpoints, JSON examples and check behavior.
 
-The admin vehicle page at `/admin/vehicles` supports statistics, approval periods, saved checks and side-by-side deviation analysis. See the [frontend guide](frontend/README.md). Excel upload is a disabled placeholder; supplier vehicle pages are unchanged.
+The admin vehicle page at `/admin/vehicles` supports supplier agreements, vehicle lists, statistics, saved checks and side-by-side deviation analysis. See the [frontend guide](frontend/README.md). Excel upload is a disabled placeholder; supplier vehicle pages are unchanged.
 
 ## Shared local configuration
 
@@ -67,7 +67,7 @@ Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
 
 The backend runs without a Statens Vegvesen key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
 
-Vehicle storage uses SQLite with explicit relationships and selected registry fields. Checks cover every saved reporting row, approval periods and registry comparisons, with high/moderate deviations. History is retained indefinitely; the default 14-day cache controls freshness only. See the [API guide](backend/README.md#vehicle-api) and [database setup](backend/README.md#database-compatibility-and-safe-development-setup).
+Vehicle storage uses SQLite with explicit relationships and selected registry fields. Checks cover every saved reporting row, agreement dates and registry comparisons, with high/moderate deviations. History is retained indefinitely; the default 14-day cache controls freshness only. See the [API guide](backend/README.md#vehicle-agreements-and-reporting) and [database setup](backend/README.md#database-reset-and-tests).
 
 ## Local data and credentials
 
@@ -98,10 +98,11 @@ Compose retains SQLite in the `vehicle-backend-data` named volume. Authenticatio
 | Variable | Purpose |
 |---|---|
 | `VITE_API_BASE_URL` | Base URL for the real backend API (normally `http://localhost:8080/api`) |
-| `VITE_USE_MOCKS` | Enables mock login and existing prototype mock layers; does not mock the admin vehicle page |
+| `VITE_USE_MOCKS` | Enables existing prototype data; Vehicles always uses the backend |
+| `VITE_MOCK_AUTH` | Optional offline demo sign-in; defaults to false |
 
-Set `VITE_USE_MOCKS=true` in root `.env` to explore existing mock pages without the
-backend. The admin vehicle page still requires the backend. See [Mock data architecture](#mock-data-architecture)
+Set `VITE_USE_MOCKS=true` to retain prototype data with real backend sign-in.
+Set `VITE_MOCK_AUTH=true` only for offline demo sign-in; Vehicles requires a real admin session. See [Mock data architecture](#mock-data-architecture)
 below for how the prototype mock layers are structured.
 
 ## Test accounts (mock login)
