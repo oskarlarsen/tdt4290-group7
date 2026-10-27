@@ -144,6 +144,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 "refresh_failure" to check.registry.refreshFailure?.name, "usage_prohibition_state" to check.registry.usageProhibitionState.name,
                 "supplier_id" to evidence?.supplier?.id, "supplier_name" to evidence?.supplier?.name,
                 "supplier_org_number" to evidence?.supplier?.orgNumber,
+                "supplier_updated_at" to evidence?.supplier?.updatedAt,
                 "agreement_id" to agreement?.id, "agreement_start" to agreement?.startDate, "agreement_end" to agreement?.endDate,
                 "agreement_allowed" to agreement?.allowedVehicles, "agreement_note" to agreement?.note,
                 "agreement_updated_at" to agreement?.updatedAt, "agreement_active" to agreement?.active?.asInteger(),
@@ -174,7 +175,8 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             val evidence = row.getString("agreement_id")?.let { agreementId -> AgreementEvidence(
                 FleetAgreement(agreementId, row.getString("supplier_id"), row.getString("agreement_start"), row.getString("agreement_end"),
                     row.getInt("agreement_allowed"), row.getString("agreement_note"), row.getString("agreement_updated_at"), row.getInt("agreement_active") == 1),
-                FleetSupplier(row.getString("supplier_id"), row.getString("supplier_name"), row.getString("supplier_org_number"))) }
+                FleetSupplier(row.getString("supplier_id"), row.getString("supplier_name"), row.getString("supplier_org_number"),
+                    updatedAt = row.getString("supplier_updated_at"))) }
 
             VehicleCheckResponse(id, row.getString("checked_at"),
                 Vehicle(plate, row.getString("vehicle_created_at"), row.getString("vehicle_agreement_id"), false,

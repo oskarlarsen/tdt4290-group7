@@ -20,7 +20,7 @@ internal fun <T> decodeFleetRequest(text: String, serializer: kotlinx.serializat
             val number = it as? JsonPrimitive ?: invalidType()
             if (number.isString || !number.content.matches(Regex("-?(0|[1-9][0-9]*)"))) invalidType()
         }
-        for (key in listOf("agreement", "replacement")) root[key]?.let { validate(it as? JsonObject ?: invalidType()) }
+        for (key in listOf("supplier", "agreement", "replacement")) root[key]?.let { validate(it as? JsonObject ?: invalidType()) }
     }
     val root = requestObject(text)
     validate(root)

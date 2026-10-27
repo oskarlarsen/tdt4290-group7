@@ -1,17 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { appendStatistics, getCheck, getFleet, getStatistics, runCheck, saveAgreement } from "../src/api/vehicles";
+import { appendStatistics, getCheck, getFleet, getStatistics, runCheck, saveAgreement, saveSupplier } from "../src/api/vehicles";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("real vehicle API client", () => {
-  it("uses GET for browsing, includes credentials, encodes filters and preserves decimals", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response('{"total":1,"items":[{"estimatedCo2Kg":123.456789012345678}]}'));
+  it("uses GET for browsing and includes credentials", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('{"suppliers":[],"agreements":[],"vehicles":[],"changes":[]}'));
     vi.stubGlobal("fetch", fetch);
     const result = await getFleet();
     expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet");
     expect(fetch.mock.calls[0][1].method).toBeUndefined();
     expect(fetch.mock.calls[0][1].credentials).toBe("include");
-    expect(result.total).toBe(1);
-    expect((result.items[0] as unknown as { estimatedCo2Kg: string }).estimatedCo2Kg).toBe("123.456789012345678");
+    expect(result).toEqual({ suppliers: [], agreements: [], vehicles: [], changes: [] });
     fetch.mockResolvedValue(new Response("{}"));
     await getCheck("synthetic-id");
     expect(fetch.mock.calls[1][0]).toContain("/vehicle-checks/synthetic-id");
@@ -28,8 +27,9 @@ describe("real vehicle API client", () => {
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ registrationNumber: "AB10001", forceRefresh: true });
   });
   it("uses a paginated GET for the statistics directory without running checks", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response('{"items":[],"total":0,"page":2,"pageSize":25}')); vi.stubGlobal("fetch", fetch);
-    await getStatistics("AB10001", 2);
+    const fetch = vi.fn().mockResolvedValue(new Response('{"items":[{"estimatedCo2Kg":123.456789012345678}],"total":1,"page":2,"pageSize":25}')); vi.stubGlobal("fetch", fetch);
+    const result = await getStatistics("AB10001", 2);
+    expect(result.items[0].estimatedCo2Kg).toBe("123.456789012345678");
     expect(fetch.mock.calls[0][0]).toContain("/trip-rows?search=AB10001&page=2&pageSize=25");
     expect(fetch.mock.calls[0][1].method).toBeUndefined(); expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -39,6 +39,17 @@ describe("real vehicle API client", () => {
     await saveAgreement(agreement);
     expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet/agreements");
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(agreement);
+  });
+  it("sends the supplier version only when updating an existing supplier", async () => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}"))); vi.stubGlobal("fetch", fetch);
+    const input = { name: "Supplier", orgNumber: "123456789" };
+    await saveSupplier(input);
+    expect(fetch.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(input);
+    const existing = { ...input, id: "supplier", active: true, updatedAt: "2026-10-27T10:00:00Z" };
+    await saveSupplier(input, existing);
+    expect(fetch.mock.calls[1][1].method).toBe("PUT");
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ supplier: input, expectedUpdatedAt: existing.updatedAt });
   });
   it("shows the backend vehicle error and does not retry a failed write", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('{"error":"Synthetic validation error"}', { status: 400 })); vi.stubGlobal("fetch", fetch);

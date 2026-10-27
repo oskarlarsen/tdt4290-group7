@@ -18,7 +18,7 @@ export const getStatistics = (search: string, page: number) => vehicleFetch<Stat
 const fleetPath = "/vehicle-fleet";
 export const getFleet = () => vehicleFetch<FleetOverview>(fleetPath);
 export const getFleetHistory = (page: number) => vehicleFetch<FleetChange[]>(`${fleetPath}/history?page=${page}`);
-export const saveSupplier = (input: { name: string; orgNumber: string }, id?: string) => vehicleFetch<FleetSupplier>(`${fleetPath}/suppliers${id ? `/${encodeURIComponent(id)}` : ""}`, { method: id ? "PUT" : "POST", body: JSON.stringify(input) });
+export const saveSupplier = (input: { name: string; orgNumber: string }, existing?: FleetSupplier) => vehicleFetch<FleetSupplier>(`${fleetPath}/suppliers${existing ? `/${encodeURIComponent(existing.id)}` : ""}`, { method: existing ? "PUT" : "POST", body: JSON.stringify(existing ? { supplier: input, expectedUpdatedAt: existing.updatedAt } : input) });
 export const saveAgreement = (input: AgreementInput, existing?: FleetAgreement) => vehicleFetch<FleetAgreement>(`${fleetPath}/agreements${existing ? `/${existing.id}` : ""}`, { method: existing ? "PUT" : "POST", body: JSON.stringify(existing ? { agreement: input, expectedUpdatedAt: existing.updatedAt } : input) });
 export const removeAgreement = (agreement: FleetAgreement) => vehicleFetch<void>(`${fleetPath}/agreements/${agreement.id}`, { method: "DELETE", body: JSON.stringify({ expectedUpdatedAt: agreement.updatedAt }) });
 export const addVehicle = (agreementId: string, input: VehicleEntryInput) => vehicleFetch<Vehicle>(`${fleetPath}/agreements/${agreementId}/vehicles`, { method: "POST", body: JSON.stringify(input) });

@@ -123,15 +123,30 @@ class FleetRepositoryTest {
     @Test fun supplierEditsCanBeUndoneUnlessTheirPreviousOrganizationNumberWasReused() {
         val repo = repository()
         val supplier = repo.fleet.saveSupplier(null, SupplierInput("First name", "123456789"), actor, now)
-        repo.fleet.saveSupplier(supplier.id, SupplierInput("Second name", "987654321"), actor, now.plusSeconds(1))
+        repo.fleet.saveSupplier(supplier.id, SupplierInput("Second name", "987654321"), actor, now.plusSeconds(1), supplier.updatedAt)
         val edit = repo.fleet.history(1).first()
         repo.fleet.undo(edit.id, actor, now.plusSeconds(2))
         assertEquals("First name", repo.fleet.overview().suppliers.single().name)
-        repo.fleet.saveSupplier(supplier.id, SupplierInput("Third name", "987654321"), actor, now.plusSeconds(3))
+        repo.fleet.saveSupplier(supplier.id, SupplierInput("Third name", "987654321"), actor, now.plusSeconds(3), repo.fleet.overview().suppliers.single().updatedAt)
         val next = repo.fleet.history(1).first()
         repo.fleet.saveSupplier(null, SupplierInput("Other supplier", "123456789"), actor, now.plusSeconds(4))
         assertFalse(repo.fleet.history(1).single { it.id == next.id }.canUndo)
         assertFailsWith<FleetConflictException> { repo.fleet.undo(next.id, actor, now.plusSeconds(5)) }
+    }
+
+    @Test fun staleSupplierEditsDoNotOverwriteDataOrRecordAuditChanges() {
+        val repo = repository()
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Original", "123456789"), actor, now)
+        val updated = repo.fleet.saveSupplier(supplier.id, SupplierInput("First administrator", "123456789"), actor,
+            now.plusSeconds(1), supplier.updatedAt)
+        val before = repo.fleet.overview()
+        assertFailsWith<FleetConflictException> {
+            repo.fleet.saveSupplier(supplier.id, SupplierInput("Stale edit", "987654321"), actor, now.plusSeconds(2), supplier.updatedAt)
+        }
+        assertEquals(before, repo.fleet.overview())
+        val saved = repo.fleet.saveSupplier(supplier.id, SupplierInput("Current edit", "123456789"), actor, now.plusSeconds(3), updated.updatedAt)
+        assertEquals("Current edit", saved.name)
+        assertEquals(now.plusSeconds(3).storageTimestamp(), saved.updatedAt)
     }
 
     @Test fun frozenCheckSurvivesAgreementEditsReplacementUndoAndRepositoryRestart() = runBlocking {

@@ -16,6 +16,33 @@ import kotlin.test.*
 class FleetRoutesTest {
     private fun repository() = VehicleRepository(Path.of("build", "test-data", "fleet-routes-${UUID.randomUUID()}.db"))
 
+    @Test fun supplierUpdatesRequireTheVersionReturnedByTheApi() = testApplication {
+        val repo = repository()
+        application { module(repo, null) }
+        val admin = adminClient()
+        val created = admin.post("/api/vehicle-fleet/suppliers") {
+            contentType(ContentType.Application.Json); setBody("""{"name":"Original","orgNumber":"123456789"}""")
+        }
+        assertEquals(HttpStatusCode.Created, created.status)
+        val supplier = Json.parseToJsonElement(created.bodyAsText()).jsonObject
+        val id = supplier.getValue("id").jsonPrimitive.content
+        val version = supplier.getValue("updatedAt")
+        assertTrue(version.jsonPrimitive.content.isNotBlank())
+        suspend fun update(body: String) = admin.put("/api/vehicle-fleet/suppliers/$id") {
+            contentType(ContentType.Application.Json); setBody(body)
+        }
+        val valid = """{"supplier":{"name":"Current edit","orgNumber":"123456789"},"expectedUpdatedAt":$version}"""
+        assertEquals(HttpStatusCode.OK, update(valid).status)
+        val before = repo.fleet.overview()
+        assertEquals(HttpStatusCode.Conflict, update(valid.replace("Current edit", "Stale edit")).status)
+        for (invalid in listOf(
+            """{"supplier":{"name":"Missing version","orgNumber":"123456789"}}""",
+            valid.replace("\"expectedUpdatedAt\":$version", "\"expectedUpdatedAt\":123"),
+            valid.replace("\"name\":\"Current edit\"", "\"name\":123"),
+        )) assertEquals(HttpStatusCode.BadRequest, update(invalid).status)
+        assertEquals(before, repo.fleet.overview())
+    }
+
     private fun agreement(repo: VehicleRepository, allowance: Int = 3): FleetAgreement {
         val now = java.time.Instant.now()
         val actor = ChangeActor("test", "Test")

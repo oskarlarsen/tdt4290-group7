@@ -19,6 +19,6 @@ An allowance reduction is permitted even when exceeded. The counter displays onl
 
 ## Development
 
-`npm run build` checks TypeScript and produces the app. `npm test -- --run` runs the frontend suite. The [backend guide](../backend/README.md#vehicle-agreements-and-reporting) describes API fields, exact decimals, history, and the version-7 development data reset.
+`npm run build` checks TypeScript and produces the app. `npm test -- --run` runs the frontend suite. The [backend guide](../backend/README.md#vehicle-agreements-and-reporting) describes API fields, exact decimals, history, and the [development database reset instructions](../backend/README.md#database-reset-and-tests).
 
 Agreement forms and fleet actions live in `components/vehicles/FleetForms.tsx`, `AgreementCard.tsx`, and `ChangeHistory.tsx`; the API and query hooks are shared. The Contracts page is unchanged.

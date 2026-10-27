@@ -3,10 +3,15 @@ package com.tdt4290group7.backend.vehicles
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class FleetSupplier(val id: String, val name: String, val orgNumber: String, val active: Boolean = true)
+data class FleetSupplier(val id: String, val name: String, val orgNumber: String, val active: Boolean = true,
+    /** Older saved checks may not have recorded a supplier timestamp. */
+    val updatedAt: String? = null)
 
 @Serializable
 data class SupplierInput(val name: String, val orgNumber: String)
+
+@Serializable
+data class SupplierUpdate(val supplier: SupplierInput, val expectedUpdatedAt: String)
 
 @Serializable
 data class AgreementInput(val supplierId: String, val startDate: String, val endDate: String,

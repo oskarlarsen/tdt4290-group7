@@ -42,7 +42,8 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     }
     put("/api/vehicle-fleet/suppliers/{id}") {
         val actor = call.adminActor() ?: return@put
-        call.respond(fleet.saveSupplier(call.parameters["id"]!!, decodeFleetRequest(call.receiveText(), SupplierInput.serializer()), actor, Instant.now()))
+        val request = decodeFleetRequest(call.receiveText(), SupplierUpdate.serializer())
+        call.respond(fleet.saveSupplier(call.parameters["id"]!!, request.supplier, actor, Instant.now(), request.expectedUpdatedAt))
     }
     post("/api/vehicle-fleet/agreements") {
         val actor = call.adminActor() ?: return@post

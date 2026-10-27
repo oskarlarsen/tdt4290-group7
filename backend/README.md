@@ -171,7 +171,7 @@ Capacity includes registered and planned entries. Additions are rejected at or a
 |---|---|---|
 | GET | `/api/vehicle-fleet` | Suppliers, agreements, listed/previous vehicles and recent changes |
 | POST | `/api/vehicle-fleet/suppliers` | Create `{name, orgNumber}` |
-| PUT | `/api/vehicle-fleet/suppliers/{id}` | Edit supplier |
+| PUT | `/api/vehicle-fleet/suppliers/{id}` | Edit `{supplier: {name, orgNumber}, expectedUpdatedAt}` |
 | POST | `/api/vehicle-fleet/agreements` | Create `{supplierId, startDate, endDate, allowedVehicles, note}` |
 | PUT | `/api/vehicle-fleet/agreements/{id}` | Edit `{agreement: {...}, expectedUpdatedAt}` |
 | DELETE | `/api/vehicle-fleet/agreements/{id}` | Remove agreement and current list; body `{expectedUpdatedAt}` |

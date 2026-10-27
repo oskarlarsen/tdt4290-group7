@@ -3,7 +3,7 @@ import type { BodyType, FuelTechnology, VehicleCategory } from "../utils/vehicle
 export type Decimal = string;
 export type DataSource = "LIVE" | "CACHE" | "STALE_CACHE" | "UNAVAILABLE";
 export type Vehicle = { registrationNumber: string; createdAt: string; agreementId: string | null; planned: boolean; listed: boolean; updatedAt: string };
-export type FleetSupplier = { id: string; name: string; orgNumber: string; active: boolean };
+export type FleetSupplier = { id: string; name: string; orgNumber: string; active: boolean; updatedAt: string | null };
 export type AgreementInput = { supplierId: string; startDate: string; endDate: string; allowedVehicles: number; note: string };
 export type FleetAgreement = AgreementInput & { id: string; updatedAt: string; active: boolean };
 export type AgreementEvidence = { agreement: FleetAgreement; supplier: FleetSupplier };

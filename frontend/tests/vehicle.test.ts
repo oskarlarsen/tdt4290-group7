@@ -39,7 +39,7 @@ describe("vehicle input and safe status presentation", () => {
     expect(() => statisticsBody({ ...electric, co2Registered: "true" })).toThrow();
   });
   it("clearly separates saved statistics from incomplete or failed automatic verification", () => {
-    const check: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", approvalStatus: "NOT_APPROVED", lookupOutcome: "NOT_CONFIGURED", dataSource: "UNAVAILABLE", deviations: ["NOT_ON_APPROVED_LIST"] };
+    const check: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", lookupOutcome: "NOT_CONFIGURED", dataSource: "UNAVAILABLE", deviations: ["NOT_ON_AGREEMENT_LIST"] };
     const result = { createdAt: "synthetic", rowCount: 1, distinctVehicleCount: 1, rows: [], checks: [{ registrationNumber: "AB12345", check }] };
     expect(statisticsSaveMessage(result, "AB12345")).toContain("Statens vegvesen verification incomplete");
     expect(statisticsSaveMessage({ ...result, checks: [{ registrationNumber: "AB12345", error: "Saved; retry check only" }] }, "AB12345")).toBe("Saved; retry check only");
@@ -102,7 +102,7 @@ describe("vehicle input and safe status presentation", () => {
     expect(() => statisticsBody({ ...values, fuelTechnology: "NOT_APPLICABLE" })).toThrow();
   });
   it("never labels stale or unavailable verification as a clean result", () => {
-    const base: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", approvalStatus: "ACTIVE", lookupOutcome: "FOUND", dataSource: "CACHE", deviations: [] };
+    const base: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", lookupOutcome: "FOUND", dataSource: "CACHE", deviations: [] };
     expect(checkLabel(null)).toBe("Not checked");
     expect(checkLabel({ ...base, dataSource: "UNAVAILABLE" })).toBe("Verification incomplete");
     expect(checkLabel({ ...base, dataSource: "STALE_CACHE" })).toBe("Stale verification");

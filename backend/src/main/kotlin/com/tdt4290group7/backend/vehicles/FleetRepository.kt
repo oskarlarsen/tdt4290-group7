@@ -14,7 +14,12 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         database.query(db, "SELECT * FROM $table WHERE $where", args, ::values)
     private fun row(db: Connection, table: String, id: String) = rows(db, table, "${key(table)} = ?", listOf(id)).firstOrNull()
     private fun values(row: ResultSet): Map<String, Any?> = (1..row.metaData.columnCount).associate {
-        row.metaData.getColumnName(it) to row.getObject(it)
+        val column = row.metaData.getColumnName(it)
+        // Keep flag comparisons and audit states independent of getObject's numeric wrapper type.
+        column to when (column) {
+            "active", "listed", "planned" -> row.getInt(it)
+            else -> row.getObject(it)
+        }
     }
 
     fun overview(): FleetOverview = database.read { db ->
@@ -28,14 +33,14 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         return database.read { changes(it, page) }
     }
 
-    fun saveSupplier(id: String?, input: SupplierInput, actor: ChangeActor, now: Instant): FleetSupplier {
+    fun saveSupplier(id: String?, input: SupplierInput, actor: ChangeActor, now: Instant, expectedUpdatedAt: String? = null): FleetSupplier {
         val name = input.name.trim()
         val org = input.orgNumber.replace(Regex("\\s"), "")
         require(name.length in 1..200) { "Enter the supplier name" }
         require(org.matches(Regex("[0-9]{9}"))) { "Enter a nine-digit organization number" }
         return change(actor, now, null, if (id == null) "Added supplier $name" else "Updated supplier $name") { writer ->
             val supplierId = id ?: UUID.randomUUID().toString()
-            if (id != null) requireActive(writer.db, "suppliers", id)
+            if (id != null) expect(requireActive(writer.db, "suppliers", id), expectedUpdatedAt)
             if (rows(writer.db, "suppliers", "org_number = ? AND id != ?", listOf(org, supplierId)).isNotEmpty())
                 throw FleetConflictException("This organization number already belongs to a supplier")
             val result = mapOf("id" to supplierId, "name" to name, "org_number" to org,
@@ -231,7 +236,8 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Enter a valid date" }
         return try { LocalDate.parse(value) } catch (_: Exception) { throw IllegalArgumentException("Enter a valid date") }
     }
-    private fun supplier(row: Map<String, Any?>) = FleetSupplier(row["id"] as String, row["name"] as String, row["org_number"] as String, row["active"] == 1)
+    private fun supplier(row: Map<String, Any?>) = FleetSupplier(row["id"] as String, row["name"] as String, row["org_number"] as String,
+        row["active"] == 1, row["updated_at"] as String)
     private fun agreement(row: Map<String, Any?>) = FleetAgreement(row["id"] as String, row["supplier_id"] as String,
         row["start_date"] as String, row["end_date"] as String, (row["allowed_vehicles"] as Number).toInt(), row["note"] as String,
         row["updated_at"] as String, row["active"] == 1)

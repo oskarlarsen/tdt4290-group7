@@ -18,7 +18,7 @@ function FormFooter({ busy, label, onClose }: { busy: boolean; label: string; on
 export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(supplier?.name ?? "");
   const [orgNumber, setOrgNumber] = useState(supplier?.orgNumber ?? "");
-  const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier?.id), onSuccess: onSaved, retry: false });
+  const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier), onSuccess: onSaved, retry: false });
   return <VehicleDialog title={supplier ? "Edit supplier" : "Add supplier"} onClose={onClose} busy={save.isPending}>
     <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate(); }}>
       <Field label="Supplier name"><input autoFocus required maxLength={200} className={inputClass} value={name} onChange={e => setName(e.target.value)} /></Field>

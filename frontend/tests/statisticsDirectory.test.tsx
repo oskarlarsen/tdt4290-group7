@@ -21,7 +21,7 @@ describe("statistics directory", () => {
     expect(html).toContain("2026-01-01"); expect(html).toContain("2026-01-31");
   });
   it("shows zero separately from not-applicable litres in read-only row details", () => {
-    const electric = { ...row, estimatedCo2Kg: null, data: { ...row.data, fuelTechnology: "5", co2GramsPerKm: null, totalNoxRegisteredGrams: null, totalKmCo2Registered: null, totalKmNoxRegistered: null } };
+    const electric = { ...row, estimatedCo2Kg: null, data: { ...row.data, fuelTechnology: "5" as const, co2GramsPerKm: null, totalNoxRegisteredGrams: null, totalKmCo2Registered: null, totalKmNoxRegistered: null } };
     const html = renderToStaticMarkup(<StatisticsRowDetails row={electric} onClose={() => {}} onOpenVehicle={() => {}} />);
     expect(html).toContain("Not applicable"); expect(html).toContain("Estimated CO₂");
     expect(html).toContain("5 - Electric"); expect(html).toContain("Open vehicle");

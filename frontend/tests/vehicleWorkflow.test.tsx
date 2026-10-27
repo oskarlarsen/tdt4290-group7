@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import * as api from "../src/api/vehicles";
 import { ApiError } from "../src/api/client";
-import { AgreementForm, VehicleEntryForm } from "../src/components/vehicles/FleetForms";
+import { AgreementForm, SupplierForm, VehicleEntryForm } from "../src/components/vehicles/FleetForms";
 import { StatisticsForm } from "../src/components/vehicles/VehicleForms";
 import { AgreementCard } from "../src/components/vehicles/AgreementCard";
 import { VehicleDetails } from "../src/components/vehicles/VehicleDetails";
@@ -13,7 +13,7 @@ import { StatisticsCard } from "../src/components/vehicles/StatisticsCard";
 import type { FleetAgreement, FleetSupplier, Snapshot, TripRow, Vehicle } from "../src/types/vehicle";
 
 const vehicle: Vehicle = { registrationNumber: "AB12345", agreementId: "agreement", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", planned: false, listed: true };
-const supplier: FleetSupplier = { id: "supplier", name: "Test supplier", orgNumber: "123456789", active: true };
+const supplier: FleetSupplier = { id: "supplier", name: "Test supplier", orgNumber: "123456789", active: true, updatedAt: vehicle.updatedAt };
 const agreement: FleetAgreement = { id: "agreement", supplierId: supplier.id, startDate: "2026-01-01", endDate: "2027-12-31", allowedVehicles: 3, note: "", updatedAt: vehicle.updatedAt, active: true };
 const row: TripRow = { id: "period", registrationNumber: vehicle.registrationNumber, createdAt: vehicle.createdAt, estimatedCo2Kg: "120", data: {
   registrationNumber: vehicle.registrationNumber, periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Test", model: "Model",
@@ -39,6 +39,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("vehicle registration and consequential actions", () => {
+  it("keeps supplier edits visible when another administrator changed the record", async () => {
+    const save = vi.spyOn(api, "saveSupplier").mockRejectedValue(new ApiError(409, "This record changed; reload before editing"));
+    const saved = vi.fn();
+    mount(<SupplierForm supplier={supplier} onClose={() => {}} onSaved={saved} />);
+    fireEvent.change(screen.getByLabelText("Supplier name"), { target: { value: "My edit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save supplier" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("reload before editing");
+    expect((screen.getByLabelText("Supplier name") as HTMLInputElement).value).toBe("My edit");
+    expect(saved).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save.mock.calls[0]).toEqual([{ name: "My edit", orgNumber: supplier.orgNumber }, supplier]);
+  });
   it("saves an ordinary agreement edit without extra confirmation", async () => {
     const save = vi.spyOn(api, "saveAgreement").mockResolvedValue({ ...agreement, allowedVehicles: 1 });
     mount(<AgreementForm supplier={supplier} agreement={agreement} onClose={() => {}} onSaved={() => {}} />);
