@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../api/vehicles";
-export function useFleet() { return useQuery({ queryKey: ["vehicles", "fleet"], queryFn: api.getFleet, retry: false }); }
+export function useFleet(enabled = true) { return useQuery({ queryKey: ["vehicles", "fleet"], queryFn: api.getFleet, enabled, retry: false }); }
 export function useFleetHistory(page: number) { return useQuery({ queryKey: ["vehicles", "changes", page], queryFn: () => api.getFleetHistory(page), retry: false }); }
 export function useVehicle(plate: string) { return useQuery({ queryKey: ["vehicles", "detail", plate], queryFn: () => api.getVehicle(plate), retry: false }); }
 export function useStatistics(search: string, page: number) {

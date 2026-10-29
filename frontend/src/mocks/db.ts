@@ -5,6 +5,8 @@ import { buildSupplierPortfolioSummary } from "./supplierSummary";
 import { formatSyncTime } from "../utils/formatSyncTime";
 import type { Notification, NotificationSeverity } from "../types/notification";
 import type { ContractStatus, DerivedContract } from "../types/contract";
+import type { Certificate } from "../types/certificate";
+import type { EnergyData, EnergyRecord, EnergyRequirement } from "../types/energy";
 
 // Keep modeled suppliers separate from aggregate data for suppliers without mock records.
 // Changes to a modeled supplier's risk or record count update the portfolio summary automatically.
@@ -48,10 +50,10 @@ export function getSuppliersRequiringAttention(): TopRiskSupplier[] {
   });
 }
 
-// Recent alerts 
+// Recent alerts
 // TODO: Add full alert details when the real alerts endpoint is available
-const BULK_HIGH_ALERTS_UNLISTED = 3; // + 2 modeled high below = 5 total
-const BULK_MEDIUM_ALERTS_UNLISTED = 12; // + 2 modeled medium below = 14 total
+const BULK_HIGH_ALERTS_UNLISTED = 0; // + 5 modeled high = 5 total
+const BULK_MEDIUM_ALERTS_UNLISTED = 7; // + 7 modeled medium = 14 total
 // Combined the unsupported "low" alerts into "medium" so the total stays consistent
 
 let alerts: RecentAlert[] = [
@@ -59,7 +61,17 @@ let alerts: RecentAlert[] = [
   { id: "alert-2", severity: "high", title: "Nordisk Avfallshåndtering", description: "Environmental certificate (ISO 14001) lapsed without renewal update.", timeAgo: "3h ago", status: "ACTIVE", supplierId: "sup-b" },
   { id: "alert-3", severity: "medium", title: "Vikon Byggservice", description: "Biogas usage dropped below 80% contract minimum floor (recorded at 64%).", timeAgo: "5h ago", status: "ACTIVE", supplierId: "sup-c" },
   { id: "alert-4", severity: "medium", title: "Ren By Transport", description: "Missing Q1 fuel consumption telemetry submission. Grace period expires in 4 days.", timeAgo: "Yesterday", status: "ACTIVE", supplierId: "sup-d" },
- ];
+  { id: "alert-demo-1", severity: "high", title: "Demo Transit Group", description: "A fictional route vehicle does not meet the contract's zero-emission requirement.", timeAgo: "35m ago", status: "ACTIVE", supplierId: "sup-a" },
+  { id: "alert-demo-2", severity: "high", title: "Sample Circular Services", description: "A fictional environmental certificate is marked as expired in the demo records.", timeAgo: "2h ago", status: "ACTIVE", supplierId: "sup-b" },
+  { id: "alert-demo-3", severity: "high", title: "Mock Freight Cooperative", description: "A fictional delivery vehicle was recorded outside its permitted emissions class.", timeAgo: "6h ago", status: "ACTIVE", supplierId: "sup-d" },
+  { id: "alert-demo-4", severity: "medium", title: "Fictional Green Works", description: "The demo quarterly renewable-energy share is below the contract target.", timeAgo: "8h ago", status: "ACTIVE", supplierId: "sup-c" },
+  { id: "alert-demo-5", severity: "medium", title: "Example Municipal Logistics", description: "A fictional fuel report is missing one required quarterly field.", timeAgo: "Yesterday", status: "ACTIVE", supplierId: "sup-e" },
+  { id: "alert-demo-6", severity: "medium", title: "Mock Eco Maintenance", description: "A fictional vehicle inspection record needs a follow-up review.", timeAgo: "Yesterday", status: "ACTIVE", supplierId: "sup-a" },
+  { id: "alert-demo-7", severity: "medium", title: "Demo Waste Partners", description: "The fictional waste-collection fleet report is missing its latest update.", timeAgo: "2 days ago", status: "ACTIVE", supplierId: "sup-b" },
+  { id: "alert-demo-8", severity: "medium", title: "Sample Building Services", description: "A fictional contract document is approaching its review deadline.", timeAgo: "3 days ago", status: "ACTIVE", supplierId: "sup-e" },
+  { id: "alert-demo-9", severity: "high", title: "Mock Route Operators", description: "A previously identified fictional vehicle deviation was dismissed for testing.", timeAgo: "4 days ago", status: "DISMISSED", dismissedBy: "demo.admin@example.test", dismissedAt: "2026-10-20T09:30:00.000Z", supplierId: "sup-d" },
+  { id: "alert-demo-10", severity: "medium", title: "Fictional Energy Services", description: "A fictional quarterly fuel-data reminder was dismissed for testing.", timeAgo: "5 days ago", status: "DISMISSED", dismissedBy: "demo.admin@example.test", dismissedAt: "2026-10-19T09:30:00.000Z", supplierId: "sup-c" },
+];
 
 // Get only active alerts; dismissed alerts are kept for history
 export function getActiveAlerts(): RecentAlert[] {
@@ -308,4 +320,62 @@ export function getDerivedContracts(): DerivedContract[] {
       environmentalActual: mock.environmentalActual,
     };
   });
+}
+
+// Demo dates stay current; certificate status is derived from validUntil, not stored.
+// Supplier B's mainIssue is manually aligned with cert-001, and certificate status does not affect supplier risk.
+// TODO: Connect Mercell contract attachments and certification-body registries.
+function isoDateFromToday(offsetDays: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+const MOCK_CERTIFICATES: Certificate[] = [
+  { id: "cert-001", standard: "iso-14001", certificateNumber: "DEMO-CERT-001", contractId: "sup-b", validUntil: isoDateFromToday(-14) },
+  { id: "cert-002", standard: "gront-punkt-norge", certificateNumber: "DEMO-CERT-002", contractId: "sup-b", validUntil: isoDateFromToday(420) },
+  { id: "cert-003", standard: "iso-14001", certificateNumber: "DEMO-CERT-003", contractId: "sup-a", validUntil: isoDateFromToday(310) },
+  { id: "cert-004", standard: "eco-driving-course", certificateNumber: "DEMO-CERT-004", contractId: "sup-a", validUntil: isoDateFromToday(18) },
+  { id: "cert-005", standard: "miljofyrtarn", certificateNumber: null, contractId: "sup-c", validUntil: null },
+  { id: "cert-006", standard: "retura", certificateNumber: "DEMO-CERT-006", contractId: "sup-c", validUntil: isoDateFromToday(42) },
+  { id: "cert-007", standard: "eco-driving-course", certificateNumber: "DEMO-CERT-007", contractId: "sup-d", validUntil: isoDateFromToday(150) },
+  { id: "cert-008", standard: "emas", certificateNumber: "DEMO-CERT-008", contractId: "sup-d", validUntil: isoDateFromToday(520) },
+  { id: "cert-009", standard: "iso-14001", certificateNumber: "DEMO-CERT-009", contractId: "sup-e", validUntil: isoDateFromToday(600) },
+  { id: "cert-010", standard: "miljofyrtarn", certificateNumber: "DEMO-CERT-010", contractId: "sup-e", validUntil: isoDateFromToday(260) },
+];
+
+export function getCertificates(): Certificate[] {
+  return MOCK_CERTIFICATES;
+}
+
+// Energy & fuel 
+function latestCompletedQuarterLabel(now: Date = new Date()): string {
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1; // 1..4
+  return currentQuarter === 1
+    ? `Q4 ${now.getFullYear() - 1}`
+    : `Q${currentQuarter - 1} ${now.getFullYear()}`;
+}
+
+const MOCK_ENERGY_PERIOD = latestCompletedQuarterLabel();
+
+const MOCK_ENERGY_REQUIREMENTS: EnergyRequirement[] = [
+  { contractId: "sup-a", minRenewableSharePercent: 50 },
+  { contractId: "sup-c", minRenewableSharePercent: 80 },
+  { contractId: "sup-d", minRenewableSharePercent: 80 },
+];
+
+const MOCK_ENERGY_RECORDS: EnergyRecord[] = [
+  { id: "energy-001", contractId: "sup-a", period: MOCK_ENERGY_PERIOD, consumptionKwh: { electric: 180000, biogas: 110000, fossil: 210000 } },
+  { id: "energy-002", contractId: "sup-c", period: MOCK_ENERGY_PERIOD, consumptionKwh: { electric: 0, biogas: 384000, fossil: 216000 } },
+  { id: "energy-003", contractId: "sup-d", period: MOCK_ENERGY_PERIOD, consumptionKwh: { electric: 434000, biogas: 0, fossil: 266000 } },
+];
+
+export function getEnergyData(): EnergyData {
+  return { requirements: MOCK_ENERGY_REQUIREMENTS, records: MOCK_ENERGY_RECORDS };
+}
+
+export function getAllAlerts(): RecentAlert[] {
+  return alerts;
 }

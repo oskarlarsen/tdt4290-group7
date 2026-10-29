@@ -7,6 +7,10 @@ import { ApiError } from "@/api/client";
 
 // Mirrors the backend's PasswordPolicy.MIN_LENGTH
 const MIN_PASSWORD_LENGTH = 12;
+const LOGIN_EMAIL_PLACEHOLDER =
+  import.meta.env.VITE_MOCK_AUTH === "true"
+    ? "admin@kommune.no"
+    : "advisor.hansen@kommune.no";
 
 export default function Login() {
   const { login, status, error: authError } = useAuth();
@@ -227,7 +231,7 @@ export default function Login() {
                       autoComplete="username"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="advisor.hansen@kommune.no"
+                      placeholder={LOGIN_EMAIL_PLACEHOLDER}
                       disabled={isLoading}
                       className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
                   />

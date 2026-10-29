@@ -1,4 +1,89 @@
-// TODO: contract, supplier, certificate name, expiry date, status, actions
-export function CertificateTable() {
-  return <div>Certificate table</div>;
+import { StatusBadge } from "../ui/StatusBadge";
+import {
+  CERTIFICATE_STANDARD_LABELS,
+  formatCertificateDate,
+  getCertificateStatus,
+} from "../../types/certificate";
+import type { Certificate } from "../../types/certificate";
+import type { DerivedContract } from "../../types/contract";
+
+// contract is optional: shown "where available" if a certificate's contract can't be found.
+export type CertificateRow = { certificate: Certificate; contract?: DerivedContract };
+
+export function CertificateTable({
+  rows,
+  onSelect,
+  emptyMessage = "No certificates to show.",
+}: {
+  rows: CertificateRow[];
+  onSelect: (row: CertificateRow) => void;
+  emptyMessage?: string;
+}) {
+  if (rows.length === 0) {
+    return <div className="py-8 text-center text-sm text-neutral-400">{emptyMessage}</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
+            <th className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
+            <th className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
+            <th className="pb-2 pr-3 font-medium">Contract</th>
+            <th className="pb-2 pr-3 font-medium">Valid until</th>
+            <th className="pb-2 pr-3 font-medium">Status</th>
+            <th className="pb-2 font-medium">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const { certificate, contract } = row;
+            const info = getCertificateStatus(certificate);
+            return (
+              <tr key={certificate.id} className="border-t border-neutral-100">
+                <td className="py-3 pr-3">
+                  {contract ? (
+                    <>
+                      <div className="font-medium text-neutral-900">{contract.supplierName}</div>
+                      <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                    </>
+                  ) : (
+                    <span className="text-xs text-neutral-400">Contract not found</span>
+                  )}
+                </td>
+                <td className="py-3 pr-3">
+                  <div className="font-medium text-neutral-900">
+                    {CERTIFICATE_STANDARD_LABELS[certificate.standard]}
+                  </div>
+                  <div className="font-mono text-xs text-neutral-400">
+                    {certificate.certificateNumber ?? "No certificate on file"}
+                  </div>
+                </td>
+                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "—"}</td>
+                <td
+                  className={`whitespace-nowrap py-3 pr-3 ${
+                    info.status === "expired" ? "font-semibold text-red-700" : "text-neutral-700"
+                  }`}
+                >
+                  {certificate.validUntil ? formatCertificateDate(certificate.validUntil) : "—"}
+                </td>
+                <td className="py-3 pr-3">
+                  <StatusBadge status={info.tone} label={info.label} />
+                </td>
+                <td className="py-3">
+                  <button
+                    onClick={() => onSelect(row)}
+                    className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+                  >
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }

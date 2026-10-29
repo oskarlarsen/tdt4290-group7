@@ -14,6 +14,9 @@ export type DerivedContract = {
   mainIssue: string;
   environmentalGoal?: number | null;
   environmentalActual?: number | null;
+  vehicleMonitoring?: "monitored" | "data-missing";
+  vehicleCount?: number;
+  flaggedVehicleCount?: number;
   status: ContractStatus;
   startDate: string; // ISO date — mock value, see mocks/db.ts
   endDate: string; // ISO date — mock value, see mocks/db.ts
