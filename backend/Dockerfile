@@ -3,7 +3,7 @@
 FROM gradle:9.8.1-jdk21@sha256:5ec5f726f14851a11a1bac6e6a5720e41062c33357053e7717eb0d189a6f1db9 AS build
 WORKDIR /app
 COPY . .
-RUN ./gradlewhttps://github.com/oskarlarsen/tdt4290-group7 buildFatJar --no-daemon
+RUN ./gradlew buildFatJar --no-daemon
 
 FROM eclipse-temurin:25-jre-alpine@sha256:b7528962e65d43064d8a8b67ba175367896bc948363ea2d3fcd7f10d34e1f048
 # Run as an unprivileged user; the app only needs to read its jar and bind 8080.
