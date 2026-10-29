@@ -1,24 +1,49 @@
-# Vehicles
+# Frontend
 
-Manage suppliers and their vehicle-use agreements inside the Vehicles page. Each agreement defines a period and maximum vehicle count; planned entries also take one place.
-
-## Run locally
-
-Install frontend dependencies with `npm install`, then `npm run dev`. Configure the shared root `.env` with `VITE_API_BASE_URL=/api` (using the Vite proxy) and `VITE_MOCK_AUTH=false` for real backend login (independent of prototype data in `VITE_USE_MOCKS`). Vehicles always uses the backend. Sign in with the seeded admin account; the backend enforces admin access and records the user for every change.
-
-## Workflow
-
-1. Add a supplier using its name and organization number.
-2. Expand the supplier and add an agreement with dates, maximum vehicles and an optional note.
-3. Add registered vehicles or enable **Registration pending** to reserve a place without details.
-4. Use **Replace vehicle** for immediate replacement, or **Register vehicle** when a planned vehicle receives its registration number.
-5. Open **View details** for reporting periods, CO2 rate/calculation, deviations and historical checks. NOx and supporting facts are expandable.
-6. Use **Change history** to undo eligible additions, removals, replacements, planned registrations and edits. Later dependent changes can prevent undo.
-
-An allowance reduction is permitted even when exceeded. The counter displays only `8 of 5 vehicles`, in red. New places are blocked, while replacement still works. Dates display as `dd.mm.yyyy`; date inputs retain browser-local formatting. The interface is English.
+React, TypeScript and Vite application with admin and supplier workspaces. See the [project overview and setup](../README.md) for feature availability, prerequisites, configuration and accounts.
 
 ## Development
 
-`npm run build` checks TypeScript and produces the app. `npm test -- --run` runs the frontend suite. The [backend guide](../backend/README.md#vehicle-agreements-and-reporting) describes API fields, exact decimals, history, and the [development database reset instructions](../backend/README.md#database-reset-and-tests).
+Configure the root `.env` and start the backend first. Then, from `frontend/`:
 
-Agreement forms and fleet actions live in `components/vehicles/FleetForms.tsx`, `AgreementCard.tsx`, and `ChangeHistory.tsx`; the API and query hooks are shared. The Contracts page is unchanged.
+```sh
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+| Command | Purpose |
+|---|---|
+| `npm run build` | Type-check and build the application into `dist/`. |
+| `npm test -- --run` | Run the frontend tests once. |
+| `npm run preview` | Serve the built application locally; requires a build first. |
+
+## Data and workflows
+
+The default setup combines demo data (`VITE_USE_MOCKS=true`) with backend sign-in (`VITE_MOCK_AUTH=false`). Vehicles always uses the backend. Setting `VITE_USE_MOCKS=false` prevents Dashboard, Suppliers and Contracts from loading data because their backend endpoints are not implemented.
+
+In Vehicles, the structure is:
+
+```mermaid
+flowchart LR
+    S[Supplier] --> A[Agreement: dates and vehicle allowance]
+    A --> R[Registered vehicles]
+    A --> P[Planned entries]
+```
+
+Create a supplier, then an agreement, then add vehicles within that agreement. Planned entries reserve spaces before registration numbers are known. Registered entries require a working registry integration. Vehicle details bring together reported statistics, checks and saved evidence; agreement and vehicle-list changes have a separate change history.
+
+Demo supplier notes and follow-up status are stored in the browser. Demo alert changes are held in memory and reset on a page reload. These demo records do not populate the vehicle directory.
+
+## Code navigation
+
+| Directory | Contents |
+|---|---|
+| [`src/app/`](src/app/) | Routing, layouts and role guards. |
+| [`src/pages/`](src/pages/) and [`src/components/`](src/components/) | Role-specific screens and reusable UI. |
+| [`src/api/`](src/api/) and [`src/hooks/`](src/hooks/) | Requests, queries and mutations. |
+| [`src/mocks/`](src/mocks/) | Demonstration data and mock sign-in. |
+| [`src/types/`](src/types/) and [`src/utils/`](src/utils/) | Shared data types and utilities. |
+
+The theme is in [`tailwind.config.ts`](tailwind.config.ts), with [global styles](src/styles/globals.css). [Configuration](../docs/configuration.md) includes frontend-only demo mode and connection troubleshooting.

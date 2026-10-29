@@ -1,25 +1,24 @@
-# Branch rulesets
+# Branch protection
 
-`protect-main.json` is the definition of the ruleset that protects `main`. GitHub does not read
-this file automatically; it has to be applied once (and re-applied after edits) by a repo admin:
+[`protect-main.json`](protect-main.json) defines protection for the default branch. A repository administrator must apply it through GitHub; storing this file does not activate the rules.
+
+The rules require a pull request, another reviewer's approval after the latest push, resolved conversations and passing `validate`, `Frontend build and test` and `Backend test` checks. Direct pushes, force pushes and branch deletion are blocked, with no administrator bypass. The configuration does not require branches to be up to date before merging.
+
+## Apply or update
+
+Run from the repository root with an authenticated GitHub CLI.
+
+Create the ruleset:
 
 ```sh
-# first time
 gh api repos/oskarlarsen/tdt4290-group7/rulesets --method POST --input .github/rulesets/protect-main.json
-
-# update an existing ruleset (find the id with: gh api repos/oskarlarsen/tdt4290-group7/rulesets)
-gh api repos/oskarlarsen/tdt4290-group7/rulesets/<id> --method PUT --input .github/rulesets/protect-main.json
 ```
 
-What it enforces on `main`:
+To update it, list existing rulesets, then replace `RULESET_ID` in the update command with the matching ID:
 
-- Changes only via pull request; no direct pushes, force pushes or branch deletion.
-- At least 1 approving review. GitHub never counts the PR author's own approval, so another
-  team member must review.
-- Approval must come after the last push (`require_last_push_approval`), and new commits dismiss
-  earlier approvals.
-- All review conversations resolved before merge.
-- The `validate` (Gradle wrapper validation), `Frontend build and test` and `Backend test` (CI) checks must pass on an up-to-date branch.
-- No bypass actors, so admins follow the same rules.
+```sh
+gh api repos/oskarlarsen/tdt4290-group7/rulesets
+gh api repos/oskarlarsen/tdt4290-group7/rulesets/RULESET_ID --method PUT --input .github/rulesets/protect-main.json
+```
 
-When adding a new required CI job, add its job name to `required_status_checks` in the JSON.
+When CI job names change, update `required_status_checks` in the JSON and reapply the ruleset.
