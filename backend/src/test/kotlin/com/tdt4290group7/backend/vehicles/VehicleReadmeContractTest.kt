@@ -13,7 +13,8 @@ class VehicleReadmeContractTest {
     @Test
     fun documentedSyntheticPostBodiesStillSatisfyTheCurrentContract() {
         val repository = VehicleRepository(Path.of("build", "test-data", "docs-${UUID.randomUUID()}.db"))
-        val examples = Regex("~~~json\\s*([\\s\\S]*?)~~~").findAll(Files.readString(Path.of("README.md")))
+        val apiReference = Files.readString(Path.of("..", "docs", "api.md"))
+        val examples = Regex("```json\\s*([\\s\\S]*?)```").findAll(apiReference)
         var validated = 0
         for (example in examples) {
             val text = example.groupValues[1]
