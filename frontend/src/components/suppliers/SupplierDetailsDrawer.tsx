@@ -99,6 +99,7 @@ export function SupplierDetailsDrawer({
             <div className="flex-1 space-y-5 p-4">
               <Section title="Supplier information">
                 <Field label="Org ID" value={supplier.orgId} />
+                {supplier.email && <Field label="Email address" value={supplier.email} />}
                 <Field label="Primary contract" value={supplier.primaryContract} />
               </Section>
 

@@ -1,8 +1,12 @@
-// TODO: Add the dismissAlert mutation when the Dismiss button is connected
-
-import type { TopRiskSupplier, RecentAlert } from "../types/dashboard";
+import type {
+  TopRiskSupplier,
+  RecentAlert,
+  NewSupplierInput,
+  RiskCategory,
+} from "../types/dashboard";
 import { buildSupplierPortfolioSummary } from "./supplierSummary";
 import { formatSyncTime } from "../utils/formatSyncTime";
+import { DUPLICATE_SUPPLIER_ORG_ID_MESSAGE, normalizeSupplierOrgId } from "../utils/supplier";
 import type { Notification, NotificationSeverity } from "../types/notification";
 import type { ContractStatus, DerivedContract } from "../types/contract";
 import type { Certificate } from "../types/certificate";
@@ -12,7 +16,7 @@ import type { EnergyData, EnergyRecord, EnergyRequirement } from "../types/energ
 // Changes to a modeled supplier's risk or record count update the portfolio summary automatically.
 // TODO: Replace the aggregate data with the full supplier list from the backend.
 
-const MODELED_SUPPLIERS: TopRiskSupplier[] = [
+const MODELED_SUPPLIERS: (Omit<TopRiskSupplier, "risk"> & { risk: RiskCategory })[] = [
   { id: "sup-a", displayName: "Supplier A", orgId: "NO 924 812 443 MVA", primaryContract: "Skolerute 2023-2026", risk: "high", mainIssue: "3 Euro-5 non-compliant heavy vehicles", issueCategory: "VEHICLE_DEVIATION" },
   { id: "sup-b", displayName: "Supplier B", orgId: "NO 811 693 219 MVA", primaryContract: "Kommunalt Avfall 24", risk: "high", mainIssue: "ISO 14001 expired 14 days ago", issueCategory: "CERTIFICATE_EXPIRY" },
   { id: "sup-c", displayName: "Supplier C", orgId: "NO 994 204 117 MVA", primaryContract: "Skolebygg Rehabilitering", risk: "medium", mainIssue: "Biogas share dropped below 80%", issueCategory: "FUEL_DEVIATION" },
@@ -39,7 +43,68 @@ export function getSupplierPortfolioSummary() {
 }
 
 export function getTopRiskSuppliers(): TopRiskSupplier[] {
-  return MODELED_SUPPLIERS;
+  return [...MODELED_SUPPLIERS, ...addedSuppliers];
+}
+
+const ADDED_SUPPLIERS_STORAGE_KEY = "added_mock_suppliers";
+
+function isAddedSupplier(value: unknown): value is TopRiskSupplier {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const supplier = value as Record<string, unknown>;
+  return (
+    typeof supplier.id === "string" &&
+    typeof supplier.displayName === "string" &&
+    typeof supplier.orgId === "string" &&
+    supplier.primaryContract === "Not assigned" &&
+    supplier.risk === "unassessed" &&
+    supplier.mainIssue === "Awaiting compliance assessment."
+  );
+}
+
+function readAddedSuppliers(): TopRiskSupplier[] {
+  try {
+    const stored = localStorage.getItem(ADDED_SUPPLIERS_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed.filter(isAddedSupplier) : [];
+  } catch {
+    return [];
+  }
+}
+
+let addedSuppliers = readAddedSuppliers();
+
+export function addSupplier(input: NewSupplierInput): TopRiskSupplier {
+  const displayName = input.displayName.trim();
+  const orgId = input.orgId.trim();
+  const email = input.email.trim();
+  if (!displayName || !orgId || !email) {
+    throw new Error("Supplier name, Organization ID, and email are required.");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Enter a valid email address.");
+  }
+  if (
+    getTopRiskSuppliers().some(
+      (supplier) => normalizeSupplierOrgId(supplier.orgId) === normalizeSupplierOrgId(orgId)
+    )
+  ) {
+    throw new Error(DUPLICATE_SUPPLIER_ORG_ID_MESSAGE);
+  }
+
+  const supplier: TopRiskSupplier = {
+    id: `sup-added-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    displayName,
+    orgId,
+    email,
+    primaryContract: input.primaryContract?.trim() || "Not assigned",
+    risk: "unassessed",
+    mainIssue: "Awaiting compliance assessment.",
+  };
+  const nextSuppliers = [...addedSuppliers, supplier];
+  localStorage.setItem(ADDED_SUPPLIERS_STORAGE_KEY, JSON.stringify(nextSuppliers));
+  addedSuppliers = nextSuppliers;
+  return supplier;
 }
 
 // Use the same supplier data and risk filter as the classification bar to keep both in sync
@@ -52,64 +117,56 @@ export function getSuppliersRequiringAttention(): TopRiskSupplier[] {
 
 // Recent alerts
 // TODO: Add full alert details when the real alerts endpoint is available
+// Fictional dates relative to today keep demo alert ages current without implying real activity.
+function demoAlertCreatedAt(daysAgo: number): string {
+  const createdAt = new Date();
+  createdAt.setDate(createdAt.getDate() - daysAgo);
+  return createdAt.toISOString();
+}
+
 const BULK_HIGH_ALERTS_UNLISTED = 0; // + 5 modeled high = 5 total
 const BULK_MEDIUM_ALERTS_UNLISTED = 7; // + 7 modeled medium = 14 total
 // Combined the unsupported "low" alerts into "medium" so the total stays consistent
 
 let alerts: RecentAlert[] = [
-  { id: "alert-1", severity: "high", title: "Fjord Transport AS", description: "Unauthorized vehicle on route #402. Non-zero-emission class operating in zero-emission zone.", timeAgo: "20m ago", status: "ACTIVE", supplierId: "sup-a" },
-  { id: "alert-2", severity: "high", title: "Nordisk Avfallshåndtering", description: "Environmental certificate (ISO 14001) lapsed without renewal update.", timeAgo: "3h ago", status: "ACTIVE", supplierId: "sup-b" },
-  { id: "alert-3", severity: "medium", title: "Vikon Byggservice", description: "Biogas usage dropped below 80% contract minimum floor (recorded at 64%).", timeAgo: "5h ago", status: "ACTIVE", supplierId: "sup-c" },
-  { id: "alert-4", severity: "medium", title: "Ren By Transport", description: "Missing Q1 fuel consumption telemetry submission. Grace period expires in 4 days.", timeAgo: "Yesterday", status: "ACTIVE", supplierId: "sup-d" },
-  { id: "alert-demo-1", severity: "high", title: "Demo Transit Group", description: "A fictional route vehicle does not meet the contract's zero-emission requirement.", timeAgo: "35m ago", status: "ACTIVE", supplierId: "sup-a" },
-  { id: "alert-demo-2", severity: "high", title: "Sample Circular Services", description: "A fictional environmental certificate is marked as expired in the demo records.", timeAgo: "2h ago", status: "ACTIVE", supplierId: "sup-b" },
-  { id: "alert-demo-3", severity: "high", title: "Mock Freight Cooperative", description: "A fictional delivery vehicle was recorded outside its permitted emissions class.", timeAgo: "6h ago", status: "ACTIVE", supplierId: "sup-d" },
-  { id: "alert-demo-4", severity: "medium", title: "Fictional Green Works", description: "The demo quarterly renewable-energy share is below the contract target.", timeAgo: "8h ago", status: "ACTIVE", supplierId: "sup-c" },
-  { id: "alert-demo-5", severity: "medium", title: "Example Municipal Logistics", description: "A fictional fuel report is missing one required quarterly field.", timeAgo: "Yesterday", status: "ACTIVE", supplierId: "sup-e" },
-  { id: "alert-demo-6", severity: "medium", title: "Mock Eco Maintenance", description: "A fictional vehicle inspection record needs a follow-up review.", timeAgo: "Yesterday", status: "ACTIVE", supplierId: "sup-a" },
-  { id: "alert-demo-7", severity: "medium", title: "Demo Waste Partners", description: "The fictional waste-collection fleet report is missing its latest update.", timeAgo: "2 days ago", status: "ACTIVE", supplierId: "sup-b" },
-  { id: "alert-demo-8", severity: "medium", title: "Sample Building Services", description: "A fictional contract document is approaching its review deadline.", timeAgo: "3 days ago", status: "ACTIVE", supplierId: "sup-e" },
-  { id: "alert-demo-9", severity: "high", title: "Mock Route Operators", description: "A previously identified fictional vehicle deviation was dismissed for testing.", timeAgo: "4 days ago", status: "DISMISSED", dismissedBy: "demo.admin@example.test", dismissedAt: "2026-10-20T09:30:00.000Z", supplierId: "sup-d" },
-  { id: "alert-demo-10", severity: "medium", title: "Fictional Energy Services", description: "A fictional quarterly fuel-data reminder was dismissed for testing.", timeAgo: "5 days ago", status: "DISMISSED", dismissedBy: "demo.admin@example.test", dismissedAt: "2026-10-19T09:30:00.000Z", supplierId: "sup-c" },
+  { id: "alert-1", severity: "high", title: "Fjord Transport AS", description: "Unauthorized vehicle on route #402. Non-zero-emission class operating in zero-emission zone.", timeAgo: "20m ago", createdAt: demoAlertCreatedAt(0), status: "OPEN", supplierId: "sup-a" },
+  { id: "alert-2", severity: "high", title: "Nordisk Avfallshåndtering", description: "Environmental certificate (ISO 14001) lapsed without renewal update.", timeAgo: "3h ago", createdAt: demoAlertCreatedAt(1), status: "UNDER_REVIEW", supplierId: "sup-b" },
+  { id: "alert-3", severity: "medium", title: "Vikon Byggservice", description: "Biogas usage dropped below 80% contract minimum floor (recorded at 64%).", timeAgo: "5h ago", createdAt: demoAlertCreatedAt(3), status: "IN_PROGRESS", supplierId: "sup-c" },
+  { id: "alert-4", severity: "medium", title: "Ren By Transport", description: "Missing Q1 fuel consumption telemetry submission. Grace period expires in 4 days.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(7), status: "OPEN", supplierId: "sup-d" },
+  { id: "alert-demo-1", severity: "high", title: "Demo Transit Group", description: "A fictional route vehicle does not meet the contract's zero-emission requirement.", timeAgo: "35m ago", createdAt: demoAlertCreatedAt(0), status: "OPEN", supplierId: "sup-a" },
+  { id: "alert-demo-2", severity: "high", title: "Sample Circular Services", description: "A fictional environmental certificate is marked as expired in the demo records.", timeAgo: "2h ago", createdAt: demoAlertCreatedAt(1), status: "UNDER_REVIEW", supplierId: "sup-b" },
+  { id: "alert-demo-3", severity: "high", title: "Mock Freight Cooperative", description: "A fictional delivery vehicle was recorded outside its permitted emissions class.", timeAgo: "6h ago", createdAt: demoAlertCreatedAt(3), status: "IN_PROGRESS", supplierId: "sup-d" },
+  { id: "alert-demo-4", severity: "medium", title: "Fictional Green Works", description: "The demo quarterly renewable-energy share is below the contract target.", timeAgo: "8h ago", createdAt: demoAlertCreatedAt(7), status: "IN_PROGRESS", supplierId: "sup-c" },
+  { id: "alert-demo-5", severity: "medium", title: "Example Municipal Logistics", description: "A fictional fuel report is missing one required quarterly field.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(14), status: "OPEN", supplierId: "sup-e" },
+  { id: "alert-demo-6", severity: "medium", title: "Mock Eco Maintenance", description: "A fictional vehicle inspection record needs a follow-up review.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(5), status: "UNDER_REVIEW", supplierId: "sup-a" },
+  { id: "alert-demo-7", severity: "medium", title: "Demo Waste Partners", description: "The fictional waste-collection fleet report is missing its latest update.", timeAgo: "2 days ago", createdAt: demoAlertCreatedAt(2), status: "OPEN", supplierId: "sup-b" },
+  { id: "alert-demo-8", severity: "medium", title: "Sample Building Services", description: "A fictional contract document is approaching its review deadline.", timeAgo: "3 days ago", createdAt: demoAlertCreatedAt(3), status: "UNDER_REVIEW", supplierId: "sup-e" },
+  { id: "alert-demo-9", severity: "high", title: "Mock Route Operators", description: "A previously identified fictional vehicle deviation was addressed in the demo workflow.", timeAgo: "4 days ago", createdAt: demoAlertCreatedAt(7), status: "RESOLVED", supplierId: "sup-d" },
+  { id: "alert-demo-10", severity: "medium", title: "Fictional Energy Services", description: "A fictional quarterly fuel-data reminder is being verified against submitted records.", timeAgo: "5 days ago", createdAt: demoAlertCreatedAt(14), status: "UNDER_REVIEW", supplierId: "sup-c" },
 ];
 
-// Get only active alerts; dismissed alerts are kept for history
-export function getActiveAlerts(): RecentAlert[] {
-  return alerts.filter((a) => a.status === "ACTIVE");
+export function getUnresolvedAlerts(): RecentAlert[] {
+  return alerts.filter((alert) => alert.status !== "RESOLVED");
 }
 
-// Not called by any UI yet — ready for a future "Dismissed Alerts" view
-export function getDismissedAlerts(): RecentAlert[] {
-  return alerts.filter((a) => a.status === "DISMISSED");
-}
-
-// Dismiss only this alert while keeping its data and history
-export function dismissAlert(id: string, dismissedBy: string): void {
-  alerts = alerts.map((a) =>
-    a.id === id
-      ? { ...a, status: "DISMISSED", dismissedAt: new Date().toISOString(), dismissedBy }
-      : a
-  );
-}
-
-export function restoreAlert(id: string): void {
-  alerts = alerts.map((a) =>
-    a.id === id ? { ...a, status: "ACTIVE", dismissedAt: undefined, dismissedBy: undefined } : a
-  );
+export function updateAlertStatus(id: string, status: RecentAlert["status"]): void {
+  if (!alerts.some((alert) => alert.id === id)) {
+    throw new Error(`Alert "${id}" was not found.`);
+  }
+  alerts = alerts.map((alert) => (alert.id === id ? { ...alert, status } : alert));
 }
 
 export function getAlertsBySeverity(): { high: number; medium: number } {
-  // Count only active alerts so dismissed alerts don't affect the KPI
-  const active = getActiveAlerts();
-  const modeledHigh = active.filter((a) => a.severity === "high").length;
-  const modeledMedium = active.filter((a) => a.severity === "medium").length;
+  const unresolved = getUnresolvedAlerts();
+  const modeledHigh = unresolved.filter((alert) => alert.severity === "high").length;
+  const modeledMedium = unresolved.filter((alert) => alert.severity === "medium").length;
   return {
     high: modeledHigh + BULK_HIGH_ALERTS_UNLISTED,
     medium: modeledMedium + BULK_MEDIUM_ALERTS_UNLISTED,
   };
 }
 
-export function getActiveAlertsCount(): number {
+export function getUnresolvedAlertsCount(): number {
   const { high, medium } = getAlertsBySeverity();
   return high + medium;
 }
@@ -134,7 +191,7 @@ export function resyncNow(): string {
 }
 
 export function getRiskLogRows() {
-  return MODELED_SUPPLIERS.map((s) => ({
+  return getTopRiskSuppliers().map((s) => ({
     Supplier: s.displayName,
     "Org ID": s.orgId,
     Contract: s.primaryContract,

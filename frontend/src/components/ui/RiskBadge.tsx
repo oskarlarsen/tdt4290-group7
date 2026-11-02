@@ -1,13 +1,14 @@
-import type { RiskCategory } from "../../types/dashboard";
+import type { SupplierRisk } from "../../types/dashboard";
 
 // Keep risk status categorical and consistent with the Dashboard spec
-const CONFIG: Record<RiskCategory, { label: string; className: string }> = {
+const CONFIG: Record<SupplierRisk, { label: string; className: string }> = {
   high: { label: "High", className: "bg-red-100 text-red-700" },
   medium: { label: "Medium", className: "bg-amber-100 text-amber-800" },
   compliant: { label: "Compliant", className: "bg-neutral-100 text-neutral-700" },
+  unassessed: { label: "Unassessed", className: "bg-neutral-100 text-neutral-500" },
 };
 
-export function RiskBadge({ level }: { level: RiskCategory }) {
+export function RiskBadge({ level }: { level: SupplierRisk }) {
   const { label, className } = CONFIG[level];
   return (
     <span

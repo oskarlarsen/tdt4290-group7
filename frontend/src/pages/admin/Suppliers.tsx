@@ -1,32 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useDashboardSummary } from "../../hooks/useDashboardSummary";
 import { useSupplierReviewStatus, type FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
+import { useContracts } from "../../hooks/useContracts";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
 import { toCsv, downloadCsv } from "../../utils/csv";
-import type { TopRiskSupplier } from "../../types/dashboard";
+import type { DashboardSummary, NewSupplierInput, TopRiskSupplier } from "../../types/dashboard";
+import { createSupplier } from "../../api/suppliers";
 
 const RISK_ORDER: Record<TopRiskSupplier["risk"], number> = {
   high: 0,
   medium: 1,
   compliant: 2,
+  unassessed: 3,
 };
 const SUPPLIERS_PAGE_SIZE = 3;
 
 export default function Suppliers() {
   const { data, isLoading, isError } = useDashboardSummary();
+  const contractsQuery = useContracts();
+  const queryClient = useQueryClient();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [riskFilter, setRiskFilter] = useState<"all" | TopRiskSupplier["risk"]>("all");
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | FollowUpStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [successMessage, setSuccessMessage] = useState("");
+  const preservePageAfterAdd = useRef(false);
   const { getStatus, setStatus } = useSupplierReviewStatus();
 
   useEffect(() => {
+    if (preservePageAfterAdd.current) {
+      preservePageAfterAdd.current = false;
+      return;
+    }
     setPage(1);
   }, [search, riskFilter, reviewStatusFilter]);
 
@@ -80,6 +92,29 @@ export default function Suppliers() {
   const paginatedSuppliers = filteredSuppliers.slice(pageStart, pageStart + SUPPLIERS_PAGE_SIZE);
   const selectedSupplier = sortedSuppliers.find((s) => s.id === selectedSupplierId) ?? null;
 
+  async function handleAddSupplier(input: NewSupplierInput) {
+    const supplier = await createSupplier(input);
+    const updatedSuppliers = [...sortedSuppliers, supplier].sort(
+      (a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk]
+    );
+    const supplierIndex = updatedSuppliers.findIndex((item) => item.id === supplier.id);
+    const targetPage = Math.floor(supplierIndex / SUPPLIERS_PAGE_SIZE) + 1;
+    const filtersWillReset =
+      search !== "" || riskFilter !== "all" || reviewStatusFilter !== "all";
+
+    if (filtersWillReset) preservePageAfterAdd.current = true;
+    queryClient.setQueryData<DashboardSummary>(["dashboard-summary"], (current) =>
+      current
+        ? { ...current, topRiskSuppliers: [...current.topRiskSuppliers, supplier] }
+        : current
+    );
+    setSearch("");
+    setRiskFilter("all");
+    setReviewStatusFilter("all");
+    setPage(targetPage);
+    setSuccessMessage(`${supplier.displayName} was added successfully.`);
+  }
+
   function handleExportDirectory() {
     const csv = toCsv(
       sortedSuppliers.map((s) => ({
@@ -103,7 +138,18 @@ export default function Suppliers() {
         compliantCount={riskClassification.compliant.count}
         compliantPercent={riskClassification.compliant.percent}
         onExport={handleExportDirectory}
+        existingSuppliers={topRiskSuppliers}
+        contracts={contractsQuery.data ?? []}
+        contractsLoading={contractsQuery.isLoading}
+        contractsError={contractsQuery.isError}
+        onAddSupplier={handleAddSupplier}
       />
+
+      {successMessage && (
+        <p role="status" className="rounded-lg border border-tertiary-200 bg-tertiary-50 px-3 py-2 text-sm text-tertiary-700">
+          {successMessage}
+        </p>
+      )}
 
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -131,6 +177,7 @@ export default function Suppliers() {
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="compliant">Compliant</option>
+                <option value="unassessed">Unassessed</option>
               </select>
             </label>
 

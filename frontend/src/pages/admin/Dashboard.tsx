@@ -2,10 +2,10 @@ import { useSupplierReviewStatus } from "../../hooks/useSupplierReviewStatus";
 import { useNavigate } from "react-router-dom";
 import { Users, ShieldAlert, Bell, CheckCircle2, Loader2, Download, RefreshCw } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
-import { useDashboardSummary, useDismissAlert, useRestoreAlert, useResyncDashboard, } from "../../hooks/useDashboardSummary";
+import { useDashboardSummary, useUpdateAlertStatus, useResyncDashboard } from "../../hooks/useDashboardSummary";
 import { formatSyncTime } from "../../utils/formatSyncTime";
 import { KpiCard } from "../../components/ui/KpiCard";
-import { DashboardExportButton, QuickActions } from "../../components/ui/QuickActions";
+import { DashboardExportButton } from "../../components/ui/QuickActions";
 import { RiskClassificationBar } from "../../components/risk/RiskClassificationBar";
 import { IssueCategoryPanel } from "../../components/risk/IssueCategoryPanel";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { sendEmailNotification } from "../../services/notificationService";
 import { getRiskLogRows } from "../../api/dashboard";
 import { toCsv, downloadCsv } from "../../utils/csv";
+import type { AlertStatus } from "../../types/dashboard";
 
 export default function Dashboard() {
   const { user, lastActiveAt } = useAuth();
@@ -23,13 +24,15 @@ export default function Dashboard() {
   const emailedOnce = useRef(false);
 
   const { data, isLoading, isError } = useDashboardSummary();
-  const dismissAlert = useDismissAlert();
-  const restoreAlert = useRestoreAlert();
+  const updateAlertStatus = useUpdateAlertStatus();
   const resync = useResyncDashboard();
 
-  // Undo state for dismissed alerts
-  const [pendingUndoId, setPendingUndoId] = useState<string | null>(null);
+  const [pendingUndo, setPendingUndo] = useState<{
+    id: string;
+    previousStatus: AlertStatus;
+  } | null>(null);
   const [undoSeconds, setUndoSeconds] = useState(0);
+  const [alertStatusError, setAlertStatusError] = useState<string | null>(null);
   const [attentionFilter, setAttentionFilter] = useState<"all" | "high" | "medium">("all");
   const [attentionPage, setAttentionPage] = useState(0);
 
@@ -38,12 +41,12 @@ export default function Dashboard() {
 
   // Clean up the Undo timer if the component unmounts
   useEffect(() => {
-  if (!pendingUndoId) return;
+  if (!pendingUndo) return;
 
   const interval = setInterval(() => {
     setUndoSeconds((seconds) => {
       if (seconds <= 1) {
-        setPendingUndoId(null);
+        setPendingUndo(null);
         return 0;
       }
       return seconds - 1;
@@ -52,26 +55,40 @@ export default function Dashboard() {
 
   // Clear the previous undo timer when the toast changes or the component unmounts
   return () => clearInterval(interval);
-}, [pendingUndoId]);
+}, [pendingUndo]);
 
 
-  function handleDismissAlert(id: string) {
-  dismissAlert.mutate(
-    { id, dismissedBy: user?.email ?? "unknown" },
+  function handleResolveAlert(id: string) {
+  const previousStatus = data?.recentAlerts.find((alert) => alert.id === id)?.status;
+  if (!previousStatus) return;
+  setAlertStatusError(null);
+  updateAlertStatus.mutate(
+    { id, status: "RESOLVED" },
     {
       onSuccess: () => {
-        setPendingUndoId(id);
+        setPendingUndo({ id, previousStatus });
         setUndoSeconds(5);
       },
+      onError: (error) =>
+        setAlertStatusError(error instanceof Error ? error.message : "Could not update alert status."),
     }
   );
 }
 
-  function handleUndoDismiss() {
-  if (!pendingUndoId) return;
-  restoreAlert.mutate(pendingUndoId);
-  setPendingUndoId(null);
-  setUndoSeconds(0);
+  function handleUndoResolve() {
+  if (!pendingUndo) return;
+  setAlertStatusError(null);
+  updateAlertStatus.mutate(
+    { id: pendingUndo.id, status: pendingUndo.previousStatus },
+    {
+      onSuccess: () => {
+        setPendingUndo(null);
+        setUndoSeconds(0);
+      },
+      onError: (error) =>
+        setAlertStatusError(error instanceof Error ? error.message : "Could not restore the previous alert status."),
+    }
+  );
 }
 
   async function handleDownloadRiskLog() {
@@ -218,8 +235,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <QuickActions />
-
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
@@ -240,9 +255,9 @@ export default function Dashboard() {
         />
 
         <KpiCard
-          label="Active alerts"
+          label="Unresolved alerts"
           value={kpis.activeAlerts}
-          sublabel="open events"
+          sublabel="not yet resolved"
           note={`${kpis.alertsBySeverity.high} high · ${kpis.alertsBySeverity.medium} medium`}
           icon={<Bell className="h-4 w-4" />}
         />
@@ -391,26 +406,32 @@ export default function Dashboard() {
               <AlertCard
                 key={alert.id}
                 alert={alert}
-                onDismiss={handleDismissAlert}
+                onResolve={handleResolveAlert}
                 onInvestigate={() => handleInvestigateAlert(alert.id)}
+                isUpdating={updateAlertStatus.isPending}
               />
             ))}
           </div>
         </section>
       </div>
 
-      {/* Dismiss confirmation / Undo */}
-      {pendingUndoId && (
+      {pendingUndo && (
   <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card">
-    <span>Alert dismissed</span>
+    <span>Alert resolved</span>
     <button
-      onClick={handleUndoDismiss}
+      onClick={handleUndoResolve}
+      disabled={updateAlertStatus.isPending}
       className="font-semibold text-tertiary-300 hover:text-tertiary-200"
     >
       Undo <span className="text-neutral-400">({undoSeconds}s)</span>
     </button>
   </div>
 )}
+      {alertStatusError && (
+        <div role="alert" className="fixed bottom-6 left-6 z-50 rounded-lg bg-red-700 px-4 py-3 text-sm text-white shadow-card">
+          {alertStatusError}
+        </div>
+      )}
     </div>
   );
 }
