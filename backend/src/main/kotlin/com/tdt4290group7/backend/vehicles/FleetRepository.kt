@@ -33,105 +33,6 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         return database.read { changes(it, page) }
     }
 
-    fun procurementContracts(supplierId: String? = null): List<ProcurementContract> = database.read { db ->
-        val filter = if (supplierId == null) "" else "AND c.supplier_id = ?"
-        val parameters = if (supplierId == null) emptyList() else listOf(supplierId)
-        database.query(
-            db,
-            """SELECT c.id, c.supplier_id, s.name AS supplier_name, s.org_number,
-                c.name, c.reference, c.start_date, c.end_date
-                FROM procurement_contracts c JOIN suppliers s ON s.id = c.supplier_id
-                WHERE s.active = 1 $filter ORDER BY s.name COLLATE NOCASE, c.name COLLATE NOCASE""",
-            parameters,
-            ::procurementContract,
-        )
-    }
-
-    fun procurementContract(id: String): ProcurementContract? = database.read { db ->
-        database.query(
-            db,
-            """SELECT c.id, c.supplier_id, s.name AS supplier_name, s.org_number,
-                c.name, c.reference, c.start_date, c.end_date
-                FROM procurement_contracts c JOIN suppliers s ON s.id = c.supplier_id
-                WHERE c.id = ? AND s.active = 1""",
-            listOf(id),
-            ::procurementContract,
-        ).firstOrNull()
-    }
-
-    fun previewContractCsv(supplierId: String, csv: String): ContractCsvPreview = database.read { db ->
-        validateContractCsv(db, supplierId, csv)
-    }
-
-    fun importContractCsv(supplierId: String, csv: String): ContractCsvImportResult = database.write { db ->
-        val preview = validateContractCsv(db, supplierId, csv)
-        if (preview.issues.isNotEmpty() || preview.validRows.isEmpty()) {
-            throw ContractCsvValidationException(
-                if (preview.issues.isEmpty()) {
-                    preview.copy(issues = listOf(ContractCsvIssue(1, "file", "CSV contains no contract rows")))
-                } else {
-                    preview
-                },
-            )
-        }
-
-        preview.validRows.forEach { row ->
-            database.insert(
-                db,
-                "procurement_contracts",
-                mapOf(
-                    "id" to UUID.randomUUID().toString(),
-                    "supplier_id" to supplierId,
-                    "name" to row.name,
-                    "reference" to row.reference,
-                    "start_date" to row.startDate,
-                    "end_date" to row.endDate,
-                ),
-            )
-        }
-        val contracts = database.query(
-            db,
-            """SELECT c.id, c.supplier_id, s.name AS supplier_name, s.org_number,
-                c.name, c.reference, c.start_date, c.end_date
-                FROM procurement_contracts c JOIN suppliers s ON s.id = c.supplier_id
-                WHERE c.supplier_id = ? ORDER BY c.name COLLATE NOCASE""",
-            listOf(supplierId),
-            ::procurementContract,
-        )
-        ContractCsvImportResult(preview.validRows.size, contracts)
-    }
-
-    private fun validateContractCsv(db: Connection, supplierId: String, csv: String): ContractCsvPreview {
-        var preview = parseContractCsv(csv)
-        val supplierExists = database.query(
-            db,
-            "SELECT id FROM suppliers WHERE id = ? AND active = 1",
-            listOf(supplierId),
-        ) { it.getString(1) }.isNotEmpty()
-        if (!supplierExists) {
-            return preview.copy(
-                issues = preview.issues + ContractCsvIssue(0, "supplierId", "Select an active supplier before importing contracts"),
-            )
-        }
-        if (preview.validRows.isEmpty()) return preview
-
-        val existingReferences = database.query(
-            db,
-            "SELECT reference FROM procurement_contracts WHERE supplier_id = ?",
-            listOf(supplierId),
-        ) { it.getString(1).lowercase() }.toSet()
-        val duplicateRows = preview.validRows.filter { it.reference.lowercase() in existingReferences }
-        if (duplicateRows.isNotEmpty()) {
-            preview = preview.copy(
-                validRows = preview.validRows - duplicateRows.toSet(),
-                issues = preview.issues + duplicateRows.map {
-                    ContractCsvIssue(it.row, "contractReference", "This reference already exists for the selected supplier")
-                },
-            )
-        }
-        return preview
-    }
-
     fun saveSupplier(id: String?, input: SupplierInput, actor: ChangeActor, now: Instant, expectedUpdatedAt: String? = null): FleetSupplier {
         val name = input.name.trim()
         val org = input.orgNumber.replace(Regex("\\s"), "")
@@ -337,16 +238,6 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
     }
     private fun supplier(row: Map<String, Any?>) = FleetSupplier(row["id"] as String, row["name"] as String, row["org_number"] as String,
         row["active"] == 1, row["updated_at"] as String)
-    private fun procurementContract(row: ResultSet) = ProcurementContract(
-        id = row.getString("id"),
-        supplierId = row.getString("supplier_id"),
-        supplierName = row.getString("supplier_name"),
-        supplierOrgNumber = row.getString("org_number"),
-        name = row.getString("name"),
-        reference = row.getString("reference"),
-        startDate = row.getString("start_date"),
-        endDate = row.getString("end_date"),
-    )
     private fun agreement(row: Map<String, Any?>) = FleetAgreement(row["id"] as String, row["supplier_id"] as String,
         row["start_date"] as String, row["end_date"] as String, (row["allowed_vehicles"] as Number).toInt(), row["note"] as String,
         row["updated_at"] as String, row["active"] == 1)

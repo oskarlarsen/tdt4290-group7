@@ -15,7 +15,7 @@ tesseract --version
 tesseract --list-langs
 ```
 
-If the executable is not on `PATH`, set `TESSERACT_PATH` in root `.env` to its full path. The backend Docker image includes Tesseract and both language packs. At most two pages are rendered/OCRed concurrently; requests wait up to 30 seconds for a slot, and each Tesseract process has a 60-second timeout.
+If the executable is not on `PATH`, set `TESSERACT_PATH` in root `.env` to its full path. The backend Docker image includes Tesseract and both language packs. At most two Tesseract processes run concurrently; requests wait up to 30 seconds for a slot, and each process has a 60-second timeout.
 
 ## Run
 

@@ -17,7 +17,6 @@ import RiskAndPrediction from "../pages/admin/RiskAndPrediction";
 import Alerts from "../pages/admin/Alerts";
 import Reports from "../pages/admin/Reports";
 import SupplierDetails from "../pages/admin/SupplierDetails";
-import SupplierOnboarding from "../pages/admin/SupplierOnboarding";
 
 import SupplierDashboard from "../pages/supplier/Dashboard";
 import MyCompany from "../pages/supplier/MyCompany";
@@ -45,7 +44,6 @@ const router = createBrowserRouter([
       { path: "dashboard", element: <AdminDashboard /> },
       { path: "suppliers", element: <Suppliers /> },
       { path: "suppliers/:id", element: <SupplierDetails /> },
-      { path: "supplier-onboarding", element: <SupplierOnboarding /> },
       { path: "contracts", element: <Contracts /> },
       { path: "vehicles", element: <Vehicles /> },
       { path: "certificates", element: <Certificates /> },

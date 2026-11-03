@@ -57,9 +57,8 @@ fun Application.module(
     configureRateLimiting()
     val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
     val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
-    val fleetRepository = (vehicleRepository as? VehicleRepository)?.fleet ?: VehicleRepository(vehicleDatabasePath).fleet
     configureRouting(vehicleRepository, registry, cacheTtl)
     val certificateDatabasePath = Path.of(backendSetting("CERTIFICATE_DB_PATH") ?: "data/certificates.db")
-    configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath), fleetRepository)
+    configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath))
     configureAuthRoutes(logResetTokens)
 }

@@ -2,13 +2,13 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { FileText, Loader2, Upload, X } from "lucide-react";
 import { useUploadCertificate } from "../../hooks/useCertificates";
-import type { ProcurementContract } from "../../api/procurement";
+import type { DerivedContract } from "../../types/contract";
 
 export function CertificateUploadDialog({
   contracts,
   onClose,
 }: {
-  contracts: ProcurementContract[];
+  contracts: DerivedContract[];
   onClose: () => void;
 }) {
   const [contractId, setContractId] = useState("");
@@ -20,7 +20,7 @@ export function CertificateUploadDialog({
     event.preventDefault();
     if (!file || !selectedContract) return;
     upload.mutate(
-      { file, contractId: selectedContract.id },
+      { file, supplierName: selectedContract.supplierName, contractId: selectedContract.id },
       { onSuccess: onClose },
     );
   }
@@ -68,7 +68,7 @@ export function CertificateUploadDialog({
             <option value="">Select a supplier</option>
             {contracts.map((contract) => (
               <option key={contract.id} value={contract.id}>
-                {contract.supplierName} — {contract.name}
+                {contract.supplierName} — {contract.contractName}
               </option>
             ))}
           </select>

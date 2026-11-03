@@ -22,7 +22,6 @@ import { CertificateDetailsDrawer } from "../../components/certificates/Certific
 import { CertificateAttentionCard } from "../../components/certificates/CertificateAttentionCard";
 import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
 import { useDeleteCertificate } from "../../hooks/useCertificates";
-import { useProcurementContracts } from "../../hooks/useProcurementContracts";
 import type { Certificate } from "../../types/certificate";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -60,7 +59,6 @@ export default function Certificates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates();
   const { data: contracts, isLoading: contractsLoading, isError: contractsError } = useContracts();
-  const { data: procurementContracts, isLoading: procurementLoading, isError: procurementError } = useProcurementContracts();
   const removeCertificate = useDeleteCertificate();
 
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
@@ -93,24 +91,12 @@ export default function Certificates() {
   }
 
   const rows = useMemo<CertificateRow[]>(() => {
-    if (!certificates || !contracts || !procurementContracts) return [];
-    const contractById = new Map([
-      ...contracts.map((contract) => [contract.id, contract] as const),
-      ...procurementContracts.map((contract) => [
-        contract.id,
-        {
-          id: contract.id,
-          contractName: contract.name,
-          supplierId: contract.supplierId,
-          supplierName: contract.supplierName,
-          supplierOrgId: contract.supplierOrgNumber,
-        },
-      ] as const),
-    ]);
+    if (!certificates || !contracts) return [];
+    const contractById = new Map(contracts.map((c) => [c.id, c]));
     return certificates
       .map((certificate) => ({ certificate, contract: contractById.get(certificate.contractId) }))
       .sort(compareBySeverity);
-  }, [certificates, contracts, procurementContracts]);
+  }, [certificates, contracts]);
 
   const counts = useMemo(() => {
     const result: Record<CertificateFilter | "criticalExpired", number> = {
@@ -170,7 +156,7 @@ export default function Certificates() {
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pagedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
 
-  if (certsLoading || contractsLoading || procurementLoading) {
+  if (certsLoading || contractsLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-400">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -178,7 +164,7 @@ export default function Certificates() {
     );
   }
 
-  if (certsError || contractsError || procurementError || !certificates || !contracts || !procurementContracts) {
+  if (certsError || contractsError || !certificates || !contracts) {
     return <div className="text-sm text-red-700">Couldn't load certificates. Try again.</div>;
   }
 
@@ -356,11 +342,10 @@ export default function Certificates() {
 
       <CertificateDetailsDrawer row={selectedRow} onClose={() => setSelectedId(null)} />
 
-      {isUploadOpen && <CertificateUploadDialog contracts={procurementContracts} onClose={() => setUploadOpen(false)} />}
+      {isUploadOpen && <CertificateUploadDialog contracts={contracts} onClose={() => setUploadOpen(false)} />}
       {editingCertificate && (
         <CertificateEditDialog
           certificate={editingCertificate}
-          contracts={procurementContracts}
           onClose={() => setEditingCertificate(null)}
         />
       )}

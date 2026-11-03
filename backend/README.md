@@ -1,6 +1,6 @@
 # Backend
 
-Kotlin/Ktor API for authentication, vehicle agreements, supplier service-contract onboarding, reported statistics, Statens vegvesen checks and administrator certificate uploads. Fleet and service-contract records, and certificate metadata, are stored in SQLite; uploaded PDFs are processed and discarded.
+Kotlin/Ktor API for authentication, vehicle agreements, reported statistics, Statens vegvesen checks and administrator certificate uploads. Vehicle and certificate metadata are stored in SQLite; uploaded PDFs are processed and discarded.
 
 Follow the [project setup](../README.md#run-locally) for JDK 21, root `.env` configuration and startup. The [Docker instructions](../README.md#run-with-docker) run both services together.
 
@@ -30,11 +30,10 @@ The optional arguments set the sample count (1–60) and seed; reusing a seed re
 ## Storage and integrations
 
 - Native startup from `backend/` creates `data/vehicles.db`; Docker uses a persistent volume. Suppliers, agreements, statistics, checks and change history survive restarts.
-- Supplier service contracts are stored with fleet data in `vehicles.db`. The `procurement_contracts` table is created additively on startup, including for existing version-8 databases.
-- Certificate metadata is stored in its own SQLite database at `data/certificates.db` by default, independent of the vehicle database. Set `CERTIFICATE_DB_PATH` to choose another location. Uploads require an admin session and an active imported contract; only extracted metadata is retained.
+- Certificate metadata is stored in its own SQLite database at `data/certificates.db` by default, independent of the vehicle database. Set `CERTIFICATE_DB_PATH` to choose another location. Uploads require an admin session; only extracted metadata is retained.
 - Authentication accounts are seeded in memory. Restarting restores the configured account passwords and requires signing in again.
 - The registry key enables live Statens vegvesen requests. Adding/replacing registered vehicles requires a successful live lookup; planned entries do not.
-- Dashboard risk metrics, supplier-directory details and contract compliance demo data are frontend features. Imported service contracts are exposed separately and do not yet populate those demo metrics.
+- Dashboard, supplier-directory and contract demo data are frontend features. There are no backend APIs for the placeholder screens.
 
 If an existing vehicle database is incompatible, preserve it and configure another path; see [configuration and troubleshooting](../docs/configuration.md#troubleshooting).
 
