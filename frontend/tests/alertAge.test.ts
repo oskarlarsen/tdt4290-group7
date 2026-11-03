@@ -52,8 +52,12 @@ describe("alert creation date and age formatting", () => {
     });
   });
 
-  it("shows Description, Risk, and Created On in the table", () => {
-    const rowAlert = { ...alert, createdAt: new Date(2026, 10, 2, 12).toISOString() };
+  it("shows alert type alongside Description, Risk, and Created On in the table", () => {
+    const rowAlert = {
+      ...alert,
+      findingType: "CONFIRMED_DEVIATION" as const,
+      createdAt: new Date(2026, 10, 2, 12).toISOString(),
+    };
     const html = renderToStaticMarkup(
       createElement(AlertsTable, {
         rows: [{ alert: rowAlert }],
@@ -66,6 +70,8 @@ describe("alert creation date and age formatting", () => {
     expect(html).toMatch(/<th class="whitespace-nowrap pb-2 pr-3 font-medium">Created On<\/th>/);
     expect(html).not.toContain("Risk / Priority");
     expect(html).toContain(">Low</span>");
+    expect(html).toContain("Alert Type:");
+    expect(html).toContain("Confirmed Deviation");
     expect(html).toContain("aria-label=\"View details for Test alert\"");
     expect(html.indexOf(">Action</th>")).toBeLessThan(html.indexOf("aria-label=\"View details for Test alert\""));
     expect(html.indexOf("aria-label=\"View details for Test alert\""))
@@ -76,7 +82,11 @@ describe("alert creation date and age formatting", () => {
   });
 
   it("shows the creation date without an age field in alert details", () => {
-    const rowAlert = { ...alert, createdAt: new Date(2026, 10, 2, 12).toISOString() };
+    const rowAlert = {
+      ...alert,
+      findingType: "UPCOMING_EXPIRY" as const,
+      createdAt: new Date(2026, 10, 2, 12).toISOString(),
+    };
     const html = renderToStaticMarkup(
       createElement(
         MemoryRouter,
@@ -90,6 +100,8 @@ describe("alert creation date and age formatting", () => {
       )
     );
     expect(html).toContain(">Risk</span>");
+    expect(html).toContain("Alert Type:");
+    expect(html).toContain("Upcoming Expiry");
     expect(html).toContain("Created On");
     expect(html).not.toContain(">Age<");
     expect(html).toContain(formatAlertCreatedDate(rowAlert.createdAt));
@@ -146,7 +158,8 @@ describe("alert creation date and age formatting", () => {
         })
       )
     );
-    expect(html).toContain("Missing documentation");
+    expect(html).toContain("Alert Type:");
+    expect(html).toContain("Missing Documentation");
     expect(html).toContain("Missing documentation alone does not confirm a contractual violation.");
     expect(html).toContain("Supplier C");
     expect(html).toContain("Skolebygg Rehabilitering");

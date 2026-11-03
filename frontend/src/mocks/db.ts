@@ -170,8 +170,8 @@ export function addManualAlert(input: NewManualAlertInput): RecentAlert {
   const title = input.title.trim();
   const description = input.description.trim();
   const supplier = getTopRiskSuppliers().find((item) => item.id === input.supplierId);
-  if (!title || !description || !supplier) {
-    throw new Error("Alert title, description, and a valid supplier are required.");
+  if (!title || !description || !supplier || !input.findingType) {
+    throw new Error("Alert title, type, description, and a valid supplier are required.");
   }
 
   const createdAt = new Date().toISOString();
@@ -182,6 +182,7 @@ export function addManualAlert(input: NewManualAlertInput): RecentAlert {
     supplierId: supplier.id,
     category: input.category,
     severity: input.severity,
+    findingType: input.findingType,
     dueDate: input.dueDate || undefined,
     source: "MANUAL",
     status: "OPEN",

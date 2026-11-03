@@ -103,7 +103,8 @@ export function AlertDetailsDrawer({
 
               <Section title="Summary">
                 {alert.findingType && (
-                  <div className="mb-2">
+                  <div className="mb-2 flex flex-wrap items-center gap-1">
+                    <span className="text-xs text-neutral-500">Alert Type:</span>
                     <AlertFindingBadge findingType={alert.findingType} />
                   </div>
                 )}

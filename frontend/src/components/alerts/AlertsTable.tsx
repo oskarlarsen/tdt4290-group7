@@ -50,7 +50,8 @@ export function AlertsTable({
                   <div className="font-medium text-neutral-900">{alert.title}</div>
                   <div className="text-xs text-neutral-500">{alert.description}</div>
                   {alert.findingType && (
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <span className="text-xs text-neutral-500">Alert Type:</span>
                       <AlertFindingBadge findingType={alert.findingType} />
                     </div>
                   )}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { X } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { ALERT_CATEGORIES } from "../../types/dashboard";
 import type {
   AlertCategory,
+  AlertFindingType,
   AlertSeverity,
   NewManualAlertInput,
   TopRiskSupplier,
@@ -21,6 +22,40 @@ const SEVERITIES: { value: AlertSeverity; label: string }[] = [
   { value: "low", label: "Low" },
 ];
 
+const ALERT_TYPES: { value: AlertFindingType; label: string }[] = [
+  { value: "CONFIRMED_DEVIATION", label: "Confirmed Deviation" },
+  { value: "MISSING_DOCUMENTATION", label: "Missing Documentation" },
+  { value: "UPCOMING_EXPIRY", label: "Upcoming Expiry" },
+];
+
+export function parseEuropeanDueDate(value: string): string | undefined {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (!match) return undefined;
+
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText);
+  const month = Number(monthText);
+  const year = Number(yearText);
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return `${yearText}-${monthText}-${dayText}`;
+}
+
+function formatDueDateForInput(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
 type Props = {
   open: boolean;
   suppliers: TopRiskSupplier[];
@@ -34,8 +69,9 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
   const [supplierId, setSupplierId] = useState("");
   const [category, setCategory] = useState<AlertCategory | "">("");
   const [severity, setSeverity] = useState<AlertSeverity | "">("");
+  const [findingType, setFindingType] = useState<AlertFindingType | "">("");
   const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDateInput, setDueDateInput] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -51,8 +87,9 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
     setSupplierId("");
     setCategory("");
     setSeverity("");
+    setFindingType("");
     setDescription("");
-    setDueDate("");
+    setDueDateInput("");
     setError("");
   }
 
@@ -68,8 +105,13 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
 
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
-    if (!trimmedTitle || !supplierId || !category || !severity || !trimmedDescription) {
+    const dueDate = dueDateInput ? parseEuropeanDueDate(dueDateInput) : undefined;
+    if (!trimmedTitle || !supplierId || !category || !severity || !findingType || !trimmedDescription) {
       setError("Complete all required fields before creating the alert.");
+      return;
+    }
+    if (dueDateInput && !dueDate) {
+      setError("Enter a valid due date in DD/MM/YYYY format.");
       return;
     }
 
@@ -81,6 +123,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         supplierId,
         category,
         severity,
+        findingType,
         description: trimmedDescription,
         dueDate: dueDate || undefined,
       });
@@ -208,6 +251,24 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         </div>
 
         <label className={labelClassName}>
+          Alert Type *
+          <select
+            required
+            value={findingType}
+            onChange={(event) => {
+              const nextType = ALERT_TYPES.find((item) => item.value === event.target.value);
+              setFindingType(nextType?.value ?? "");
+            }}
+            className={fieldClassName}
+          >
+            <option value="">Select an alert type</option>
+            {ALERT_TYPES.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className={labelClassName}>
           Description *
           <textarea
             required
@@ -220,12 +281,28 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
 
         <label className={labelClassName}>
           Due Date
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
-            className={fieldClassName}
-          />
+          <span className="mt-1 flex gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="DD/MM/YYYY"
+              aria-label="Due Date (DD/MM/YYYY)"
+              value={dueDateInput}
+              onChange={(event) => setDueDateInput(event.target.value)}
+              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+            />
+            <span className="relative inline-flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-50">
+              <CalendarDays className="h-4 w-4" aria-hidden="true" />
+              <input
+                type="date"
+                aria-label="Choose due date"
+                value={parseEuropeanDueDate(dueDateInput) ?? ""}
+                onChange={(event) => setDueDateInput(formatDueDateForInput(event.target.value))}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </span>
+          </span>
+          <span className="sr-only">Enter date as day/month/year.</span>
         </label>
 
         <div className="flex justify-end gap-2 border-t border-neutral-100 pt-4">

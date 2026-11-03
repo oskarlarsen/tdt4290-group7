@@ -14,10 +14,10 @@ export const ALERT_STATUS_LABELS: Record<AlertStatus, string> = {
   RESOLVED: "Resolved",
 };
 
-const ALERT_FINDING_LABELS: Record<AlertFindingType, string> = {
-  CONFIRMED_DEVIATION: "Confirmed deviation",
-  MISSING_DOCUMENTATION: "Missing documentation",
-  UPCOMING_EXPIRY: "Upcoming expiry",
+export const ALERT_FINDING_LABELS: Record<AlertFindingType, string> = {
+  CONFIRMED_DEVIATION: "Confirmed Deviation",
+  MISSING_DOCUMENTATION: "Missing Documentation",
+  UPCOMING_EXPIRY: "Upcoming Expiry",
 };
 
 const ALERT_FINDING_CLASSES: Record<AlertFindingType, string> = {

@@ -1,6 +1,6 @@
 import { apiFetch } from "./client";
 import * as db from "../mocks/db";
-import type { DashboardSummary } from "../types/dashboard";
+import type { AlertStatus, DashboardSummary } from "../types/dashboard";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
@@ -16,7 +16,7 @@ export function getDashboardSummary(): Promise<DashboardSummary> {
         totalSuppliersDeltaThisMonth: supplierSummary.renewedThisMonthCount,
         highRiskSuppliers: riskClassification.high.count,
         monitoredSuppliers: supplierSummary.monitoredSuppliers,
-        activeAlerts: db.getActiveAlertsCount(),
+        activeAlerts: db.getUnresolvedAlertsCount(),
         alertsBySeverity: db.getAlertsBySeverity(),
         complianceRatePercent: riskClassification.compliant.percent,
         complianceTargetPercent: 95,
@@ -25,28 +25,17 @@ export function getDashboardSummary(): Promise<DashboardSummary> {
       topRiskSuppliers: db.getTopRiskSuppliers(),
       suppliersRequiringAttention: db.getSuppliersRequiringAttention(),
       issueCategoryBreakdown: db.getIssueCategoryBreakdown(),
-      recentAlerts: db.getActiveAlerts(),
+      recentAlerts: db.getUnresolvedAlerts(),
     });
   }
   return apiFetch<DashboardSummary>("/admin/dashboard/summary");
 }
-export function dismissAlert(id: string, dismissedBy: string): Promise<void> {
+export function updateAlertStatus(id: string, status: AlertStatus): Promise<void> {
   if (USE_MOCKS) {
-    db.dismissAlert(id, dismissedBy);
+    db.updateAlertStatus(id, status);
     return Promise.resolve();
   }
-  return apiFetch<void>(`/admin/alerts/${id}/dismiss`, {
-    method: "POST",
-    body: JSON.stringify({ dismissedBy }),
-  });
- }
-
-export function restoreAlert(id: string): Promise<void> {
-  if (USE_MOCKS) {
-    db.restoreAlert(id);
-    return Promise.resolve();
-  }
-  return apiFetch<void>(`/admin/alerts/${id}/restore`, { method: "POST" });
+  return Promise.reject(new Error("Alert status updates are not supported by the backend yet."));
 }
 
 export function resyncDashboard(): Promise<{ lastSyncedAt: string }> {

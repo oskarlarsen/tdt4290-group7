@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { CreateManualAlertDialog } from "../src/components/alerts/CreateManualAlertDialog";
+import {
+  CreateManualAlertDialog,
+  parseEuropeanDueDate,
+} from "../src/components/alerts/CreateManualAlertDialog";
 import { addManualAlert, deleteAlert, getAllAlerts, getAlertsBySeverity, getTopRiskSuppliers } from "../src/mocks/db";
 import { ALERT_CATEGORIES } from "../src/types/dashboard";
 import type { AlertSeverity } from "../src/types/dashboard";
@@ -27,8 +30,11 @@ describe("manual alert creation", () => {
     expect(html).toContain("Supplier *");
     expect(html).toContain("Risk Category *");
     expect(html).toContain("Risk *");
+    expect(html).toContain("Alert Type *");
     expect(html).toContain("Description *");
     expect(html).toContain("Due Date");
+    expect(html).toContain("DD/MM/YYYY");
+    expect(html).toContain('type="date"');
     expect(html).toContain("Cancel");
     expect(html).toContain("Create Alert");
     for (const category of [
@@ -40,6 +46,18 @@ describe("manual alert creation", () => {
       expect(html).toContain(category);
     }
     expect(ALERT_CATEGORIES).not.toContain("OTHER");
+    for (const type of ["Confirmed Deviation", "Missing Documentation", "Upcoming Expiry"]) {
+      expect(html).toContain(type);
+    }
+  });
+
+  it("interprets entered due dates as DD/MM/YYYY and preserves ISO values", () => {
+    expect(parseEuropeanDueDate("05/11/2026")).toBe("2026-11-05");
+    expect(parseEuropeanDueDate("29/02/2028")).toBe("2028-02-29");
+    expect(parseEuropeanDueDate("29/02/2027")).toBeUndefined();
+    expect(parseEuropeanDueDate("31/04/2026")).toBeUndefined();
+    expect(parseEuropeanDueDate("11/05/2026")).toBe("2026-05-11");
+    expect(parseEuropeanDueDate("2026-11-05")).toBeUndefined();
   });
 
   it("creates a manual OPEN alert associated with a supplier and includes it in counts", () => {
@@ -52,6 +70,7 @@ describe("manual alert creation", () => {
       supplierId: supplier.id,
       category: "ENVIRONMENTAL_COMPLIANCE",
       severity,
+      findingType: "MISSING_DOCUMENTATION",
       description: "  Review the submitted evidence.  ",
       dueDate: "2026-11-10",
     });
@@ -62,6 +81,7 @@ describe("manual alert creation", () => {
       supplierId: supplier.id,
       category: "ENVIRONMENTAL_COMPLIANCE",
       severity: "high",
+      findingType: "MISSING_DOCUMENTATION",
       dueDate: "2026-11-10",
       source: "MANUAL",
       status: "OPEN",
@@ -79,9 +99,10 @@ describe("manual alert creation", () => {
         supplierId: "unknown",
         category: "CERTIFICATES",
         severity: "low",
+        findingType: "UPCOMING_EXPIRY",
         description: "Description",
       })
-    ).toThrow("Alert title, description, and a valid supplier are required.");
+    ).toThrow("Alert title, type, description, and a valid supplier are required.");
   });
 
   it("permanently removes an alert from the mock alerts store", () => {
@@ -90,6 +111,7 @@ describe("manual alert creation", () => {
       supplierId: getTopRiskSuppliers()[0].id,
       category: "ENVIRONMENTAL_COMPLIANCE",
       severity: "low",
+      findingType: "CONFIRMED_DEVIATION",
       description: "Test deletion",
     });
     const indexBeforeDelete = getAllAlerts().findIndex((alert) => alert.id === created.id);
