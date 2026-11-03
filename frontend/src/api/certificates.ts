@@ -1,12 +1,85 @@
 import { apiFetch } from "./client";
-import * as db from "../mocks/db";
-import type { Certificate } from "../types/certificate";
+import type { Certificate, CertificateStandard } from "../types/certificate";
 
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+type CertificateResponse = {
+  id: string;
+  supplierName: string;
+  certificateType: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  sourceFile: string;
+  contractId: string | null;
+};
 
-// TODO(backend): GET /admin/certificates should return real per-contract
-// certificate records (Mercell attachments + certification-body registries).
-export function getCertificates(): Promise<Certificate[]> {
-  if (USE_MOCKS) return Promise.resolve(db.getCertificates());
-  return apiFetch<Certificate[]>("/admin/certificates");
+export type CertificateUpdate = {
+  supplierName: string;
+  certificateType: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  contractId: string | null;
+};
+
+function toStandard(value: string): CertificateStandard {
+  switch (value.trim().toLowerCase()) {
+    case "iso 14001":
+      return "iso-14001";
+    case "miljøfyrtårn":
+    case "miljofyrtarn":
+      return "miljofyrtarn";
+    case "grønt punkt norge":
+    case "gront punkt norge":
+      return "gront-punkt-norge";
+    case "retura":
+      return "retura";
+    case "kurs i økonomisk kjøring":
+    case "eco-driving course":
+      return "eco-driving-course";
+    default:
+      return "unknown";
+  }
+}
+
+function toCertificate(response: CertificateResponse): Certificate {
+  return {
+    id: response.id,
+    standard: toStandard(response.certificateType),
+    certificateNumber: null,
+    contractId: response.contractId ?? "",
+    validUntil: response.expiryDate,
+    supplierName: response.supplierName,
+    certificateType: response.certificateType,
+    issueDate: response.issueDate,
+    sourceFile: response.sourceFile,
+  };
+}
+
+export async function getCertificates(): Promise<Certificate[]> {
+  const certificates = await apiFetch<CertificateResponse[]>("/certificates");
+  return certificates.map(toCertificate);
+}
+
+export async function uploadCertificate(
+  file: File,
+  contractId: string,
+): Promise<Certificate> {
+  const form = new FormData();
+  form.append("contractId", contractId);
+  form.append("file", file);
+  const response = await apiFetch<CertificateResponse>("/certificates", {
+    method: "POST",
+    body: form,
+  });
+  return toCertificate(response);
+}
+
+export async function updateCertificate(id: string, updates: CertificateUpdate): Promise<Certificate> {
+  const response = await apiFetch<CertificateResponse>(`/certificates/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+  return toCertificate(response);
+}
+
+export function deleteCertificate(id: string): Promise<void> {
+  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

@@ -11,21 +11,26 @@ import {
   Plus,
   Search,
   ShieldCheck,
-  X,
 } from "lucide-react";
 import { useCertificates } from "../../hooks/useCertificates";
 import { useContracts } from "../../hooks/useContracts";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { CertificateTable } from "../../components/certificates/CertificateTable";
 import type { CertificateRow } from "../../components/certificates/CertificateTable";
+import { CertificateEditDialog } from "../../components/certificates/CertificateEditDialog";
 import { CertificateDetailsDrawer } from "../../components/certificates/CertificateDetailsDrawer";
 import { CertificateAttentionCard } from "../../components/certificates/CertificateAttentionCard";
+import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
+import { useDeleteCertificate } from "../../hooks/useCertificates";
+import { useProcurementContracts } from "../../hooks/useProcurementContracts";
+import type { Certificate } from "../../types/certificate";
 import {
   CERTIFICATE_STANDARD_LABELS,
   CERTIFICATE_THRESHOLDS,
   getCertificateStatus,
 } from "../../types/certificate";
 import { downloadCsv, toCsv } from "../../utils/csv";
+import { useSearchParams } from "react-router-dom";
 
 type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired";
 
@@ -52,22 +57,60 @@ function compareBySeverity(a: CertificateRow, b: CertificateRow): number {
 }
 
 export default function Certificates() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates();
   const { data: contracts, isLoading: contractsLoading, isError: contractsError } = useContracts();
+  const { data: procurementContracts, isLoading: procurementLoading, isError: procurementError } = useProcurementContracts();
+  const removeCertificate = useDeleteCertificate();
 
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isRecordInfoOpen, setIsRecordInfoOpen] = useState(false);
+  const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null);
+  const isUploadOpen = searchParams.get("upload") === "true";
+
+  function setUploadOpen(open: boolean) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (open) next.set("upload", "true");
+      else next.delete("upload");
+      return next;
+    });
+  }
+
+  function handleDelete(certificate: Certificate) {
+    const supplier = certificate.supplierName ?? "this supplier";
+    if (!window.confirm(`Delete the ${certificate.certificateType ?? "certificate"} for ${supplier}? This cannot be undone.`)) {
+      return;
+    }
+    removeCertificate.reset();
+    removeCertificate.mutate(certificate.id, {
+      onSuccess: () => {
+        if (selectedId === certificate.id) setSelectedId(null);
+      },
+    });
+  }
 
   const rows = useMemo<CertificateRow[]>(() => {
-    if (!certificates || !contracts) return [];
-    const contractById = new Map(contracts.map((c) => [c.id, c]));
+    if (!certificates || !contracts || !procurementContracts) return [];
+    const contractById = new Map([
+      ...contracts.map((contract) => [contract.id, contract] as const),
+      ...procurementContracts.map((contract) => [
+        contract.id,
+        {
+          id: contract.id,
+          contractName: contract.name,
+          supplierId: contract.supplierId,
+          supplierName: contract.supplierName,
+          supplierOrgId: contract.supplierOrgNumber,
+        },
+      ] as const),
+    ]);
     return certificates
       .map((certificate) => ({ certificate, contract: contractById.get(certificate.contractId) }))
       .sort(compareBySeverity);
-  }, [certificates, contracts]);
+  }, [certificates, contracts, procurementContracts]);
 
   const counts = useMemo(() => {
     const result: Record<CertificateFilter | "criticalExpired", number> = {
@@ -104,6 +147,7 @@ export default function Certificates() {
             query.length === 0 ||
             CERTIFICATE_STANDARD_LABELS[certificate.standard].toLowerCase().includes(query) ||
             (certificate.certificateNumber?.toLowerCase().includes(query) ?? false) ||
+            (certificate.supplierName?.toLowerCase().includes(query) ?? false) ||
             (contract?.supplierName.toLowerCase().includes(query) ?? false) ||
             (contract?.supplierOrgId.toLowerCase().includes(query) ?? false) ||
             (contract?.contractName.toLowerCase().includes(query) ?? false);
@@ -126,7 +170,7 @@ export default function Certificates() {
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pagedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
 
-  if (certsLoading || contractsLoading) {
+  if (certsLoading || contractsLoading || procurementLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-400">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -134,13 +178,13 @@ export default function Certificates() {
     );
   }
 
-  if (certsError || contractsError || !certificates || !contracts) {
+  if (certsError || contractsError || procurementError || !certificates || !contracts || !procurementContracts) {
     return <div className="text-sm text-red-700">Couldn't load certificates. Try again.</div>;
   }
 
   // Every KPI is a direct count over the certificate records.
   const total = certificates.length;
-  const contractCount = new Set(certificates.map((c) => c.contractId)).size;
+  const contractCount = new Set(certificates.map((c) => c.contractId).filter(Boolean)).size;
   const validPercent = total > 0 ? Math.round((counts.valid / total) * 100) : null;
   const selectedRow = rows.find((r) => r.certificate.id === selectedId) ?? null;
 
@@ -148,7 +192,7 @@ export default function Certificates() {
     if (filteredRows.length === 0) return;
     const csv = toCsv(
       filteredRows.map(({ certificate, contract }) => ({
-        Supplier: contract?.supplierName ?? "",
+        Supplier: contract?.supplierName ?? certificate.supplierName ?? "",
         "Org ID": contract?.supplierOrgId ?? "",
         Contract: contract?.contractName ?? "",
         Standard: CERTIFICATE_STANDARD_LABELS[certificate.standard],
@@ -182,11 +226,11 @@ export default function Certificates() {
             Export (CSV)
           </button>
           <button
-            onClick={() => setIsRecordInfoOpen(true)}
+            onClick={() => setUploadOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
           >
             <Plus className="h-3.5 w-3.5" />
-            Record Certificate
+            Upload certificate
           </button>
           </div>
         </div>
@@ -259,12 +303,21 @@ export default function Certificates() {
         <CertificateTable
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.certificate.id)}
+          onEdit={setEditingCertificate}
+          onDelete={handleDelete}
           emptyMessage={
             certificates.length === 0
               ? "No certificate records available."
               : "No certificates match the current filters."
           }
         />
+        {removeCertificate.isError && (
+          <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {removeCertificate.error instanceof Error
+              ? removeCertificate.error.message
+              : "Could not delete certificate."}
+          </p>
+        )}
 
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
@@ -303,47 +356,13 @@ export default function Certificates() {
 
       <CertificateDetailsDrawer row={selectedRow} onClose={() => setSelectedId(null)} />
 
-      {isRecordInfoOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/30 p-4"
-          onClick={() => setIsRecordInfoOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="record-certificate-title"
-            className="w-full max-w-md rounded-xl border border-neutral-100 bg-white p-4 shadow-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="record-certificate-title" className="font-headline text-lg font-semibold text-neutral-900">
-                  Record certificate
-                </h2>
-                <p className="mt-2 text-sm leading-5 text-neutral-600">
-                  Recording certificates isn't available yet. Certificate records are currently
-                  fictional mock data. A real flow would take documents from Mercell contract
-                  attachments and certification registries, neither of which is connected.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsRecordInfoOpen(false)}
-                aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setIsRecordInfoOpen(false)}
-                className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {isUploadOpen && <CertificateUploadDialog contracts={procurementContracts} onClose={() => setUploadOpen(false)} />}
+      {editingCertificate && (
+        <CertificateEditDialog
+          certificate={editingCertificate}
+          contracts={procurementContracts}
+          onClose={() => setEditingCertificate(null)}
+        />
       )}
     </div>
   );

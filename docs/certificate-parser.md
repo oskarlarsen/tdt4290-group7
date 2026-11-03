@@ -1,6 +1,8 @@
 # Certificate extraction and parsing
 
-The backend includes a standalone tool for extracting certificate text and parsing certificate type, issue dates, expiry date and missing fields. It is separate from the placeholder certificate page and has no upload API.
+The admin Certificates page can upload a PDF to the backend, which extracts certificate type and dates and stores the parsed metadata. The original PDF is discarded; review extracted values before treating them as compliance evidence. Uploads are limited to 8 MB and 25 pages; see the [certificate API](api.md#certificates).
+
+The backend also includes a standalone command-line tool for extracting certificate text and parsing certificate type, issue dates, expiry date and missing fields.
 
 ## Setup
 
@@ -13,7 +15,7 @@ tesseract --version
 tesseract --list-langs
 ```
 
-If the executable is not on `PATH`, set `TESSERACT_PATH` in root `.env` to its full path. The Docker images do not include Tesseract or the language data.
+If the executable is not on `PATH`, set `TESSERACT_PATH` in root `.env` to its full path. The backend Docker image includes Tesseract and both language packs. At most two pages are rendered/OCRed concurrently; requests wait up to 30 seconds for a slot, and each Tesseract process has a 60-second timeout.
 
 ## Run
 

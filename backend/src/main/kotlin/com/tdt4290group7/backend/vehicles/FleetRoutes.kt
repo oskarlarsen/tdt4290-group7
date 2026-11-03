@@ -30,6 +30,26 @@ internal suspend fun ApplicationCall.adminActor(): ChangeActor? {
 
 fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     get("/api/vehicle-fleet") { if (call.adminActor() != null) call.respond(fleet.overview()) }
+    get("/api/procurement/contracts") {
+        if (call.adminActor() == null) return@get
+        call.respond(fleet.procurementContracts(call.request.queryParameters["supplierId"]))
+    }
+    post("/api/procurement/contracts/preview") {
+        if (call.adminActor() == null) return@post
+        val request = decodeFleetRequest(call.receiveText(), ContractCsvRequest.serializer())
+        call.respond(fleet.previewContractCsv(request.supplierId, request.csv))
+    }
+    post("/api/procurement/contracts/import") {
+        if (call.adminActor() == null) return@post
+        val request = decodeFleetRequest(call.receiveText(), ContractCsvRequest.serializer())
+        val result = try {
+            fleet.importContractCsv(request.supplierId, request.csv)
+        } catch (cause: ContractCsvValidationException) {
+            call.respond(HttpStatusCode.Conflict, ApiError(cause.preview.issues.joinToString("; ") { "Row ${it.row}: ${it.message}" }))
+            return@post
+        }
+        call.respond(HttpStatusCode.Created, result)
+    }
     get("/api/vehicle-fleet/history") {
         if (call.adminActor() == null) return@get
         val rawPage = call.request.queryParameters["page"]

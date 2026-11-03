@@ -25,6 +25,17 @@ internal val fleetSchemaStatements = listOf(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_org ON suppliers(org_number)",
     "CREATE TABLE IF NOT EXISTS agreements (id TEXT PRIMARY KEY, ${agreementColumns(true)}) STRICT",
     "CREATE INDEX IF NOT EXISTS idx_agreement_supplier ON agreements(supplier_id)",
+    """CREATE TABLE IF NOT EXISTS procurement_contracts (
+        id TEXT PRIMARY KEY,
+        supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+        name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 200),
+        reference TEXT NOT NULL CHECK (length(trim(reference)) BETWEEN 1 AND 120),
+        start_date TEXT NOT NULL CHECK (date(start_date, '+0 days') = start_date),
+        end_date TEXT NOT NULL CHECK (date(end_date, '+0 days') = end_date),
+        CHECK (start_date <= end_date),
+        UNIQUE (supplier_id, reference)
+    ) STRICT""",
+    "CREATE INDEX IF NOT EXISTS idx_procurement_contract_supplier ON procurement_contracts(supplier_id)",
     "CREATE TABLE IF NOT EXISTS vehicles (registration_number TEXT PRIMARY KEY, ${vehicleColumns(true)}) STRICT",
     "CREATE INDEX IF NOT EXISTS idx_vehicle_agreement ON vehicles(agreement_id, listed)",
     """CREATE TABLE IF NOT EXISTS fleet_changes (

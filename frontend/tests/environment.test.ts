@@ -17,6 +17,7 @@ describe("shared environment configuration", () => {
     writeFileSync(join(directory, ".env"), [
       "VITE_API_BASE_URL=http://localhost:8080/api",
       "VITE_USE_MOCKS=false",
+      "VITE_USE_MOCK_AUTH=false",
       "JWT_SECRET=synthetic-jwt-secret",
       "SEED_ADMIN_PASSWORD=synthetic-admin-password",
       "SEED_SUPPLIER_PASSWORD=synthetic-supplier-password",
@@ -25,6 +26,7 @@ describe("shared environment configuration", () => {
     const browserSettings = loadEnv("development", directory, "VITE_");
     expect(browserSettings).toHaveProperty("VITE_API_BASE_URL");
     expect(browserSettings).toHaveProperty("VITE_USE_MOCKS");
+    expect(browserSettings).toHaveProperty("VITE_USE_MOCK_AUTH");
     for (const key of ["JWT_SECRET", "SEED_ADMIN_PASSWORD", "SEED_SUPPLIER_PASSWORD", "SVV_API_KEY"]) {
       expect(browserSettings).not.toHaveProperty(key);
     }

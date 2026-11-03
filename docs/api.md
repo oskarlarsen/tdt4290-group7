@@ -1,6 +1,6 @@
 # API reference
 
-The local API is at `http://localhost:8080`. Requests with bodies use JSON. This reference covers implemented endpoints; the frontend's prototype APIs for other screens are not implemented on the backend.
+The local API is at `http://localhost:8080`. JSON is used except for certificate PDF uploads, which use multipart form data. This reference covers implemented endpoints; the frontend's prototype APIs for other screens are not implemented on the backend.
 
 ## Authentication
 
@@ -28,6 +28,23 @@ Password-reset email delivery is not connected. For local testing, enable `APP_E
 
 Sign-in/reset requests are rate-limited. Repeated failed sign-ins also lock the account temporarily; `429` responses include retry guidance. Seed accounts and password changes are in memory and reset on backend restart.
 
+## Certificates
+
+Certificate routes require an administrator session.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/certificates` | List extracted certificate metadata, most urgent first. |
+| POST | `/api/certificates` | Upload one PDF, extract its certificate type and dates, and store the metadata. |
+| PUT | `/api/certificates/{id}` | Correct certificate type, dates and active contract. |
+| DELETE | `/api/certificates/{id}` | Delete certificate metadata. |
+
+`POST /api/certificates` accepts `multipart/form-data` fields `file` and `contractId`. The contract must be an active imported service contract; supplier name is taken from that record rather than from the request. Uploads are limited to 8 MB and 25 pages. Text-based PDFs use PDFBox; scanned pages require Tesseract with Norwegian and English language data. The response includes the parsed `certificateType`, `issueDate`, `expiryDate`, `sourceFile`, `contractId` and recalculated status. Check parsed values before relying on them as compliance evidence.
+
+`PUT /api/certificates/{id}` accepts JSON fields `supplierName`, `certificateType`, optional `issueDate`, `expiryDate` and `contractId`. The contract ID must reference an active imported contract, and the supplier is derived from it. Dates use `YYYY-MM-DD`; issue date cannot be after expiry. `DELETE` returns `204` when the record is removed.
+
+The original PDF is discarded. The certificate page offers imported service contracts, and the backend verifies the contract association. Certificate records and supplier contracts are held in separate SQLite databases, so the association is validated by the API rather than a cross-database foreign key. Certificates are not linked to external certification registries.
+
 ## Fleet management
 
 An agreement belongs to a supplier and specifies dates and vehicle allowance. Vehicles are added to an agreement as registered vehicles or planned entries.
@@ -51,6 +68,27 @@ For example, create a supplier:
 ```json
 { "name": "Example Transport", "orgNumber": "123456789" }
 ```
+
+### Import supplier service contracts
+
+These are procurement/service contracts, not the vehicle `agreements` above. All endpoints require an administrator session.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/procurement/contracts` | List active suppliers' imported service contracts; optionally filter with `?supplierId=...`. |
+| POST | `/api/procurement/contracts/preview` | Validate CSV text without writing records. |
+| POST | `/api/procurement/contracts/import` | Atomically validate and import all rows. |
+
+Preview and import accept:
+
+```json
+{
+  "supplierId": "returned-supplier-id",
+  "csv": "contractName,contractReference,startDate,endDate\nWaste collection,WS-2026,2026-01-01,2026-12-31"
+}
+```
+
+The CSV header must match exactly and stay in this order: `contractName,contractReference,startDate,endDate`. Fields follow standard CSV quoting rules; dates use `YYYY-MM-DD`. Names are limited to 200 characters, references to 120; references must be unique per supplier. The upload is limited to 2 MB and 5,000 data rows. Preview returns `validRows` and `issues`; any issue blocks import. Import revalidates in a transaction, so duplicate/racing or invalid data cannot leave a partial import.
 
 Use the returned supplier `id` to create an agreement:
 

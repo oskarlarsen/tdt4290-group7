@@ -6,8 +6,16 @@ import org.apache.pdfbox.rendering.PDFRenderer
 import org.apache.pdfbox.rendering.ImageType
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import java.awt.image.BufferedImage
+
+private const val TESSERACT_MAX_CONCURRENT_PROCESSES = 2
+private const val TESSERACT_QUEUE_TIMEOUT_SECONDS = 30L
+private const val TESSERACT_PROCESS_TIMEOUT_SECONDS = 60L
+private val tesseractSlots = Semaphore(TESSERACT_MAX_CONCURRENT_PROCESSES, true)
 
 fun extractText(pdfFile: File): String {
     val document = Loader.loadPDF(pdfFile)
@@ -43,19 +51,22 @@ fun extractTextWithOcr(pdfFile: File, languages: String = "eng+nor", dpi: Int = 
             if (nativeText.length >= 30) {
                 pageTexts.add(nativeText)
             } else {
-                // Render page to image and run OCR
-                val image: BufferedImage = renderer.renderImageWithDPI(pageIndex - 1, dpi.toFloat(), ImageType.RGB)
-                val preprocessed = preprocessForOcr(image)
-
-                val tempImage = File.createTempFile("pdf_page_${pageIndex}", ".png")
-                tempImage.deleteOnExit()
-                ImageIO.write(preprocessed, "png", tempImage)
-
-                val ocrText = runTesseract(tempImage, languages)
-                pageTexts.add(ocrText.trim())
-
-                // cleanup
-                try { tempImage.delete() } catch (_: Exception) {}
+                pageTexts.add(
+                    withTesseractSlot {
+                        val image: BufferedImage =
+                            renderer.renderImageWithDPI(pageIndex - 1, dpi.toFloat(), ImageType.RGB)
+                        val preprocessed = preprocessForOcr(image)
+                        val tempImage = Files.createTempFile("pdf_page_${pageIndex}_", ".png")
+                        try {
+                            check(ImageIO.write(preprocessed, "png", tempImage.toFile())) {
+                                "PNG image writer is unavailable"
+                            }
+                            runTesseract(tempImage.toFile(), languages).trim()
+                        } finally {
+                            Files.deleteIfExists(tempImage)
+                        }
+                    },
+                )
             }
         }
     }
@@ -124,6 +135,22 @@ internal fun preprocessForOcr(img: BufferedImage): BufferedImage {
     return enhanced
 }
 
+private fun <T> withTesseractSlot(action: () -> T): T {
+    val acquired = try {
+        tesseractSlots.tryAcquire(TESSERACT_QUEUE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    } catch (cause: InterruptedException) {
+        Thread.currentThread().interrupt()
+        throw IllegalStateException("Interrupted while waiting for an OCR slot", cause)
+    }
+    check(acquired) { "OCR capacity is temporarily full; try again shortly" }
+
+    try {
+        return action()
+    } finally {
+        tesseractSlots.release()
+    }
+}
+
 private fun runTesseract(imageFile: File, languages: String): String {
     val executable = com.tdt4290group7.backend.backendSetting("TESSERACT_PATH")
         ?.takeIf { it.isNotBlank() }
@@ -132,24 +159,54 @@ private fun runTesseract(imageFile: File, languages: String): String {
             ?.takeIf { it.isFile }
             ?.absolutePath
         ?: "tesseract"
-    val process = try {
-        ProcessBuilder(
-            executable, imageFile.absolutePath, "stdout", "-l", languages, "--psm", "11"
-        ).redirectErrorStream(true).start()
-    } catch (e: IOException) {
-        throw IllegalStateException(
-            "Could not start Tesseract. Install Tesseract and add it to PATH, " +
-                "or set TESSERACT_PATH to the full path of tesseract.exe.",
-            e
-        )
-    }
+    val outputFile = Files.createTempFile("tesseract-output-", ".txt")
+    try {
+        val process = try {
+            ProcessBuilder(
+                executable, imageFile.absolutePath, "stdout", "-l", languages, "--psm", "11",
+            ).redirectErrorStream(true).redirectOutput(outputFile.toFile()).start()
+        } catch (cause: IOException) {
+            throw IllegalStateException(
+                "Could not start Tesseract. Install it and add it to PATH, or set TESSERACT_PATH.",
+                cause,
+            )
+        }
 
-    val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-    val exitCode = process.waitFor()
-    check(exitCode == 0) {
-        "Tesseract exited with code $exitCode for ${imageFile.absolutePath}: $output"
+        val completed = try {
+            process.waitFor(TESSERACT_PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } catch (cause: InterruptedException) {
+            terminateTesseract(process)
+            Thread.currentThread().interrupt()
+            throw IllegalStateException("Interrupted while waiting for Tesseract", cause)
+        }
+        if (!completed) {
+            terminateTesseract(process)
+            throw IllegalStateException(
+                "Tesseract exceeded its $TESSERACT_PROCESS_TIMEOUT_SECONDS-second timeout",
+            )
+        }
+
+        val output = Files.readString(outputFile, Charsets.UTF_8)
+        check(process.exitValue() == 0) {
+            "Tesseract exited with code ${process.exitValue()} for ${imageFile.absolutePath}: $output"
+        }
+        return output
+    } finally {
+        Files.deleteIfExists(outputFile)
     }
-    return output
+}
+
+private fun terminateTesseract(process: Process) {
+    process.destroyForcibly()
+    var interrupted = false
+    while (process.isAlive) {
+        try {
+            process.waitFor()
+        } catch (_: InterruptedException) {
+            interrupted = true
+        }
+    }
+    if (interrupted) Thread.currentThread().interrupt()
 }
 
 fun main_old() {

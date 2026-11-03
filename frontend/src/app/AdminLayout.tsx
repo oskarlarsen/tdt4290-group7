@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
+  UserRoundPlus,
   FileText,
   Truck,
   BadgeCheck,
@@ -16,6 +17,7 @@ import { ProfileMenu } from "../components/ui/ProfileMenu";
 const NAV = [
   { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "suppliers", label: "Suppliers", icon: Users },
+  { to: "supplier-onboarding", label: "Supplier onboarding", icon: UserRoundPlus },
   { to: "contracts", label: "Contracts", icon: FileText },
   { to: "vehicles", label: "Vehicles", icon: Truck },
   { to: "certificates", label: "Environmental Certificates", icon: BadgeCheck },

@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from "lucide-react";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -6,17 +7,26 @@ import {
 } from "../../types/certificate";
 import type { Certificate } from "../../types/certificate";
 import type { DerivedContract } from "../../types/contract";
+import type { RiskCategory } from "../../types/risk";
 
 // contract is optional: shown "where available" if a certificate's contract can't be found.
-export type CertificateRow = { certificate: Certificate; contract?: DerivedContract };
+export type CertificateContract = Pick<
+  DerivedContract,
+  "id" | "contractName" | "supplierId" | "supplierName" | "supplierOrgId"
+> & { risk?: RiskCategory };
+export type CertificateRow = { certificate: Certificate; contract?: CertificateContract };
 
 export function CertificateTable({
   rows,
   onSelect,
+  onEdit,
+  onDelete,
   emptyMessage = "No certificates to show.",
 }: {
   rows: CertificateRow[];
   onSelect: (row: CertificateRow) => void;
+  onEdit: (certificate: Certificate) => void;
+  onDelete: (certificate: Certificate) => void;
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
@@ -33,7 +43,7 @@ export function CertificateTable({
             <th className="pb-2 pr-3 font-medium">Contract</th>
             <th className="pb-2 pr-3 font-medium">Valid until</th>
             <th className="pb-2 pr-3 font-medium">Status</th>
-            <th className="pb-2 font-medium">Action</th>
+            <th className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -43,10 +53,14 @@ export function CertificateTable({
             return (
               <tr key={certificate.id} className="border-t border-neutral-100">
                 <td className="py-3 pr-3">
-                  {contract ? (
+                  {contract || certificate.supplierName ? (
                     <>
-                      <div className="font-medium text-neutral-900">{contract.supplierName}</div>
-                      <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                      <div className="font-medium text-neutral-900">
+                        {contract?.supplierName ?? certificate.supplierName}
+                      </div>
+                      {contract?.supplierOrgId && (
+                        <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                      )}
                     </>
                   ) : (
                     <span className="text-xs text-neutral-400">Contract not found</span>
@@ -60,7 +74,7 @@ export function CertificateTable({
                     {certificate.certificateNumber ?? "No certificate on file"}
                   </div>
                 </td>
-                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "—"}</td>
+                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "Not linked"}</td>
                 <td
                   className={`whitespace-nowrap py-3 pr-3 ${
                     info.status === "expired" ? "font-semibold text-red-700" : "text-neutral-700"
@@ -72,12 +86,30 @@ export function CertificateTable({
                   <StatusBadge status={info.tone} label={info.label} />
                 </td>
                 <td className="py-3">
-                  <button
-                    onClick={() => onSelect(row)}
-                    className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-                  >
-                    View Details
-                  </button>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      onClick={() => onSelect(row)}
+                      className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+                    >
+                      View Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(certificate)}
+                      aria-label={`Edit ${certificate.supplierName ?? "certificate"}`}
+                      className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(certificate)}
+                      aria-label={`Delete ${certificate.supplierName ?? "certificate"}`}
+                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
