@@ -7,6 +7,8 @@ import { ContractComplianceSummary } from "../../components/contracts/ContractCo
 import { KpiCard } from "../../components/ui/KpiCard";
 import type { DerivedContract } from "../../types/contract";
 import { downloadCsv, toCsv } from "../../utils/csv";
+import { useProcurementContracts } from "../../hooks/useProcurementContracts";
+import { Link } from "react-router-dom";
 
 type ContractStatusFilter = "all" | DerivedContract["status"];
 type ComplianceFilter = "all" | DerivedContract["risk"];
@@ -15,6 +17,7 @@ const CONTRACTS_PAGE_SIZE = 3;
 
 export default function Contracts() {
   const { data: contracts, isLoading, isError } = useContracts();
+  const { data: importedContracts, isError: importedContractsError } = useProcurementContracts();
   const [contractStatusFilter, setContractStatusFilter] = useState<ContractStatusFilter>("all");
   const [complianceFilter, setComplianceFilter] = useState<ComplianceFilter>("all");
   const [search, setSearch] = useState("");
@@ -434,6 +437,48 @@ export default function Contracts() {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-neutral-100 bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-headline text-base font-semibold text-neutral-900">Imported supplier contracts</h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              Persisted contracts from supplier onboarding. These records are separate from the demo compliance metrics above.
+            </p>
+          </div>
+          <Link to="/admin/supplier-onboarding" className="text-xs font-medium text-primary-900 hover:underline">
+            Manage onboarding
+          </Link>
+        </div>
+        {importedContractsError ? (
+          <p role="alert" className="py-4 text-sm text-red-700">Could not load imported contracts.</p>
+        ) : !importedContracts || importedContracts.length === 0 ? (
+          <p className="py-4 text-center text-sm text-neutral-400">No imported supplier contracts yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
+                <th className="pb-2 pr-3 font-medium">Contract</th>
+                <th className="pb-2 pr-3 font-medium">Reference</th>
+                <th className="pb-2 pr-3 font-medium">Supplier</th>
+                <th className="pb-2 pr-3 font-medium">Org. number</th>
+                <th className="pb-2 pr-3 font-medium">Start date</th>
+                <th className="pb-2 font-medium">End date</th>
+              </tr></thead>
+              <tbody>{importedContracts.map((contract) => (
+                <tr key={contract.id} className="border-t border-neutral-100">
+                  <td className="py-3 pr-3 font-medium text-neutral-900">{contract.name}</td>
+                  <td className="py-3 pr-3 font-mono text-xs text-neutral-600">{contract.reference}</td>
+                  <td className="py-3 pr-3 text-neutral-700">{contract.supplierName}</td>
+                  <td className="py-3 pr-3 font-mono text-xs text-neutral-500">{contract.supplierOrgNumber}</td>
+                  <td className="whitespace-nowrap py-3 pr-3 text-neutral-700">{contract.startDate}</td>
+                  <td className="whitespace-nowrap py-3 text-neutral-700">{contract.endDate}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <ContractComplianceSummary contracts={contracts ?? []} onViewDetails={setSelectedContract} />

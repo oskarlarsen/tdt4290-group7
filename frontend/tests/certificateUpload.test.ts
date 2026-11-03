@@ -27,7 +27,6 @@ describe("certificate API", () => {
 
     const uploaded = await uploadCertificate(
       new File(["pdf"], "iso-14001.pdf", { type: "application/pdf" }),
-      "Example Transport AS",
       "sup-a",
     );
 
@@ -38,6 +37,7 @@ describe("certificate API", () => {
     expect(options.body).toBeInstanceOf(FormData);
     expect(new Headers(options.headers).has("Content-Type")).toBe(false);
     expect(options.body.get("contractId")).toBe("sup-a");
+    expect(options.body.has("supplierName")).toBe(false);
     expect(uploaded).toMatchObject({
       id: "certificate-1",
       supplierName: "Example Transport AS",

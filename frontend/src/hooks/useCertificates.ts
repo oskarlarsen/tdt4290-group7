@@ -18,8 +18,8 @@ export function useCertificates() {
 export function useUploadCertificate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, supplierName, contractId }: { file: File; supplierName: string; contractId: string }) =>
-      uploadCertificate(file, supplierName, contractId),
+    mutationFn: ({ file, contractId }: { file: File; contractId: string }) =>
+      uploadCertificate(file, contractId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["certificates"] }),
   });
 }

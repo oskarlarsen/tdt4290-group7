@@ -7,9 +7,14 @@ import {
 } from "../../types/certificate";
 import type { Certificate } from "../../types/certificate";
 import type { DerivedContract } from "../../types/contract";
+import type { RiskCategory } from "../../types/risk";
 
 // contract is optional: shown "where available" if a certificate's contract can't be found.
-export type CertificateRow = { certificate: Certificate; contract?: DerivedContract };
+export type CertificateContract = Pick<
+  DerivedContract,
+  "id" | "contractName" | "supplierId" | "supplierName" | "supplierOrgId"
+> & { risk?: RiskCategory };
+export type CertificateRow = { certificate: Certificate; contract?: CertificateContract };
 
 export function CertificateTable({
   rows,

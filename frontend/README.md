@@ -4,10 +4,11 @@ React, TypeScript and Vite application with admin and supplier workspaces. See t
 
 ## Certificates
 
-- Upload a supplier certificate as a PDF (up to 8 MB and 25 pages). The backend extracts its type and issue/expiry dates and shows its current status, sorted by urgency. The overview also shows the contract reference; **Details** reveals the source filename and record ID.
+- Admins create suppliers and import service contracts through the [supplier onboarding flow](../docs/supplier-onboarding.md). The certificate upload and edit forms select an active imported contract; the backend derives its supplier and validates that link.
+- Upload a supplier certificate as a PDF (up to 8 MB and 25 pages). The backend extracts its type and issue/expiry dates and shows its current status, sorted by urgency. **Details** reveals the source filename and linked supplier/contract.
 - Scanned PDFs require Tesseract OCR configured on the backend; searchable PDFs use native text extraction.
 - The original PDF is discarded after processing. Extracted metadata is saved in the SQLite database and survives backend restarts. Confirm parser results against the source before taking action; a missing expiry date is flagged for review.
-- Administrators can edit supplier, certificate type, issue/expiry dates, and contract reference, or delete a certificate after confirmation. Editing metadata does not reprocess the PDF; upload the document again if its extracted details need to be refreshed.
+- Administrators can edit certificate type, issue/expiry dates and its linked active contract, or delete a certificate after confirmation. Editing metadata does not reprocess the PDF; upload the document again if its extracted details need to be refreshed.
 - Certificate routes require a real administrator login. They are not served by mock data or mock authentication.
 
 ## Development
@@ -29,7 +30,7 @@ Open `http://localhost:5173`.
 
 ## Data and workflows
 
-The default setup combines demo data (`VITE_USE_MOCKS=true`) with backend sign-in (`VITE_MOCK_AUTH=false`). Vehicles always uses the backend. Setting `VITE_USE_MOCKS=false` prevents Dashboard, Suppliers and Contracts from loading data because their backend endpoints are not implemented.
+The default setup uses backend data and sign-in (`VITE_USE_MOCKS=false`, `VITE_USE_MOCK_AUTH=false`). Set `VITE_USE_MOCKS=true` to enable demo data on prototype pages; Vehicles and Certificates always use the backend.
 
 In Vehicles, the structure is:
 
@@ -42,7 +43,7 @@ flowchart LR
 
 Create a supplier, then an agreement, then add vehicles within that agreement. Planned entries reserve spaces before registration numbers are known. Registered entries require a working registry integration. Vehicle details bring together reported statistics, checks and saved evidence; agreement and vehicle-list changes have a separate change history.
 
-Demo supplier notes and follow-up status are stored in the browser. Demo alert changes are held in memory and reset on a page reload. These demo records do not populate the vehicle directory.
+Demo supplier notes and follow-up status are stored in the browser. Demo alert changes are held in memory and reset on a page reload. These demo records do not populate the vehicle directory. Imported supplier contracts are backend data and are shown separately from the demo contract metrics.
 
 ## Code navigation
 

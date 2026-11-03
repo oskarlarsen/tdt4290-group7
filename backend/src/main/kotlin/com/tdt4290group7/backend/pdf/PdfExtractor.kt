@@ -51,19 +51,22 @@ fun extractTextWithOcr(pdfFile: File, languages: String = "eng+nor", dpi: Int = 
             if (nativeText.length >= 30) {
                 pageTexts.add(nativeText)
             } else {
-                // Render page to image and run OCR
-                val image: BufferedImage = renderer.renderImageWithDPI(pageIndex - 1, dpi.toFloat(), ImageType.RGB)
-                val preprocessed = preprocessForOcr(image)
-
-                val tempImage = File.createTempFile("pdf_page_${pageIndex}", ".png")
-                tempImage.deleteOnExit()
-                ImageIO.write(preprocessed, "png", tempImage)
-
-                val ocrText = runTesseract(tempImage, languages)
-                pageTexts.add(ocrText.trim())
-
-                // cleanup
-                try { tempImage.delete() } catch (_: Exception) {}
+                pageTexts.add(
+                    withTesseractSlot {
+                        val image: BufferedImage =
+                            renderer.renderImageWithDPI(pageIndex - 1, dpi.toFloat(), ImageType.RGB)
+                        val preprocessed = preprocessForOcr(image)
+                        val tempImage = Files.createTempFile("pdf_page_${pageIndex}_", ".png")
+                        try {
+                            check(ImageIO.write(preprocessed, "png", tempImage.toFile())) {
+                                "PNG image writer is unavailable"
+                            }
+                            runTesseract(tempImage.toFile(), languages).trim()
+                        } finally {
+                            Files.deleteIfExists(tempImage)
+                        }
+                    },
+                )
             }
         }
     }
@@ -132,14 +135,7 @@ internal fun preprocessForOcr(img: BufferedImage): BufferedImage {
     return enhanced
 }
 
-private fun runTesseract(imageFile: File, languages: String): String {
-    val executable = com.tdt4290group7.backend.backendSetting("TESSERACT_PATH")
-        ?.takeIf { it.isNotBlank() }
-        ?: System.getenv("ProgramFiles")
-            ?.let { File(File(it, "Tesseract-OCR"), "tesseract.exe") }
-            ?.takeIf { it.isFile }
-            ?.absolutePath
-        ?: "tesseract"
+private fun <T> withTesseractSlot(action: () -> T): T {
     val acquired = try {
         tesseractSlots.tryAcquire(TESSERACT_QUEUE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     } catch (cause: InterruptedException) {
@@ -149,38 +145,68 @@ private fun runTesseract(imageFile: File, languages: String): String {
     check(acquired) { "OCR capacity is temporarily full; try again shortly" }
 
     try {
-        val outputFile = Files.createTempFile("tesseract-output-", ".txt")
-        try {
-            val process = try {
-                ProcessBuilder(
-                    executable, imageFile.absolutePath, "stdout", "-l", languages, "--psm", "11",
-                ).redirectErrorStream(true).redirectOutput(outputFile.toFile()).start()
-            } catch (cause: IOException) {
-                throw IllegalStateException(
-                    "Could not start Tesseract. Install it and add it to PATH, or set TESSERACT_PATH.",
-                    cause,
-                )
-            }
-
-            if (!process.waitFor(TESSERACT_PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
-                process.waitFor()
-                throw IllegalStateException(
-                    "Tesseract exceeded its $TESSERACT_PROCESS_TIMEOUT_SECONDS-second timeout",
-                )
-            }
-
-            val output = Files.readString(outputFile, Charsets.UTF_8)
-            check(process.exitValue() == 0) {
-                "Tesseract exited with code ${process.exitValue()} for ${imageFile.absolutePath}: $output"
-            }
-            return output
-        } finally {
-            Files.deleteIfExists(outputFile)
-        }
+        return action()
     } finally {
         tesseractSlots.release()
     }
+}
+
+private fun runTesseract(imageFile: File, languages: String): String {
+    val executable = com.tdt4290group7.backend.backendSetting("TESSERACT_PATH")
+        ?.takeIf { it.isNotBlank() }
+        ?: System.getenv("ProgramFiles")
+            ?.let { File(File(it, "Tesseract-OCR"), "tesseract.exe") }
+            ?.takeIf { it.isFile }
+            ?.absolutePath
+        ?: "tesseract"
+    val outputFile = Files.createTempFile("tesseract-output-", ".txt")
+    try {
+        val process = try {
+            ProcessBuilder(
+                executable, imageFile.absolutePath, "stdout", "-l", languages, "--psm", "11",
+            ).redirectErrorStream(true).redirectOutput(outputFile.toFile()).start()
+        } catch (cause: IOException) {
+            throw IllegalStateException(
+                "Could not start Tesseract. Install it and add it to PATH, or set TESSERACT_PATH.",
+                cause,
+            )
+        }
+
+        val completed = try {
+            process.waitFor(TESSERACT_PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } catch (cause: InterruptedException) {
+            terminateTesseract(process)
+            Thread.currentThread().interrupt()
+            throw IllegalStateException("Interrupted while waiting for Tesseract", cause)
+        }
+        if (!completed) {
+            terminateTesseract(process)
+            throw IllegalStateException(
+                "Tesseract exceeded its $TESSERACT_PROCESS_TIMEOUT_SECONDS-second timeout",
+            )
+        }
+
+        val output = Files.readString(outputFile, Charsets.UTF_8)
+        check(process.exitValue() == 0) {
+            "Tesseract exited with code ${process.exitValue()} for ${imageFile.absolutePath}: $output"
+        }
+        return output
+    } finally {
+        Files.deleteIfExists(outputFile)
+    }
+}
+
+private fun terminateTesseract(process: Process) {
+    process.destroyForcibly()
+    var interrupted = false
+    while (process.isAlive) {
+        try {
+            process.waitFor()
+        } catch (_: InterruptedException) {
+            interrupted = true
+        }
+    }
+    if (interrupted) Thread.currentThread().interrupt()
 }
 
 fun main_old() {

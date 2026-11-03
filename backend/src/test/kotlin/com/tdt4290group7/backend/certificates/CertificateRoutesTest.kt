@@ -31,9 +31,10 @@ class CertificateRoutesTest {
     @Test
     fun administratorCanUploadParseAndRetrieveCertificateMetadata() = testApplication {
         val certificateDatabase = databasePath()
+        val vehicleRepository = VehicleRepository(databasePath())
         application {
             module(
-                VehicleRepository(databasePath()),
+                vehicleRepository,
                 null,
                 Duration.ofDays(14),
                 CertificateRepository(certificateDatabase),
@@ -43,6 +44,16 @@ class CertificateRoutesTest {
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/certificates").status)
 
         val adminClient = adminClient()
+        val supplierResponse = adminClient.post("/api/vehicle-fleet/suppliers") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"Example Transport AS","orgNumber":"123456789"}""")
+        }
+        assertEquals(HttpStatusCode.Created, supplierResponse.status, supplierResponse.bodyAsText())
+        val supplierId = Json.parseToJsonElement(supplierResponse.bodyAsText()).jsonObject.getValue("id").jsonPrimitive.content
+        val contract = vehicleRepository.fleet.importContractCsv(
+            supplierId,
+            "contractName,contractReference,startDate,endDate\nWaste collection,CONTRACT-42,2025-01-01,2028-12-31",
+        ).contracts.single()
         val pdf = javaClass.classLoader
             .getResourceAsStream("test-pdf/test-certificate-iso14001.pdf")!!
             .use { it.readBytes() }
@@ -50,8 +61,7 @@ class CertificateRoutesTest {
             setBody(
                 MultiPartFormDataContent(
                     formData {
-                        append("supplierName", "Example Transport AS")
-                        append("contractId", "sup-a")
+                        append("contractId", contract.id)
                         append(
                             "file",
                             pdf,
@@ -69,7 +79,7 @@ class CertificateRoutesTest {
         val uploaded = Json.parseToJsonElement(response.bodyAsText()).jsonObject
         assertEquals("Example Transport AS", uploaded.getValue("supplierName").jsonPrimitive.content)
         assertEquals("ISO 14001", uploaded.getValue("certificateType").jsonPrimitive.content)
-        assertEquals("sup-a", uploaded.getValue("contractId").jsonPrimitive.content)
+        assertEquals(contract.id, uploaded.getValue("contractId").jsonPrimitive.content)
 
         val listed = adminClient.get("/api/certificates")
         assertEquals(HttpStatusCode.OK, listed.status)
@@ -83,14 +93,14 @@ class CertificateRoutesTest {
         val edited = adminClient.put("/api/certificates/$certificateId") {
             contentType(ContentType.Application.Json)
             setBody(
-                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2025-01-15","expiryDate":"2028-12-31","contractId":"CONTRACT-42"}""",
+                """{"supplierName":"Forged Supplier Name","certificateType":"ISO 14001","issueDate":"2025-01-15","expiryDate":"2028-12-31","contractId":"${contract.id}"}""",
             )
         }
         assertEquals(HttpStatusCode.OK, edited.status, edited.bodyAsText())
         val editedRecord = Json.parseToJsonElement(edited.bodyAsText()).jsonObject
-        assertEquals("Updated Transport AS", editedRecord.getValue("supplierName").jsonPrimitive.content)
+        assertEquals("Example Transport AS", editedRecord.getValue("supplierName").jsonPrimitive.content)
         assertEquals("2025-01-15", editedRecord.getValue("issueDate").jsonPrimitive.content)
-        assertEquals("CONTRACT-42", editedRecord.getValue("contractId").jsonPrimitive.content)
+        assertEquals(contract.id, editedRecord.getValue("contractId").jsonPrimitive.content)
         assertEquals("iso-14001.pdf", CertificateRepository(certificateDatabase).getById(certificateId)?.sourceFile)
 
         val invalidEdit = adminClient.put("/api/certificates/$certificateId") {

@@ -57,13 +57,9 @@ fun Application.module(
     configureRateLimiting()
     val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
     val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
+    val fleetRepository = (vehicleRepository as? VehicleRepository)?.fleet ?: VehicleRepository(vehicleDatabasePath).fleet
     configureRouting(vehicleRepository, registry, cacheTtl)
-    val certificateDatabasePath = Path.of(
-        backendSetting("CERTIFICATE_DB_PATH")
-            ?: vehicleDatabasePath.resolveSibling(
-                "${vehicleDatabasePath.fileName.toString().substringBeforeLast('.')}-certificates.db",
-            ).toString(),
-    )
-    configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath))
+    val certificateDatabasePath = Path.of(backendSetting("CERTIFICATE_DB_PATH") ?: "data/certificates.db")
+    configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath), fleetRepository)
     configureAuthRoutes(logResetTokens)
 }
