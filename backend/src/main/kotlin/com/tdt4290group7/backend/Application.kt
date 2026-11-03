@@ -2,6 +2,7 @@ package com.tdt4290group7.backend
 
 import com.tdt4290group7.backend.config.AppEnvironment
 import com.tdt4290group7.backend.config.resetTokenLoggingEnabled
+import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.plugins.configureBodyLimit
 import com.tdt4290group7.backend.plugins.configureCORS
 import com.tdt4290group7.backend.plugins.configureMonitoring
@@ -12,6 +13,7 @@ import com.tdt4290group7.backend.plugins.configureSerialization
 import com.tdt4290group7.backend.plugins.configureStatusPages
 import com.tdt4290group7.backend.repository.UserRepository
 import com.tdt4290group7.backend.routes.configureAuthRoutes
+import com.tdt4290group7.backend.routes.configureCertificateRoutes
 import com.tdt4290group7.backend.vehicles.VehicleRegistryClient
 import com.tdt4290group7.backend.vehicles.VehicleRepository
 import com.tdt4290group7.backend.vehicles.VehicleStore
@@ -34,6 +36,7 @@ fun Application.module(
     repository: VehicleStore? = null,
     registry: VehicleRegistryClient? = svvApiKey()?.let(::VegvesenVehicleRegistryClient),
     cacheTtl: Duration = Duration.ofDays(svvCacheTtlDays()),
+    certificateRepository: CertificateRepository? = null,
 ) {
     // Read and validate config first, so a bad combination stops startup before anything runs.
     val environment = AppEnvironment.parse(backendSetting("APP_ENV"))
@@ -52,9 +55,10 @@ fun Application.module(
     configureBodyLimit()
     configureSecurity()
     configureRateLimiting()
-    val vehicleRepository = repository ?: VehicleRepository(
-        Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db"),
-    )
+    val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
+    val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
     configureRouting(vehicleRepository, registry, cacheTtl)
+    val certificateDatabasePath = Path.of(backendSetting("CERTIFICATE_DB_PATH") ?: "data/certificates.db")
+    configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath))
     configureAuthRoutes(logResetTokens)
 }

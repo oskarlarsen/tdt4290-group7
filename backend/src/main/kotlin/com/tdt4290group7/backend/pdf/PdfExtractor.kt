@@ -6,8 +6,16 @@ import org.apache.pdfbox.rendering.PDFRenderer
 import org.apache.pdfbox.rendering.ImageType
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import java.awt.image.BufferedImage
+
+private const val TESSERACT_MAX_CONCURRENT_PROCESSES = 2
+private const val TESSERACT_QUEUE_TIMEOUT_SECONDS = 30L
+private const val TESSERACT_PROCESS_TIMEOUT_SECONDS = 60L
+private val tesseractSlots = Semaphore(TESSERACT_MAX_CONCURRENT_PROCESSES, true)
 
 fun extractText(pdfFile: File): String {
     val document = Loader.loadPDF(pdfFile)
@@ -132,24 +140,47 @@ private fun runTesseract(imageFile: File, languages: String): String {
             ?.takeIf { it.isFile }
             ?.absolutePath
         ?: "tesseract"
-    val process = try {
-        ProcessBuilder(
-            executable, imageFile.absolutePath, "stdout", "-l", languages, "--psm", "11"
-        ).redirectErrorStream(true).start()
-    } catch (e: IOException) {
-        throw IllegalStateException(
-            "Could not start Tesseract. Install Tesseract and add it to PATH, " +
-                "or set TESSERACT_PATH to the full path of tesseract.exe.",
-            e
-        )
+    val acquired = try {
+        tesseractSlots.tryAcquire(TESSERACT_QUEUE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    } catch (cause: InterruptedException) {
+        Thread.currentThread().interrupt()
+        throw IllegalStateException("Interrupted while waiting for an OCR slot", cause)
     }
+    check(acquired) { "OCR capacity is temporarily full; try again shortly" }
 
-    val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-    val exitCode = process.waitFor()
-    check(exitCode == 0) {
-        "Tesseract exited with code $exitCode for ${imageFile.absolutePath}: $output"
+    try {
+        val outputFile = Files.createTempFile("tesseract-output-", ".txt")
+        try {
+            val process = try {
+                ProcessBuilder(
+                    executable, imageFile.absolutePath, "stdout", "-l", languages, "--psm", "11",
+                ).redirectErrorStream(true).redirectOutput(outputFile.toFile()).start()
+            } catch (cause: IOException) {
+                throw IllegalStateException(
+                    "Could not start Tesseract. Install it and add it to PATH, or set TESSERACT_PATH.",
+                    cause,
+                )
+            }
+
+            if (!process.waitFor(TESSERACT_PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                process.waitFor()
+                throw IllegalStateException(
+                    "Tesseract exceeded its $TESSERACT_PROCESS_TIMEOUT_SECONDS-second timeout",
+                )
+            }
+
+            val output = Files.readString(outputFile, Charsets.UTF_8)
+            check(process.exitValue() == 0) {
+                "Tesseract exited with code ${process.exitValue()} for ${imageFile.absolutePath}: $output"
+            }
+            return output
+        } finally {
+            Files.deleteIfExists(outputFile)
+        }
+    } finally {
+        tesseractSlots.release()
     }
-    return output
 }
 
 fun main_old() {

@@ -12,7 +12,7 @@ The application is a prototype: some areas have working workflows, while others 
 | Suppliers | Demo directory with supplier details, notes and follow-up status. |
 | Contracts | Demo contract directory, compliance summaries and placeholder CSV export.  |
 | Vehicles | Backend-connected supplier and agreement management, registered/planned vehicles, statistics, registry checks and change history with undo. |
-| Environmental Certificates | Placeholder page. A separate PDF/OCR tool can extract and parse certificates. |
+| Environmental Certificates | Admins can upload PDF certificates for backend text/OCR extraction and review parsed metadata. Contract attachments, registry verification and automatic reminders are not connected. |
 | Energy & Fuel | Placeholder page for energy and fuel reporting. |
 | Risk & Prediction | Placeholder page for risk analysis. |
 | Alerts | Placeholder page for alerts. |
@@ -74,7 +74,7 @@ Generate a signing secret with:
 node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
 ```
 
-Keep `VITE_USE_MOCKS=true` and `VITE_MOCK_AUTH=false` as supplied: this enables demo pages alongside real backend sign-in and vehicles.
+Keep `VITE_USE_MOCKS=true` and `VITE_MOCK_AUTH=false` as supplied: this enables demo pages alongside real backend sign-in, vehicles and certificate uploads.
 
 `SVV_API_KEY` is optional for startup. Adding or replacing a registered vehicle requires a working "Statens-vegvesen-API-key". Without one, you can still manage suppliers, agreements and planned entries.
 

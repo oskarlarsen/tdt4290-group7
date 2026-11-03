@@ -184,7 +184,7 @@ object CertificateParser {
             try {
                 return LocalDate.parse(token, fmt)
             } catch (_: DateTimeParseException) {
-                // probar el siguiente formato
+                // try next format
             }
         }
         return null

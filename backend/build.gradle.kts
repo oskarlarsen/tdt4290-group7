@@ -22,6 +22,13 @@ tasks.register<JavaExec>("runCertificateParser") {
     mainClass.set("com.tdt4290group7.backend.certificates.CertificateParserRunnerKt")
 }
 
+tasks.register<JavaExec>("runCertificateGenerator") {
+    group = "application"
+    description = "Generate synthetic certificate PDFs for local testing"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.tdt4290group7.backend.certificates.CertificateSampleGeneratorKt")
+}
+
 repositories {
     mavenCentral()
 }
@@ -61,4 +68,5 @@ tasks.test {
     environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
     // Auth tests now initialize the vehicle store too; keep them away from local vehicle data.
     environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles-v7.db").get().asFile.absolutePath)
+    environment("CERTIFICATE_DB_PATH", layout.buildDirectory.file("test-data/default-certificates.db").get().asFile.absolutePath)
 }
