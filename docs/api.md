@@ -1,6 +1,6 @@
 # API reference
 
-The local API is at `http://localhost:8080`. Requests with bodies use JSON. This reference covers implemented endpoints; the frontend's prototype APIs for other screens are not implemented on the backend.
+The local API is at `http://localhost:8080`. JSON is used except for certificate PDF uploads, which use multipart form data. This reference covers implemented endpoints; the frontend's prototype APIs for other screens are not implemented on the backend.
 
 ## Authentication
 
@@ -27,6 +27,19 @@ The response contains `user` and `expiresAt` and sets the `auth_token` cookie. R
 Password-reset email delivery is not connected. For local testing, enable `APP_ENV=dev` and `ALLOW_DEV_PASSWORD_RESET_LOG=true` to obtain the token from the backend log. Tokens expire after 15 minutes and are single-use. A successful reset invalidates that user's existing sessions. New passwords must be 12–72 UTF-8 bytes.
 
 Sign-in/reset requests are rate-limited. Repeated failed sign-ins also lock the account temporarily; `429` responses include retry guidance. Seed accounts and password changes are in memory and reset on backend restart.
+
+## Certificates
+
+Certificate routes require an administrator session.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/certificates` | List extracted certificate metadata, most urgent first. |
+| POST | `/api/certificates` | Upload one PDF, extract its certificate type and dates, and store the metadata. |
+
+`POST /api/certificates` accepts `multipart/form-data` fields `supplierName`, `file` and optional `contractId`. Uploads are limited to 8 MB and 25 pages. Text-based PDFs use PDFBox; scanned pages require Tesseract with Norwegian and English language data. The response includes the parsed `certificateType`, `issueDate`, `expiryDate`, `sourceFile`, `contractId` and recalculated status. Check parsed values before relying on them as compliance evidence.
+
+The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
 ## Fleet management
 

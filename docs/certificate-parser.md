@@ -1,6 +1,8 @@
 # Certificate extraction and parsing
 
-The backend includes a standalone tool for extracting certificate text and parsing certificate type, issue dates, expiry date and missing fields. It is separate from the placeholder certificate page and has no upload API.
+The admin Certificates page can upload a PDF to the backend, which extracts certificate type and dates and stores the parsed metadata. The original PDF is discarded; review extracted values before treating them as compliance evidence. Uploads are limited to 8 MB and 25 pages; see the [certificate API](api.md#certificates).
+
+The backend also includes a standalone command-line tool for extracting certificate text and parsing certificate type, issue dates, expiry date and missing fields.
 
 ## Setup
 

@@ -98,6 +98,10 @@ export function CertificateDetailsDrawer({
                   label="Valid until"
                   value={certificate.validUntil ? formatCertificateDate(certificate.validUntil) : "Not submitted"}
                 />
+                {certificate.issueDate && (
+                  <Field label="Issued" value={formatCertificateDate(certificate.issueDate)} />
+                )}
+                {certificate.sourceFile && <Field label="Source file" value={certificate.sourceFile} />}
               </Section>
 
               <Section title="Status">
@@ -124,14 +128,13 @@ export function CertificateDetailsDrawer({
                     </button>
                   </>
                 ) : (
-                  <p className="text-sm text-neutral-400">Contract not found for this certificate.</p>
+                  <Field label="Supplier" value={certificate.supplierName ?? "Not recorded"} />
                 )}
               </Section>
 
               <p className="rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-500">
-                Demo data. Certificate records are fictional and were not verified against any
-                certification-body registry. Contract-attachment import (Mercell), registry checks, and
-                automatic supplier reminders (6, 3 and 1 months before expiry) aren't connected yet.
+                Extracted details should be reviewed before being used as compliance evidence. The
+                original PDF is not retained, and certificates are not yet linked to live contract records.
               </p>
             </div>
           </>

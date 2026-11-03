@@ -4,7 +4,8 @@ export type CertificateStandard =
   | "emas"
   | "gront-punkt-norge"
   | "retura"
-  | "eco-driving-course";
+  | "eco-driving-course"
+  | "unknown";
 
 // The standards named in the customer's documents.
 export const CERTIFICATE_STANDARD_LABELS: Record<CertificateStandard, string> = {
@@ -14,6 +15,7 @@ export const CERTIFICATE_STANDARD_LABELS: Record<CertificateStandard, string> = 
   "gront-punkt-norge": "Grønt Punkt Norge",
   retura: "Retura",
   "eco-driving-course": "Eco-driving course",
+  unknown: "Unrecognized certificate",
 };
 
 // Certificates belong to contracts. A null validUntil means required documentation is missing;
@@ -24,6 +26,9 @@ export type Certificate = {
   certificateNumber: string | null;
   contractId: string;
   validUntil: string | null; // ISO date (YYYY-MM-DD)
+  supplierName?: string;
+  issueDate?: string | null;
+  sourceFile?: string;
 };
 
 export type CertificateStatus =

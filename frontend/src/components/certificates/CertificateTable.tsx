@@ -43,10 +43,14 @@ export function CertificateTable({
             return (
               <tr key={certificate.id} className="border-t border-neutral-100">
                 <td className="py-3 pr-3">
-                  {contract ? (
+                  {contract || certificate.supplierName ? (
                     <>
-                      <div className="font-medium text-neutral-900">{contract.supplierName}</div>
-                      <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                      <div className="font-medium text-neutral-900">
+                        {contract?.supplierName ?? certificate.supplierName}
+                      </div>
+                      {contract?.supplierOrgId && (
+                        <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                      )}
                     </>
                   ) : (
                     <span className="text-xs text-neutral-400">Contract not found</span>
@@ -60,7 +64,7 @@ export function CertificateTable({
                     {certificate.certificateNumber ?? "No certificate on file"}
                   </div>
                 </td>
-                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "—"}</td>
+                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "Not linked"}</td>
                 <td
                   className={`whitespace-nowrap py-3 pr-3 ${
                     info.status === "expired" ? "font-semibold text-red-700" : "text-neutral-700"

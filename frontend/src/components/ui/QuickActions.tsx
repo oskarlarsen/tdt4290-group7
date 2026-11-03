@@ -21,6 +21,12 @@ export function QuickActions() {
       >
         View all alerts
       </button>
+      <button
+        onClick={() => navigate("/admin/certificates?upload=true")}
+        className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+      >
+        Add supplier certificate
+      </button>
     </div>
   );
 }
