@@ -70,7 +70,7 @@ export default function Dashboard() {
         setUndoSeconds(5);
       },
       onError: (error) =>
-        setAlertStatusError(error instanceof Error ? error.message : "Could not update alert status."),
+        setAlertStatusError(error instanceof Error ? error.message : "Could not update alert status"),
     }
   );
 }
@@ -86,7 +86,7 @@ export default function Dashboard() {
         setUndoSeconds(0);
       },
       onError: (error) =>
-        setAlertStatusError(error instanceof Error ? error.message : "Could not restore the previous alert status."),
+        setAlertStatusError(error instanceof Error ? error.message : "Could not restore the previous alert status"),
     }
   );
 }
@@ -189,10 +189,10 @@ export default function Dashboard() {
   const hasPreviousAttentionSuppliers = safeAttentionPage > 0;
   const emptyAttentionMessage =
     attentionFilter === "all"
-      ? "No suppliers requiring attention."
+      ? "No suppliers requiring attention"
       : attentionFilter === "high"
-        ? "No high-risk suppliers requiring attention."
-        : "No medium-risk suppliers requiring attention.";
+        ? "No high-risk suppliers requiring attention"
+        : "No medium-risk suppliers requiring attention";
 
   return (
     <div className="space-y-4 p-4">

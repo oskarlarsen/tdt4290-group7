@@ -18,7 +18,7 @@ const MOCK_USERS: Record<string, { password: string; user: AuthUser }> = {
       name: "Leverandør 1",
       email: "supplier@leverandor.no",
       role: "SUPPLIER",
-      supplierId: "supplier-1",
+      supplierId: "sup-c",
     },
   },
 };

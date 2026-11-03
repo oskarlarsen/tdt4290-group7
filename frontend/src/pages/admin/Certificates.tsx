@@ -261,15 +261,15 @@ export default function Certificates() {
           onSelect={(row) => setSelectedId(row.certificate.id)}
           emptyMessage={
             certificates.length === 0
-              ? "No certificate records available."
-              : "No certificates match the current filters."
+              ? "No certificate records available"
+              : "No certificates match the current filters"
           }
         />
 
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
             {filteredRows.length === 0
-              ? "No certificates match the current filters."
+              ? "No certificates match the current filters"
               : `Showing ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, filteredRows.length)} of ${filteredRows.length} certificate${filteredRows.length === 1 ? "" : "s"}`}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">

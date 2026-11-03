@@ -409,7 +409,7 @@ export default function Contracts() {
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
             {filteredContracts.length === 0
-              ? "No contracts match the current filters."
+              ? "No contracts match the current filters"
               : `Showing ${pageStart + 1}–${Math.min(pageStart + CONTRACTS_PAGE_SIZE, filteredContracts.length)} of ${filteredContracts.length} contract${filteredContracts.length === 1 ? "" : "s"}`}
           </p>
           <div className="flex items-center gap-1.5">
