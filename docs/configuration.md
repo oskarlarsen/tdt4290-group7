@@ -26,7 +26,7 @@ The backend and Vite load it when started from their documented directories. Res
 | `HOST` | `127.0.0.1` natively | Backend listening address. |
 | `PORT` | `8080` | Backend listening port. |
 | `VEHICLE_DB_PATH` | `data/vehicles.db` | SQLite path, relative to the backend working directory unless absolute. |
-| `CERTIFICATE_DB_PATH` | Sibling `*-certificates.db` file | Optional SQLite path for certificate metadata. |
+| `CERTIFICATE_DB_PATH` | `data/certificates.db` | SQLite path for certificate metadata, independent of `VEHICLE_DB_PATH`. |
 | `JWT_ISSUER` / `JWT_AUDIENCE` | `tdt4290-backend` / `tdt4290-frontend` | Session issuer and audience. |
 | `APP_ENV` | `prod` | Select `dev` to allow development-only password-reset logging. |
 | `ALLOW_DEV_PASSWORD_RESET_LOG` | `false` | Log reset tokens locally; requires `APP_ENV=dev`. Email delivery is not implemented. |
@@ -34,7 +34,7 @@ The backend and Vite load it when started from their documented directories. Res
 | `API_ORIGIN` | `http://localhost:8080` | API origin permitted by the Docker frontend's content security policy; match the origin in `VITE_API_BASE_URL`. |
 | `TESSERACT_PATH` | Executable discovery / `tesseract` | Optional executable path for the [certificate parser](certificate-parser.md). |
 
-Compose fixes the backend's container address, port and vehicle database location; certificate metadata uses `/app/data/certificates.db` by default. It does not pass through host `HOST`, `PORT` or `VEHICLE_DB_PATH` overrides. The backend image includes Tesseract and its English/Norwegian language data.
+Compose fixes the backend's container address, port and database locations, including `/app/data/certificates.db` for certificate metadata. It does not pass through host `HOST`, `PORT` or `VEHICLE_DB_PATH` overrides. The backend image includes Tesseract and its English/Norwegian language data.
 
 For isolated tooling, `BACKEND_ENV_FILE` in the process environment selects another configuration file; relative paths use the server's working directory. Tests use this to avoid local configuration.
 
