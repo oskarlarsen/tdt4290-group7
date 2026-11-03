@@ -353,8 +353,8 @@ export default function Energy() {
           onSelect={(row) => setSelectedId(row.record.id)}
           emptyMessage={
             rows.length === 0
-              ? "No assessable energy records available."
-              : "No contracts match the current filters."
+              ? "No assessable energy records available"
+              : "No contracts match the current filters"
           }
         />
 
@@ -379,7 +379,7 @@ export default function Energy() {
       <NotConnectedDialog
         open={isRecordInfoOpen}
         title="Record energy data"
-        message="Recording energy data isn't available yet. Energy records are currently fictional mock data. A real flow would take supplier quarterly energy and fuel statistics (Excel via Mercell), which isn't connected."
+        message="Recording energy data isn't available yet. Energy records are currently fictional mock data. A real flow would take supplier quarterly energy and fuel statistics (Excel via Mercell), which isn't connected"
         onClose={() => setIsRecordInfoOpen(false)}
       />
     </div>

@@ -1,9 +1,29 @@
 import type { RiskCategory } from "./risk";
 export type { RiskCategory } from "./risk";
 
-export type AlertSeverity = "high" | "medium";
-export type AlertStatus = "ACTIVE" | "DISMISSED";
+export type AlertSeverity = "high" | "medium" | "low";
+export const ALERT_STATUSES = ["OPEN", "IN_PROGRESS", "UNDER_REVIEW", "RESOLVED"] as const;
+export type AlertStatus = (typeof ALERT_STATUSES)[number];
+export const ALERT_CATEGORIES = [
+  "ENVIRONMENTAL_COMPLIANCE",
+  "ENERGY_FUEL",
+  "VEHICLE_COMPLIANCE",
+  "CERTIFICATES",
+] as const;
+export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
+export type AlertSource = "MANUAL" | "AUTOMATIC";
+export type AlertFindingType =
+  | "CONFIRMED_DEVIATION"
+  | "MISSING_DOCUMENTATION"
+  | "UPCOMING_EXPIRY";
 export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "FUEL_DEVIATION";
+export type SupplierRisk = RiskCategory | "unassessed";
+export type NewSupplierInput = {
+  displayName: string;
+  orgId: string;
+  email: string;
+  primaryContract?: string;
+};
 
 // TODO: Match this type with the backend response when the dashboard API is ready
 export type DashboardKpis = {
@@ -40,8 +60,9 @@ export type TopRiskSupplier = {
   // Keep supplier names anonymous on the overview; show full details on the supplier pages
   displayName: string;
   orgId: string;
+  email?: string;
   primaryContract: string;
-  risk: RiskCategory;
+  risk: SupplierRisk;
   mainIssue: string;
   // Set the issue only for high/medium-risk suppliers
   issueCategory?: SupplierIssueCategory;
@@ -53,11 +74,29 @@ export type RecentAlert = {
   title: string;
   description: string;
   timeAgo: string;
+  createdAt?: string;
   status: AlertStatus;
-  dismissedAt?: string;
-  dismissedBy?: string;
+  category?: AlertCategory;
+  source?: AlertSource;
+  dueDate?: string;
+  findingType?: AlertFindingType;
+  affectedItem?: {
+    type: "Vehicle" | "Document";
+    name?: string;
+  };
+  reason?: string;
   // Set only when the alert clearly matches a supplier issue in the mock data
   supplierId?: string;
+};
+
+export type NewManualAlertInput = {
+  title: string;
+  supplierId: string;
+  category: AlertCategory;
+  severity: AlertSeverity;
+  findingType: AlertFindingType;
+  description: string;
+  dueDate?: string;
 };
 
 export type IssueCategoryBreakdown = {

@@ -137,7 +137,7 @@ export function buildRiskOutlook(
         kind: "data-gap",
         priority: "medium",
         title: "Vehicle data not submitted",
-        detail: "This contract involves vehicles, but no vehicle data has been submitted, so deviations can't be checked.",
+        detail: "This contract involves vehicles, but no vehicle data has been submitted, so deviations can't be checked",
         date: null,
         daysUntil: null,
       });
@@ -155,7 +155,7 @@ export function buildRiskOutlook(
           kind: "data-gap",
           priority: "medium",
           title: "Energy data not submitted",
-          detail: "This contract has an energy requirement, but no consumption data has been submitted, so compliance can't be checked.",
+          detail: "This contract has an energy requirement, but no consumption data has been submitted, so compliance can't be checked",
           date: null,
           daysUntil: null,
         });
@@ -205,7 +205,7 @@ export function buildRiskOutlook(
           kind: "active",
           priority: "medium",
           title: `${label}: documentation missing`,
-          detail: "Required by the contract, but no certificate documentation has been submitted.",
+          detail: "Required by the contract, but no certificate documentation has been submitted",
           date: null,
           daysUntil: null,
         });
