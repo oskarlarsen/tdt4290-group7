@@ -16,6 +16,17 @@ Run these from `backend/`. No separate Gradle installation is needed.
 
 Tests use synthetic configuration and isolated databases. They do not use your configured registry key or development database.
 
+## Certificate sample generator
+
+Generate synthetic certificate PDFs for local parser testing from `backend/`:
+
+```powershell
+.\gradlew.bat runCertificateGenerator
+.\gradlew.bat runCertificateGenerator --args="20 4290"
+```
+
+The optional arguments set the sample count (1–60) and seed; reusing a seed reproduces the same samples. Files are written under `build/generated-certificate-samples/`. They are clearly marked as invalid test documents and contain no real certificate data.
+
 ## Storage and integrations
 
 - Native startup from `backend/` creates `data/vehicles.db`; Docker uses a persistent volume. Suppliers, agreements, statistics, checks and change history survive restarts.
