@@ -61,8 +61,9 @@ export function CertificateAttentionCard({
   const seenContractIds = new Set<string>();
   const attentionRows = rows.filter(({ certificate }) => {
     if (getCertificateStatus(certificate).group === "valid") return false;
-    if (seenContractIds.has(certificate.contractId)) return false;
-    seenContractIds.add(certificate.contractId);
+    const key = certificate.contractId || certificate.id;
+    if (seenContractIds.has(key)) return false;
+    seenContractIds.add(key);
     return true;
   });
   const safeAttentionIndex = Math.min(activeAttentionIndex, attentionRows.length - 1);
@@ -84,7 +85,7 @@ export function CertificateAttentionCard({
   const info = getCertificateStatus(certificate);
 
   const standard = CERTIFICATE_STANDARD_LABELS[certificate.standard];
-  const supplierName = contract?.supplierName ?? "Unknown supplier";
+  const supplierName = contract?.supplierName ?? certificate.supplierName ?? "Unknown supplier";
   const contractName = contract?.contractName ?? "an unknown contract";
   const days = Math.abs(info.daysRemaining ?? 0);
 

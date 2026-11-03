@@ -22,7 +22,7 @@ fun main() {
     val extractedText = extractTextWithOcr(pdf, languages = "nor+eng", dpi = 400)
     val outputFile = File("extracted.txt")
     outputFile.writeText(extractedText, Charsets.UTF_8)
-    println("Texto guardado en: ${outputFile.absolutePath}")
+    println("Text saved in: ${outputFile.absolutePath}")
     val parsed = CertificateParser.parse(extractedText, pdf.name)
 
     println("===== ${pdf.name}: extracted text =====")
