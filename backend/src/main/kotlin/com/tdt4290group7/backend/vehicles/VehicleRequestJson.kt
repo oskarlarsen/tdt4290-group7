@@ -14,7 +14,7 @@ private val requestJson = Json { ignoreUnknownKeys = false; isLenient = false }
 /** Keep fleet requests as strict about JSON token types as reporting requests. */
 internal fun <T> decodeFleetRequest(text: String, serializer: kotlinx.serialization.DeserializationStrategy<T>): T {
     fun validate(root: JsonObject) {
-        root.textFields("name", "orgNumber", "supplierId", "startDate", "endDate", "note", "expectedUpdatedAt", "registrationNumber")
+        root.textFields("name", "orgNumber", "supplierId", "startDate", "endDate", "note", "expectedUpdatedAt", "registrationNumber", "email")
         root.booleanFields("planned")
         root["allowedVehicles"]?.let {
             val number = it as? JsonPrimitive ?: invalidType()

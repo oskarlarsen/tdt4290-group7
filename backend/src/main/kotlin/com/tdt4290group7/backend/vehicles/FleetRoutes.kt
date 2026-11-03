@@ -2,6 +2,7 @@ package com.tdt4290group7.backend.vehicles
 
 import com.tdt4290group7.backend.auth.JwtConfig
 import com.tdt4290group7.backend.plugins.ApiError
+import com.tdt4290group7.backend.repository.AccountConflictException
 import com.tdt4290group7.backend.repository.UserRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -39,6 +40,39 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     post("/api/vehicle-fleet/suppliers") {
         val actor = call.adminActor() ?: return@post
         call.respond(HttpStatusCode.Created, fleet.saveSupplier(null, decodeFleetRequest(call.receiveText(), SupplierInput.serializer()), actor, Instant.now()))
+    }
+    post("/api/vehicle-fleet/suppliers/{id}/invitations") {
+        val actor = call.adminActor() ?: return@post
+        val supplierId = call.parameters["id"] ?: run {
+            call.respond(HttpStatusCode.BadRequest, ApiError("Supplier ID is required"))
+            return@post
+        }
+        val supplier = fleet.overview().suppliers.firstOrNull { it.id == supplierId }
+        if (supplier == null) {
+            call.respond(HttpStatusCode.NotFound, ApiError("Active supplier organization not found"))
+            return@post
+        }
+        val request = try {
+            decodeFleetRequest(call.receiveText(), SupplierInvitationRequest.serializer())
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request: ${e.message}"))
+            return@post
+        }
+        try {
+            val invitation = UserRepository.createSupplierInvitation(
+                supplierId = supplier.id,
+                supplierName = supplier.name,
+                email = request.email
+            )
+            call.respond(
+                HttpStatusCode.Created,
+                SupplierInvitationResponse(request.email.trim(), invitation.token, invitation.expiresAt)
+            )
+        } catch (e: AccountConflictException) {
+            call.respond(HttpStatusCode.Conflict, ApiError(e.message ?: "An account already exists"))
+        } catch (e: IllegalArgumentException) {
+            call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid invitation"))
+        }
     }
     put("/api/vehicle-fleet/suppliers/{id}") {
         val actor = call.adminActor() ?: return@put

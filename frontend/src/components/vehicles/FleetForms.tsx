@@ -28,6 +28,46 @@ export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetS
   </VehicleDialog>;
 }
 
+export function InviteSupplierForm({ supplier, onClose }: { supplier: FleetSupplier; onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [invitationUrl, setInvitationUrl] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState("");
+  const invite = useMutation({
+    mutationFn: () => api.inviteSupplier(supplier.id, email),
+    onSuccess: ({ token }) => setInvitationUrl(`${window.location.origin}/accept-invitation#${token}`),
+    retry: false,
+  });
+  async function copyInvitation() {
+    if (!invitationUrl) return;
+    try {
+      await navigator.clipboard.writeText(invitationUrl);
+      setCopyMessage("Invitation link copied. Send it to the supplier; it expires in 48 hours.");
+    } catch {
+      setCopyMessage("Copy the invitation link below and send it to the supplier. It expires in 48 hours.");
+    }
+  }
+  return <VehicleDialog title={`Invite account · ${supplier.name}`} onClose={onClose} busy={invite.isPending}>
+    {invitationUrl ? (
+      <div className="space-y-4">
+        <p className="text-sm text-neutral-700">Invitation created for <strong>{email}</strong>. Share this one-time link with the supplier:</p>
+        <input readOnly aria-label="Supplier invitation link" className={inputClass} value={invitationUrl} onFocus={event => event.currentTarget.select()} />
+        <p role="status" className="text-sm text-neutral-600">{copyMessage || "The link expires in 48 hours and can only be used once."}</p>
+        <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
+          <button type="button" className={buttonClass} onClick={onClose}>Close</button>
+          <button type="button" className={primaryClass} onClick={() => void copyInvitation()}>Copy invitation link</button>
+        </footer>
+      </div>
+    ) : (
+      <form className="space-y-4" onSubmit={event => { event.preventDefault(); invite.mutate(); }}>
+        <p className="text-sm text-neutral-600">Create a supplier account linked to this organization. The generated link must be shared with the contact manually.</p>
+        <Field label="Contact email"><input autoFocus required type="email" maxLength={254} className={inputClass} value={email} onChange={event => setEmail(event.target.value)} /></Field>
+        <ErrorNotice error={invite.error} />
+        <FormFooter busy={invite.isPending} label="Create invitation" onClose={onClose} />
+      </form>
+    )}
+  </VehicleDialog>;
+}
+
 export function AgreementForm({ supplier, agreement, onClose, onSaved }: { supplier: FleetSupplier; agreement?: FleetAgreement; onClose: () => void; onSaved: () => void }) {
   const [startDate, setStart] = useState(agreement?.startDate ?? "");
   const [endDate, setEnd] = useState(agreement?.endDate ?? "");

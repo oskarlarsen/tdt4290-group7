@@ -17,7 +17,7 @@ The application is a prototype: some areas have working workflows, while others 
 | Risk & Prediction | Placeholder page for risk analysis. |
 | Alerts | Placeholder page for alerts. |
 | Reports | Placeholder page. |
-| Supplier workspace | Navigation for dashboard, company, contracts, vehicles, certificates, energy, compliance, risk, alerts and required actions; the pages are placeholders. |
+| Supplier workspace | Backend-connected onboarding dashboard for contact details, checklist progress, CSV template/download, validation preview, imports and submission. Other supplier pages remain placeholders. |
 | Authentication | Admin/supplier sign-in, logout and session handling. Password-reset API exists; email delivery is not connected. |
 
 Dashboard, supplier and contract demo data are separate and not connected to the vehicle database, i.e suppliers under "Suppliers" and "Vehicles" are not linked.
@@ -66,7 +66,6 @@ Open `.env` in your editor and fill in:
 |---|---|
 | `JWT_SECRET` | A generated signing secret. |
 | `SEED_ADMIN_PASSWORD` | Your password for the seeded admin account. |
-| `SEED_SUPPLIER_PASSWORD` | Your password for the seeded supplier account. |
 
 Generate a signing secret with:
 
@@ -119,9 +118,8 @@ Open **http://localhost:5173**. Use `localhost` for both the frontend and API so
 | Role | Email | Password |
 |---|---|---|
 | Admin | `advisor.hansen@kommune.no` | Your `SEED_ADMIN_PASSWORD` value. |
-| Supplier | `supplier@nordvik.no` | Your `SEED_SUPPLIER_PASSWORD` value. |
 
-Use the admin account to explore the implemented workflows. Vehicles starts empty; create a supplier and agreement before adding vehicles. Supplier sign-in opens the placeholder workspace.
+Use the admin account to explore the implemented workflows. Vehicles starts empty; create a supplier, then invite a contact from that supplier's card. Share the one-time activation link with the contact; they set their password and the account is linked to the organization automatically.
 
 ## Run with Docker
 

@@ -18,15 +18,15 @@ $listener.Stop()
 [IO.File]::WriteAllLines((Join-Path $fixtureRoot '.env'), @(
     'JWT_SECRET=synthetic-smoke-signing-secret',
     'SEED_ADMIN_PASSWORD=synthetic-admin-password',
-    'SEED_SUPPLIER_PASSWORD=synthetic-supplier-password',
     'AUTH_COOKIE_SECURE=false',
     'CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000',
     'SVV_API_KEY=',
     'HOST=127.0.0.1',
     "PORT=$port",
-    'VEHICLE_DB_PATH=synthetic-vehicles.db'
+    'VEHICLE_DB_PATH=synthetic-vehicles.db',
+    'USER_DB_PATH=synthetic-users.db'
 ))
-$settings = @('BACKEND_ENV_FILE', 'JWT_SECRET', 'JWT_ISSUER', 'JWT_AUDIENCE', 'SEED_ADMIN_PASSWORD', 'SEED_SUPPLIER_PASSWORD', 'AUTH_COOKIE_SECURE', 'CORS_ALLOWED_ORIGINS', 'SVV_API_KEY', 'SVV_CACHE_TTL_DAYS', 'HOST', 'PORT', 'VEHICLE_DB_PATH', 'APP_ENV', 'ALLOW_DEV_PASSWORD_RESET_LOG', 'TRUSTED_PROXY_HOPS')
+$settings = @('BACKEND_ENV_FILE', 'JWT_SECRET', 'JWT_ISSUER', 'JWT_AUDIENCE', 'SEED_ADMIN_PASSWORD', 'AUTH_COOKIE_SECURE', 'CORS_ALLOWED_ORIGINS', 'SVV_API_KEY', 'SVV_CACHE_TTL_DAYS', 'HOST', 'PORT', 'VEHICLE_DB_PATH', 'USER_DB_PATH', 'APP_ENV', 'ALLOW_DEV_PASSWORD_RESET_LOG', 'TRUSTED_PROXY_HOPS')
 $previous = @{}
 $server = $null
 try {

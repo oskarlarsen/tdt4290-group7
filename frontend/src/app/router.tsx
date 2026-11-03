@@ -5,6 +5,7 @@ import { AdminLayout } from "./AdminLayout";
 import { SupplierLayout } from "./SupplierLayout";
 
 import Login from "../pages/auth/Login";
+import AcceptSupplierInvitation from "../pages/auth/AcceptSupplierInvitation";
 import Unauthorized from "../pages/auth/Unauthorized";
 
 import AdminDashboard from "../pages/admin/Dashboard";
@@ -32,6 +33,7 @@ import RequiredActions from "../pages/supplier/RequiredActions";
 const router = createBrowserRouter([
   { path: "/", element: <RoleRedirect /> },
   { path: "/login", element: <Login /> },
+  { path: "/accept-invitation", element: <AcceptSupplierInvitation /> },
   { path: "/unauthorized", element: <Unauthorized /> },
   {
     path: "/admin",

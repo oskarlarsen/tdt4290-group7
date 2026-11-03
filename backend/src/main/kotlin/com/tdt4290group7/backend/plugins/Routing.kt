@@ -31,6 +31,9 @@ import com.tdt4290group7.backend.vehicles.adminActor
 import io.ktor.server.auth.authenticate
 import kotlinx.serialization.SerializationException
 
+import com.tdt4290group7.backend.certificates.CertificateRepository
+import com.tdt4290group7.backend.onboarding.onboardingRoutes
+
 @Serializable
 data class HealthStatus(val status: String = "UP")
 
@@ -41,6 +44,7 @@ fun Application.configureRouting(
     repository: VehicleStore,
     registry: VehicleRegistryClient?,
     cacheTtl: Duration,
+    certificateRepository: CertificateRepository? = null,
 ) {
     val registryLookup = VehicleRegistryLookup(registry, cacheTtl)
     val checks = VehicleCheckService(repository, registry, cacheTtl, registryLookup = registryLookup)
@@ -54,7 +58,11 @@ fun Application.configureRouting(
         }
 
         authenticate(AUTH_JWT) {
-            if (repository is VehicleRepository) fleetRoutes(repository.fleet, registryLookup)
+            if (repository is VehicleRepository) {
+                repository.onboarding.attachCertificateRepository(certificateRepository)
+                fleetRoutes(repository.fleet, registryLookup)
+                onboardingRoutes(repository.onboarding, certificateRepository)
+            }
             get("/api/vehicles/{registrationNumber}") {
                 if (call.adminActor() == null) return@get
                 val result = try {

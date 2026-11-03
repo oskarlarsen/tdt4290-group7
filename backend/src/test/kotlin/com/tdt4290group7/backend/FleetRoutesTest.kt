@@ -1,8 +1,5 @@
 package com.tdt4290group7.backend
 
-import com.tdt4290group7.backend.auth.AuthCookie
-import com.tdt4290group7.backend.auth.JwtConfig
-import com.tdt4290group7.backend.repository.UserRepository
 import com.tdt4290group7.backend.vehicles.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
@@ -141,16 +138,26 @@ class FleetRoutesTest {
     }
 
     @Test fun fleetRoutesRequireAnAdminAndIgnoreClientSuppliedActor() = testApplication {
-        application { module(repository(), null) }
+        val repo = repository()
+        application { module(repo, null) }
         startApplication()
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/vehicle-fleet").status)
-        val supplier = UserRepository.findByEmail("supplier@nordvik.no")!!
-        val token = JwtConfig.generateToken(supplier, false).first
-        assertEquals(HttpStatusCode.Forbidden, client.post("/api/vehicle-fleet/suppliers") {
-            cookie(AuthCookie.NAME, token); contentType(ContentType.Application.Json)
+        val admin = adminClient()
+        val created = admin.post("/api/vehicle-fleet/suppliers") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"Supplier role test","orgNumber":"123456789"}""")
+        }
+        val supplierId = Json.parseToJsonElement(created.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content
+        val supplier = supplierClient(supplierId)
+        assertEquals(HttpStatusCode.Forbidden, supplier.post("/api/vehicle-fleet/suppliers") {
+            contentType(ContentType.Application.Json)
             setBody("""{"name":"Test","orgNumber":"123456789"}""")
         }.status)
-        assertEquals(HttpStatusCode.BadRequest, adminClient().post("/api/vehicle-fleet/suppliers") {
+        assertEquals(HttpStatusCode.Forbidden, supplier.post("/api/vehicle-fleet/suppliers/$supplierId/invitations") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"new-contact@example.no"}""")
+        }.status)
+        assertEquals(HttpStatusCode.BadRequest, admin.post("/api/vehicle-fleet/suppliers") {
             contentType(ContentType.Application.Json)
             setBody("""{"name":"Test","orgNumber":"123456789","actorName":"Someone else"}""")
         }.status)

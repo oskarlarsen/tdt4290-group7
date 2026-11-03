@@ -65,8 +65,8 @@ tasks.test {
     // The app refuses to start without these; tests get throwaway values that never ship.
     environment("JWT_SECRET", "test-only-jwt-secret")
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
-    environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
-    // Auth tests now initialize the vehicle store too; keep them away from local vehicle data.
+    // Auth tests use isolated SQLite stores and never touch local application data.
     environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles-v7.db").get().asFile.absolutePath)
     environment("CERTIFICATE_DB_PATH", layout.buildDirectory.file("test-data/default-certificates.db").get().asFile.absolutePath)
+    environment("USER_DB_PATH", layout.buildDirectory.file("test-data/default-users.db").get().asFile.absolutePath)
 }
