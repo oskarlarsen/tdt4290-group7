@@ -7,8 +7,8 @@ import type { DeviationFinding, TripRow, VehicleCheck } from "../src/types/vehic
 
 const row: TripRow = { id: "synthetic-row", registrationNumber: "AB12345", createdAt: "2026-01-01T00:00:00Z", estimatedCo2Kg: "72",
   data: { registrationNumber: "AB12345", periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic", model: "Synthetic",
-    co2Registered: true, co2GramsPerKm: "120", medianCo2: "120", totalTripKm: "600", totalKmCo2Registered: "600", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "600", totalKmNoxRegistered: "600", totalNoxRegisteredGrams: "18", tripCount: 1, averageFuelConsumptionLitresPer100Km: "8", fuelConsumedLitres: "48" } };
-const check: VehicleCheck = { id: "synthetic-check", checkedAt: "2026-02-01T00:00:00Z", vehicle: { registrationNumber: "AB12345", createdAt: "synthetic" }, approvalStatus: "NOT_APPROVED", approvals: [], tripRows: [row], deviations: [], findings: [],
+    co2Registered: true, co2GramsPerKm: "120", totalTripKm: "600", totalKmCo2Registered: "600", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "600", totalKmNoxRegistered: "600", totalNoxRegisteredGrams: "18", averageFuelConsumptionLitresPer100Km: "8", fuelConsumedLitres: "48" } };
+const check: VehicleCheck = { id: "synthetic-check", checkedAt: "2026-02-01T00:00:00Z", vehicle: { registrationNumber: "AB12345", createdAt: "synthetic", updatedAt: "synthetic", agreementId: null, listed: false, planned: false }, agreement: null, tripRows: [row], deviations: [], findings: [],
   registry: { dataSource: "LIVE", lookupOutcome: "FOUND", fetchedAt: "2026-02-01T00:00:00Z", deviations: [], usageProhibitionState: "UNKNOWN", data: { registrationNumber: "AB12345", bodyType: { code: "AB", name: "ignored untranslated label" }, fuels: [{ fuelTechnology: { code: "2" }, measurements: [{ measurementMethod: { code: "WLTP" }, co2GramsPerKm: "140", noxMgPerKm: "40" }] }] } } };
 const finding = (code: string): DeviationFinding => ({ code, priority: "MODERATE", origin: "REGISTRY", description: "Synthetic saved reason", tripRowId: row.id, fuelIndex: 0, measurementIndex: 0 });
 
@@ -63,30 +63,22 @@ describe("saved deviation fact comparisons", () => {
     expect(exactRatio("1", "1", 1n, -1)).toBeNull();
     expect(exactRatio("1e1000000", "1")).toBeNull();
   });
-  it("ties approval coverage to the saved row and frozen periods, not current live state", () => {
-    const analysis = analyzeDeviation(finding("APPROVAL_PERIOD_NOT_COVERED"), check);
-    expect(analysis.comparison.rows[0]).toEqual({ label: "Period", left: "2026-01-01 to 2026-01-31", right: "No approval periods recorded" });
-    expect(analysis.note).toContain("without gaps");
-  });
-  it("shows effective approval coverage with the correct Oslo revocation boundary", () => {
-    const approved = { ...check, approvals: [{ id: "synthetic-approval", registrationNumber: "AB12345", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-15T23:30:00Z", revokedAt: "2026-01-15T23:30:00Z", data: { registrationNumber: "AB12345", fuelTechnology: "2" as const, vehicleCategory: "M1" as const, startDate: "2026-01-01", expiryDate: null } }] };
-    const analysis = analyzeDeviation(finding("APPROVAL_PERIOD_NOT_COVERED"), approved);
-    // UTC Jan 15 at 23:30 is Oslo Jan 16; coverage therefore ends on Jan 15.
-    expect(analysis.comparison.rows[0].right).toContain("2026-01-01 to 2026-01-15");
-    expect(analysis.comparison.rows[0].right).not.toContain("to indefinite");
+  it("compares reporting periods with the saved agreement evidence", () => {
+    const analysis = analyzeDeviation(finding("AGREEMENT_PERIOD_NOT_COVERED"), check);
+    expect(analysis.comparison.rows[0]).toEqual({ label: "Period", left: "01.01.2026 to 31.01.2026", right: "No agreement linked" });
   });
   it("renders a keyboard-operable fact expander with source labels and readable units", () => {
     const html = renderToStaticMarkup(<DeviationFacts finding={finding("NOX_MISMATCH")} check={check} />);
-    expect(html).toContain("<details"); expect(html).toContain("Compare facts");
-    expect(html).toContain("Supplier statistics (calculated)"); expect(html).toContain("Statens Vegvesen (WLTP)");
+    expect(html).toContain("<details"); expect(html).toContain("See compared values");
+    expect(html).toContain("Supplier statistics (calculated)"); expect(html).toContain("Statens vegvesen (WLTP)");
     expect(html).toContain("30 mg/km"); expect(html).toContain("40 mg/km");
     expect(html).toContain("18 g"); expect(html).toContain("600 km");
   });
-  it("lets users narrow analysis to a reporting row and priority", () => {
+  it("identifies the comparison source without exposing priority controls by default", () => {
     const populated = { ...check, findings: [finding("NOX_MISMATCH")] };
     const html = renderToStaticMarkup(<DeviationList check={populated} />);
-    expect(html).toContain("Deviation priority"); expect(html).toContain("Reporting row");
-    expect(html).toContain("Row 1: 2026-01-01 — 2026-01-31"); expect(html).toContain("Showing 1 of 1 deviations");
-    expect(html).toContain("NOx rates do not match"); expect(html).toContain("Compare facts");
+    expect(html).toContain("Compared with Statens vegvesen");
+    expect(html).toContain("NOx rates do not match"); expect(html).toContain("See compared values");
+    expect(html).not.toContain("Deviation priority");
   });
 });

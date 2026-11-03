@@ -8,7 +8,7 @@ import { ApiError } from "@/api/client";
 // Mirrors the backend's PasswordPolicy.MIN_LENGTH
 const MIN_PASSWORD_LENGTH = 12;
 const LOGIN_EMAIL_PLACEHOLDER =
-  import.meta.env.VITE_USE_MOCKS === "true"
+  import.meta.env.VITE_MOCK_AUTH === "true"
     ? "admin@kommune.no"
     : "advisor.hansen@kommune.no";
 

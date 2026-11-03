@@ -19,6 +19,10 @@ updates:
       interval: weekly
     # One PR for all minor/patch bumps; major versions get their own PR since they can break.
     groups:
+      # Listed first because a dependency joins the first group it matches. These share peer ranges,
+      # so bumping one alone breaks npm ci; keep every update type, majors included, in one PR.
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
       npm-minor-and-patch:
         update-types: [minor, patch]
 

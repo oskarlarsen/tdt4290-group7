@@ -30,7 +30,7 @@ class VehicleRelationalStorageTest {
                         assertEquals(1, rows.getInt("strict"))
                         count++
                     }
-                    assertEquals(11, count)
+                    assertEquals(14, count)
                 }
                 statement.executeQuery("PRAGMA table_info(vehicles)").use { rows ->
                     val names = mutableListOf<String>()
@@ -38,12 +38,12 @@ class VehicleRelationalStorageTest {
                         names += rows.getString("name")
                         if (rows.getString("name") == "registration_number") assertEquals(1, rows.getInt("pk"))
                     }
-                    assertEquals(listOf("registration_number", "supplier_id", "created_at"), names)
+                    assertEquals(listOf("registration_number", "agreement_id", "planned", "listed", "created_at", "updated_at"), names)
                 }
                 statement.executeQuery("SELECT sql FROM sqlite_schema WHERE type = 'table'").use { rows ->
                     while (rows.next()) {
                         val ddl = rows.getString("sql")
-                        for (removed in listOf("data_json", "assignment_number", "used_throughout_period", "average_consumption_litres_per_km"))
+                        for (removed in listOf("median_co2_unscaled", "data_json", "assignment_number", "used_throughout_period", "average_consumption_litres_per_km"))
                             assertTrue(removed !in ddl, "Removed column must not exist: $removed")
                     }
                 }
@@ -55,9 +55,9 @@ class VehicleRelationalStorageTest {
     fun decimalsAndAllSupplierFieldsRoundTripAndEstimateUsesOnlySupplierValues() {
         val repository = VehicleRepository(path())
         val input = syntheticTrip("ab-12345", "2026-01-01", "2026-01-31", FuelTechnology.DIESEL,
-            "Make", BodyType.AA, "Model", true, BigDecimal("123.456789"), BigDecimal("44.12"),
+            "Make", BodyType.AA, "Model", true, BigDecimal("123.456789"),
             BigDecimal("1000"), BigDecimal("900"), BigDecimal("100"), BigDecimal("50"),
-            BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"), 3,
+            BigDecimal("950"), BigDecimal("800"), BigDecimal("12.345"),
             BigDecimal("12.3456"), BigDecimal("123.456"), "Synthetic comment")
         val stored = repository.appendTripRows(AppendTripRowsRequest("source", listOf(input)), now).rows.single()
         val loaded = repository.tripRowsForVehicle("AB12345").single()
@@ -76,7 +76,7 @@ class VehicleRelationalStorageTest {
         val invalid = listOf(
             valid.copy(periodStart = "2026-1-01"), valid.copy(periodEnd = "2026-02-30"),
             valid.copy(periodEnd = "2025-12-31"), valid.copy(totalTripKm = BigDecimal("-1")),
-            valid.copy(tripCount = -1), valid.copy(co2GramsPerKm = BigDecimal("0.0000000000000000001")),
+            valid.copy(co2GramsPerKm = BigDecimal("0.0000000000000000001")),
             valid.copy(totalTripKm = BigDecimal("9223372036854775808")),
         )
         invalid.forEach {
@@ -125,25 +125,6 @@ class VehicleRelationalStorageTest {
         }
     }
 
-    @Test
-    fun approvalReplacementClearsOmittedFieldsAndNormalizesThePlate() {
-        val repository = VehicleRepository(path())
-        val first = repository.appendApprovals(AppendApprovalsRequest("source", listOf(
-            syntheticApproval("ab 12345", FuelTechnology.DIESEL, "2025-01-01", "2026-12-31", VehicleCategory.M3),
-        )), now).approvals.single()
-        val replaced = repository.updateApproval(first.id, UpdateApprovalRequest(syntheticApproval("AB12345"), first.updatedAt), now.plusSeconds(1))!!
-        assertEquals(first.id, replaced.id)
-        assertEquals(FuelTechnology.DIESEL, replaced.data.fuelTechnology)
-        assertEquals(VehicleCategory.M1, replaced.data.vehicleCategory)
-        assertNull(replaced.data.expiryDate)
-        assertNull(replaced.sourceName)
-        assertEquals(replaced, repository.approvalForVehicle("ab-12345"))
-        repository.revokeApproval(replaced.id, now.plusSeconds(2))
-        val reapproved = repository.appendApprovals(AppendApprovalsRequest(approvals = listOf(
-            syntheticApproval("AB12345"),
-        )), now.plusSeconds(3)).approvals.single()
-        assertTrue(reapproved.id != first.id)
-    }
 
     @Test
     fun legacySchemaIsRefusedWithoutAlteringOrReadingItsRecords() {

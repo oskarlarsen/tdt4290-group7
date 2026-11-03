@@ -114,6 +114,8 @@ internal fun projectRegistryVehicle(element: JsonElement, requestedPlate: String
         bodyType = technical.at("karosseriOgLasteplan", "karosseritype").registryCode()?.let { bodyCode(it.code) },
         euroClass = environment.at("euroKlasse").registryCode(),
         fuels = fuels,
+        lastApprovedInspectionDate = vehicle.at("periodiskKjoretoyKontroll", "sistGodkjent").dateOrNull(),
+        nextInspectionDueDate = vehicle.at("periodiskKjoretoyKontroll", "kontrollfrist").dateOrNull(),
     )
 }
 
@@ -145,4 +147,9 @@ private fun JsonElement?.registryCode(): RegistryCode? = when (this) {
 private fun JsonElement?.decimalOrNull(): java.math.BigDecimal? = when (this) {
     null, JsonNull -> null
     else -> Json.decodeFromJsonElement(DecimalSerializer, this)
+}
+
+private fun JsonElement?.dateOrNull(): String? = stringOrNull()?.also {
+    require(it.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Invalid inspection date" }
+    java.time.LocalDate.parse(it)
 }

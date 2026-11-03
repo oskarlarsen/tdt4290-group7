@@ -1,284 +1,149 @@
 # TDT4290 Group 7 — Environmental Monitoring & Contract Compliance
 
-TDT4290 project with a React/TypeScript frontend and a Kotlin/Ktor backend. The backend stores vehicle statistics and approvals and checks one registration number against local approvals and Statens Vegvesen.
+A municipal dashboard for following up suppliers and their environmental contract requirements. Administrators can review supplier risks, manage vehicle agreements and compare reported vehicle data with Statens vegvesen.
 
-## Repository layout
+The application is a prototype: some areas have working workflows, while others are demonstration screens or placeholders.
 
-- `frontend/`: React + TypeScript + Vite dashboard.
-- `backend/`: Ktor HTTP API, SQLite storage, and Statens Vegvesen integration.
+## What is included
 
-See the [vehicle API guide](backend/README.md#vehicle-api) for endpoints, JSON examples and check behavior.
+| Area | Purpose and current status |
+|---|---|
+| Dashboard | Demo overview of totals/metrics, compliance rates, supplier risks and alerts. Includes placeholder CSV export button. |
+| Suppliers | Demo directory with supplier details, notes and follow-up status. |
+| Contracts | Demo contract directory, compliance summaries and placeholder CSV export.  |
+| Vehicles | Backend-connected supplier and agreement management, registered/planned vehicles, statistics, registry checks and change history with undo. |
+| Environmental Certificates | Placeholder page. A separate PDF/OCR tool can extract and parse certificates. |
+| Energy & Fuel | Placeholder page for energy and fuel reporting. |
+| Risk & Prediction | Placeholder page for risk analysis. |
+| Alerts | Placeholder page for alerts. |
+| Reports | Placeholder page. |
+| Supplier workspace | Navigation for dashboard, company, contracts, vehicles, certificates, energy, compliance, risk, alerts and required actions; the pages are placeholders. |
+| Authentication | Admin/supplier sign-in, logout and session handling. Password-reset API exists; email delivery is not connected. |
 
-The admin vehicle page at `/admin/vehicles` supports statistics, approval periods, saved checks and side-by-side deviation analysis. See the [frontend guide](frontend/README.md). Excel upload is a disabled placeholder; supplier vehicle pages are unchanged.
+Dashboard, supplier and contract demo data are separate and not connected to the vehicle database, i.e suppliers under "Suppliers" and "Vehicles" are not linked.
 
-## Shared local configuration
+## Run locally
 
-Use one **root `.env`** for Gradle, Vite and Docker Compose. `.env.example` is the only shared template; it contains no credentials. If root `.env` does not exist, copy it once from the repository root:
+Use local npm + Gradle for development. [Docker Compose](#run-with-docker) is an alternative for running both services together.
+
+### 1. Prerequisites
+
+Install Git, **Node.js 22.22.2 or newer within the Node 22 release line** (with npm), and **JDK 21**. Node 22 matches CI; the minimum version also supports the locked test dependencies. Gradle is included through the repository's wrapper.
+
+Check your installations in a terminal:
+
+```sh
+git --version
+node --version
+npm --version
+java -version
+```
+
+### 2. Get the project and configure it
+
+```sh
+git clone https://github.com/oskarlarsen/tdt4290-group7.git
+cd tdt4290-group7
+```
+
+Create `.env` in the repository root. Reuse it if you already have one.
+
+PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Do not overwrite a configured file. Fill `JWT_SECRET`, `SEED_ADMIN_PASSWORD` and `SEED_SUPPLIER_PASSWORD` privately before starting the backend; optionally set `SVV_API_KEY`. These values persist between restarts. Use literal, single-line values; single-quote secrets containing `$` or `#`. Do not use `${OTHER_VARIABLE}` references: the standalone backend does not expand them.
+macOS:
 
-For an existing checkout with `backend/.env` or `frontend/.env`, run this instead of copying the template:
-
-```powershell
-.\scripts\Migrate-LocalEnv.ps1
+```sh
+cp .env.example .env
 ```
 
-The migration preserves saved values, stops on conflicting duplicate keys and moves originals to Git-ignored `.env-backups/`. Missing authentication settings remain blank for you to fill. Backups contain secrets: keep them private and remove them yourself once verified. Retired per-service files are no longer read.
+Open `.env` in your editor and fill in:
 
-Explicit process environment values take precedence over the root file, including blank values. A blank `SVV_API_KEY` in the process disables live requests even if the file contains a key; blank required authentication settings prevent startup. Remove stale session overrides if you want the saved file value. Restart the backend/Vite after changes; rebuild the frontend Docker image after changing `VITE_` settings.
+| Setting | Value to provide |
+|---|---|
+| `JWT_SECRET` | A generated signing secret. |
+| `SEED_ADMIN_PASSWORD` | Your password for the seeded admin account. |
+| `SEED_SUPPLIER_PASSWORD` | Your password for the seeded supplier account. |
 
-Only `VITE_` settings are exposed to browser code. Never give backend secrets that prefix. Avoid mode-specific `.env.local`/`.env.development` variants for this shared setup: Vite supports them, but the backend reads only root `.env`. Compose passes backend settings only to the backend and public frontend build arguments only to the frontend; it does not copy the root file into either image. Production deployments should inject secrets through their secret manager rather than shipping a development `.env`.
+Generate a signing secret with:
 
-## Frontend setup
+```sh
+node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
+```
 
-From the repository root in PowerShell:
+Keep `VITE_USE_MOCKS=true` and `VITE_MOCK_AUTH=false` as supplied: this enables demo pages alongside real backend sign-in and vehicles.
+
+`SVV_API_KEY` is optional for startup. Adding or replacing a registered vehicle requires a working "Statens-vegvesen-API-key". Without one, you can still manage suppliers, agreements and planned entries.
+
+See [configuration](docs/configuration.md) for optional settings and troubleshooting.
+
+### 3. Start the backend
+
+From the repository root:
+
+```sh
+cd backend
+```
+
+PowerShell:
 
 ```powershell
+.\gradlew.bat run
+```
+
+macOS:
+
+```sh
+./gradlew run
+```
+
+The API runs at `http://localhost:8080`. Open `http://localhost:8080/health` to check that it returns `{"status":"UP"}`. SQLite is created automatically; no database installation is needed.
+
+### 4. Start the frontend
+
+Open a second terminal in the repository root:
+
+```sh
 cd frontend
 npm ci
 npm run dev
 ```
 
-Configure root `.env` first. Other commands: `npm run build`, `npm test -- --run`, and `npm run preview`.
+Open **http://localhost:5173**. Use `localhost` for both the frontend and API so the login cookie works.
 
-The example frontend configuration enables mock login and points at `http://localhost:8080/api`. The admin vehicle page always uses the real backend, regardless of the mock toggle. For real backend login, set `VITE_USE_MOCKS=false`; other prototype pages may still depend on their mock data layer. The backend permits the Vite origin `http://localhost:5173` by default. Authentication routes use cookies; vehicle routes are documented in the backend guide.
-
-## Backend setup
-
-Install JDK 21. From the repository root:
-
-```powershell
-cd backend
-.\gradlew.bat test
-.\gradlew.bat run
-```
-
-The backend discovers root `.env` automatically when launched from `backend/` or the repository root. No repeated PowerShell credential assignments are needed. Tests use isolated synthetic configuration and do not read your saved Statens Vegvesen key or database path. Keep the server terminal open. In another terminal:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
-```
-
-Expected response: `{"status":"UP"}`. Stop with `Ctrl+C`.
-
-The backend runs without a Statens Vegvesen key: local data remains usable, but a registry lookup without a usable snapshot reports `NOT_CONFIGURED`. SQLite is created automatically at `backend/data/vehicles.db` when running from `backend/`.
-
-Vehicle storage uses SQLite with explicit relationships and selected registry fields. Checks cover every saved reporting row, approval periods and registry comparisons, with high/moderate deviations. History is retained indefinitely; the default 14-day cache controls freshness only. See the [API guide](backend/README.md#vehicle-api) and [database setup](backend/README.md#database-compatibility-and-safe-development-setup).
-
-## Local data and credentials
-
-Keep the Statens Vegvesen key and authentication secrets in ignored root `.env`, never in browser-visible `VITE_` settings or vehicle request bodies. Keep confidential datasets, real vehicle responses, logs containing them, and databases local. Agents must not inspect them. Shared examples must use synthetic data.
-
-The backend includes cookie-based JWT authentication and clears the cookie on logout. Vehicle endpoints remain unauthenticated. The default host and Compose's published backend port are bound to loopback for local development. Authentication and authorization for vehicle endpoints are pending separate work; implement them before deploying or exposing the backend to other machines.
-
-## Run the full stack with Docker
-
-From the repository root:
-
-```powershell
-# Configure the existing root .env first.
-docker compose up --build
-```
-
-Compose requires the three authentication values from the same root `.env` used for native development. Docker is optional; running Vite and Gradle directly is supported. `API_ORIGIN` controls the frontend container's Content-Security-Policy and must match the origin of `VITE_API_BASE_URL`. `HOST`, `PORT`, `VEHICLE_DB_PATH` and host-specific `TESSERACT_PATH` overrides in the template are standalone-only; containers retain their listen address/port and persistent volume.
-
-Known existing build blocker: `backend/Dockerfile` currently has a malformed Gradle command (`./gradlewhttps://...`). That unrelated line must be corrected before a full Compose image build can succeed; configuration centralization does not fix it.
-
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8080`
-
-Compose retains SQLite in the `vehicle-backend-data` named volume. Authentication demo users are in memory and recreated on restart, unlike vehicle data. See [authentication](backend/README.md#authentication) for endpoints and account configuration.
-
-## Frontend environment variables
-
-| Variable | Purpose |
-|---|---|
-| `VITE_API_BASE_URL` | Base URL for the real backend API (normally `http://localhost:8080/api`) |
-| `VITE_USE_MOCKS` | Enables mock login and existing prototype mock layers; does not mock the admin vehicle page |
-
-Set `VITE_USE_MOCKS=true` in root `.env` to explore existing mock pages without the
-backend. The admin vehicle page still requires the backend. See [Mock data architecture](#mock-data-architecture)
-below for how the prototype mock layers are structured.
-
-## Test accounts (mock login)
+### 5. Sign in
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@kommune.no` | `admin123` |
-| Supplier | `supplier@leverandor.no` | `supplier123` |
+| Admin | `advisor.hansen@kommune.no` | Your `SEED_ADMIN_PASSWORD` value. |
+| Supplier | `supplier@nordvik.no` | Your `SEED_SUPPLIER_PASSWORD` value. |
 
-## Tech stack
+Use the admin account to explore the implemented workflows. Vehicles starts empty; create a supplier and agreement before adding vehicles. Supplier sign-in opens the placeholder workspace.
 
-- **React 18 + TypeScript + Vite**
-- **React Router v6** — role-based routing (`/admin/*`, `/supplier/*`), protected routes
-- **TanStack Query** — server state, caching, and mutations (including for mock data — see below)
-- **Tailwind CSS** — custom "Nordic Municipal Compliance" design system (see below)
-- **lucide-react** — icons
+## Run with Docker
 
-## Design system
+Install and start Docker with Compose support. From the repository root, complete the `.env` configuration above, then run:
 
-Custom Tailwind theme in `tailwind.config.ts`:
-
-- **Colors:** `primary` (dark green, brand/buttons), `secondary` (mid green, links/accents),
-  `tertiary` (light green, success/compliant states), `neutral` (blue-slate, body text/UI chrome)
-  — each a full 50–950 shade scale, not single hex values.
-- **Type:** `font-headline` (Geist, page titles), `font-body` (Inter, default body text),
-  `font-mono` (JetBrains Mono, field labels and data-dense UI) — loaded via Google Fonts in `index.html`.
-
-## Project Structure
-
-```text
-src/
-├── App.tsx
-├── main.tsx
-├── vite-env.d.ts
-│
-├── api/                         # API layer for backend/mock requests
-│   ├── alerts.ts
-│   ├── auth.ts
-│   ├── certificates.ts
-│   ├── client.ts
-│   ├── contracts.ts
-│   ├── dashboard.ts
-│   ├── energy.ts
-│   ├── notifications.ts
-│   ├── risk.ts
-│   ├── suppliers.ts
-│   └── vehicles.ts
-│
-├── app/                         # Application routing, layouts and route protection
-│   ├── AdminLayout.tsx
-│   ├── ProtectedRoute.tsx
-│   ├── RoleRedirect.tsx
-│   ├── router.tsx
-│   └── SupplierLayout.tsx
-│
-├── components/                  # Reusable UI and feature components
-│   ├── alerts/
-│   │   ├── AlertActions.tsx
-│   │   └── AlertCard.tsx
-│   │
-│   ├── certificates/
-│   │   └── CertificateTable.tsx
-│   │
-│   ├── charts/
-│   │   ├── FuelMixDonut.tsx
-│   │   ├── ProgressBar.tsx
-│   │   └── TrendLineChart.tsx
-│   │
-│   ├── risk/
-│   │   ├── RiskClassificationBar.tsx
-│   │   ├── RiskFactorsList.tsx
-│   │   └── RiskRankedTable.tsx
-│   │
-│   ├── suppliers/
-│   │   └── TopRiskSuppliersTable.tsx
-│   │
-│   ├── ui/
-│   │   ├── DataTable.tsx
-│   │   ├── ExportButton.tsx
-│   │   ├── FilterSidebar.tsx
-│   │   ├── KpiCard.tsx
-│   │   ├── NotificationBell.tsx
-│   │   ├── ProfileMenu.tsx
-│   │   ├── QuickActions.tsx
-│   │   ├── RiskBadge.tsx
-│   │   ├── SearchSuppliers.tsx
-│   │   ├── StatusBadge.tsx
-│   │   └── TopBar.tsx
-│   │
-│   └── vehicles/
-│       └── VehicleTable.tsx
-│
-├── context/                     # Global React context
-│   └── AuthContext.tsx
-│
-├── hooks/                       # Reusable React hooks for data and application logic
-│   ├── useAlerts.ts
-│   ├── useAuth.ts
-│   ├── useCertificates.ts
-│   ├── useContracts.ts
-│   ├── useDashboardSummary.ts
-│   ├── useEnergy.ts
-│   ├── useNotifications.ts
-│   ├── useRisk.ts
-│   ├── useSuppliers.ts
-│   └── useVehicles.ts
-│
-├── mocks/                       # Mock data and mock request handlers
-│   ├── authMock.ts
-│   ├── db.ts
-│   ├── handlers.ts
-│   └── fixtures/
-│       ├── certificates.json
-│       ├── risk.json
-│       └── vehicles.json
-│
-├── pages/                       # Application pages organized by user role
-│   ├── admin/
-│   │   ├── Alerts.tsx
-│   │   ├── Certificates.tsx
-│   │   ├── Contracts.tsx
-│   │   ├── Dashboard.tsx
-│   │   ├── Energy.tsx
-│   │   ├── Reports.tsx
-│   │   ├── RiskAndPrediction.tsx
-│   │   ├── SupplierDetails.tsx
-│   │   ├── Suppliers.tsx
-│   │   └── Vehicles.tsx
-│   │
-│   ├── auth/
-│   │   ├── Login.tsx
-│   │   └── Unauthorized.tsx
-│   │
-│   └── supplier/
-│       ├── Dashboard.tsx
-│       ├── MyAlerts.tsx
-│       ├── MyCertificates.tsx
-│       ├── MyCompany.tsx
-│       ├── MyCompliance.tsx
-│       ├── MyContracts.tsx
-│       ├── MyEnergy.tsx
-│       ├── MyRiskAndPrediction.tsx
-│       ├── MyVehicles.tsx
-│       └── RequiredActions.tsx
-│
-├── services/                    # Application-level services
-│   └── notificationService.ts
-│
-├── styles/                      # Global styling
-│   └── globals.css
-│
-├── types/                       # Shared TypeScript domain types
-│   ├── alert.ts
-│   ├── auth.ts
-│   ├── certificate.ts
-│   ├── contract.ts
-│   ├── dashboard.ts
-│   ├── energy.ts
-│   ├── notification.ts
-│   ├── risk.ts
-│   ├── supplier.ts
-│   └── vehicle.ts
-│
-└── utils/                       # Shared utility functions
-    ├── csv.ts
-    ├── formatDate.ts
-    ├── formatNumber.ts
-    ├── formatSyncTime.ts
-    ├── initials.ts
-    └── riskColor.ts
+```sh
+docker compose up --build
 ```
 
-## Scripts
+Open **http://localhost:3000** and sign in with the same accounts. The backend uses port `8080`, so stop the local backend before starting Docker. Both startup paths use the same configuration file, but keep separate vehicle databases.
 
-```bash
-npm run dev       # start the dev server
-npm run build     # type-check (tsc -b) + production build
-npm run preview   # preview the production build locally
-npm run test      # run tests (vitest)
+```sh
+docker compose down
 ```
+
+This stops the stack and retains its vehicle database in the named volume. After source or frontend configuration changes, run `docker compose up --build` again. The optional OCR tool is not included in the container setup.
+
+## Development and troubleshooting
+
+- [Frontend](frontend/README.md): commands and code navigation.
+- [Backend](backend/README.md): commands, storage and integrations.
+- [API reference](docs/api.md): implemented endpoints and request examples.
+- [Certificate parser](docs/certificate-parser.md): optional PDF/OCR setup.
+- [Configuration and troubleshooting](docs/configuration.md): login, startup and existing-data issues.
+- [Repository rules](.github/rulesets/README.md): maintainer instructions for branch protection.
