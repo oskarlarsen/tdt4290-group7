@@ -11,6 +11,14 @@ type CertificateResponse = {
   contractId: string | null;
 };
 
+export type CertificateUpdate = {
+  supplierName: string;
+  certificateType: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  contractId: string | null;
+};
+
 function toStandard(value: string): CertificateStandard {
   switch (value.trim().toLowerCase()) {
     case "iso 14001":
@@ -39,6 +47,7 @@ function toCertificate(response: CertificateResponse): Certificate {
     contractId: response.contractId ?? "",
     validUntil: response.expiryDate,
     supplierName: response.supplierName,
+    certificateType: response.certificateType,
     issueDate: response.issueDate,
     sourceFile: response.sourceFile,
   };
@@ -63,4 +72,16 @@ export async function uploadCertificate(
     body: form,
   });
   return toCertificate(response);
+}
+
+export async function updateCertificate(id: string, updates: CertificateUpdate): Promise<Certificate> {
+  const response = await apiFetch<CertificateResponse>(`/certificates/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+  return toCertificate(response);
+}
+
+export function deleteCertificate(id: string): Promise<void> {
+  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

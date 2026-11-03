@@ -7,11 +7,15 @@ import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
+import io.ktor.client.request.delete
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import java.nio.file.Path
 import java.time.Duration
@@ -75,7 +79,30 @@ class CertificateRoutesTest {
             uploaded.getValue("id").jsonPrimitive.content,
             records.single().jsonObject.getValue("id").jsonPrimitive.content,
         )
-        assertEquals(1, CertificateRepository(certificateDatabase).getAll().size)
+        val certificateId = uploaded.getValue("id").jsonPrimitive.content
+        val edited = adminClient.put("/api/certificates/$certificateId") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2025-01-15","expiryDate":"2028-12-31","contractId":"CONTRACT-42"}""",
+            )
+        }
+        assertEquals(HttpStatusCode.OK, edited.status, edited.bodyAsText())
+        val editedRecord = Json.parseToJsonElement(edited.bodyAsText()).jsonObject
+        assertEquals("Updated Transport AS", editedRecord.getValue("supplierName").jsonPrimitive.content)
+        assertEquals("2025-01-15", editedRecord.getValue("issueDate").jsonPrimitive.content)
+        assertEquals("CONTRACT-42", editedRecord.getValue("contractId").jsonPrimitive.content)
+        assertEquals("iso-14001.pdf", CertificateRepository(certificateDatabase).getById(certificateId)?.sourceFile)
+
+        val invalidEdit = adminClient.put("/api/certificates/$certificateId") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2029-01-01","expiryDate":"2028-12-31"}""",
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, invalidEdit.status)
+
+        assertEquals(HttpStatusCode.NoContent, adminClient.delete("/api/certificates/$certificateId").status)
+        assertEquals(0, CertificateRepository(certificateDatabase).getAll().size)
     }
 
     private fun databasePath() = Path.of("build", "test-data", "certificate-${UUID.randomUUID()}.db")

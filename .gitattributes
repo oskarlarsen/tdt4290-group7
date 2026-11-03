@@ -1,1 +1,2 @@
 sample-certificates/*.pdf -text -diff
+mock-environmental-certificate.pdf -text -diff

@@ -22,6 +22,13 @@ tasks.register<JavaExec>("runCertificateParser") {
     mainClass.set("com.tdt4290group7.backend.certificates.CertificateParserRunnerKt")
 }
 
+tasks.register<JavaExec>("runCertificateGenerator") {
+    group = "application"
+    description = "Generate synthetic certificate PDFs for local testing"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.tdt4290group7.backend.certificates.CertificateSampleGeneratorKt")
+}
+
 repositories {
     mavenCentral()
 }

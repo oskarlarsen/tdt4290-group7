@@ -2,8 +2,10 @@ import { apiFetch } from "./client";
 import * as mock from "../mocks/authMock";
 import type { LoginRequest, LoginResponse, AuthUser } from "@/types/auth";
 
-// Keep demo data independent of authentication: Vehicles needs a real admin session.
-const USE_MOCK_AUTH = import.meta.env.VITE_MOCK_AUTH === "true";
+// Keep mock authentication separate from mock data so real API features can be tested.
+// Keep demo data independent of authentication: admin API features need a real session.
+const USE_MOCK_AUTH =
+  (import.meta.env.VITE_MOCK_AUTH ?? import.meta.env.VITE_USE_MOCK_AUTH) === "true";
 
 // Backend response determines the user's role and redirect target
 export function login(payload: LoginRequest): Promise<LoginResponse> {

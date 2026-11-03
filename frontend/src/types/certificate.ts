@@ -27,6 +27,7 @@ export type Certificate = {
   contractId: string;
   validUntil: string | null; // ISO date (YYYY-MM-DD)
   supplierName?: string;
+  certificateType?: string;
   issueDate?: string | null;
   sourceFile?: string;
 };

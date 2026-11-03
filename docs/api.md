@@ -36,8 +36,12 @@ Certificate routes require an administrator session.
 |---|---|---|
 | GET | `/api/certificates` | List extracted certificate metadata, most urgent first. |
 | POST | `/api/certificates` | Upload one PDF, extract its certificate type and dates, and store the metadata. |
+| PUT | `/api/certificates/{id}` | Correct saved supplier, certificate type, dates and optional contract reference. |
+| DELETE | `/api/certificates/{id}` | Delete certificate metadata. |
 
 `POST /api/certificates` accepts `multipart/form-data` fields `supplierName`, `file` and optional `contractId`. Uploads are limited to 8 MB and 25 pages. Text-based PDFs use PDFBox; scanned pages require Tesseract with Norwegian and English language data. The response includes the parsed `certificateType`, `issueDate`, `expiryDate`, `sourceFile`, `contractId` and recalculated status. Check parsed values before relying on them as compliance evidence.
+
+`PUT /api/certificates/{id}` accepts JSON fields `supplierName`, `certificateType`, optional `issueDate`, `expiryDate` and `contractId`. Dates use `YYYY-MM-DD`; issue date cannot be after expiry. `DELETE` returns `204` when the record is removed.
 
 The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 

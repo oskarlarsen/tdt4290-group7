@@ -17,9 +17,12 @@ import { useContracts } from "../../hooks/useContracts";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { CertificateTable } from "../../components/certificates/CertificateTable";
 import type { CertificateRow } from "../../components/certificates/CertificateTable";
+import { CertificateEditDialog } from "../../components/certificates/CertificateEditDialog";
 import { CertificateDetailsDrawer } from "../../components/certificates/CertificateDetailsDrawer";
 import { CertificateAttentionCard } from "../../components/certificates/CertificateAttentionCard";
 import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
+import { useDeleteCertificate } from "../../hooks/useCertificates";
+import type { Certificate } from "../../types/certificate";
 import {
   CERTIFICATE_STANDARD_LABELS,
   CERTIFICATE_THRESHOLDS,
@@ -56,11 +59,13 @@ export default function Certificates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates();
   const { data: contracts, isLoading: contractsLoading, isError: contractsError } = useContracts();
+  const removeCertificate = useDeleteCertificate();
 
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null);
   const isUploadOpen = searchParams.get("upload") === "true";
 
   function setUploadOpen(open: boolean) {
@@ -69,6 +74,19 @@ export default function Certificates() {
       if (open) next.set("upload", "true");
       else next.delete("upload");
       return next;
+    });
+  }
+
+  function handleDelete(certificate: Certificate) {
+    const supplier = certificate.supplierName ?? "this supplier";
+    if (!window.confirm(`Delete the ${certificate.certificateType ?? "certificate"} for ${supplier}? This cannot be undone.`)) {
+      return;
+    }
+    removeCertificate.reset();
+    removeCertificate.mutate(certificate.id, {
+      onSuccess: () => {
+        if (selectedId === certificate.id) setSelectedId(null);
+      },
     });
   }
 
@@ -271,12 +289,21 @@ export default function Certificates() {
         <CertificateTable
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.certificate.id)}
+          onEdit={setEditingCertificate}
+          onDelete={handleDelete}
           emptyMessage={
             certificates.length === 0
               ? "No certificate records available."
               : "No certificates match the current filters."
           }
         />
+        {removeCertificate.isError && (
+          <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {removeCertificate.error instanceof Error
+              ? removeCertificate.error.message
+              : "Could not delete certificate."}
+          </p>
+        )}
 
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
@@ -316,6 +343,12 @@ export default function Certificates() {
       <CertificateDetailsDrawer row={selectedRow} onClose={() => setSelectedId(null)} />
 
       {isUploadOpen && <CertificateUploadDialog contracts={contracts} onClose={() => setUploadOpen(false)} />}
+      {editingCertificate && (
+        <CertificateEditDialog
+          certificate={editingCertificate}
+          onClose={() => setEditingCertificate(null)}
+        />
+      )}
     </div>
   );
 }

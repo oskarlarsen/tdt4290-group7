@@ -2,6 +2,14 @@
 
 React, TypeScript and Vite application with admin and supplier workspaces. See the [project overview and setup](../README.md) for feature availability, prerequisites, configuration and accounts.
 
+## Certificates
+
+- Upload a supplier certificate as a PDF (up to 8 MB and 25 pages). The backend extracts its type and issue/expiry dates and shows its current status, sorted by urgency. The overview also shows the contract reference; **Details** reveals the source filename and record ID.
+- Scanned PDFs require Tesseract OCR configured on the backend; searchable PDFs use native text extraction.
+- The original PDF is discarded after processing. Extracted metadata is saved in the SQLite database and survives backend restarts. Confirm parser results against the source before taking action; a missing expiry date is flagged for review.
+- Administrators can edit supplier, certificate type, issue/expiry dates, and contract reference, or delete a certificate after confirmation. Editing metadata does not reprocess the PDF; upload the document again if its extracted details need to be refreshed.
+- Certificate routes require a real administrator login. They are not served by mock data or mock authentication.
+
 ## Development
 
 Configure the root `.env` and start the backend first. Then, from `frontend/`:

@@ -10,6 +10,7 @@ import com.tdt4290group7.backend.plugins.AUTH_JWT
 import com.tdt4290group7.backend.plugins.ApiError
 import com.tdt4290group7.backend.vehicles.adminActor
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.server.application.Application
@@ -18,16 +19,20 @@ import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.bodylimit.RequestBodyLimit
+import io.ktor.server.request.receive
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.respond
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -50,6 +55,15 @@ private data class CertificateResponse(
     val contractId: String?,
 )
 
+@Serializable
+private data class UpdateCertificateRequest(
+    val supplierName: String,
+    val certificateType: String,
+    val issueDate: String? = null,
+    val expiryDate: String? = null,
+    val contractId: String? = null,
+)
+
 fun Application.configureCertificateRoutes(repository: CertificateRepository) {
     routing {
         authenticate(AUTH_JWT) {
@@ -62,6 +76,68 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository) {
                         .sortedWith(compareBy<Certificate> { it.status.priority }.thenBy { it.expiryDate })
                         .map(Certificate::toResponse)
                     call.respond(certificates)
+                }
+
+                put("/{id}") {
+                    if (call.adminActor() == null) return@put
+                    val id = call.parameters["id"]
+                    val existing = id?.let(repository::getById)
+                    if (existing == null) {
+                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found"))
+                        return@put
+                    }
+
+                    val request = try {
+                        call.receive<UpdateCertificateRequest>()
+                    } catch (_: ContentTransformationException) {
+                        call.respond(HttpStatusCode.BadRequest, ApiError("Invalid certificate details"))
+                        return@put
+                    }
+
+                    val supplierName = request.supplierName.trim()
+                    val certificateType = request.certificateType.trim()
+                    val contractId = request.contractId?.trim()?.ifEmpty { null }
+                    if (supplierName.isEmpty() || supplierName.length > 200 ||
+                        certificateType.isEmpty() || certificateType.length > 200 ||
+                        (contractId != null && contractId.length > 200)
+                    ) {
+                        call.respond(HttpStatusCode.BadRequest, ApiError("Invalid certificate details"))
+                        return@put
+                    }
+
+                    val issueDate = request.issueDate.toLocalDateOrNull()
+                    val expiryDate = request.expiryDate.toLocalDateOrNull()
+                    if ((request.issueDate != null && issueDate == null) ||
+                        (request.expiryDate != null && expiryDate == null) ||
+                        (issueDate != null && expiryDate != null && issueDate.isAfter(expiryDate))
+                    ) {
+                        call.respond(HttpStatusCode.BadRequest, ApiError("Certificate dates are invalid"))
+                        return@put
+                    }
+
+                    val updated = existing.copy(
+                        supplierName = supplierName,
+                        certificateType = certificateType,
+                        issueDate = issueDate,
+                        expiryDate = expiryDate,
+                        contractId = contractId,
+                        status = calculateStatus(expiryDate, LocalDate.now(OSLO_ZONE)),
+                    )
+                    if (!repository.update(updated)) {
+                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found"))
+                        return@put
+                    }
+                    call.respond(updated.toResponse())
+                }
+
+                delete("/{id}") {
+                    if (call.adminActor() == null) return@delete
+                    val id = call.parameters["id"]
+                    if (id == null || !repository.delete(id)) {
+                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found"))
+                        return@delete
+                    }
+                    call.respond(HttpStatusCode.NoContent)
                 }
 
                 post {
@@ -143,6 +219,15 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository) {
                 }
             }
         }
+    }
+}
+
+private fun String?.toLocalDateOrNull(): LocalDate? {
+    if (this == null) return null
+    return try {
+        LocalDate.parse(this)
+    } catch (_: DateTimeException) {
+        null
     }
 }
 

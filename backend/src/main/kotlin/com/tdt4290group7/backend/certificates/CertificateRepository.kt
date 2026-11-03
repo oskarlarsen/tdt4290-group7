@@ -49,6 +49,31 @@ class CertificateRepository(databasePath: Path) {
         }
     }
 
+    fun update(certificate: Certificate): Boolean =
+        DriverManager.getConnection(databaseUrl).use { db ->
+            db.prepareStatement(
+                """UPDATE certificates
+                    SET supplier_name = ?, certificate_type = ?, issue_date = ?, expiry_date = ?, contract_id = ?
+                    WHERE id = ?""".trimIndent(),
+            ).use { statement ->
+                statement.setString(1, certificate.supplierName)
+                statement.setString(2, certificate.certificateType)
+                statement.setString(3, certificate.issueDate?.toString())
+                statement.setString(4, certificate.expiryDate?.toString())
+                statement.setString(5, certificate.contractId)
+                statement.setString(6, certificate.id)
+                statement.executeUpdate() == 1
+            }
+        }
+
+    fun delete(id: String): Boolean =
+        DriverManager.getConnection(databaseUrl).use { db ->
+            db.prepareStatement("DELETE FROM certificates WHERE id = ?").use { statement ->
+                statement.setString(1, id)
+                statement.executeUpdate() == 1
+            }
+        }
+
     fun getAll(): List<Certificate> =
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
