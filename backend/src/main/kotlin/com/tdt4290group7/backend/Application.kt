@@ -58,8 +58,11 @@ fun Application.module(
     val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
     val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
     configureRouting(vehicleRepository, registry, cacheTtl)
-    val certificateDatabasePath = vehicleDatabasePath.resolveSibling(
-        "${vehicleDatabasePath.fileName.toString().substringBeforeLast('.')}-certificates.db",
+    val certificateDatabasePath = Path.of(
+        backendSetting("CERTIFICATE_DB_PATH")
+            ?: vehicleDatabasePath.resolveSibling(
+                "${vehicleDatabasePath.fileName.toString().substringBeforeLast('.')}-certificates.db",
+            ).toString(),
     )
     configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath))
     configureAuthRoutes(logResetTokens)

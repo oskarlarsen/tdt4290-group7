@@ -11,6 +11,7 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE:-tdt4290-frontend}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in your .env file (see .env.example)}
       SEED_SUPPLIER_PASSWORD: ${SEED_SUPPLIER_PASSWORD:?Set SEED_SUPPLIER_PASSWORD in your .env file (see .env.example)}
+      CERTIFICATE_DB_PATH: ${CERTIFICATE_DB_PATH:-/app/data/certificates.db}
       SVV_API_KEY: ${SVV_API_KEY:-}
       SVV_CACHE_TTL_DAYS: ${SVV_CACHE_TTL_DAYS:-14}
       APP_ENV: ${APP_ENV:-prod}
@@ -39,7 +40,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
-        VITE_USE_MOCKS: ${VITE_USE_MOCKS:-true}
+        VITE_USE_MOCKS: ${VITE_USE_MOCKS:-false}
         VITE_USE_MOCK_AUTH: ${VITE_USE_MOCK_AUTH:-false}
     environment:
       # Must match the origin of VITE_API_BASE_URL, or the CSP blocks API calls.
