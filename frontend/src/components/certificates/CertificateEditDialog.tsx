@@ -2,15 +2,12 @@ import type { FormEvent } from "react";
 import { X } from "lucide-react";
 import { useUpdateCertificate } from "../../hooks/useCertificates";
 import type { Certificate } from "../../types/certificate";
-import type { ProcurementContract } from "../../api/procurement";
 
 export function CertificateEditDialog({
   certificate,
-  contracts,
   onClose,
 }: {
   certificate: Certificate;
-  contracts: ProcurementContract[];
   onClose: () => void;
 }) {
   const update = useUpdateCertificate();
@@ -18,18 +15,15 @@ export function CertificateEditDialog({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const contractId = String(formData.get("contractId"));
-    const contract = contracts.find((item) => item.id === contractId);
-    if (!contract) return;
     update.mutate(
       {
         id: certificate.id,
         updates: {
-          supplierName: contract.supplierName,
+          supplierName: String(formData.get("supplierName")).trim(),
           certificateType: String(formData.get("certificateType")).trim(),
           issueDate: String(formData.get("issueDate")) || null,
           expiryDate: String(formData.get("expiryDate")) || null,
-          contractId,
+          contractId: String(formData.get("contractId")).trim() || null,
         },
       },
       { onSuccess: onClose },
@@ -73,6 +67,16 @@ export function CertificateEditDialog({
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-neutral-700">
+            Supplier
+            <input
+              required
+              maxLength={200}
+              name="supplierName"
+              defaultValue={certificate.supplierName ?? ""}
+              className="mt-1 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm font-normal outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+            />
+          </label>
+          <label className="text-sm font-medium text-neutral-700">
             Certificate type
             <input
               required
@@ -101,20 +105,13 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700 sm:col-span-2">
-            Supplier and contract
-            <select
-              required
+            Contract reference
+            <input
+              maxLength={200}
               name="contractId"
               defaultValue={certificate.contractId}
-              className="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-            >
-              <option value="">Select a supplier contract…</option>
-              {contracts.map((contract) => (
-                <option key={contract.id} value={contract.id}>
-                  {contract.supplierName} — {contract.name} ({contract.reference})
-                </option>
-              ))}
-            </select>
+              className="mt-1 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm font-normal outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+            />
           </label>
         </div>
 

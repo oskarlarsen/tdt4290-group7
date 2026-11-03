@@ -11,7 +11,7 @@ const vehicle: Vehicle = { registrationNumber: "AB12345", agreementId: "agreemen
 
 describe("agreement vehicle actions", () => {
   it("uses a real session while prototype data remains enabled", async () => {
-    vi.stubEnv("VITE_USE_MOCK_AUTH", "false");
+    vi.stubEnv("VITE_MOCK_AUTH", "false");
     vi.stubEnv("VITE_USE_MOCKS", "true");
     const fetch = vi.fn().mockResolvedValue(new Response('{"id":"admin","role":"ADMIN"}'));
     vi.stubGlobal("fetch", fetch);

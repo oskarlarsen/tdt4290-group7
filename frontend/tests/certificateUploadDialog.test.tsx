@@ -18,13 +18,16 @@ describe("certificate upload dialog", () => {
         contracts={[
           {
             id: "sup-a",
-            name: "Example transport contract",
-            reference: "CONTRACT-42",
+            contractName: "Example transport contract",
             supplierId: "sup-a",
             supplierName: "Example Transport AS",
-            supplierOrgNumber: "123456789",
+            supplierOrgId: "NO 123 456 789 MVA",
+            risk: "compliant",
+            mainIssue: "",
+            status: "Active",
             startDate: "2026-01-01",
             endDate: "2027-12-31",
+            documentUrl: null,
           },
         ]}
         onClose={vi.fn()}
@@ -40,6 +43,7 @@ describe("certificate upload dialog", () => {
     expect(mutate).toHaveBeenCalledWith(
       {
         file: expect.any(File),
+        supplierName: "Example Transport AS",
         contractId: "sup-a",
       },
       { onSuccess: expect.any(Function) },

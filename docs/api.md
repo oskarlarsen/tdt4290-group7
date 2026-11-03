@@ -36,14 +36,14 @@ Certificate routes require an administrator session.
 |---|---|---|
 | GET | `/api/certificates` | List extracted certificate metadata, most urgent first. |
 | POST | `/api/certificates` | Upload one PDF, extract its certificate type and dates, and store the metadata. |
-| PUT | `/api/certificates/{id}` | Correct certificate type, dates and active contract. |
+| PUT | `/api/certificates/{id}` | Correct saved supplier, certificate type, dates and optional contract reference. |
 | DELETE | `/api/certificates/{id}` | Delete certificate metadata. |
 
-`POST /api/certificates` accepts `multipart/form-data` fields `file` and `contractId`. The contract must be an active imported service contract; supplier name is taken from that record rather than from the request. Uploads are limited to 8 MB and 25 pages. Text-based PDFs use PDFBox; scanned pages require Tesseract with Norwegian and English language data. The response includes the parsed `certificateType`, `issueDate`, `expiryDate`, `sourceFile`, `contractId` and recalculated status. Check parsed values before relying on them as compliance evidence.
+`POST /api/certificates` accepts `multipart/form-data` fields `supplierName`, `file` and optional `contractId`. Uploads are limited to 8 MB and 25 pages. Text-based PDFs use PDFBox; scanned pages require Tesseract with Norwegian and English language data. The response includes the parsed `certificateType`, `issueDate`, `expiryDate`, `sourceFile`, `contractId` and recalculated status. Check parsed values before relying on them as compliance evidence.
 
-`PUT /api/certificates/{id}` accepts JSON fields `supplierName`, `certificateType`, optional `issueDate`, `expiryDate` and `contractId`. The contract ID must reference an active imported contract, and the supplier is derived from it. Dates use `YYYY-MM-DD`; issue date cannot be after expiry. `DELETE` returns `204` when the record is removed.
+`PUT /api/certificates/{id}` accepts JSON fields `supplierName`, `certificateType`, optional `issueDate`, `expiryDate` and `contractId`. Dates use `YYYY-MM-DD`; issue date cannot be after expiry. `DELETE` returns `204` when the record is removed.
 
-The original PDF is discarded. The certificate page offers imported service contracts, and the backend verifies the contract association. Certificate records and supplier contracts are held in separate SQLite databases, so the association is validated by the API rather than a cross-database foreign key. Certificates are not linked to external certification registries.
+The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
 ## Fleet management
 
@@ -68,27 +68,6 @@ For example, create a supplier:
 ```json
 { "name": "Example Transport", "orgNumber": "123456789" }
 ```
-
-### Import supplier service contracts
-
-These are procurement/service contracts, not the vehicle `agreements` above. All endpoints require an administrator session.
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/procurement/contracts` | List active suppliers' imported service contracts; optionally filter with `?supplierId=...`. |
-| POST | `/api/procurement/contracts/preview` | Validate CSV text without writing records. |
-| POST | `/api/procurement/contracts/import` | Atomically validate and import all rows. |
-
-Preview and import accept:
-
-```json
-{
-  "supplierId": "returned-supplier-id",
-  "csv": "contractName,contractReference,startDate,endDate\nWaste collection,WS-2026,2026-01-01,2026-12-31"
-}
-```
-
-The CSV header must match exactly and stay in this order: `contractName,contractReference,startDate,endDate`. Fields follow standard CSV quoting rules; dates use `YYYY-MM-DD`. Names are limited to 200 characters, references to 120; references must be unique per supplier. The upload is limited to 2 MB and 5,000 data rows. Preview returns `validRows` and `issues`; any issue blocks import. Import revalidates in a transaction, so duplicate/racing or invalid data cannot leave a partial import.
 
 Use the returned supplier `id` to create an agreement:
 

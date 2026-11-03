@@ -9,7 +9,6 @@ import com.tdt4290group7.backend.pdf.extractTextWithOcr
 import com.tdt4290group7.backend.plugins.AUTH_JWT
 import com.tdt4290group7.backend.plugins.ApiError
 import com.tdt4290group7.backend.vehicles.adminActor
-import com.tdt4290group7.backend.vehicles.FleetRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.http.content.PartData
@@ -65,7 +64,7 @@ private data class UpdateCertificateRequest(
     val contractId: String? = null,
 )
 
-fun Application.configureCertificateRoutes(repository: CertificateRepository, fleet: FleetRepository) {
+fun Application.configureCertificateRoutes(repository: CertificateRepository) {
     routing {
         authenticate(AUTH_JWT) {
             route("/api/certificates") {
@@ -95,15 +94,14 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         return@put
                     }
 
+                    val supplierName = request.supplierName.trim()
                     val certificateType = request.certificateType.trim()
                     val contractId = request.contractId?.trim()?.ifEmpty { null }
-                    if (certificateType.isEmpty() || certificateType.length > 200 || contractId == null || contractId.length > 200) {
+                    if (supplierName.isEmpty() || supplierName.length > 200 ||
+                        certificateType.isEmpty() || certificateType.length > 200 ||
+                        (contractId != null && contractId.length > 200)
+                    ) {
                         call.respond(HttpStatusCode.BadRequest, ApiError("Invalid certificate details"))
-                        return@put
-                    }
-                    val contract = fleet.procurementContract(contractId)
-                    if (contract == null) {
-                        call.respond(HttpStatusCode.BadRequest, ApiError("Select an active supplier contract"))
                         return@put
                     }
 
@@ -118,7 +116,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     }
 
                     val updated = existing.copy(
-                        supplierName = contract.supplierName,
+                        supplierName = supplierName,
                         certificateType = certificateType,
                         issueDate = issueDate,
                         expiryDate = expiryDate,
@@ -151,11 +149,6 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid certificate upload"))
                         return@post
                     }
-                    val contract = upload.contractId?.let(fleet::procurementContract)
-                    if (contract == null) {
-                        call.respond(HttpStatusCode.BadRequest, ApiError("Select an active supplier contract"))
-                        return@post
-                    }
 
                     val tempFile = try {
                         Files.createTempFile("certificate-upload-", ".pdf")
@@ -185,7 +178,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         } catch (_: IllegalStateException) {
                             call.respond(
                                 HttpStatusCode.ServiceUnavailable,
-                                ApiError("Could not extract certificate text; OCR is unavailable or processing failed"),
+                                ApiError("Could not extract certificate text; check the local OCR setup"),
                             )
                             return@post
                         } catch (_: IOException) {
@@ -200,7 +193,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         val parsed = CertificateParser.parse(text, upload.sourceFile)
                         val certificate = Certificate(
                             id = UUID.randomUUID().toString(),
-                            supplierName = contract.supplierName,
+                            supplierName = upload.supplierName,
                             certificateType = parsed.certificateType,
                             issueDate = parsed.issueDate,
                             expiryDate = parsed.expiryDate,
@@ -239,12 +232,14 @@ private fun String?.toLocalDateOrNull(): LocalDate? {
 }
 
 private data class CertificateUpload(
+    val supplierName: String,
     val sourceFile: String,
     val pdf: ByteArray,
     val contractId: String?,
 )
 
 private suspend fun io.ktor.server.application.ApplicationCall.receiveCertificateUpload(): CertificateUpload {
+    var supplierName: String? = null
     var sourceFile: String? = null
     var pdf: ByteArray? = null
     var contractId: String? = null
@@ -254,7 +249,10 @@ private suspend fun io.ktor.server.application.ApplicationCall.receiveCertificat
     receiveMultipart().forEachPart { part ->
         try {
             when (part) {
-                is PartData.FormItem -> if (part.name == "contractId") {
+                is PartData.FormItem -> if (part.name == "supplierName") {
+                    if (supplierName != null) validationError = "Supplier name must be provided once"
+                    supplierName = part.value.trim()
+                } else if (part.name == "contractId") {
                     if (contractIdSeen) validationError = "Contract ID must be provided once"
                     contractIdSeen = true
                     contractId = part.value.trim().takeIf { it.isNotEmpty() }
@@ -283,15 +281,17 @@ private suspend fun io.ktor.server.application.ApplicationCall.receiveCertificat
     }
 
     validationError?.let { throw IllegalArgumentException(it) }
+    val name = supplierName?.takeIf { it.isNotBlank() && it.length <= 200 }
+        ?: throw IllegalArgumentException("Supplier name is required and must be at most 200 characters")
     val selectedContractId = contractId
-    if (selectedContractId.isNullOrBlank() || selectedContractId.length > 200) {
-        throw IllegalArgumentException("Select an active supplier contract")
+    if (selectedContractId != null && selectedContractId.length > 200) {
+        throw IllegalArgumentException("Contract ID must be at most 200 characters")
     }
     val filename = sourceFile ?: throw IllegalArgumentException("Certificate PDF is required")
     val bytes = pdf?.takeIf { it.isNotEmpty() } ?: throw IllegalArgumentException("Certificate PDF is empty")
     val header = bytes.copyOfRange(0, minOf(bytes.size, 1024)).toString(Charsets.ISO_8859_1)
     if (!header.contains("%PDF-")) throw IllegalArgumentException("Uploaded file is not a valid PDF")
-    return CertificateUpload(filename, bytes, selectedContractId)
+    return CertificateUpload(name, filename, bytes, selectedContractId)
 }
 
 private fun Certificate.toResponse() = CertificateResponse(

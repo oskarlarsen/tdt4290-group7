@@ -30,7 +30,7 @@ class VehicleRelationalStorageTest {
                         assertEquals(1, rows.getInt("strict"))
                         count++
                     }
-                    assertEquals(15, count)
+                    assertEquals(14, count)
                 }
                 statement.executeQuery("PRAGMA table_info(vehicles)").use { rows ->
                     val names = mutableListOf<String>()

@@ -9,11 +9,10 @@ The application is a prototype: some areas have working workflows, while others 
 | Area | Purpose and current status |
 |---|---|
 | Dashboard | Demo overview of totals/metrics, compliance rates, supplier risks and alerts. Includes placeholder CSV export button. |
-| Suppliers | Demo directory with supplier details, notes and follow-up status. The Add Supplier action opens the backend-backed onboarding flow. |
-| Contracts | Demo compliance directory plus a separate list of imported supplier service contracts. |
+| Suppliers | Demo directory with supplier details, notes and follow-up status. |
+| Contracts | Demo contract directory, compliance summaries and placeholder CSV export.  |
 | Vehicles | Backend-connected supplier and agreement management, registered/planned vehicles, statistics, registry checks and change history with undo. |
-| Supplier onboarding | Admins can create suppliers, validate service-contract CSV files, preview rows and import contracts atomically. |
-| Environmental Certificates | Admins can upload PDF certificates linked to an imported service contract and review extracted metadata. Registry verification and automatic reminders are not connected. |
+| Environmental Certificates | Admins can upload PDF certificates for backend text/OCR extraction and review parsed metadata. Contract attachments, registry verification and automatic reminders are not connected. |
 | Energy & Fuel | Placeholder page for energy and fuel reporting. |
 | Risk & Prediction | Placeholder page for risk analysis. |
 | Alerts | Placeholder page for alerts. |
@@ -21,7 +20,7 @@ The application is a prototype: some areas have working workflows, while others 
 | Supplier workspace | Navigation for dashboard, company, contracts, vehicles, certificates, energy, compliance, risk, alerts and required actions; the pages are placeholders. |
 | Authentication | Admin/supplier sign-in, logout and session handling. Password-reset API exists; email delivery is not connected. |
 
-Dashboard risk metrics and most supplier/contract details remain demo data and are not linked to the backend supplier directory. Imported service contracts are persisted separately and appear in Contracts and the certificate workflow.
+Dashboard, supplier and contract demo data are separate and not connected to the vehicle database, i.e suppliers under "Suppliers" and "Vehicles" are not linked.
 
 ## Run locally
 
@@ -75,7 +74,7 @@ Generate a signing secret with:
 node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
 ```
 
-Set `VITE_USE_MOCKS=true` when you want demo data on prototype pages; keep `VITE_USE_MOCK_AUTH=false` for backend sign-in, vehicles and certificate uploads. Docker Compose defaults demo data off.
+Keep `VITE_USE_MOCKS=true` and `VITE_MOCK_AUTH=false` as supplied: this enables demo pages alongside real backend sign-in, vehicles and certificate uploads.
 
 `SVV_API_KEY` is optional for startup. Adding or replacing a registered vehicle requires a working "Statens-vegvesen-API-key". Without one, you can still manage suppliers, agreements and planned entries.
 
@@ -138,7 +137,7 @@ Open **http://localhost:3000** and sign in with the same accounts. The backend u
 docker compose down
 ```
 
-This stops the stack and retains its databases in the named volume. After source or frontend configuration changes, run `docker compose up --build` again. The backend image includes Tesseract with English and Norwegian language data for scanned certificates.
+This stops the stack and retains its vehicle database in the named volume. After source or frontend configuration changes, run `docker compose up --build` again. The optional OCR tool is not included in the container setup.
 
 ## Development and troubleshooting
 
@@ -146,6 +145,5 @@ This stops the stack and retains its databases in the named volume. After source
 - [Backend](backend/README.md): commands, storage and integrations.
 - [API reference](docs/api.md): implemented endpoints and request examples.
 - [Certificate parser](docs/certificate-parser.md): optional PDF/OCR setup.
-- [Supplier onboarding tutorial](docs/supplier-onboarding.md): create a supplier and import linked service contracts from CSV.
 - [Configuration and troubleshooting](docs/configuration.md): login, startup and existing-data issues.
 - [Repository rules](.github/rulesets/README.md): maintainer instructions for branch protection.

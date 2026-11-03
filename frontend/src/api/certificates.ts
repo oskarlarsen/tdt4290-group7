@@ -60,9 +60,11 @@ export async function getCertificates(): Promise<Certificate[]> {
 
 export async function uploadCertificate(
   file: File,
+  supplierName: string,
   contractId: string,
 ): Promise<Certificate> {
   const form = new FormData();
+  form.append("supplierName", supplierName);
   form.append("contractId", contractId);
   form.append("file", file);
   const response = await apiFetch<CertificateResponse>("/certificates", {
