@@ -3,18 +3,19 @@ import type { RecentAlert } from "../../types/dashboard";
 const SEVERITY_CLASSES: Record<RecentAlert["severity"], string> = {
   high: "bg-red-100 text-red-700",
   medium: "bg-amber-100 text-amber-800",
+  low: "bg-tertiary-100 text-tertiary-700",
 };
 
 export function AlertCard({
   alert,
-  onDismiss,
+  onResolve,
   onInvestigate,
-  isDismissing,
+  isUpdating,
 }: {
   alert: RecentAlert;
-  onDismiss?: (id: string) => void;
+  onResolve?: (id: string) => void;
   onInvestigate?: (id: string) => void;
-  isDismissing?: boolean;
+  isUpdating?: boolean;
 }) {
   return (
     <div className="border-t border-neutral-100 py-3 first:border-t-0 first:pt-0">
@@ -31,12 +32,12 @@ export function AlertCard({
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
-          aria-label={isDismissing ? "Dismissing alert" : "Dismiss alert"}
-          onClick={() => onDismiss?.(alert.id)}
-          disabled={isDismissing || !onDismiss}
+          aria-label={isUpdating ? "Updating alert" : "Mark alert resolved"}
+          onClick={() => onResolve?.(alert.id)}
+          disabled={isUpdating || !onResolve}
           className="inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-900/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isDismissing ? "Dismissing…" : "Dismiss"}
+          {isUpdating ? "Updating…" : "Mark resolved"}
         </button>
         {alert.supplierId && (
           <button
