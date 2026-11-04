@@ -3,7 +3,6 @@ import type { DerivedContract } from "../types/contract";
 import type { RecentAlert, TopRiskSupplier } from "../types/dashboard";
 import type { EnergyRequirement, EnergyRecord } from "../types/energy";
 import type { FleetOverview } from "../types/vehicle";
-import type { RiskOutlook } from "../types/riskOutlook";
 
 export const MOCK_SUPPLIER_MAPPING = "sup-c"; // Phase 1.1: Named constant for mapping
 
