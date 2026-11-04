@@ -16,7 +16,6 @@ import Certificates from "../pages/admin/Certificates";
 import Energy from "../pages/admin/Energy";
 import RiskAndPrediction from "../pages/admin/RiskAndPrediction";
 import Alerts from "../pages/admin/Alerts";
-import Reports from "../pages/admin/Reports";
 import SupplierDetails from "../pages/admin/SupplierDetails";
 
 import SupplierDashboard from "../pages/supplier/Dashboard";
@@ -52,7 +51,6 @@ const router = createBrowserRouter([
       { path: "energy", element: <Energy /> },
       { path: "risk", element: <RiskAndPrediction /> },
       { path: "alerts", element: <Alerts /> },
-      { path: "reports", element: <Reports /> },
     ],
   },
   {

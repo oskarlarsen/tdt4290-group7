@@ -1,6 +1,9 @@
 import { useState } from "react";
-import { Building2, ShieldAlert, Clock3, CheckCircle2, Download, Plus, X } from "lucide-react";
+import { Building2, ShieldAlert, Clock3, CheckCircle2, Download, Plus } from "lucide-react";
 import { KpiCard } from "../ui/KpiCard";
+import { AddSupplierDialog } from "./AddSupplierDialog";
+import type { DerivedContract } from "../../types/contract";
+import type { NewSupplierInput, TopRiskSupplier } from "../../types/dashboard";
 
 type Props = {
   monitoredSuppliers: number;
@@ -10,6 +13,11 @@ type Props = {
   compliantCount: number;
   compliantPercent: number;
   onExport: () => void;
+  existingSuppliers: TopRiskSupplier[];
+  contracts: DerivedContract[];
+  contractsLoading: boolean;
+  contractsError: boolean;
+  onAddSupplier: (supplier: NewSupplierInput) => Promise<void>;
 };
 
 // Use the mockup as a visual reference, but show only metrics backed by the shared dashboard summary
@@ -21,8 +29,13 @@ export function SuppliersOverviewHeader({
   compliantCount,
   compliantPercent,
   onExport,
+  existingSuppliers,
+  contracts,
+  contractsLoading,
+  contractsError,
+  onAddSupplier,
 }: Props) {
-  const [isAddInfoOpen, setIsAddInfoOpen] = useState(false);
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
   const cards = [
     {
@@ -86,7 +99,7 @@ export function SuppliersOverviewHeader({
             </button>
             <button
               type="button"
-              onClick={() => setIsAddInfoOpen(true)}
+              onClick={() => setIsAddSupplierOpen(true)}
               className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg bg-[#1f4d46] px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#173a34]"
             >
               <Plus className="h-4 w-4" />
@@ -110,47 +123,15 @@ export function SuppliersOverviewHeader({
         ))}
       </div>
 
-      {isAddInfoOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/30 p-4"
-          onClick={() => setIsAddInfoOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="add-supplier-title"
-            className="w-full max-w-md rounded-xl border border-neutral-100 bg-white p-4 shadow-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="add-supplier-title" className="font-headline text-lg font-semibold text-neutral-900">
-                  Add supplier
-                </h2>
-                <p className="mt-2 text-sm leading-5 text-neutral-600">
-                  Adding suppliers isn't available yet. Supplier records are currently fictional
-                  mock data, and creating or saving a supplier requires backend integration.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsAddInfoOpen(false)}
-                aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setIsAddInfoOpen(false)}
-                className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddSupplierDialog
+        open={isAddSupplierOpen}
+        existingSuppliers={existingSuppliers}
+        contracts={contracts}
+        contractsLoading={contractsLoading}
+        contractsError={contractsError}
+        onClose={() => setIsAddSupplierOpen(false)}
+        onAddSupplier={onAddSupplier}
+      />
     </div>
   );
 }

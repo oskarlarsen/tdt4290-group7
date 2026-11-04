@@ -12,16 +12,19 @@ export function buildSupplierPortfolioSummary(
 ): SupplierPortfolioSummary {
   const modeledRiskCounts = modeledSuppliers.reduce(
     (counts, supplier) => {
-      counts[supplier.risk] += 1;
+      if (supplier.risk !== "unassessed") counts[supplier.risk] += 1;
       return counts;
     },
     { high: 0, medium: 0, compliant: 0 }
   );
 
   const monitoredSuppliers = modeledSuppliers.length + unmodeledSuppliers.totalSuppliers;
+  const unassessedCount = modeledSuppliers.filter(
+    (supplier) => supplier.risk === "unassessed"
+  ).length;
   const highCount = modeledRiskCounts.high + unmodeledSuppliers.highRiskSuppliers;
   const mediumCount = modeledRiskCounts.medium + unmodeledSuppliers.mediumRiskSuppliers;
-  const compliantCount = monitoredSuppliers - highCount - mediumCount;
+  const compliantCount = monitoredSuppliers - highCount - mediumCount - unassessedCount;
   const percent = (count: number) =>
     monitoredSuppliers === 0 ? 0 : Math.round((count / monitoredSuppliers) * 100);
 

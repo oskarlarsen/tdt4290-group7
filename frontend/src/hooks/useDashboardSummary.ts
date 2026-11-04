@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as dashboardApi from "../api/dashboard";
-import type { DashboardSummary } from "../types/dashboard";
+import type { AlertStatus, DashboardSummary } from "../types/dashboard";
 
 const DASHBOARD_QUERY_KEY = ["dashboard-summary"];
 
@@ -12,21 +12,11 @@ const DASHBOARD_QUERY_KEY = ["dashboard-summary"];
    });
  }
 
-export function useDismissAlert() {
+export function useUpdateAlertStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, dismissedBy }: { id: string; dismissedBy: string }) =>
-      dashboardApi.dismissAlert(id, dismissedBy),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY }),
-  });
-}
-
-// Not wired to any button yet — exists so a future "Dismissed Alerts"
-// view can call it without touching this file again.
-export function useRestoreAlert() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (alertId: string) => dashboardApi.restoreAlert(alertId),
+    mutationFn: ({ id, status }: { id: string; status: AlertStatus }) =>
+      dashboardApi.updateAlertStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY }),
   });
 }

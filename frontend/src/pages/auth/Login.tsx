@@ -40,7 +40,7 @@ export default function Login() {
     setFormError(null);
 
     if (!email.trim() || !password) {
-      setFormError("Enter your email or username and password.");
+      setFormError("Enter your email or username and password");
       return;
     }
 
@@ -63,12 +63,12 @@ export default function Login() {
     const value = email.trim();
 
     if (!value) {
-      setFormError("Enter your email address first, then select Forgot password.");
+      setFormError("Enter your email address first, then select Forgot password");
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setFormError("Please enter a valid email address to reset your password.");
+      setFormError("Please enter a valid email address to reset your password");
       return;
     }
 
@@ -77,11 +77,11 @@ export default function Login() {
     try {
       await requestPasswordReset(value);
       setResetMessage(
-        "If that account exists, we've sent password reset instructions."
+        "If that account exists, we've sent password reset instructions"
       );
       setResetRequested(true)
     } catch {
-      setFormError("Couldn't send reset instructions right now. Please try again.");
+      setFormError("Couldn't send reset instructions right now. Please try again!");
     }
   }
 
@@ -100,13 +100,13 @@ export default function Login() {
       setResetRequested(false);
       setResetToken("");
       setNewPassword("");
-      setResetMessage("Password updated. Sign in with your new password.");
+      setResetMessage("Password updated, Sign in with your new password");
     } catch (err) {
       // 400s carry a user-facing reason (password rule or bad/expired code)
       setFormError(
         err instanceof ApiError && err.status === 400
           ? err.message
-          : "Couldn't reset your password right now. Please try again."
+          : "Couldn't reset your password right now. Please try again!"
       );
     } finally {
       setResetLoading(false);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
 import type { AlertRow } from "./AlertsTable";
+import { formatAlertCreatedDate } from "../../utils/alertAge";
 
 export function AlertsAttentionCard({
   rows,
@@ -31,11 +32,11 @@ export function AlertsAttentionCard({
   const currentPage = Math.min(page, totalPages);
   const visibleRow = rows[currentPage - 1];
   const { alert, contract } = visibleRow;
-  const supplierName = contract?.supplierName ?? "Unknown supplier";
+  const supplierName = contract?.supplierName ?? visibleRow.supplier?.displayName ?? "Unknown supplier";
 
   function openNotice(row: AlertRow) {
-    const rowSupplier = row.contract?.supplierName ?? "Unknown supplier";
-    const rowContract = row.contract?.contractName ?? "No linked contract";
+    const rowSupplier = row.contract?.supplierName ?? row.supplier?.displayName ?? "Unknown supplier";
+    const rowContract = row.contract?.contractName ?? row.supplier?.primaryContract ?? "No linked contract";
     setNoticeMessage(
       `This demo notice concerns ${row.alert.title}. Supplier: ${rowSupplier}. Contract: ${rowContract}. Reason: ${row.alert.description}`
     );
@@ -59,15 +60,15 @@ export function AlertsAttentionCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-red-700">
-                Active attention
+                Needs attention
               </span>
               <span className="font-headline text-sm font-semibold text-neutral-900">
-                High severity alert · {supplierName}
+                High-risk alert · {supplierName}
               </span>
             </div>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
               {alert.title}: {alert.description}
-              {contract ? ` Linked contract: ${contract.contractName}.` : ""} Raised {alert.timeAgo}.
+              {contract ? ` Linked contract: ${contract.contractName}.` : ""} Created on {formatAlertCreatedDate(alert.createdAt)}.
             </p>
           </div>
 

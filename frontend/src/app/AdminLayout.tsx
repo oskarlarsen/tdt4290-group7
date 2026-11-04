@@ -8,7 +8,6 @@ import {
   Zap,
   ShieldAlert,
   Bell,
-  ClipboardList,
 } from "lucide-react";
 import { TopBar } from "../components/ui/TopBar";
 import { ProfileMenu } from "../components/ui/ProfileMenu";
@@ -22,7 +21,6 @@ const NAV = [
   { to: "energy", label: "Energy & Fuel", icon: Zap },
   { to: "risk", label: "Risk & Prediction", icon: ShieldAlert },
   { to: "alerts", label: "Alerts", icon: Bell },
-  { to: "reports", label: "Reports", icon: ClipboardList },
 ];
 
 export function AdminLayout() {
