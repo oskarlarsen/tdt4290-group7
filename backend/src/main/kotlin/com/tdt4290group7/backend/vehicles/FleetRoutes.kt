@@ -55,7 +55,7 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
         val request = try {
             decodeFleetRequest(call.receiveText(), SupplierInvitationRequest.serializer())
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request: ${e.message}"))
+            call.respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request"))
             return@post
         }
         try {
