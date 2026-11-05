@@ -7,6 +7,8 @@ import { useSupplierReviewStatus, type FollowUpStatus } from "../../hooks/useSup
 import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
+import { SupplierDetailsDialog } from "../../components/suppliers/SupplierDetailsDialog";
+import { useAlerts } from "../../hooks/useAlerts";
 import { SupplierReportingDataDialog } from "../../components/suppliers/SupplierReportingDataDialog";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
 import { AgreementForm, InviteSupplierForm, RemoveSupplierAction, SupplierForm } from "../../components/vehicles/FleetForms";
@@ -29,6 +31,9 @@ export default function Suppliers() {
   const fleet = useFleet();
   const refreshFleet = useRefreshVehicles();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  // The large Details window replaces the side panel while it is open.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { data: allAlerts = [] } = useAlerts();
   const [searchParams, setSearchParams] = useSearchParams();
   const [organizationForm, setOrganizationForm] = useState<FleetSupplier | "new" | null>(null);
   const [agreementSupplier, setAgreementSupplier] = useState<FleetSupplier | null>(null);
@@ -70,6 +75,7 @@ export default function Suppliers() {
 
   function handleCloseDrawer() {
     setSelectedSupplierId(null);
+    setDetailsOpen(false);
     if (searchParams.get("supplierId")) {
       const next = new URLSearchParams(searchParams);
       next.delete("supplierId");
@@ -326,12 +332,20 @@ export default function Suppliers() {
       </section>}
 
       <SupplierDetailsDrawer
-        supplier={selectedSupplier}
-        alerts={data?.recentAlerts ?? []}
+        supplier={detailsOpen ? null : selectedSupplier}
+        alerts={allAlerts}
         reviewStatus={selectedSupplier ? getStatus(selectedSupplier.id) : "to-review"}
         onChangeReviewStatus={(status) => selectedSupplier && setStatus(selectedSupplier.id, status)}
+        onOpenDetails={() => setDetailsOpen(true)}
         onClose={handleCloseDrawer}
       />
+      {detailsOpen && selectedSupplier && (
+        <SupplierDetailsDialog
+          supplier={selectedSupplier}
+          alerts={allAlerts.filter((alert) => alert.supplierId === selectedSupplier.id && alert.status !== "RESOLVED")}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
       {organizationForm && (
         <SupplierForm
           supplier={organizationForm === "new" ? undefined : organizationForm}

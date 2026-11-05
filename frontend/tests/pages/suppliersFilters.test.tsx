@@ -23,6 +23,7 @@ vi.mock("../../src/hooks/useSupplierReviewStatus", () => ({
   useSupplierReviewStatus: () => ({ getStatus: () => "to-review", setStatus: vi.fn(), errorMessage: null }),
 }));
 
+vi.mock("../../src/hooks/useAlerts", () => ({ useAlerts: () => ({ data: [], isLoading: false, isError: false }) }));
 vi.mock("../../src/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "a", name: "Admin", role: "ADMIN" } }) }));
 
 import Suppliers from "../../src/pages/admin/Suppliers";
@@ -80,5 +81,22 @@ describe("admin suppliers page issue filter", () => {
     expect(screen.getAllByText("Supplier med").length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText("Filter suppliers by issue category"), { target: { value: "all" } });
     expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers?risk=medium");
+  });
+});
+
+describe("supplier summary and details windows", () => {
+  it("replaces the side panel with the Details window and brings it back on close", () => {
+    HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+    HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+    mount("/admin/suppliers?supplierId=hi");
+
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
+    expect(screen.getByRole("dialog", { name: "Details for Supplier hi" })).toBeTruthy();
+    // The side panel is gone while the large window is open, so Escape cannot close both.
+    expect(screen.queryByRole("button", { name: "Details" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close Details for Supplier hi" }));
+    expect(screen.queryByRole("dialog", { name: "Details for Supplier hi" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Details" })).toBeTruthy();
   });
 });

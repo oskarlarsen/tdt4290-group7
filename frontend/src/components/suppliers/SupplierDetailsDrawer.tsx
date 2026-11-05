@@ -1,19 +1,10 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Send, Eye } from "lucide-react";
+import { X, Send } from "lucide-react";
 import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useSupplierNotes, useAddSupplierNote } from "../../hooks/useSupplierNotes";
 import type { FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
 import type { TopRiskSupplier, RecentAlert } from "../../types/dashboard";
-import { reviewSupplierOnboarding } from "../../api/onboarding";
-import { SupplierReportingDataDialog } from "./SupplierReportingDataDialog";
-
-const ISSUE_CATEGORY_LABELS: Record<NonNullable<TopRiskSupplier["issueCategory"]>, string> = {
-  VEHICLE_DEVIATION: "Vehicle deviation",
-  CERTIFICATE_EXPIRY: "Certificate expiry",
-  FUEL_DEVIATION: "Fuel/energy deviation",
-};
 
 const REVIEW_STATUS_BADGES: Record<FollowUpStatus, { label: string; color: "yellow" | "orange" | "tertiary" }> = {
   "to-review": { label: "To Review", color: "yellow" },
@@ -26,6 +17,8 @@ type Props = {
   alerts: RecentAlert[];
   reviewStatus: FollowUpStatus;
   onChangeReviewStatus: (status: FollowUpStatus) => void;
+  /** Opens the large Details window, which replaces this panel. */
+  onOpenDetails: () => void;
   onClose: () => void;
 };
 
@@ -34,29 +27,13 @@ export function SupplierDetailsDrawer({
   alerts,
   reviewStatus,
   onChangeReviewStatus,
+  onOpenDetails,
   onClose,
 }: Props) {
   const isOpen = supplier !== null;
   const { data: notes = [] } = useSupplierNotes(supplier?.id ?? null);
   const addNote = useAddSupplierNote(supplier?.id ?? null);
   const [noteText, setNoteText] = useState("");
-  const [onboardingNotes, setOnboardingNotes] = useState("");
-  const [showReportingData, setShowReportingData] = useState(false);
-  const queryClient = useQueryClient();
-  const onboardingReview = useMutation({
-    mutationFn: ({ action, notes }: { action: "APPROVE" | "REQUEST_CHANGES"; notes?: string }) =>
-      reviewSupplierOnboarding(supplier!.id, action, notes),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      setOnboardingNotes("");
-    },
-  });
-
-  useEffect(() => {
-    setOnboardingNotes("");
-    setShowReportingData(false);
-    onboardingReview.reset();
-  }, [supplier?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,7 +48,9 @@ export function SupplierDetailsDrawer({
     };
   }, [isOpen, onClose]);
 
-  const linkedAlert = supplier ? alerts.find((a) => a.supplierId === supplier.id) : undefined;
+  // Key words only: the full alert text is in the Details window.
+  const supplierAlerts = supplier ? alerts.filter((a) => a.supplierId === supplier.id && a.status !== "RESOLVED") : [];
+  const MAX_KEYWORDS = 3;
 
   function handleSubmitNote() {
     if (!noteText.trim()) return;
@@ -117,120 +96,32 @@ export function SupplierDetailsDrawer({
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Supplier information">
-                <Field label="Org ID" value={supplier.orgId} />
-                {(supplier.contactEmail || supplier.email) && (
-                  <Field label="Contact email" value={supplier.contactEmail || supplier.email || ""} />
-                )}
-                {supplier.contactName && <Field label="Contact name" value={supplier.contactName} />}
-                {supplier.contactPhone && <Field label="Contact phone" value={supplier.contactPhone} />}
-                <Field label="Primary contract" value={supplier.primaryContract} />
-              </Section>
-
-              <Section title="Supplier onboarding">
-                <Field label="Status" value={(supplier.onboardingStatus ?? "INVITED").replace(/_/g, " ")} />
-                <Field label="Registered accounts" value={String(supplier.registeredAccountCount ?? 0)} />
-                {supplier.submittedAt && (
-                  <Field label="Submitted" value={new Date(supplier.submittedAt).toLocaleString()} />
-                )}
-                <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-neutral-600">
-                  <span>{supplier.agreementCount ?? 0} agreements</span>
-                  <span>{supplier.vehicleCount ?? 0} vehicles</span>
-                  <span>{supplier.certificateCount ?? 0} certificates</span>
-                  <span>{supplier.energyRecordCount ?? 0} energy records</span>
-                  <span>{supplier.productCount ?? 0} products</span>
-                </div>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowReportingData(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
-                  >
-                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                    View submitted reporting data
-                  </button>
-                </div>
-                {supplier.reviewerNotes && (
-                  <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
-                    Review feedback: {supplier.reviewerNotes}
-                  </p>
-                )}
-                {(supplier.onboardingStatus === "SUBMITTED" || supplier.onboardingStatus === "UNDER_REVIEW") && (
-                  <div className="mt-3 space-y-2">
-                    <textarea
-                      value={onboardingNotes}
-                      onChange={(event) => setOnboardingNotes(event.target.value)}
-                      placeholder="Feedback for the supplier (required when requesting changes)"
-                      rows={2}
-                      className="w-full resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
-                    />
-                    {onboardingReview.isError && (
-                      <p role="alert" className="text-sm text-red-700">
-                        {onboardingReview.error instanceof Error
-                          ? onboardingReview.error.message
-                          : "Could not update onboarding review."}
-                      </p>
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={onboardingReview.isPending || !onboardingNotes.trim()}
-                        onClick={() => onboardingReview.mutate({
-                          action: "REQUEST_CHANGES",
-                          notes: onboardingNotes.trim(),
-                        })}
-                        className="rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-                      >
-                        Request changes
-                      </button>
-                      <button
-                        type="button"
-                        disabled={onboardingReview.isPending}
-                        onClick={() => onboardingReview.mutate({
-                          action: "APPROVE",
-                          notes: onboardingNotes.trim() || undefined,
-                        })}
-                        className="rounded-lg bg-primary-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-                      >
-                        Approve onboarding
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Risk level & main issue">
-                <p className="text-sm text-neutral-700">
+              <Section title="Main issue">
+                <p className="text-sm font-semibold text-red-700">
                   {supplier.mainIssue || "No open issues on record."}
                 </p>
               </Section>
 
-              <Section title="Environmental compliance">
-                <p className="text-sm text-neutral-700">
-                  {supplier.issueCategory
-                    ? ISSUE_CATEGORY_LABELS[supplier.issueCategory]
-                    : "No compliance category recorded for this supplier."}
-                </p>
-              </Section>
-
-              {/* Renamed from "Follow-up status" — this shows a linked
-                  system alert, a different concept from the admin's own
-                  manual review workflow below. Keeping the two visually
-                  and semantically separate was the point of this fix. */}
-              <Section title="Active alert">
-                {linkedAlert ? (
-                  <div className="rounded-lg bg-neutral-50 p-2.5">
-                    <p className="text-sm font-medium text-neutral-900">{linkedAlert.title}</p>
-                    <p className="mt-0.5 text-sm text-neutral-500">{linkedAlert.description}</p>
-                  </div>
+              <Section title="Active alerts">
+                {supplierAlerts.length === 0 ? (
+                  <p className="text-sm text-neutral-400">No active alerts.</p>
                 ) : (
-                  <p className="text-sm text-neutral-400">
-                    No active alerts currently linked to this supplier.
-                  </p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {supplierAlerts.slice(0, MAX_KEYWORDS).map((alert) => (
+                      <li key={alert.id} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700">
+                        {alert.title}
+                      </li>
+                    ))}
+                    {supplierAlerts.length > MAX_KEYWORDS && (
+                      <li className="rounded-full px-2 py-1 text-xs text-neutral-500">
+                        +{supplierAlerts.length - MAX_KEYWORDS} more
+                      </li>
+                    )}
+                  </ul>
                 )}
               </Section>
 
-              <Section title="Review status">
+              <Section title="Follow-up status">
                 <div className="flex items-center gap-2">
                   <StatusBadge
                     status={REVIEW_STATUS_BADGES[reviewStatus].color}
@@ -240,9 +131,6 @@ export function SupplierDetailsDrawer({
                     <span className="text-xs text-neutral-500">Assigned to you</span>
                   )}
                 </div>
-                <p className="mt-1.5 text-xs text-neutral-400">
-                  Your own triage label — stored locally, does not affect risk classification.
-                </p>
                 <div className="mt-2 flex gap-2">
                   {reviewStatus === "to-review" && (
                     <button
@@ -304,17 +192,18 @@ export function SupplierDetailsDrawer({
                 </div>
               </Section>
 
+              <button
+                type="button"
+                onClick={onOpenDetails}
+                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+              >
+                Details
+              </button>
             </div>
           </>
         )}
       </div>
 
-      {showReportingData && supplier && (
-        <SupplierReportingDataDialog
-          supplier={{ id: supplier.id, name: supplier.displayName }}
-          onClose={() => setShowReportingData(false)}
-        />
-      )}
     </>
   );
 }
