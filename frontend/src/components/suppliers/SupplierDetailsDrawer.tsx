@@ -4,7 +4,7 @@ import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useSupplierNotes, useAddSupplierNote } from "../../hooks/useSupplierNotes";
 import type { FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
-import type { TopRiskSupplier, RecentAlert } from "../../types/dashboard";
+import type { TopRiskSupplier, RecentAlert, NoteVisibility } from "../../types/dashboard";
 
 const REVIEW_STATUS_BADGES: Record<FollowUpStatus, { label: string; color: "yellow" | "orange" | "tertiary" }> = {
   "to-review": { label: "To Review", color: "yellow" },
@@ -34,6 +34,8 @@ export function SupplierDetailsDrawer({
   const { data: notes = [] } = useSupplierNotes(supplier?.id ?? null);
   const addNote = useAddSupplierNote(supplier?.id ?? null);
   const [noteText, setNoteText] = useState("");
+  // Chosen before writing; defaults to the private kind so nothing is shared by accident.
+  const [visibility, setVisibility] = useState<NoteVisibility>("SELF");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,7 +56,7 @@ export function SupplierDetailsDrawer({
 
   function handleSubmitNote() {
     if (!noteText.trim()) return;
-    addNote.mutate(noteText.trim(), { onSuccess: () => setNoteText("") });
+    addNote.mutate({ text: noteText.trim(), visibility }, { onSuccess: () => setNoteText("") });
   }
 
   return (
@@ -151,7 +153,7 @@ export function SupplierDetailsDrawer({
                 </div>
               </Section>
 
-              <Section title="Admin notes">
+              <Section title="Notes">
                 <div className="space-y-2">
                   {notes.length === 0 && (
                     <p className="text-sm text-neutral-400">No notes yet for this supplier.</p>
@@ -159,7 +161,12 @@ export function SupplierDetailsDrawer({
                   {notes.map((note) => (
                     <div key={note.id} className="rounded-lg bg-neutral-50 p-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-neutral-700">{note.authorName}</span>
+                        <span className="text-xs font-medium text-neutral-700">
+                          {note.authorName}
+                          <span className="ml-2 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-normal text-neutral-600">
+                            {note.visibility === "SELF" ? "Note to self" : "Internal note"}
+                          </span>
+                        </span>
                         <span className="font-mono text-[11px] text-neutral-400">
                           {new Date(note.createdAt).toLocaleString("en-GB", {
                             day: "numeric",
@@ -173,11 +180,26 @@ export function SupplierDetailsDrawer({
                     </div>
                   ))}
                 </div>
+                <fieldset className="mt-2">
+                  <legend className="sr-only">Who can see this note</legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-700">
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "SELF"} onChange={() => setVisibility("SELF")} />
+                      Note to self
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "INTERNAL"} onChange={() => setVisibility("INTERNAL")} />
+                      Internal note
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-400">Notes are never shown to the supplier.</p>
+                </fieldset>
                 <div className="mt-2 flex gap-2">
                   <textarea
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
-                    placeholder="Add a note about this supplier's issue…"
+                    maxLength={2000}
+                    placeholder="Add a note about this supplier…"
                     rows={2}
                     className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
                   />

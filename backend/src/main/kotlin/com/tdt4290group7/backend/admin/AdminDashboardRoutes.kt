@@ -34,6 +34,7 @@ private val ALERT_CATEGORIES = setOf("ENVIRONMENTAL_COMPLIANCE", "ENERGY_FUEL", 
 private val ALERT_FINDING_TYPES = setOf("CONFIRMED_DEVIATION", "MISSING_DOCUMENTATION", "UPCOMING_EXPIRY")
 private val ALERT_STATUSES = setOf("OPEN", "IN_PROGRESS", "UNDER_REVIEW", "RESOLVED")
 private val SUPPLIER_REVIEW_STATUSES = setOf("to-review", "in-progress", "resolved")
+private val NOTE_VISIBILITIES = setOf("SELF", "INTERNAL")
 
 @Serializable
 data class DashboardKpis(
@@ -146,6 +147,23 @@ data class AlertStatusUpdate(val status: String)
 @Serializable
 data class SupplierReviewStatusUpdate(val status: String)
 
+@Serializable
+data class SupplierNoteInput(val text: String, val visibility: String = "SELF", val alertId: String? = null)
+
+@Serializable
+data class SupplierNote(
+    val id: String,
+    val supplierId: String,
+    val authorId: String,
+    val authorName: String,
+    val visibility: String,
+    val text: String,
+    val alertId: String? = null,
+    val createdAt: String,
+)
+
+private fun SupplierNoteRecord.toNote() = SupplierNote(id, supplierId, authorId, authorName, visibility, text, alertId, createdAt)
+
 private data class SupplierEvidence(
     var hasEvidence: Boolean = false,
     var hasHighFinding: Boolean = false,
@@ -232,6 +250,29 @@ fun Route.adminDashboardRoutes(
         if (call.adminActor() == null) return@get
         val activeSupplierIds = fleet.overview().suppliers.mapTo(mutableSetOf()) { it.id }
         call.respond(insights.supplierReviewStatuses().filterKeys(activeSupplierIds::contains))
+    }
+
+    // Notes are admin-only: no supplier route reads them. SELF notes are filtered by author on the server.
+    get("/api/admin/suppliers/{supplierId}/notes") {
+        val actor = call.adminActor() ?: return@get
+        val supplierId = call.parameters["supplierId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        call.respond(insights.notesFor(supplierId, actor.id).map { it.toNote() })
+    }
+
+    post("/api/admin/suppliers/{supplierId}/notes") {
+        val actor = call.adminActor() ?: return@post
+        val supplierId = call.parameters["supplierId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (fleet.overview().suppliers.none { it.id == supplierId }) {
+            return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Supplier not found"))
+        }
+        val input = call.receive<SupplierNoteInput>()
+        val text = input.text.trim()
+        require(text.length in 1..2000) { "Note must be between 1 and 2000 characters" }
+        require(input.visibility in NOTE_VISIBILITIES) { "Select who can see the note" }
+        require(input.alertId == null || input.alertId.length <= 100) { "Invalid alert reference" }
+        val note = insights.addNote(supplierId, actor.id, actor.name, input.visibility, text, input.alertId, Instant.now())
+        call.application.log.info("admin_note_created noteId={} actorId={} visibility={}", note.id, actor.id, note.visibility)
+        call.respond(HttpStatusCode.Created, note.toNote())
     }
 
     put("/api/admin/supplier-reviews/{supplierId}") {

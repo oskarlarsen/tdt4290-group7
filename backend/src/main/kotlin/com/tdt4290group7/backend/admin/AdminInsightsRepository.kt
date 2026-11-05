@@ -25,6 +25,17 @@ data class AdminAlertRecord(
     val findingKey: String?,
 )
 
+data class SupplierNoteRecord(
+    val id: String,
+    val supplierId: String,
+    val authorId: String,
+    val authorName: String,
+    val visibility: String,
+    val text: String,
+    val alertId: String?,
+    val createdAt: String,
+)
+
 class AdminInsightsRepository(databasePath: Path) {
     private val databaseUrl: String
 
@@ -60,6 +71,20 @@ class AdminInsightsRepository(databasePath: Path) {
                         value TEXT NOT NULL
                     )""".trimIndent(),
                 )
+                // Admin-only notes. SELF notes are returned to their author only, INTERNAL notes to every admin.
+                statement.execute(
+                    """CREATE TABLE IF NOT EXISTS supplier_notes (
+                        id TEXT PRIMARY KEY,
+                        supplier_id TEXT NOT NULL,
+                        author_id TEXT NOT NULL,
+                        author_name TEXT NOT NULL,
+                        visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL')),
+                        text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
+                        alert_id TEXT,
+                        created_at TEXT NOT NULL
+                    )""".trimIndent(),
+                )
+                statement.execute("CREATE INDEX IF NOT EXISTS idx_supplier_notes_supplier ON supplier_notes(supplier_id, created_at)")
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_review_statuses (
                         supplier_id TEXT PRIMARY KEY,
@@ -230,6 +255,64 @@ class AdminInsightsRepository(databasePath: Path) {
                 it.executeQuery().use { rows -> if (rows.next()) rows.getString(1) else null }
             }
         }
+
+    fun notesFor(supplierId: String, viewerId: String): List<SupplierNoteRecord> =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement(
+                """SELECT id, supplier_id, author_id, author_name, visibility, text, alert_id, created_at
+                    FROM supplier_notes
+                    WHERE supplier_id = ? AND (visibility = 'INTERNAL' OR author_id = ?)
+                    ORDER BY created_at DESC, rowid DESC""".trimIndent(),
+            ).use { statement ->
+                statement.setString(1, supplierId)
+                statement.setString(2, viewerId)
+                statement.executeQuery().use { rows ->
+                    buildList {
+                        while (rows.next()) add(
+                            SupplierNoteRecord(
+                                id = rows.getString("id"),
+                                supplierId = rows.getString("supplier_id"),
+                                authorId = rows.getString("author_id"),
+                                authorName = rows.getString("author_name"),
+                                visibility = rows.getString("visibility"),
+                                text = rows.getString("text"),
+                                alertId = rows.getString("alert_id"),
+                                createdAt = rows.getString("created_at"),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+    fun addNote(
+        supplierId: String,
+        authorId: String,
+        authorName: String,
+        visibility: String,
+        text: String,
+        alertId: String?,
+        now: Instant,
+    ): SupplierNoteRecord {
+        val note = SupplierNoteRecord(UUID.randomUUID().toString(), supplierId, authorId, authorName, visibility, text, alertId, now.toString())
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement(
+                """INSERT INTO supplier_notes (id, supplier_id, author_id, author_name, visibility, text, alert_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+            ).use { statement ->
+                statement.setString(1, note.id)
+                statement.setString(2, note.supplierId)
+                statement.setString(3, note.authorId)
+                statement.setString(4, note.authorName)
+                statement.setString(5, note.visibility)
+                statement.setString(6, note.text)
+                statement.setString(7, note.alertId)
+                statement.setString(8, note.createdAt)
+                statement.executeUpdate()
+            }
+        }
+        return note
+    }
 
     fun supplierReviewStatuses(): Map<String, String> =
         DriverManager.getConnection(databaseUrl).use { database ->

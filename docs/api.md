@@ -185,6 +185,21 @@ Supplier onboarding and portal endpoints support both supplier sessions (strictl
 | `GET` | `/api/supplier/products` | List catalog items and eco-labels. |
 | `GET` | `/api/supplier/certificates` | List environmental certificates for the supplier's contracts. |
 
+### Supplier notes
+
+Notes are written by administrators about a supplier and are never shown to suppliers: no supplier route reads them.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/admin/suppliers/{supplierId}/notes` | List the caller's own `SELF` notes and every `INTERNAL` note, newest first. |
+| `POST` | `/api/admin/suppliers/{supplierId}/notes` | Add a note. The author comes from the login. |
+
+```json
+{ "text": "Call the contact on Monday", "visibility": "SELF", "alertId": "optional-alert-id" }
+```
+
+`visibility` is `SELF` (only the author sees it, the default) or `INTERNAL` (every administrator sees it). `text` is 1–2000 characters after trimming. An unknown supplier returns 404 and a supplier session returns 403.
+
 See [Supplier Onboarding Reference](supplier-onboarding.md) for full cURL examples, two-phase ingestion details, and SQLite schema DDLs.
 
 ## Errors

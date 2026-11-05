@@ -19,6 +19,8 @@ vi.mock("../../src/hooks/useDashboardSummary", () => ({
   useUpdateAlertStatus: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock("../../src/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "a", name: "Admin", role: "ADMIN" } }) }));
+
 import Alerts from "../../src/pages/admin/Alerts";
 
 function Where() { const l = useLocation(); return <p data-testid="where">{l.pathname + l.search}</p>; }

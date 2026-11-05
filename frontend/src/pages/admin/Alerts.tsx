@@ -6,6 +6,8 @@ import { useFleet } from "../../hooks/useVehicles";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardSummary, useUpdateAlertStatus } from "../../hooks/useDashboardSummary";
 import { createManualAlert, deleteAlert } from "../../api/alerts";
+import { addSupplierNote } from "../../api/notes";
+import { useAuth } from "../../hooks/useAuth";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { TablePagination } from "../../components/ui/TablePagination";
 import { AlertsTable } from "../../components/alerts/AlertsTable";
@@ -38,6 +40,7 @@ type PendingAlertDelete = { deadline: number; isDeleting: boolean };
 
 export default function Alerts() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: alerts, isLoading: alertsLoading, isError: alertsError } = useAlerts();
   // Agreement names are a convenience column: if the fleet data is unavailable the page still works without them.
   const fleet = useFleet();
@@ -267,14 +270,30 @@ export default function Alerts() {
     });
   }
 
-  async function handleCreateAlert(input: NewManualAlertInput) {
+  async function handleCreateAlert(input: NewManualAlertInput, noteToSelf?: string) {
     const createdAlert: RecentAlert = await createAlert.mutateAsync(input);
+    // The alert is already saved: a failed note must not make the dialog report the whole thing as failed.
+    let noteSaved = true;
+    if (noteToSelf) {
+      try {
+        await addSupplierNote(input.supplierId, { id: user?.id ?? "", name: user?.name ?? "Unknown admin" }, {
+          text: noteToSelf,
+          visibility: "SELF",
+          alertId: createdAlert.id,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["supplier-notes", input.supplierId] });
+      } catch {
+        noteSaved = false;
+      }
+    }
     setView("all");
     setStatusFilter("ALL");
     setSearch("");
     setPage(1);
     setCreatedAlertIdToReveal(createdAlert.id);
-    setCreateSuccessMessage("Manual alert created successfully");
+    setCreateSuccessMessage(
+      noteSaved ? "Manual alert created successfully" : "Alert saved, note not saved. Add the note from the supplier's page."
+    );
   }
 
   function handleExport() {

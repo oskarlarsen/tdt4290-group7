@@ -60,7 +60,8 @@ type Props = {
   open: boolean;
   suppliers: TopRiskSupplier[];
   onClose: () => void;
-  onCreate: (input: NewManualAlertInput) => Promise<void>;
+  /** noteToSelf is set when the admin ticked "Save a note to self". */
+  onCreate: (input: NewManualAlertInput, noteToSelf?: string) => Promise<void>;
 };
 
 export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: Props) {
@@ -72,6 +73,8 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
   const [findingType, setFindingType] = useState<AlertFindingType | "">("");
   const [description, setDescription] = useState("");
   const [dueDateInput, setDueDateInput] = useState("");
+  const [saveNote, setSaveNote] = useState(false);
+  const [noteText, setNoteText] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -90,6 +93,8 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
     setFindingType("");
     setDescription("");
     setDueDateInput("");
+    setSaveNote(false);
+    setNoteText("");
     setError("");
   }
 
@@ -114,6 +119,10 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
       setError("Enter a valid due date in DD/MM/YYYY format.");
       return;
     }
+    if (saveNote && !noteText.trim()) {
+      setError("Write the note, or untick \"Save a note to self\".");
+      return;
+    }
 
     setError("");
     setIsSaving(true);
@@ -126,7 +135,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         findingType,
         description: trimmedDescription,
         dueDate: dueDate || undefined,
-      });
+      }, saveNote ? noteText.trim() : undefined);
       resetForm();
       onClose();
     } catch (submitError) {
@@ -304,6 +313,26 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
           </span>
           <span className="sr-only">Enter date as day/month/year.</span>
         </label>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
+            <input type="checkbox" checked={saveNote} onChange={(event) => setSaveNote(event.target.checked)} />
+            Save a note to self
+          </label>
+          {saveNote && (
+            <label className={`${labelClassName} mt-2`}>
+              Note to self
+              <textarea
+                value={noteText}
+                onChange={(event) => setNoteText(event.target.value)}
+                maxLength={2000}
+                rows={3}
+                className={fieldClassName}
+              />
+              <span className="mt-1 block font-normal text-neutral-400">Only you see this note. It is never shown to the supplier.</span>
+            </label>
+          )}
+        </div>
 
         <div className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
           <button

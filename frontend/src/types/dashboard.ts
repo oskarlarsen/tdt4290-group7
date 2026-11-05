@@ -161,13 +161,21 @@ export type IssueCategoryBreakdown = {
   modeledSupplierCount: number;
 };
 
+// SELF notes are seen only by their author; INTERNAL notes by every admin. Suppliers never see notes.
+export type NoteVisibility = "SELF" | "INTERNAL";
+
 export type SupplierNote = {
   id: string;
   supplierId: string;
+  authorId: string;
   authorName: string;
+  visibility: NoteVisibility;
   text: string;
+  alertId: string | null;
   createdAt: string;
 };
+
+export type NewSupplierNote = { text: string; visibility: NoteVisibility; alertId?: string };
 
 export type DashboardSummary = {
   lastSyncedAt: string;

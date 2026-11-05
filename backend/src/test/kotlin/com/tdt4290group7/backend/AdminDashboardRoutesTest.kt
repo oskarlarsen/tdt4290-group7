@@ -148,5 +148,57 @@ class AdminDashboardRoutesTest {
         assertTrue(AdminInsightsRepository(insightsPath).allAlerts().isNotEmpty())
     }
 
+    @Test
+    fun supplierNotesAreAdminOnlyAndSelfNotesBelongToTheirAuthor() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Notes Transport AS", "123456789"), ChangeActor("admin", "Administrator"), Instant.now())
+        application { module(vehicles, null, adminInsightsRepository = insights) }
+        val admin = adminClient()
+
+        suspend fun post(body: String) = admin.post("/api/admin/suppliers/${supplier.id}/notes") {
+            contentType(ContentType.Application.Json); setBody(body)
+        }
+        // Visibility defaults to SELF, and the author comes from the login, not the request.
+        val self = post("""{"text":"  Remember to call  "}""")
+        assertEquals(HttpStatusCode.Created, self.status, self.bodyAsText())
+        val selfNote = Json.parseToJsonElement(self.bodyAsText()).jsonObject
+        assertEquals("SELF", selfNote.getValue("visibility").jsonPrimitive.content)
+        assertEquals("Remember to call", selfNote.getValue("text").jsonPrimitive.content)
+        assertEquals("Advisor Hansen", selfNote.getValue("authorName").jsonPrimitive.content)
+        assertEquals(HttpStatusCode.Created, post("""{"text":"Shared with admins","visibility":"INTERNAL","alertId":"alert-1"}""").status)
+
+        val listed = Json.parseToJsonElement(admin.get("/api/admin/suppliers/${supplier.id}/notes").bodyAsText()).jsonArray
+        assertEquals(listOf("Shared with admins", "Remember to call"), listed.map { it.jsonObject.getValue("text").jsonPrimitive.content })
+        assertEquals("alert-1", listed.first().jsonObject.getValue("alertId").jsonPrimitive.content)
+
+        // Validation and unknown suppliers.
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"   "}""").status)
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"${"x".repeat(2001)}"}""").status)
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"SUPPLIER"}""").status)
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/admin/suppliers/unknown/notes") {
+            contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""")
+        }.status)
+
+        // Suppliers can neither read nor write notes.
+        val supplierUser = supplierClient(supplier.id)
+        assertEquals(HttpStatusCode.Forbidden, supplierUser.get("/api/admin/suppliers/${supplier.id}/notes").status)
+        assertEquals(HttpStatusCode.Forbidden, supplierUser.post("/api/admin/suppliers/${supplier.id}/notes") {
+            contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""")
+        }.status)
+    }
+
+    @Test
+    fun anotherAdminSeesInternalNotesButNotSelfNotes() {
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val now = Instant.now()
+        insights.addNote("s1", "admin-a", "Admin A", "SELF", "private to A", null, now)
+        insights.addNote("s1", "admin-a", "Admin A", "INTERNAL", "for all admins", null, now.plusSeconds(1))
+        insights.addNote("s2", "admin-a", "Admin A", "INTERNAL", "other supplier", null, now.plusSeconds(2))
+
+        assertEquals(listOf("for all admins", "private to A"), insights.notesFor("s1", "admin-a").map { it.text })
+        assertEquals(listOf("for all admins"), insights.notesFor("s1", "admin-b").map { it.text })
+    }
+
     private fun databasePath(name: String) = Path.of("build", "test-data", "dashboard-$name-${UUID.randomUUID()}.db")
 }

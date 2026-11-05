@@ -295,7 +295,7 @@ export function getIssueCategoryBreakdown() {
   };
 }
 
-import type { SupplierNote } from "../types/dashboard";
+import type { NewSupplierNote, SupplierNote } from "../types/dashboard";
 
 const NOTES_STORAGE_KEY = "supplier_issue_notes";
 
@@ -318,22 +318,34 @@ function writeStoredNotes(notes: SupplierNote[]) {
   }
 }
 
-let supplierNotes: SupplierNote[] = readStoredNotes();
+// Notes saved before visibility existed are treated as INTERNAL notes with no known author.
+let supplierNotes: SupplierNote[] = readStoredNotes().map((note) => ({
+  ...note,
+  authorId: note.authorId ?? "",
+  visibility: note.visibility ?? "INTERNAL",
+  alertId: note.alertId ?? null,
+}));
 
-// TODO(backend): becomes real POST/GET /admin/suppliers/:id/notes
-// TODO: Resolve authorName from the authenticated session when the backend is available
-export function getNotesForSupplier(supplierId: string): SupplierNote[] {
+// Mirrors the server: SELF notes go to their author only, INTERNAL notes to every admin.
+export function getNotesForSupplier(supplierId: string, viewerId: string): SupplierNote[] {
   return supplierNotes
-    .filter((n) => n.supplierId === supplierId)
+    .filter((n) => n.supplierId === supplierId && (n.visibility === "INTERNAL" || n.authorId === viewerId))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export function addSupplierNote(supplierId: string, authorName: string, text: string): SupplierNote {
+export function addSupplierNote(
+  supplierId: string,
+  author: { id: string; name: string },
+  input: NewSupplierNote
+): SupplierNote {
   const note: SupplierNote = {
     id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     supplierId,
-    authorName,
-    text,
+    authorId: author.id,
+    authorName: author.name,
+    visibility: input.visibility,
+    text: input.text.trim(),
+    alertId: input.alertId ?? null,
     createdAt: new Date().toISOString(),
   };
   supplierNotes = [...supplierNotes, note];
