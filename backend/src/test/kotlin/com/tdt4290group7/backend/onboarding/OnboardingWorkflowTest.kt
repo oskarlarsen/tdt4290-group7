@@ -498,4 +498,39 @@ class OnboardingWorkflowTest {
         val adminProductsList = json.parseToJsonElement(adminProductsRes.bodyAsText()).jsonArray
         assertEquals(2, adminProductsList.size)
     }
+
+    private fun previewVehicle(repo: VehicleRepository, agreementId: String, plate: String, at: Instant): String {
+        val csv = "agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes\n" +
+            "$agreementId,$plate,FALSE,13,FALSE,TRUE,,,ORD-1,"
+        val preview = repo.onboarding.createBatchPreview("nordvik-transport", BatchEntityType.VEHICLES, "v.csv", csv.toByteArray(), at)
+        assertTrue(preview.canCommit, preview.errors.toString())
+        return preview.batchId
+    }
+
+    @Test
+    fun expiredPreviewCannotBeConfirmed() {
+        val repo = testRepository()
+        val agreementId = setupSupplierAndAgreement(repo)
+        val start = Instant.parse("2026-01-01T10:00:00Z")
+        val batchId = previewVehicle(repo, agreementId, "AB12301", start)
+
+        val failure = kotlin.runCatching {
+            repo.onboarding.confirmBatch(batchId, "nordvik-transport", start.plusSeconds(16 * 60))
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException && failure.message!!.contains("expired"), failure.toString())
+    }
+
+    @Test
+    fun keepsOnlyFivePendingPreviewsPerSupplier() {
+        val repo = testRepository()
+        val agreementId = setupSupplierAndAgreement(repo)
+        val start = Instant.parse("2026-01-01T10:00:00Z")
+        val ids = (1..6).map { previewVehicle(repo, agreementId, "AB1230$it", start.plusSeconds(it.toLong())) }
+
+        val oldest = kotlin.runCatching {
+            repo.onboarding.confirmBatch(ids.first(), "nordvik-transport", start.plusSeconds(10))
+        }.exceptionOrNull()
+        assertTrue(oldest is IllegalArgumentException, "oldest preview should have been evicted")
+        repo.onboarding.confirmBatch(ids.last(), "nordvik-transport", start.plusSeconds(10))
+    }
 }

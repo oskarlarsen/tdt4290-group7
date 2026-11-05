@@ -15,6 +15,9 @@ import java.awt.image.BufferedImage
 private const val TESSERACT_MAX_CONCURRENT_PROCESSES = 2
 private const val TESSERACT_QUEUE_TIMEOUT_SECONDS = 30L
 private const val TESSERACT_PROCESS_TIMEOUT_SECONDS = 60L
+// An A4 page at 300 DPI is about 8.7 million pixels. Bigger pages are rendered at a lower DPI.
+private const val MAX_OCR_PIXELS = 40_000_000L
+private const val MIN_OCR_DPI = 100f
 private val tesseractSlots = Semaphore(TESSERACT_MAX_CONCURRENT_PROCESSES, true)
 
 fun extractText(pdfFile: File): String {
@@ -52,7 +55,10 @@ fun extractTextWithOcr(pdfFile: File, languages: String = "eng+nor", dpi: Int = 
                 pageTexts.add(nativeText)
             } else {
                 // Render page to image and run OCR
-                val image: BufferedImage = renderer.renderImageWithDPI(pageIndex - 1, dpi.toFloat(), ImageType.RGB)
+                val box = document.getPage(pageIndex - 1).mediaBox
+                val pageDpi = ocrDpiFor(box.width, box.height, dpi.toFloat())
+                    ?: throw IOException("PDF page $pageIndex is too large to read")
+                val image: BufferedImage = renderer.renderImageWithDPI(pageIndex - 1, pageDpi, ImageType.RGB)
                 val preprocessed = preprocessForOcr(image)
 
                 val tempImage = File.createTempFile("pdf_page_${pageIndex}", ".png")
@@ -70,6 +76,14 @@ fun extractTextWithOcr(pdfFile: File, languages: String = "eng+nor", dpi: Int = 
 
     // join pages with an explicit separator so downstream parser can use page boundaries
     return pageTexts.joinToString(separator = "\n\n--- PAGE BREAK ---\n\n")
+}
+
+/** The DPI to render a page of the given size (in points) at, or null if even [MIN_OCR_DPI] is too big. */
+internal fun ocrDpiFor(widthPoints: Float, heightPoints: Float, dpi: Float): Float? {
+    val pixelsAt = { d: Float -> (widthPoints / 72.0 * d) * (heightPoints / 72.0 * d) }
+    if (pixelsAt(dpi) <= MAX_OCR_PIXELS) return dpi
+    val fitted = (dpi * Math.sqrt(MAX_OCR_PIXELS / pixelsAt(dpi))).toFloat()
+    return fitted.takeIf { it >= MIN_OCR_DPI }
 }
 
 internal fun preprocessForOcr(img: BufferedImage): BufferedImage {

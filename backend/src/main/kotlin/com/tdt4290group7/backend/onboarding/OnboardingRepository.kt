@@ -26,10 +26,23 @@ internal class OnboardingRepository(
         val fileHash: String,
         val rows: List<Map<String, String>>,
         val validRowsCount: Int,
-        val errorRowsCount: Int
+        val errorRowsCount: Int,
+        val cachedAt: Instant
     )
 
     private val batchCache = ConcurrentHashMap<String, CachedBatch>()
+
+    // Previews live in memory only until confirmed, so bound their age and count per supplier.
+    private val batchTtl = java.time.Duration.ofMinutes(15)
+    private val maxPendingBatchesPerSupplier = 5
+
+    private fun evictBatches(supplierId: String, now: Instant) {
+        batchCache.values.removeIf { it.cachedAt.plus(batchTtl) <= now }
+        batchCache.values.filter { it.supplierId == supplierId }
+            .sortedBy { it.cachedAt }
+            .dropLast(maxPendingBatchesPerSupplier - 1)
+            .forEach { batchCache.remove(it.batchId) }
+    }
 
     internal fun attachCertificateRepository(repository: CertificateRepository?) {
         certificateRepository = repository
@@ -320,6 +333,7 @@ internal class OnboardingRepository(
         val canCommit = parseResult.errors.isEmpty() && totalRows > 0
 
         if (canCommit) {
+            evictBatches(supplierId, now)
             batchCache[batchId] = CachedBatch(
                 batchId = batchId,
                 supplierId = supplierId,
@@ -328,7 +342,8 @@ internal class OnboardingRepository(
                 fileHash = hash,
                 rows = parseResult.rows,
                 validRowsCount = validRowsCount,
-                errorRowsCount = errorRowsCount
+                errorRowsCount = errorRowsCount,
+                cachedAt = now
             )
 
             // Persist batch audit trail record
@@ -368,7 +383,7 @@ internal class OnboardingRepository(
     }
 
     fun confirmBatch(batchId: String, supplierId: String, now: Instant): CsvConfirmResponse {
-        val cached = batchCache[batchId]
+        val cached = batchCache[batchId]?.takeIf { it.cachedAt.plus(batchTtl) > now }
             ?: throw IllegalArgumentException("Batch preview expired or not found. Please upload the CSV again.")
 
         require(cached.supplierId == supplierId) { "Batch does not belong to your organization" }
