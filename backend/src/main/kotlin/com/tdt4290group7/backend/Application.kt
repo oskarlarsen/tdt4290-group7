@@ -7,6 +7,7 @@ import com.tdt4290group7.backend.plugins.configureBodyLimit
 import com.tdt4290group7.backend.plugins.configureCORS
 import com.tdt4290group7.backend.plugins.configureMonitoring
 import com.tdt4290group7.backend.plugins.configureRateLimiting
+import com.tdt4290group7.backend.plugins.configureRequireJsonBody
 import com.tdt4290group7.backend.plugins.configureRouting
 import com.tdt4290group7.backend.plugins.configureSecurity
 import com.tdt4290group7.backend.plugins.configureSerialization
@@ -51,6 +52,7 @@ fun Application.module(
     configureMonitoring()
     configureStatusPages()
     configureBodyLimit()
+    configureRequireJsonBody()
     configureSecurity()
     configureRateLimiting()
     val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
