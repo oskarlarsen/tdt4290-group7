@@ -1,5 +1,6 @@
 import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
 import { Loader2, Truck } from "lucide-react";
+import type { Vehicle } from "../../types/vehicle";
 
 export default function MyVehicles() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
@@ -13,7 +14,7 @@ export default function MyVehicles() {
   // We use contract.id (or contract.supplierId) which is the same supplierId we used to filter in buildSupplierOverview
   const supplierId = data.contract?.supplierId || data.supplier?.orgId; // Fallback
 
-  let myVehicles = [];
+  let myVehicles: Vehicle[] = [];
   if (raw.vehicles && supplierId) {
      // match the logic from buildSupplierOverview
      const myAgreement = raw.vehicles.agreements.find(a => a.supplierId === supplierId || a.supplierId === "sup-c");

@@ -11,6 +11,12 @@ data class FleetSupplier(val id: String, val name: String, val orgNumber: String
 data class SupplierInput(val name: String, val orgNumber: String)
 
 @Serializable
+data class SupplierInvitationRequest(val email: String)
+
+@Serializable
+data class SupplierInvitationResponse(val email: String, val token: String, val expiresAt: String)
+
+@Serializable
 data class SupplierUpdate(val supplier: SupplierInput, val expectedUpdatedAt: String)
 
 @Serializable

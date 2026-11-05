@@ -47,6 +47,9 @@ data class ForgotPasswordRequest(val email: String)
 data class ResetPasswordRequest(val token: String, val newPassword: String)
 
 @Serializable
+data class AcceptSupplierInvitationRequest(val token: String, val newPassword: String)
+
+@Serializable
 data class ErrorResponse(val message: String)
 
 /**
@@ -63,7 +66,7 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
 
     routing {
         route("/api/auth") {
-            // Applies to login and forgot-password: blunt brute-force / enumeration protection.
+            // Applies to sign-in, recovery and invitation acceptance to constrain repeated attempts.
             rateLimit(LOGIN_RATE_LIMIT) {
                 post("/login") {
                     val request = call.receive<LoginRequest>()
@@ -156,6 +159,26 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     // The account owner proved control of it, so lift any brute-force lock.
                     LoginAttemptTracker.recordSuccess(user.email)
                     logger.info("Password reset completed for user ${user.id}")
+                    call.respond(HttpStatusCode.OK)
+                }
+
+                post("/accept-invitation") {
+                    val request = call.receive<AcceptSupplierInvitationRequest>()
+                    PasswordPolicy.violation(request.newPassword)?.let { reason ->
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(reason))
+                        return@post
+                    }
+                    val user = UserRepository.acceptSupplierInvitation(
+                        request.token.trim(),
+                        request.newPassword
+                    )
+                    if (user == null) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ErrorResponse("This supplier invitation is invalid, expired, or already used.")
+                        )
+                        return@post
+                    }
                     call.respond(HttpStatusCode.OK)
                 }
             }

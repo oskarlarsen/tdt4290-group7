@@ -5,6 +5,14 @@ AGENTS.md
 !.env.*.example
 .env-backups/
 backend/data/
+# Sensitive operational and municipal data
+data/
+data_inventory.json
+deep_data_summary.json
+pdf_summary.json
+extracted.txt
+backend/extracted.txt
+test_classifier.txt
 bin/
 .DS_Store
 .idea/

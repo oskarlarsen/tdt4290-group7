@@ -10,7 +10,6 @@ The backend and Vite load it when started from their documented directories. Res
 |---|---|---|
 | `JWT_SECRET` | Required | Sign backend sessions. |
 | `SEED_ADMIN_PASSWORD` | Required | Seed `advisor.hansen@kommune.no`. |
-| `SEED_SUPPLIER_PASSWORD` | Required | Seed `supplier@nordvik.no`. |
 | `VITE_API_BASE_URL` | Template: `http://localhost:8080/api` | API address used by the browser. |
 | `VITE_USE_MOCKS` | Template: `false` | Enable demo data on prototype pages; off by default, including Docker Compose. |
 | `VITE_USE_MOCK_AUTH` | Template: `false` | Enable offline demo sign-in instead of backend authentication. |
@@ -27,6 +26,7 @@ The backend and Vite load it when started from their documented directories. Res
 | `PORT` | `8080` | Backend listening port. |
 | `VEHICLE_DB_PATH` | `data/vehicles.db` | SQLite path, relative to the backend working directory unless absolute. |
 | `CERTIFICATE_DB_PATH` | `data/certificates.db` | SQLite path for certificate metadata, independent of `VEHICLE_DB_PATH`. |
+| `USER_DB_PATH` | `data/users.db` | SQLite path for persistent user accounts and supplier invitations. |
 | `JWT_ISSUER` / `JWT_AUDIENCE` | `tdt4290-backend` / `tdt4290-frontend` | Session issuer and audience. |
 | `APP_ENV` | `prod` | Select `dev` to allow development-only password-reset logging. |
 | `ALLOW_DEV_PASSWORD_RESET_LOG` | `false` | Log reset tokens locally; requires `APP_ENV=dev`. Email delivery is not implemented. |
@@ -53,7 +53,7 @@ Restore `VITE_USE_MOCK_AUTH=false` and restart Vite to use backend sign-in again
 
 | Problem | Action |
 |---|---|
-| Backend reports a missing required setting | Fill all three required values in root `.env`. Check for an old process environment override if the file already contains a value. |
+| Backend reports a missing required setting | Fill both required values in root `.env`. Check for an old process environment override if the file already contains a value. |
 | PowerShell blocks `npm.ps1` | Use `npm.cmd` for the same commands, for example `npm.cmd ci`. |
 | Gradle cannot find Java 21 | Check `java -version` and that `JAVA_HOME`, if set, points to JDK 21. |
 | Dependency installation/tests reject the Node version | Use Node 22.22.2 or newer within Node 22. Node 24 requires at least 24.15.0 for the locked test dependencies. |

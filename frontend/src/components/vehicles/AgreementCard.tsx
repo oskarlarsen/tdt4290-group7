@@ -7,6 +7,7 @@ import { useRefreshVehicles } from "../../hooks/useVehicles";
 import { AgreementForm, VehicleEntryForm } from "./FleetForms";
 import { ConfirmAction } from "./ConfirmAction";
 import { ErrorNotice, buttonClass, dangerClass, primaryClass } from "./VehicleDialog";
+import { CopyableValue } from "../ui/CopyableValue";
 
 export function VehicleAllowance({ count, allowed }: { count: number; allowed: number }) {
   return <span className={`text-sm font-medium ${count > allowed ? "text-red-700" : "text-neutral-700"}`}>{count} of {allowed} vehicles</span>;
@@ -35,7 +36,11 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
   }
   return <article className="rounded-xl border border-neutral-200 bg-white p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h3 className="font-medium text-neutral-900">{vehicleDate(agreement.startDate)} – {vehicleDate(agreement.endDate)}</h3><p className="mt-1 text-xs text-neutral-500">{agreementDuration(agreement.startDate, agreement.endDate)}</p></div>
+      <div className="space-y-1">
+        <h3 className="font-medium text-neutral-900">{vehicleDate(agreement.startDate)} – {vehicleDate(agreement.endDate)}</h3>
+        <p className="text-xs text-neutral-500">{agreementDuration(agreement.startDate, agreement.endDate)}</p>
+        <CopyableValue label="Agreement ID (for supplier CSV)" value={agreement.id} />
+      </div>
       <VehicleAllowance count={listed.length} allowed={agreement.allowedVehicles} />
     </div>
     <div className="my-4 flex flex-wrap gap-2">

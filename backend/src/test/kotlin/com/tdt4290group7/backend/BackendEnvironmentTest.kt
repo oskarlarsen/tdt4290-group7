@@ -85,14 +85,14 @@ class BackendEnvironmentTest {
         val path = fixture("""
             JWT_SECRET='synthetic ${'$'}value # literal' # explanation
             SEED_ADMIN_PASSWORD=" synthetic password "
-            SEED_SUPPLIER_PASSWORD=synthetic-password # explanation
+            USER_DB_PATH=users.db # account store path
             TESSERACT_PATH='C:\Program Files\Tesseract-OCR\tesseract.exe'
             JWT_ISSUER="line\nsecond"
             JWT_AUDIENCE='${'$'}{JWT_ISSUER}'
         """.trimIndent())
         assertEquals("synthetic ${'$'}value # literal", backendSetting("JWT_SECRET", emptyMap(), path))
         assertEquals(" synthetic password ", backendSetting("SEED_ADMIN_PASSWORD", emptyMap(), path))
-        assertEquals("synthetic-password", backendSetting("SEED_SUPPLIER_PASSWORD", emptyMap(), path))
+        assertEquals("users.db", backendSetting("USER_DB_PATH", emptyMap(), path))
         assertEquals("C:\\Program Files\\Tesseract-OCR\\tesseract.exe", backendSetting("TESSERACT_PATH", emptyMap(), path))
         assertEquals("line\nsecond", backendSetting("JWT_ISSUER", emptyMap(), path))
         assertEquals("${'$'}{JWT_ISSUER}", backendSetting("JWT_AUDIENCE", emptyMap(), path))

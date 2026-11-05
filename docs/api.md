@@ -21,12 +21,13 @@ The response contains `user` and `expiresAt` and sets the `auth_token` cookie. R
 | POST | `/api/auth/login` | Sign in. |
 | POST | `/api/auth/logout` | Clear the session cookie. |
 | GET | `/api/auth/me` | Read the signed-in user. |
+| POST | `/api/auth/accept-invitation` | Accept `{ "token": "...", "newPassword": "..." }` once to activate a supplier account. |
 | POST | `/api/auth/forgot-password` | Request a reset with `{ "email": "..." }`. |
 | POST | `/api/auth/reset-password` | Reset with `{ "token": "...", "newPassword": "..." }`. |
 
-Password-reset email delivery is not connected. For local testing, enable `APP_ENV=dev` and `ALLOW_DEV_PASSWORD_RESET_LOG=true` to obtain the token from the backend log. Tokens expire after 15 minutes and are single-use. A successful reset invalidates that user's existing sessions. New passwords must be 12–72 UTF-8 bytes.
+Supplier invitations are created by an administrator at `POST /api/vehicle-fleet/suppliers/{id}/invitations` with `{ "email": "..." }`; the response contains a one-time token to append as a URL fragment to `/accept-invitation#...`. Share that link with the contact manually; email delivery is not configured. Invitations expire after 48 hours. Password-reset email delivery is also not connected. For local testing, enable `APP_ENV=dev` and `ALLOW_DEV_PASSWORD_RESET_LOG=true` to obtain reset tokens from the backend log. Reset tokens expire after 15 minutes and are single-use. A successful reset invalidates that user's existing sessions. New passwords must be 12–72 UTF-8 bytes.
 
-Sign-in/reset requests are rate-limited. Repeated failed sign-ins also lock the account temporarily; `429` responses include retry guidance. Seed accounts and password changes are in memory and reset on backend restart.
+Sign-in, reset, and invitation acceptance are rate-limited. Repeated failed sign-ins also lock the account temporarily; `429` responses include retry guidance. Accounts persist in the SQLite database configured by `USER_DB_PATH`; only the initial administrator password comes from environment configuration.
 
 ## Certificates
 
@@ -55,6 +56,7 @@ An agreement belongs to a supplier and specifies dates and vehicle allowance. Ve
 | GET | `/api/vehicle-fleet/history?page=1` | Change history. |
 | POST | `/api/vehicle-fleet/suppliers` | Create a supplier. |
 | PUT | `/api/vehicle-fleet/suppliers/{id}` | Update a supplier. |
+| POST | `/api/vehicle-fleet/suppliers/{id}/invitations` | Admin creates a one-time supplier account invitation by email. |
 | POST | `/api/vehicle-fleet/agreements` | Create an agreement. |
 | PUT | `/api/vehicle-fleet/agreements/{id}` | Update an agreement. |
 | DELETE | `/api/vehicle-fleet/agreements/{id}` | Remove an agreement and unlist its vehicles. |
@@ -159,6 +161,28 @@ A check compares saved reporting rows with agreement coverage and registry facts
 Checks can reuse a registry snapshot for `SVV_CACHE_TTL_DAYS` (default 14). `forceRefresh=true` requests a new lookup. Inspect `dataSource`, `lookupOutcome`, `refreshFailure` and `fetchedAt`: an HTTP success does not establish successful registry verification. Registry sources are `LIVE`, `CACHE`, `STALE_CACHE` and `UNAVAILABLE`.
 
 Current registry data cannot establish historical registry status. The registry endpoint does not establish usage prohibitions (`bruksforbud`). Exact comparisons are implemented in [VehicleDeviationRules.kt](../backend/src/main/kotlin/com/tdt4290group7/backend/vehicles/VehicleDeviationRules.kt).
+
+## Supplier onboarding & dashboard
+
+Supplier onboarding and portal endpoints support both supplier sessions (strictly scoped to their own `supplierId`) and administrator sessions (using `?supplierId=<id>` for tenant inspection).
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/onboarding/status` | Read onboarding lifecycle status and step completion. |
+| `POST` | `/api/onboarding/profile` | Update sustainability contact person and email. |
+| `GET` | `/api/onboarding/templates/{entity}` | Download a blank semicolon-delimited CSV header template (`vehicles`, `energy`, `products`) for Excel. Upload accepts comma- or semicolon-delimited CSV. Use active agreement IDs shown in the supplier workspace. |
+| `POST` | `/api/onboarding/upload/{entity}/preview` | Multipart CSV dry-run preview with cell error reporting. |
+| `POST` | `/api/onboarding/upload/{entity}/confirm` | Atomically commit a verified batch preview. |
+| `POST` | `/api/onboarding/submit` | Submit dossier for municipal review. |
+| `POST` | `/api/admin/onboarding/{supplierId}/review` | Administrator approval or revision request. |
+| `GET` | `/api/supplier/overview` | Portal summary metrics and agreement breakdown. |
+| `GET` | `/api/supplier/agreements` | List agreements assigned to the authenticated supplier. |
+| `GET` | `/api/supplier/vehicles` | List vehicles linked to the supplier's agreements. |
+| `GET` | `/api/supplier/energy` | List facility energy consumption records. |
+| `GET` | `/api/supplier/products` | List catalog items and eco-labels. |
+| `GET` | `/api/supplier/certificates` | List environmental certificates for the supplier's contracts. |
+
+See [Supplier Onboarding Reference](supplier-onboarding.md) for full cURL examples, two-phase ingestion details, and SQLite schema DDLs.
 
 ## Errors
 

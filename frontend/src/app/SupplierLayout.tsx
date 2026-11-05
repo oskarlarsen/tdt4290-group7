@@ -9,12 +9,14 @@ import {
   CheckCircle2,
   ShieldAlert,
   Bell,
-  AlertTriangle
+  AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 import { ProfileMenu } from "../components/ui/ProfileMenu";
 
 const NAV = [
   { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "onboarding", label: "Onboarding", icon: ClipboardList },
   { to: "company", label: "My Company", icon: Building2 },
   { to: "contracts", label: "My Contracts", icon: FileText },
   { to: "vehicles", label: "My Vehicles", icon: Truck },

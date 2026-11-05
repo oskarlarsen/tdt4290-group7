@@ -5,6 +5,7 @@ import { AdminLayout } from "./AdminLayout";
 import { SupplierLayout } from "./SupplierLayout";
 
 import Login from "../pages/auth/Login";
+import AcceptSupplierInvitation from "../pages/auth/AcceptSupplierInvitation";
 import Unauthorized from "../pages/auth/Unauthorized";
 
 import AdminDashboard from "../pages/admin/Dashboard";
@@ -18,6 +19,7 @@ import Alerts from "../pages/admin/Alerts";
 import SupplierDetails from "../pages/admin/SupplierDetails";
 
 import SupplierDashboard from "../pages/supplier/Dashboard";
+import SupplierOnboarding from "../pages/supplier/Onboarding";
 import MyCompany from "../pages/supplier/MyCompany";
 import MyContracts from "../pages/supplier/MyContracts";
 import MyVehicles from "../pages/supplier/MyVehicles";
@@ -31,6 +33,7 @@ import RequiredActions from "../pages/supplier/RequiredActions";
 const router = createBrowserRouter([
   { path: "/", element: <RoleRedirect /> },
   { path: "/login", element: <Login /> },
+  { path: "/accept-invitation", element: <AcceptSupplierInvitation /> },
   { path: "/unauthorized", element: <Unauthorized /> },
   {
     path: "/admin",
@@ -60,6 +63,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { path: "dashboard", element: <SupplierDashboard /> },
+      { path: "onboarding", element: <SupplierOnboarding /> },
       { path: "company", element: <MyCompany /> },
       { path: "contracts", element: <MyContracts /> },
       { path: "vehicles", element: <MyVehicles /> },

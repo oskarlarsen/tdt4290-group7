@@ -31,7 +31,7 @@ describe("statistics directory", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><MemoryRouter><Vehicles /></MemoryRouter></QueryClientProvider>);
     expect(html).toContain("Find supplier, organization number or vehicle");
     expect(html).toContain("Reported data"); expect(html).toContain("Change history");
-    expect(html).toContain("Add supplier"); expect(html).not.toContain("coming soon");
+    expect(html).toContain('href="/admin/suppliers"'); expect(html).not.toContain("Add supplier"); expect(html).not.toContain("coming soon");
     expect(html).not.toContain("Add approval period");
   });
 });

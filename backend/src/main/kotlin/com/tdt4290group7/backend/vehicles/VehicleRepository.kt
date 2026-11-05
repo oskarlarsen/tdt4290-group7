@@ -9,6 +9,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatterBuilder
 import java.util.UUID
+import com.tdt4290group7.backend.onboarding.OnboardingRepository
 
 interface VehicleStore {
     fun findOrCreateVehicle(registrationNumber: String, now: Instant): Vehicle
@@ -27,6 +28,7 @@ internal fun Instant.storageTimestamp(): String = timestampFormat.format(this)
 class VehicleRepository(databasePath: Path) : VehicleStore {
     internal val database = VehicleDatabase(databasePath)
     val fleet = FleetRepository(database)
+    internal val onboarding = OnboardingRepository(database, fleet)
     private fun <T> readTransaction(action: (Connection) -> T) = database.read(action)
     private fun <T> writeTransaction(action: (Connection) -> T) = database.write(action)
     private fun <T> query(db: Connection, sql: String, parameters: List<Any?> = emptyList(), map: (ResultSet) -> T) = database.query(db, sql, parameters, map)

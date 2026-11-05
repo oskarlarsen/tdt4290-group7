@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildSupplierOverview } from "../../src/utils/supplierOverview";
-import type { TopRiskSupplier, RecentAlert } from "../../src/types/dashboard";
-import type { DerivedContract } from "../../src/types/contract";
-import type { Certificate } from "../../src/types/certificate";
-import type { EnergyRequirement, EnergyRecord } from "../../src/types/energy";
+import { buildSupplierOverview } from "../src/utils/supplierOverview";
+import type { TopRiskSupplier, RecentAlert } from "../src/types/dashboard";
+import type { DerivedContract } from "../src/types/contract";
+import type { Certificate } from "../src/types/certificate";
+import type { EnergyRequirement, EnergyRecord } from "../src/types/energy";
 
 describe("buildSupplierOverview", () => {
   const mockSuppliers: TopRiskSupplier[] = [
@@ -35,7 +35,7 @@ describe("buildSupplierOverview", () => {
       mockSuppliers,
       mockContracts,
       mockCerts,
-      { items: [], total: 0 },
+      { suppliers: [], agreements: [], vehicles: [], changes: [] },
       { requirements: mockEnergyReqs, records: mockEnergyRecs },
       mockAlerts
     );
@@ -56,7 +56,7 @@ describe("buildSupplierOverview", () => {
       mockSuppliers,
       mockContracts,
       mockCerts,
-      { items: [], total: 0 },
+      { suppliers: [], agreements: [], vehicles: [], changes: [] },
       { requirements: mockEnergyReqs, records: mockEnergyRecs },
       mockAlerts
     );

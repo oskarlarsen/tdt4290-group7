@@ -1,9 +1,5 @@
-import { useState } from "react";
 import { Building2, ShieldAlert, Clock3, CheckCircle2, Download, Plus } from "lucide-react";
 import { KpiCard } from "../ui/KpiCard";
-import { AddSupplierDialog } from "./AddSupplierDialog";
-import type { DerivedContract } from "../../types/contract";
-import type { NewSupplierInput, TopRiskSupplier } from "../../types/dashboard";
 
 type Props = {
   monitoredSuppliers: number;
@@ -13,11 +9,7 @@ type Props = {
   compliantCount: number;
   compliantPercent: number;
   onExport: () => void;
-  existingSuppliers: TopRiskSupplier[];
-  contracts: DerivedContract[];
-  contractsLoading: boolean;
-  contractsError: boolean;
-  onAddSupplier: (supplier: NewSupplierInput) => Promise<void>;
+  onAddSupplier: () => void;
 };
 
 // Use the mockup as a visual reference, but show only metrics backed by the shared dashboard summary
@@ -29,14 +21,8 @@ export function SuppliersOverviewHeader({
   compliantCount,
   compliantPercent,
   onExport,
-  existingSuppliers,
-  contracts,
-  contractsLoading,
-  contractsError,
   onAddSupplier,
 }: Props) {
-  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
-
   const cards = [
     {
       label: "MONITORED SUPPLIERS",
@@ -99,7 +85,7 @@ export function SuppliersOverviewHeader({
             </button>
             <button
               type="button"
-              onClick={() => setIsAddSupplierOpen(true)}
+              onClick={onAddSupplier}
               className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg bg-[#1f4d46] px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#173a34]"
             >
               <Plus className="h-4 w-4" />
@@ -123,15 +109,6 @@ export function SuppliersOverviewHeader({
         ))}
       </div>
 
-      <AddSupplierDialog
-        open={isAddSupplierOpen}
-        existingSuppliers={existingSuppliers}
-        contracts={contracts}
-        contractsLoading={contractsLoading}
-        contractsError={contractsError}
-        onClose={() => setIsAddSupplierOpen(false)}
-        onAddSupplier={onAddSupplier}
-      />
     </div>
   );
 }

@@ -43,9 +43,7 @@ fun Application.module(
     val logResetTokens = resetTokenLoggingEnabled(environment, backendSetting("ALLOW_DEV_PASSWORD_RESET_LOG"))
     log.info("Starting in ${environment.name.lowercase()} mode")
 
-    // Fail fast at startup: UserRepository's init throws if SEED_ADMIN_PASSWORD /
-    // SEED_SUPPLIER_PASSWORD are missing or blank. Kotlin objects initialize lazily,
-    // so touch it here instead of failing on the first auth request.
+    // Kotlin objects initialize lazily, so touch the repository here and fail before serving requests.
     require(UserRepository.count > 0) { "User repository failed to seed" }
 
     configureSerialization()
@@ -57,8 +55,9 @@ fun Application.module(
     configureRateLimiting()
     val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
     val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
-    configureRouting(vehicleRepository, registry, cacheTtl)
     val certificateDatabasePath = Path.of(backendSetting("CERTIFICATE_DB_PATH") ?: "data/certificates.db")
-    configureCertificateRoutes(certificateRepository ?: CertificateRepository(certificateDatabasePath))
+    val resolvedCertificateRepository = certificateRepository ?: CertificateRepository(certificateDatabasePath)
+    configureRouting(vehicleRepository, registry, cacheTtl, resolvedCertificateRepository)
+    configureCertificateRoutes(resolvedCertificateRepository)
     configureAuthRoutes(logResetTokens)
 }
