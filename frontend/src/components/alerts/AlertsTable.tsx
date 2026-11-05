@@ -1,14 +1,15 @@
 import { Trash2 } from "lucide-react";
 import { AlertFindingBadge, AlertStatusBadge, SeverityBadge } from "./AlertBadges";
 import type { RecentAlert, TopRiskSupplier } from "../../types/dashboard";
-import type { DerivedContract } from "../../types/contract";
 import { formatAlertCreatedDate } from "../../utils/alertAge";
 
-// contract is optional: not every alert is linked to a supplier, and a link can't always
-// be resolved to a contract.
+// The agreement is optional: not every alert is linked to a supplier, and a link can't always
+// be resolved to an agreement.
+export type AlertContract = { supplierId: string; supplierName: string; supplierOrgId: string; contractName: string };
+
 export type AlertRow = {
   alert: RecentAlert;
-  contract?: DerivedContract;
+  contract?: AlertContract;
   supplier?: Pick<TopRiskSupplier, "id" | "displayName" | "orgId" | "primaryContract">;
 };
 

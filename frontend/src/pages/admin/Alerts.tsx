@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Bell, CheckCircle2, ChevronDown, Clock3, Download, Loader2, Plus, Search } from "lucide-react";
 import { useAlerts } from "../../hooks/useAlerts";
-import { useContracts } from "../../hooks/useContracts";
+import { useFleet } from "../../hooks/useVehicles";
+import { useSearchParams } from "react-router-dom";
 import { useDashboardSummary, useUpdateAlertStatus } from "../../hooks/useDashboardSummary";
 import { createManualAlert, deleteAlert } from "../../api/alerts";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -15,11 +16,14 @@ import { AlertsAttentionCard } from "../../components/alerts/AlertsAttentionCard
 import { ALERT_SEVERITY_LABELS, ALERT_STATUS_LABELS } from "../../components/alerts/AlertBadges";
 import { ALERT_STATUSES } from "../../types/dashboard";
 import type { AlertSeverity, AlertStatus, NewManualAlertInput, RecentAlert } from "../../types/dashboard";
-import type { DerivedContract } from "../../types/contract";
+import { getActiveCertificateContracts } from "../../utils/certificateContracts";
+import type { AlertContract } from "../../components/alerts/AlertsTable";
 import { formatAlertCreatedDate } from "../../utils/alertAge";
 import { downloadCsv, toCsv } from "../../utils/csv";
 
 type AlertView = "all" | AlertSeverity;
+// "UNRESOLVED" is every status except RESOLVED, the same set the dashboard card counts.
+type StatusFilter = "ALL" | "UNRESOLVED" | AlertStatus;
 
 const FILTERS: { value: AlertView; label: string }[] = [
   { value: "all", label: "All" },
@@ -35,7 +39,9 @@ type PendingAlertDelete = { deadline: number; isDeleting: boolean };
 export default function Alerts() {
   const queryClient = useQueryClient();
   const { data: alerts, isLoading: alertsLoading, isError: alertsError } = useAlerts();
-  const { data: contracts, isLoading: contractsLoading, isError: contractsError } = useContracts();
+  // Agreement names are a convenience column: if the fleet data is unavailable the page still works without them.
+  const fleet = useFleet();
+  const contracts = useMemo(() => (fleet.data ? getActiveCertificateContracts(fleet.data) : []), [fleet.data]);
   // Only used for the portfolio-wide count shown next to the record-based KPIs.
   const { data: dashboard } = useDashboardSummary();
   const updateAlertStatus = useUpdateAlertStatus();
@@ -53,7 +59,19 @@ export default function Alerts() {
   });
 
   const [view, setView] = useState<AlertView>("all");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | AlertStatus>("ALL");
+  // The status filter lives in the URL so dashboard links such as ?status=unresolved can set it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusParam = searchParams.get("status")?.toUpperCase();
+  const statusFilter: StatusFilter =
+    statusParam === "UNRESOLVED" ? "UNRESOLVED" : ALERT_STATUSES.find((candidate) => candidate === statusParam) ?? "ALL";
+  const setStatusFilter = useCallback((next: StatusFilter) => {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (next === "ALL") params.delete("status");
+      else params.set("status", next.toLowerCase());
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [createdAlertIdToReveal, setCreatedAlertIdToReveal] = useState<string | null>(null);
@@ -97,8 +115,8 @@ export default function Alerts() {
 
   // Most severe first; within a severity, the original order (most recent first) is kept.
   const rows = useMemo<AlertRow[]>(() => {
-    if (!alerts || !contracts) return [];
-    const contractBySupplier = new Map<string, DerivedContract>();
+    if (!alerts) return [];
+    const contractBySupplier = new Map<string, AlertContract>();
     const supplierById = new Map((dashboard?.topRiskSuppliers ?? []).map((supplier) => [supplier.id, supplier]));
     for (const c of contracts) {
       if (!contractBySupplier.has(c.supplierId)) contractBySupplier.set(c.supplierId, c);
@@ -141,7 +159,8 @@ export default function Alerts() {
     const query = search.trim().toLowerCase();
     return rows
       .filter(({ alert }) => {
-        const matchesStatus = statusFilter === "ALL" || alert.status === statusFilter;
+        const matchesStatus =
+          statusFilter === "ALL" || (statusFilter === "UNRESOLVED" ? alert.status !== "RESOLVED" : alert.status === statusFilter);
         const matchesSeverity = view === "all" || alert.severity === view;
         return matchesStatus && matchesSeverity;
       })
@@ -184,7 +203,7 @@ export default function Alerts() {
     ? "No alert records available"
     : "No alerts match the current filters";
 
-  if (alertsLoading || contractsLoading) {
+  if (alertsLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-neutral-400">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -192,7 +211,7 @@ export default function Alerts() {
     );
   }
 
-  if (alertsError || contractsError || !alerts || !contracts) {
+  if (alertsError || !alerts) {
     return <div className="text-sm text-red-700">Couldn't load alerts. Try again.</div>;
   }
 
@@ -377,8 +396,8 @@ export default function Alerts() {
                 value={statusFilter}
                 onChange={(event) => {
                   const value = event.target.value;
-                  if (value === "ALL") {
-                    setStatusFilter("ALL");
+                  if (value === "ALL" || value === "UNRESOLVED") {
+                    setStatusFilter(value);
                   } else {
                     const status = ALERT_STATUSES.find((candidate) => candidate === value);
                     if (status) setStatusFilter(status);
@@ -388,6 +407,7 @@ export default function Alerts() {
                 aria-label="Filter alerts by status"
               >
                 <option value="ALL">All statuses</option>
+                <option value="UNRESOLVED">Unresolved</option>
                 {ALERT_STATUSES.map((status) => (
                   <option key={status} value={status}>{ALERT_STATUS_LABELS[status]}</option>
                 ))}

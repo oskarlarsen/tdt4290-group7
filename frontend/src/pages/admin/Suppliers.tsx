@@ -34,7 +34,16 @@ export default function Suppliers() {
   const [agreementSupplier, setAgreementSupplier] = useState<FleetSupplier | null>(null);
   const [invitationSupplier, setInvitationSupplier] = useState<FleetSupplier | null>(null);
   const [reportingSupplier, setReportingSupplier] = useState<FleetSupplier | null>(null);
-  const [riskFilter, setRiskFilter] = useState<"all" | TopRiskSupplier["risk"]>("all");
+  // The risk filter lives in the URL so dashboard links such as ?risk=high can set it.
+  const riskParam = searchParams.get("risk");
+  const riskFilter: "all" | TopRiskSupplier["risk"] =
+    riskParam === "high" || riskParam === "medium" || riskParam === "compliant" || riskParam === "unassessed" ? riskParam : "all";
+  function setRiskFilter(next: "all" | TopRiskSupplier["risk"]) {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("risk");
+    else params.set("risk", next);
+    setSearchParams(params, { replace: true });
+  }
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | FollowUpStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);

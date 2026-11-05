@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 type Tone = "neutral" | "danger" | "success";
 
@@ -13,6 +14,8 @@ type Props = {
   icon?: ReactNode;
   iconClassName?: string;
   valueClassName?: string;
+  /** When set, the whole card is a link to a filtered list. */
+  href?: string;
 };
 
 const NOTE_TONE_CLASSES: Record<Tone, string> = {
@@ -31,9 +34,10 @@ export function KpiCard({
   icon,
   iconClassName,
   valueClassName,
+  href,
 }: Props) {
-  return (
-    <div className="rounded-xl border border-neutral-100 bg-white p-4">
+  const card = (
+    <div className={`rounded-xl border border-neutral-100 bg-white p-4 ${href ? "hover:border-neutral-300" : ""}`}>
       <div className="flex items-start justify-between">
         <div className="text-sm font-mono text-neutral-500">{label}</div>
         {icon && (
@@ -57,5 +61,15 @@ export function KpiCard({
         <div className={`mt-1 text-xs font-medium ${NOTE_TONE_CLASSES[noteTone]}`}>{note}</div>
       )}
     </div>
+  );
+  if (!href) return card;
+  return (
+    <Link
+      to={href}
+      aria-label={`${label}: ${value}${sublabel ? ` ${sublabel}` : ""}, open list`}
+      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/40"
+    >
+      {card}
+    </Link>
   );
 }

@@ -172,6 +172,7 @@ export default function Dashboard() {
           sublabel={`/ ${data.kpis.totalSuppliers} active`}
           note={`${data.kpis.assessedSuppliers} assessed from stored evidence`}
           noteTone="danger"
+          href="/admin/suppliers?risk=high"
           icon={<ShieldAlert className="h-4 w-4" />}
         />
         <KpiCard
@@ -179,6 +180,7 @@ export default function Dashboard() {
           value={data.kpis.activeAlerts}
           sublabel="not yet resolved"
           note={`${alertsBySeverity.high} high · ${alertsBySeverity.medium} medium`}
+          href="/admin/alerts?status=unresolved"
           icon={<Bell className="h-4 w-4" />}
         />
         <KpiCard
