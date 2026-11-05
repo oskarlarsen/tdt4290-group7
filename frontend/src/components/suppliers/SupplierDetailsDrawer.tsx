@@ -4,6 +4,7 @@ import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useSupplierNotes, useAddSupplierNote } from "../../hooks/useSupplierNotes";
 import type { FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
+import { describeLastActive, describeLastUpdated } from "../../utils/activity";
 import type { TopRiskSupplier, RecentAlert, NoteVisibility } from "../../types/dashboard";
 
 const REVIEW_STATUS_BADGES: Record<FollowUpStatus, { label: string; color: "yellow" | "orange" | "tertiary" }> = {
@@ -17,6 +18,8 @@ type Props = {
   alerts: RecentAlert[];
   reviewStatus: FollowUpStatus;
   onChangeReviewStatus: (status: FollowUpStatus) => void;
+  /** When activity tracking started; shown when a supplier has no recorded check-in. */
+  trackingSince?: string;
   /** Opens the large Details window, which replaces this panel. */
   onOpenDetails: () => void;
   onClose: () => void;
@@ -28,6 +31,7 @@ export function SupplierDetailsDrawer({
   reviewStatus,
   onChangeReviewStatus,
   onOpenDetails,
+  trackingSince,
   onClose,
 }: Props) {
   const isOpen = supplier !== null;
@@ -102,6 +106,11 @@ export function SupplierDetailsDrawer({
                 <p className="text-sm font-semibold text-red-700">
                   {supplier.mainIssue || "No open issues on record."}
                 </p>
+              </Section>
+
+              <Section title="Activity">
+                <p className="text-sm text-neutral-700">{describeLastActive(supplier.lastActiveAt, trackingSince)}</p>
+                <p className="text-sm text-neutral-500">{describeLastUpdated(supplier.lastUpdatedAt, supplier.lastUpdatedBy)}</p>
               </Section>
 
               <Section title="Active alerts">

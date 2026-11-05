@@ -120,6 +120,10 @@ export type TopRiskSupplier = {
   energyRecordCount?: number;
   productCount?: number;
   registeredAccountCount?: number;
+  lastActiveAt?: string | null;
+  lastUpdatedAt?: string | null;
+  /** SUPPLIER, or ADMIN when an admin made the change for the supplier; null when unknown. */
+  lastUpdatedBy?: string | null;
 };
 
 export type RecentAlert = {
@@ -189,6 +193,8 @@ export type NewSupplierNote = { text: string; visibility: NoteVisibility; alertI
 
 export type DashboardSummary = {
   lastSyncedAt: string;
+  /** When check-ins started being recorded: suppliers with none were last seen before this. */
+  activityTrackingSince?: string;
   kpis: DashboardKpis;
   riskClassification: RiskClassification;
   topRiskSuppliers: TopRiskSupplier[];

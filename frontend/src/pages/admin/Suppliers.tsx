@@ -336,12 +336,14 @@ export default function Suppliers() {
         alerts={allAlerts}
         reviewStatus={selectedSupplier ? getStatus(selectedSupplier.id) : "to-review"}
         onChangeReviewStatus={(status) => selectedSupplier && setStatus(selectedSupplier.id, status)}
+        trackingSince={data?.activityTrackingSince}
         onOpenDetails={() => setDetailsOpen(true)}
         onClose={handleCloseDrawer}
       />
       {detailsOpen && selectedSupplier && (
         <SupplierDetailsDialog
           supplier={selectedSupplier}
+          trackingSince={data?.activityTrackingSince}
           alerts={allAlerts.filter((alert) => alert.supplierId === selectedSupplier.id && alert.status !== "RESOLVED")}
           onClose={() => setDetailsOpen(false)}
         />

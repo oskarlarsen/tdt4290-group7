@@ -19,7 +19,7 @@ type RiskFilter = "all" | "high" | "medium";
 const ATTENTION_WIDGET_VISIBLE_LIMIT = 3;
 
 export default function Dashboard() {
-  const { user, lastActiveAt } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { getStatus, setStatus, errorMessage: reviewStatusError } = useSupplierReviewStatus();
   const { data, isLoading, isError, error, refetch } = useDashboardSummary();
@@ -123,11 +123,6 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              {lastActiveAt && (
-                <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-xs text-neutral-500">
-                  Last active: {formatSyncTime(lastActiveAt)}
-                </span>
-              )}
               <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-xs text-neutral-500">
                 Data refreshed: {formatSyncTime(data.lastSyncedAt)}
               </span>

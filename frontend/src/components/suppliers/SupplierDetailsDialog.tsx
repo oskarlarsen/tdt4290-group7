@@ -5,6 +5,7 @@ import { VehicleDialog } from "../vehicles/VehicleDialog";
 import { reviewSupplierOnboarding } from "../../api/onboarding";
 import type { RecentAlert, TopRiskSupplier } from "../../types/dashboard";
 import { SupplierReportingDataDialog } from "./SupplierReportingDataDialog";
+import { describeLastActive, describeLastUpdated } from "../../utils/activity";
 
 const ISSUE_CATEGORY_LABELS: Record<NonNullable<TopRiskSupplier["issueCategory"]>, string> = {
   VEHICLE_DEVIATION: "Vehicle deviation",
@@ -18,11 +19,12 @@ type Props = {
   supplier: TopRiskSupplier;
   /** The supplier's unresolved alerts, with their full text. */
   alerts: RecentAlert[];
+  trackingSince?: string;
   onClose: () => void;
 };
 
 /** The long version of the supplier summary: full alert text, onboarding review and everything the supplier has submitted. */
-export function SupplierDetailsDialog({ supplier, alerts, onClose }: Props) {
+export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose }: Props) {
   const [onboardingNotes, setOnboardingNotes] = useState("");
   const [showReportingData, setShowReportingData] = useState(false);
   const queryClient = useQueryClient();
@@ -55,6 +57,8 @@ export function SupplierDetailsDialog({ supplier, alerts, onClose }: Props) {
             {supplier.contactName && <Field label="Contact name" value={supplier.contactName} />}
             {supplier.contactPhone && <Field label="Contact phone" value={supplier.contactPhone} />}
             <Field label="Agreement" value={supplier.primaryContract} />
+            <Field label="Activity" value={describeLastActive(supplier.lastActiveAt, trackingSince)} />
+            <Field label="Last update" value={describeLastUpdated(supplier.lastUpdatedAt, supplier.lastUpdatedBy)} />
           </Section>
 
           <Section title="Main issue">
