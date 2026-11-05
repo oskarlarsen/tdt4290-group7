@@ -116,7 +116,7 @@ class VehicleInputRulesTest {
 
     @Test
     fun incompatibleSchemasRequireAnExplicitResetWithoutChangingRecords() {
-        for (version in listOf(2, 7)) {
+        for (version in listOf(2, 7, 11)) {
             val path = path()
             java.nio.file.Files.createDirectories(path.parent)
             DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
@@ -136,6 +136,21 @@ class VehicleInputRulesTest {
                     rows.next(); assertEquals(version, rows.getInt(1))
                 } }
             }
+        }
+    }
+
+    @Test
+    fun versionTenDatabaseOpensAndKeepsItsVersion() {
+        val path = path()
+        VehicleRepository(path)
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.execute("PRAGMA user_version=10") }
+        }
+        VehicleRepository(path)
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
+                rows.next(); assertEquals(10, rows.getInt(1))
+            } }
         }
     }
 

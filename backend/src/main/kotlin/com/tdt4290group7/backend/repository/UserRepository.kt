@@ -175,8 +175,23 @@ object UserRepository {
             if (user(db, "email = ?", normalizedEmail) != null) {
                 throw AccountConflictException("An account already exists for this email address")
             }
-            db.prepareStatement("DELETE FROM supplier_invitations WHERE email = ? AND accepted_at IS NULL").use {
+            // A pending invitation from another organization must never be replaced: that would let one
+            // inviter cancel or take over an address another organization has invited.
+            val pendingElsewhere = db.prepareStatement(
+                "SELECT supplier_id, expires_at FROM supplier_invitations WHERE email = ? AND accepted_at IS NULL AND supplier_id != ?"
+            ).use { statement ->
+                statement.setString(1, normalizedEmail)
+                statement.setString(2, supplierId)
+                statement.executeQuery().use { rows ->
+                    buildList { while (rows.next()) add(Instant.parse(rows.getString("expires_at"))) }
+                }
+            }.any { it.isAfter(now) }
+            if (pendingElsewhere) {
+                throw AccountConflictException("This email has a pending invitation from another organization")
+            }
+            db.prepareStatement("DELETE FROM supplier_invitations WHERE email = ? AND supplier_id = ? AND accepted_at IS NULL").use {
                 it.setString(1, normalizedEmail)
+                it.setString(2, supplierId)
                 it.executeUpdate()
             }
             db.prepareStatement(

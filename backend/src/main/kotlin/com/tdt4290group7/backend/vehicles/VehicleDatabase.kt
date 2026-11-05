@@ -18,7 +18,8 @@ internal class VehicleDatabase(path: Path) {
         databaseUrl = "jdbc:sqlite:$absolute"
         write { db ->
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            check(version == 0 || version == 8 || version == 9) {
+            // Version 10 is accepted before any release writes it, so a rollback from 10 still starts.
+            check(version == 0 || version == 8 || version == 9 || version == 10) {
                 "Incompatible vehicle database schema (version $version). Stop the backend and run scripts/reset-vehicle-data.ps1 after confirming that the data can be wiped."
             }
             if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") { it.getString(1) }.isEmpty()) { "Vehicle database is not empty; run the development reset." }
@@ -26,7 +27,7 @@ internal class VehicleDatabase(path: Path) {
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
             }
             if (version == 8) migrateAgreementRequirements(db)
-            db.createStatement().use { it.execute("PRAGMA user_version = 9") }
+            if (version != 10) db.createStatement().use { it.execute("PRAGMA user_version = 9") }
         }
     }
 
