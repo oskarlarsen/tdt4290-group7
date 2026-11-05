@@ -262,6 +262,53 @@ class AdminDashboardRoutesTest {
     }
 
     @Test
+    fun adminCanEditManualAlertsButNotAutomaticOnes() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val certificateRepository = CertificateRepository(databasePath("certificates"))
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val actor = ChangeActor("admin", "Administrator")
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Edit AS", "123456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now())
+        certificateRepository.add(Certificate("c1", supplier.name, "Retura", null, LocalDate.now(ZoneId.of("Europe/Oslo")).plusDays(10), "c.pdf", CertificateStatus.EXPIRES_30D, agreement.id))
+        application { module(vehicles, null, certificateRepository = certificateRepository, adminInsightsRepository = insights) }
+        val admin = adminClient()
+        val manualId = Json.parseToJsonElement(admin.post("/api/admin/alerts") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"Original","supplierId":"${supplier.id}","category":"VEHICLE_COMPLIANCE","severity":"medium","findingType":"CONFIRMED_DEVIATION","description":"Old text","dueDate":"2026-12-01"}""")
+        }.bodyAsText()).jsonObject.getValue("id").jsonPrimitive.content
+        suspend fun patch(id: String, body: String) = admin.patch("/api/admin/alerts/$id") { contentType(ContentType.Application.Json); setBody(body) }
+        suspend fun alert(id: String) = Json.parseToJsonElement(admin.get("/api/admin/alerts").bodyAsText()).jsonArray.map { it.jsonObject }.single { it.getValue("id").jsonPrimitive.content == id }
+
+        // Content edits keep what is not mentioned, and a status-only patch still works.
+        val edited = patch(manualId, """{"title":"  Edited  ","severity":"high"}""")
+        assertEquals(HttpStatusCode.OK, edited.status, edited.bodyAsText())
+        val row = alert(manualId)
+        assertEquals("Edited", row.getValue("title").jsonPrimitive.content)
+        assertEquals("high", row.getValue("severity").jsonPrimitive.content)
+        assertEquals("Old text", row.getValue("description").jsonPrimitive.content)
+        assertEquals("2026-12-01", row.getValue("dueDate").jsonPrimitive.content)
+        assertEquals(HttpStatusCode.OK, patch(manualId, """{"description":"New text","dueDate":"2027-01-15","status":"IN_PROGRESS"}""").status)
+        assertEquals("IN_PROGRESS", alert(manualId).getValue("status").jsonPrimitive.content)
+        assertEquals("2027-01-15", alert(manualId).getValue("dueDate").jsonPrimitive.content)
+        assertEquals(HttpStatusCode.OK, patch(manualId, """{"dueDate":""}""").status)
+        assertEquals(null, alert(manualId)["dueDate"]?.takeIf { it.toString() != "null" })
+        assertEquals(HttpStatusCode.OK, patch(manualId, """{"status":"RESOLVED"}""").status)
+
+        // Validation, and nothing at all to update.
+        for (bad in listOf("""{"title":"  "}""", """{"title":"${"x".repeat(201)}"}""", """{"severity":"urgent"}""", """{"dueDate":"01/02/2027"}""", """{"status":"DONE"}""", "{}")) {
+            assertEquals(HttpStatusCode.BadRequest, patch(manualId, bad).status, bad)
+        }
+        assertEquals(HttpStatusCode.NotFound, patch("missing", """{"title":"x"}""").status)
+
+        // Automatic alerts are rebuilt from evidence, so their content cannot be edited, but their status can.
+        val automaticId = Json.parseToJsonElement(admin.get("/api/admin/alerts").bodyAsText()).jsonArray.map { it.jsonObject }
+            .single { it.getValue("source").jsonPrimitive.content == "AUTOMATIC" }.getValue("id").jsonPrimitive.content
+        assertEquals(HttpStatusCode.Conflict, patch(automaticId, """{"title":"Mine"}""").status)
+        assertEquals(HttpStatusCode.OK, patch(automaticId, """{"status":"UNDER_REVIEW"}""").status)
+        assertEquals(HttpStatusCode.Forbidden, supplierClient(supplier.id).patch("/api/admin/alerts/$manualId") { contentType(ContentType.Application.Json); setBody("""{"title":"x"}""") }.status)
+    }
+
+    @Test
     fun supplierNotesAreAdminOnlyAndSelfNotesBelongToTheirAuthor() = testApplication {
         val vehicles = VehicleRepository(databasePath("fleet"))
         val insights = AdminInsightsRepository(databasePath("insights"))

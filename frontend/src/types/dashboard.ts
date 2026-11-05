@@ -145,6 +145,14 @@ export type RecentAlert = {
   supplierId?: string;
 };
 
+/** Content of a manual alert an admin may change. dueDate: undefined keeps it, "" clears it. */
+export type AlertContentUpdate = {
+  title?: string;
+  description?: string;
+  severity?: AlertSeverity;
+  dueDate?: string;
+};
+
 export type NewManualAlertInput = {
   title: string;
   supplierId: string;

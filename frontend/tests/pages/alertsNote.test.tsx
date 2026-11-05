@@ -16,6 +16,7 @@ vi.mock("../../src/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "admin
 vi.mock("../../src/hooks/useDashboardSummary", () => ({
   useDashboardSummary: () => ({ data: { kpis: { activeAlerts: 0 }, topRiskSuppliers: [{ id: "supplier-1", displayName: "Nordvik AS", orgId: "1", primaryContract: "x", risk: "medium", mainIssue: "m" }] } }),
   useUpdateAlertStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateManualAlert: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("../../src/api/alerts", () => ({ createManualAlert: vi.fn(async () => created), deleteAlert: vi.fn() }));
 vi.mock("../../src/api/notes", () => ({ addSupplierNote: vi.fn() }));

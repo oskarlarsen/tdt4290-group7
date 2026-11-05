@@ -166,6 +166,24 @@ export function deleteAlert(id: string): void {
   alerts = alerts.filter((alert) => alert.id !== id);
 }
 
+export function updateManualAlert(id: string, changes: AlertContentUpdate): RecentAlert {
+  const existing = alerts.find((alert) => alert.id === id);
+  if (!existing) throw new Error(`Alert "${id}" was not found.`);
+  if (existing.source !== "MANUAL") throw new Error("Automatic alerts are rebuilt from evidence and cannot be edited");
+  const title = (changes.title ?? existing.title).trim();
+  const description = (changes.description ?? existing.description).trim();
+  if (!title || !description) throw new Error("Alert title and description are required.");
+  const updated: RecentAlert = {
+    ...existing,
+    title,
+    description,
+    severity: changes.severity ?? existing.severity,
+    dueDate: changes.dueDate === undefined ? existing.dueDate : changes.dueDate || undefined,
+  };
+  alerts = alerts.map((alert) => (alert.id === id ? updated : alert));
+  return updated;
+}
+
 export function archiveAlert(id: string): void {
   if (!alerts.some((alert) => alert.id === id)) throw new Error(`Alert "${id}" was not found.`);
   alerts = alerts.map((alert) => (alert.id === id ? { ...alert, archivedAt: new Date().toISOString() } : alert));
@@ -306,7 +324,7 @@ export function getIssueCategoryBreakdown() {
   };
 }
 
-import type { NewSupplierNote, SupplierNote } from "../types/dashboard";
+import type { AlertContentUpdate, NewSupplierNote, SupplierNote } from "../types/dashboard";
 
 const NOTES_STORAGE_KEY = "supplier_issue_notes";
 

@@ -17,6 +17,7 @@ vi.mock("../../src/hooks/useVehicles", () => ({ useFleet: () => ({ data: undefin
 vi.mock("../../src/hooks/useDashboardSummary", () => ({
   useDashboardSummary: () => ({ data: undefined }),
   useUpdateAlertStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateManualAlert: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("../../src/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "a", name: "Admin", role: "ADMIN" } }) }));

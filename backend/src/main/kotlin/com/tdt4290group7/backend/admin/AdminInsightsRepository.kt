@@ -241,6 +241,25 @@ class AdminInsightsRepository(databasePath: Path) {
             }
         }
 
+    fun findAlert(id: String): AdminAlertRecord? =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("SELECT * FROM admin_alerts WHERE id = ? AND deleted = 0").use { statement ->
+                statement.setString(1, id)
+                statement.executeQuery().use { rows -> if (rows.next()) rows.toAlert() else null }
+            }
+        }
+
+    /** Only manual alerts: automatic ones are rebuilt from evidence on every refresh and would lose the edit. */
+    fun updateManualContent(id: String, title: String, description: String, severity: String, dueDate: String?): Boolean =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement(
+                "UPDATE admin_alerts SET title = ?, description = ?, severity = ?, due_date = ? WHERE id = ? AND source = 'MANUAL' AND deleted = 0",
+            ).use {
+                it.setString(1, title); it.setString(2, description); it.setString(3, severity); it.setString(4, dueDate); it.setString(5, id)
+                it.executeUpdate() == 1
+            }
+        }
+
     fun archivedAlerts(): List<AdminAlertRecord> =
         DriverManager.getConnection(databaseUrl).use { database ->
             database.prepareStatement("SELECT * FROM admin_alerts WHERE archived_at IS NOT NULL ORDER BY archived_at DESC").use { statement ->

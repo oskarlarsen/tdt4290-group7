@@ -143,8 +143,15 @@ data class ManualAlertInput(
     val dueDate: String? = null,
 )
 
+/** Every field is optional. dueDate: absent keeps it, an empty string clears it, a date sets it. */
 @Serializable
-data class AlertStatusUpdate(val status: String)
+data class AlertUpdate(
+    val status: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val severity: String? = null,
+    val dueDate: String? = null,
+)
 
 @Serializable
 data class SupplierReviewStatusUpdate(val status: String)
@@ -249,13 +256,34 @@ fun Route.adminDashboardRoutes(
     }
 
     patch("/api/admin/alerts/{id}") {
-        if (call.adminActor() == null) return@patch
+        val actor = call.adminActor() ?: return@patch
         val id = call.parameters["id"] ?: return@patch call.respond(HttpStatusCode.BadRequest)
-        val status = call.receive<AlertStatusUpdate>().status
-        require(status in ALERT_STATUSES) { "Select a valid alert status" }
-        val alert = insights.updateStatus(id, status)
+        val update = call.receive<AlertUpdate>()
+        val editsContent = update.title != null || update.description != null || update.severity != null || update.dueDate != null
+        require(update.status != null || editsContent) { "Nothing to update" }
+        update.status?.let { require(it in ALERT_STATUSES) { "Select a valid alert status" } }
+        var alert = insights.findAlert(id)
             ?: return@patch call.respond(HttpStatusCode.NotFound, mapOf("error" to "Alert not found"))
-        call.respond(toRecentAlert(alert))
+        if (editsContent) {
+            if (alert.source != "MANUAL") {
+                return@patch call.respond(
+                    HttpStatusCode.Conflict,
+                    mapOf("error" to "Automatic alerts are rebuilt from evidence and cannot be edited"),
+                )
+            }
+            val title = (update.title ?: alert.title).trim()
+            val description = (update.description ?: alert.description).trim()
+            val severity = update.severity ?: alert.severity
+            val dueDate = when (update.dueDate) { null -> alert.dueDate; "" -> null; else -> update.dueDate }
+            require(title.length in 1..200) { "Alert title must be between 1 and 200 characters" }
+            require(description.length in 1..4000) { "Alert description must be between 1 and 4000 characters" }
+            require(severity in ALERT_SEVERITIES) { "Select a valid alert severity" }
+            dueDate?.let { requireValidDueDate(it) }
+            insights.updateManualContent(id, title, description, severity, dueDate)
+        }
+        update.status?.let { alert = insights.updateStatus(id, it) ?: alert }
+        call.application.log.info("admin_alert_updated alertId={} actorId={} content={} status={}", id, actor.id, editsContent, update.status != null)
+        call.respond(toRecentAlert(insights.findAlert(id) ?: alert))
     }
 
     delete("/api/admin/alerts/{id}") {
@@ -311,15 +339,17 @@ private fun ManualAlertInput.validated(): ManualAlertInput {
     require(severity in ALERT_SEVERITIES) { "Select a valid alert severity" }
     require(category in ALERT_CATEGORIES) { "Select a valid alert category" }
     require(findingType in ALERT_FINDING_TYPES) { "Select a valid finding type" }
-    dueDate?.let { value ->
-        require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Due date must use YYYY-MM-DD" }
-        try {
-            LocalDate.parse(value)
-        } catch (_: Exception) {
-            throw IllegalArgumentException("Enter a valid due date")
-        }
-    }
+    dueDate?.let(::requireValidDueDate)
     return this
+}
+
+private fun requireValidDueDate(value: String) {
+    require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Due date must use YYYY-MM-DD" }
+    try {
+        LocalDate.parse(value)
+    } catch (_: Exception) {
+        throw IllegalArgumentException("Enter a valid due date")
+    }
 }
 
 private fun refreshFindings(

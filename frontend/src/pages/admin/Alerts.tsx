@@ -4,7 +4,7 @@ import { AlertTriangle, Bell, CheckCircle2, ChevronDown, Clock3, Download, Loade
 import { useAlerts } from "../../hooks/useAlerts";
 import { useFleet } from "../../hooks/useVehicles";
 import { useSearchParams } from "react-router-dom";
-import { useDashboardSummary, useUpdateAlertStatus } from "../../hooks/useDashboardSummary";
+import { useDashboardSummary, useUpdateAlertStatus, useUpdateManualAlert } from "../../hooks/useDashboardSummary";
 import { createManualAlert, archiveAlert, restoreAlert } from "../../api/alerts";
 import { addSupplierNote } from "../../api/notes";
 import { useAuth } from "../../hooks/useAuth";
@@ -49,6 +49,7 @@ export default function Alerts() {
   // Only used for the portfolio-wide count shown next to the record-based KPIs.
   const { data: dashboard } = useDashboardSummary();
   const updateAlertStatus = useUpdateAlertStatus();
+  const updateManualAlert = useUpdateManualAlert();
   const createAlert = useMutation({
     mutationFn: (input: NewManualAlertInput) => createManualAlert(input),
     onSuccess: async () => {
@@ -494,6 +495,7 @@ export default function Alerts() {
         row={selectedRow}
         onClose={() => setSelectedId(null)}
         onStatusChange={handleStatusChange}
+        onEdit={async (id, changes) => { await updateManualAlert.mutateAsync({ id, changes }); }}
         isBusy={updateAlertStatus.isPending}
         statusMessage={statusFeedbackForSelected?.message}
         statusError={statusFeedbackForSelected?.isError}

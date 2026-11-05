@@ -46,6 +46,10 @@ Certificate routes require an administrator session.
 
 The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
+### Editing alerts
+
+`PATCH /api/admin/alerts/{id}` takes any of `status`, `title`, `description`, `severity` and `dueDate` (at least one). `title`, `description`, `severity` and `dueDate` can only be changed on manual alerts: an automatic alert is rebuilt from evidence on every refresh, so editing it returns `409`. For `dueDate`, leave it out to keep it, send `""` to clear it, or send `YYYY-MM-DD`. A body with only `status` works on every alert.
+
 ### Archiving alerts and certificates
 
 Alerts and certificates are archived, not deleted. An archived item is hidden from lists and counts, raises no alerts, and can be restored.
