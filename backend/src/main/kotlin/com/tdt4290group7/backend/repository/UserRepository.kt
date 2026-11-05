@@ -64,6 +64,11 @@ object UserRepository {
                 statement.execute(
                     "CREATE INDEX IF NOT EXISTS idx_supplier_invitations_email ON supplier_invitations(email, accepted_at)"
                 )
+                // Added after first release: nullable ADD COLUMN only, so an older release can still read the file.
+                val existing = statement.executeQuery("PRAGMA table_info(users)").use { rows ->
+                    buildSet { while (rows.next()) add(rows.getString("name")) }
+                }
+                if ("last_active_at" !in existing) statement.execute("ALTER TABLE users ADD COLUMN last_active_at TEXT")
             }
             val adminPassword = hash(requireSeedPassword("SEED_ADMIN_PASSWORD"))
             db.prepareStatement(
@@ -133,6 +138,34 @@ object UserRepository {
     fun findByEmail(email: String): User? = read { user(it, "email = ?", email.trim()) }
 
     fun findById(id: String): User? = read { user(it, "id = ?", id) }
+
+    /**
+     * Records that the user checked in (logged in, or had a session restored). Written at most once an hour,
+     * and a failure never fails the request: activity tracking must not be able to break login.
+     */
+    fun recordActivity(userId: String, now: Instant = Instant.now()) {
+        runCatching {
+            read { db ->
+                db.prepareStatement("UPDATE users SET last_active_at = ? WHERE id = ? AND (last_active_at IS NULL OR last_active_at < ?)").use {
+                    it.setString(1, now.toString())
+                    it.setString(2, userId)
+                    it.setString(3, now.minus(ACTIVITY_WRITE_INTERVAL).toString())
+                    it.executeUpdate()
+                }
+            }
+        }.onFailure { logger.warn("activity_record_failed userId={}", userId) }
+    }
+
+    /** The most recent check-in among a supplier's accounts. */
+    fun lastActiveBySupplier(): Map<String, String> = read { db ->
+        db.prepareStatement(
+            "SELECT supplier_id, MAX(last_active_at) AS last_active FROM users WHERE role = 'SUPPLIER' AND supplier_id IS NOT NULL AND last_active_at IS NOT NULL GROUP BY supplier_id"
+        ).use { statement ->
+            statement.executeQuery().use { rows -> buildMap { while (rows.next()) put(rows.getString("supplier_id"), rows.getString("last_active")) } }
+        }
+    }
+
+    private val ACTIVITY_WRITE_INTERVAL: Duration = Duration.ofHours(1)
 
     /** Every account that belongs to this supplier: the people notified about its alerts. */
     fun supplierUserIds(supplierId: String): List<String> = read { db ->

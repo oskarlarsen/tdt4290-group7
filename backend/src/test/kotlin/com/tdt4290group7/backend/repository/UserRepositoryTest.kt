@@ -94,4 +94,34 @@ class UserRepositoryTest {
         val invitation = UserRepository.createSupplierInvitation(UUID.randomUUID().toString(), "New Transport AS", email, now)
         assertNotNull(UserRepository.acceptSupplierInvitation(invitation.token, "test-only-supplier-password", now))
     }
+
+    private fun supplierUser(supplierId: String, now: Instant): String {
+        val email = "active-${UUID.randomUUID()}@example.no"
+        val invitation = UserRepository.createSupplierInvitation(supplierId, "Active Transport AS", email, now)
+        UserRepository.acceptSupplierInvitation(invitation.token, "test-only-supplier-password", now)
+        return UserRepository.findByEmail(email)!!.id
+    }
+
+    @Test
+    fun activityIsRecordedAtMostOnceAnHourAndTheSupplierShowsItsNewestCheckIn() {
+        val now = Instant.parse("2026-06-01T10:00:00Z")
+        val supplierId = UUID.randomUUID().toString()
+        val first = supplierUser(supplierId, now)
+        val second = supplierUser(supplierId, now)
+        assertEquals(null, UserRepository.lastActiveBySupplier()[supplierId])
+
+        UserRepository.recordActivity(first, now)
+        UserRepository.recordActivity(first, now.plusSeconds(30 * 60)) // inside the hour: ignored
+        assertEquals(now.toString(), UserRepository.lastActiveBySupplier()[supplierId])
+
+        UserRepository.recordActivity(second, now.plusSeconds(90 * 60))
+        assertEquals(now.plusSeconds(90 * 60).toString(), UserRepository.lastActiveBySupplier()[supplierId])
+        UserRepository.recordActivity(first, now.plusSeconds(2 * 3600)) // an hour after its last write: recorded
+        assertEquals(now.plusSeconds(2 * 3600).toString(), UserRepository.lastActiveBySupplier()[supplierId])
+    }
+
+    @Test
+    fun recordingActivityForAnUnknownUserDoesNothingAndDoesNotFail() {
+        UserRepository.recordActivity("no-such-user")
+    }
 }

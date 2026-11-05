@@ -48,7 +48,9 @@ internal class VehicleDatabase(path: Path) {
             ),
             "vehicle_checks" to listOf("agreement_saksnr TEXT"),
             // The category (and so the weight class) Statens vegvesen gave when the fuel was filled in at upload.
-            "vehicle_contract_details" to listOf("vehicle_category TEXT")
+            "vehicle_contract_details" to listOf("vehicle_category TEXT"),
+            // Who confirmed an upload (SUPPLIER, or ADMIN acting for the supplier), for "last updated".
+            "upload_batches" to listOf("committed_by_role TEXT")
         )
         columnsByTable.forEach { (table, definitions) ->
             val existing = query(db, "PRAGMA table_info($table)") { it.getString("name") }.toSet()

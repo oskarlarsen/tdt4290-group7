@@ -434,7 +434,7 @@ internal class OnboardingRepository(
         )
     }
 
-    fun confirmBatch(batchId: String, supplierId: String, now: Instant): CsvConfirmResponse {
+    fun confirmBatch(batchId: String, supplierId: String, now: Instant, byRole: String? = null): CsvConfirmResponse {
         val cached = batchCache[batchId]?.takeIf { it.cachedAt.plus(batchTtl) > now }
             ?: throw IllegalArgumentException("Batch preview expired or not found. Please upload the CSV again.")
 
@@ -470,7 +470,8 @@ internal class OnboardingRepository(
                 "upload_batches",
                 mapOf(
                     "status" to BatchStatus.COMMITTED.name,
-                    "committed_at" to ts
+                    "committed_at" to ts,
+                    "committed_by_role" to byRole
                 ),
                 "id = ?",
                 listOf(batchId)
@@ -657,6 +658,24 @@ internal class OnboardingRepository(
     // -------------------------------------------------------------------------
     // Supplier Dashboard Queries
     // -------------------------------------------------------------------------
+
+    /** The latest change to each supplier's data, and whether the supplier or an admin made it (null when unknown). */
+    data class LastUpdate(val at: Instant, val by: String?)
+
+    fun lastUpdatedBySupplier(): Map<String, LastUpdate> = database.read { db ->
+        val sql = """
+            SELECT supplier_id, committed_at AS at, committed_by_role AS role FROM upload_batches
+              WHERE status = 'COMMITTED' AND committed_at IS NOT NULL
+            UNION ALL
+            SELECT a.supplier_id, c.occurred_at, 'ADMIN' FROM fleet_changes c JOIN agreements a ON a.id = c.agreement_id
+        """.trimIndent()
+        val latest = mutableMapOf<String, LastUpdate>()
+        database.query(db, sql, emptyList()) { row ->
+            val update = LastUpdate(Instant.parse(row.getString("at")), row.getString("role"))
+            latest.merge(row.getString("supplier_id"), update) { a, b -> if (b.at.isAfter(a.at)) b else a }
+        }
+        latest
+    }
 
     fun getSupplierAgreementIds(supplierId: String): Set<String> {
         return database.read { db ->

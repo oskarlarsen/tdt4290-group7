@@ -537,4 +537,23 @@ class OnboardingWorkflowTest {
         assertTrue(oldest is IllegalArgumentException, "oldest preview should have been evicted")
         repo.onboarding.confirmBatch(ids.last(), "nordvik-transport", start.plusSeconds(10))
     }
+
+    @Test
+    fun lastUpdatedIsTheLatestChangeAndSaysWhoMadeIt() {
+        val repo = testRepository()
+        val agreementId = setupSupplierAndAgreement(repo)
+        val start = Instant.now().plusSeconds(600)
+        // The agreement was created by an admin: that is the only change so far.
+        assertEquals("ADMIN", repo.onboarding.lastUpdatedBySupplier().getValue("nordvik-transport").by)
+
+        val upload = previewVehicle(repo, agreementId, "AB12401", start)
+        repo.onboarding.confirmBatch(upload, "nordvik-transport", start.plusSeconds(60), byRole = "SUPPLIER")
+        val afterUpload = repo.onboarding.lastUpdatedBySupplier().getValue("nordvik-transport")
+        assertEquals("SUPPLIER", afterUpload.by)
+        assertEquals(start.plusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.MILLIS), afterUpload.at.truncatedTo(java.time.temporal.ChronoUnit.MILLIS))
+
+        // A later admin change takes over; an upload with no recorded role is attributed to nobody.
+        repo.fleet.addVehicle(agreementId, com.tdt4290group7.backend.vehicles.VehicleEntryInput(planned = true), ChangeActor("admin", "Admin"), start.plusSeconds(3600))
+        assertEquals("ADMIN", repo.onboarding.lastUpdatedBySupplier().getValue("nordvik-transport").by)
+    }
 }

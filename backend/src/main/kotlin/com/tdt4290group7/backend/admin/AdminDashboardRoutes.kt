@@ -90,6 +90,11 @@ data class DashboardSupplier(
     val energyRecordCount: Int = 0,
     val productCount: Int = 0,
     val registeredAccountCount: Int = 0,
+    /** The most recent check-in (login or restored session) by any of the supplier's accounts. */
+    val lastActiveAt: String? = null,
+    val lastUpdatedAt: String? = null,
+    /** SUPPLIER or ADMIN (an admin acting for the supplier); null when it is not known who made the change. */
+    val lastUpdatedBy: String? = null,
 )
 
 @Serializable
@@ -125,6 +130,8 @@ data class RecentAlert(
 @Serializable
 data class AdminDashboardSummary(
     val lastSyncedAt: String,
+    /** Suppliers with no check-in were last seen before this date, when activity tracking started. */
+    val activityTrackingSince: String,
     val kpis: DashboardKpis,
     val riskClassification: RiskClassification,
     val topRiskSuppliers: List<DashboardSupplier>,
@@ -597,6 +604,8 @@ private fun buildSummary(
     val agreementsBySupplier = overview.agreements.groupBy { it.supplierId }
     val onboardingBySupplier = vehicles.onboarding.getAdminSupplierOnboardingSummaries().associateBy { it.supplierId }
     val registeredAccountsBySupplier = UserRepository.supplierAccountCounts()
+    val lastActiveBySupplier = UserRepository.lastActiveBySupplier()
+    val lastUpdatedBySupplier = vehicles.onboarding.lastUpdatedBySupplier()
     val dashboardSuppliers = activeSuppliers.values.map { supplier ->
         val risk = riskForSupplier.getValue(supplier.id)
         val onboarding = onboardingBySupplier[supplier.id]
@@ -633,6 +642,9 @@ private fun buildSummary(
             energyRecordCount = onboarding?.energyRecordCount ?: 0,
             productCount = onboarding?.productCount ?: 0,
             registeredAccountCount = registeredAccountsBySupplier[supplier.id] ?: 0,
+            lastActiveAt = lastActiveBySupplier[supplier.id],
+            lastUpdatedAt = lastUpdatedBySupplier[supplier.id]?.at?.toString(),
+            lastUpdatedBy = lastUpdatedBySupplier[supplier.id]?.by,
         )
     }
     val alerts = insights.allAlerts()
@@ -651,6 +663,7 @@ private fun buildSummary(
     val lastSyncedAt = insights.lastSyncedAt() ?: Instant.now().toString()
     return AdminDashboardSummary(
         lastSyncedAt = lastSyncedAt,
+        activityTrackingSince = insights.activityTrackingSince(Instant.now()),
         kpis = DashboardKpis(
             totalSuppliers = activeSuppliers.size,
             totalSuppliersDeltaThisMonth = 0,

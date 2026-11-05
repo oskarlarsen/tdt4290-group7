@@ -106,6 +106,7 @@ fun Application.configureAuthRoutes(
                         return@post
                     }
                     LoginAttemptTracker.recordSuccess(email)
+                    UserRepository.recordActivity(user.id)
 
                     val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
                     // Without "remember me" the cookie lasts until the browser closes (the JWT
@@ -200,6 +201,7 @@ fun Application.configureAuthRoutes(
                         return@get
                     }
 
+                    UserRepository.recordActivity(user.id)
                     call.respond(user.toAuthUser())
                 }
             }

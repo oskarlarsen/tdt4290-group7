@@ -187,7 +187,7 @@ internal fun Route.onboardingRoutes(
             }
 
             try {
-                val response = repository.confirmBatch(request.batchId, supplierId, Instant.now())
+                val response = repository.confirmBatch(request.batchId, supplierId, Instant.now(), byRole = user.role.name)
                 call.respond(response)
             } catch (e: IllegalArgumentException) {
                 call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Failed to confirm batch"))

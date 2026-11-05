@@ -414,6 +414,17 @@ class AdminInsightsRepository(databasePath: Path) {
         }
     }
 
+    /** When activity tracking started, so "no activity recorded" can say since when. Set once. */
+    fun activityTrackingSince(now: Instant): String =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("INSERT OR IGNORE INTO admin_insights_metadata(name, value) VALUES ('activity_tracking_since', ?)").use {
+                it.setString(1, now.toString()); it.executeUpdate()
+            }
+            database.prepareStatement("SELECT value FROM admin_insights_metadata WHERE name = 'activity_tracking_since'").use {
+                it.executeQuery().use { rows -> rows.next(); rows.getString(1) }
+            }
+        }
+
     fun lastSyncedAt(): String? =
         DriverManager.getConnection(databaseUrl).use { database ->
             database.prepareStatement("SELECT value FROM admin_insights_metadata WHERE name = 'last_synced_at'").use {
