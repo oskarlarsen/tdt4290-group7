@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import Contracts from "../src/pages/admin/Contracts";
+import { formatDate } from "../src/utils/formatDate";
 
 const supplier = { id: "supplier-1", name: "Canonical Transport AS", orgNumber: "123456789", active: true, updatedAt: "2026-10-01T10:00:00Z" };
 const agreement = { id: "agreement-1", supplierId: supplier.id, startDate: "2026-01-01", endDate: "2027-12-31", allowedVehicles: 4, note: "Transport services", saksnr: "2024/1234", updatedAt: "2026-10-01T10:00:00Z", active: true };
@@ -34,7 +35,8 @@ describe("admin supplier agreements page", () => {
     mount();
 
     expect(await screen.findByText("Canonical Transport AS · 2024/1234 — Transport services")).toBeTruthy();
-    expect(screen.getByText(/Environmental compliance is not assessed/)).toBeTruthy();
+    expect(screen.queryByText(/Environmental compliance is not assessed/)).toBeNull();
+    expect(screen.getByText(`Expires on ${formatDate("2027-12-31")}`)).toBeTruthy();
     expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet");
 
     fireEvent.click(screen.getByRole("button", { name: "Add agreement" }));
@@ -77,5 +79,20 @@ describe("admin supplier agreements page", () => {
     fireEvent.change(screen.getByLabelText("Agreement status"), { target: { value: "Missing saksnr" } });
     expect(screen.queryByText("Canonical Transport AS · 2024/1234 — Transport services")).toBeNull();
     expect(screen.getByText("Canonical Transport AS · Saksnr missing — Old agreement")).toBeTruthy();
+  });
+
+  it("opens the agreement details from its name and shows the saksnr and end date", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ suppliers: [supplier], agreements: [agreement], vehicles: [], changes: [] }), { status: 200 })));
+    mount();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Canonical Transport AS · 2024/1234 — Transport services" }));
+    const drawer = screen.getByRole("dialog", { name: "2024/1234 — Transport services details" });
+    expect(drawer.textContent).toContain("2024/1234");
+    expect(drawer.textContent).toContain(formatDate("2027-12-31"));
+    expect(drawer.textContent).toContain("Canonical Transport AS");
+    expect(drawer.textContent).toContain("123456789");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "2024/1234 — Transport services details" })).toBeNull();
   });
 });
