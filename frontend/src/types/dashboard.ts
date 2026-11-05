@@ -78,6 +78,8 @@ export type RiskClassification = {
   compliant: { count: number; percent: number };
   medium: { count: number; percent: number };
   high: { count: number; percent: number };
+  // Suppliers with no stored vehicle check or dated certificate. Percentages are of all suppliers.
+  unassessed: { count: number; percent: number };
 };
 
 export type UnmodeledSupplierAggregate = {
@@ -103,6 +105,8 @@ export type TopRiskSupplier = {
   mainIssue: string;
   // Set the issue only for high/medium-risk suppliers
   issueCategory?: SupplierIssueCategory;
+  // Every category that applies; older responses only have issueCategory.
+  issueCategories?: SupplierIssueCategory[];
   onboardingStatus?: SupplierOnboardingStatus;
   contactName?: string | null;
   contactEmail?: string | null;

@@ -44,6 +44,14 @@ export default function Suppliers() {
     else params.set("risk", next);
     setSearchParams(params, { replace: true });
   }
+  const issueParam = searchParams.get("issue");
+  const issueFilter: "all" | "vehicle" | "certificate" = issueParam === "vehicle" || issueParam === "certificate" ? issueParam : "all";
+  function setIssueFilter(next: "all" | "vehicle" | "certificate") {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("issue");
+    else params.set("issue", next);
+    setSearchParams(params, { replace: true });
+  }
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | FollowUpStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -52,7 +60,7 @@ export default function Suppliers() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, riskFilter, reviewStatusFilter]);
+  }, [search, riskFilter, issueFilter, reviewStatusFilter]);
 
   /** Open the existing supplier drawer when reached from other pages */
   useEffect(() => {
@@ -102,6 +110,9 @@ export default function Suppliers() {
   const query = search.trim().toLowerCase();
   const filteredSuppliers = sortedSuppliers.filter((supplier) => {
     const matchesRisk = riskFilter === "all" || supplier.risk === riskFilter;
+    const categories = supplier.issueCategories ?? (supplier.issueCategory ? [supplier.issueCategory] : []);
+    const matchesIssue =
+      issueFilter === "all" || categories.includes(issueFilter === "vehicle" ? "VEHICLE_DEVIATION" : "CERTIFICATE_EXPIRY");
     const matchesReviewStatus =
       reviewStatusFilter === "all" || getStatus(supplier.id) === reviewStatusFilter;
     const matchesSearch =
@@ -110,7 +121,7 @@ export default function Suppliers() {
       supplier.orgId.toLowerCase().includes(query) ||
       supplier.primaryContract.toLowerCase().includes(query) ||
       supplier.mainIssue.toLowerCase().includes(query);
-    return matchesRisk && matchesReviewStatus && matchesSearch;
+    return matchesRisk && matchesIssue && matchesReviewStatus && matchesSearch;
   });
   const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / SUPPLIERS_PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -238,6 +249,19 @@ export default function Suppliers() {
                 <option value="medium">Medium</option>
                 <option value="compliant">Compliant</option>
                 <option value="unassessed">Unassessed</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-neutral-600">
+              <span className="font-medium text-neutral-700">Issue:</span>
+              <select
+                value={issueFilter}
+                onChange={(event) => setIssueFilter(event.target.value as "all" | "vehicle" | "certificate")}
+                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+                aria-label="Filter suppliers by issue category"
+              >
+                <option value="all">All</option>
+                <option value="vehicle">Vehicle deviations</option>
+                <option value="certificate">Certificate issues</option>
               </select>
             </label>
 

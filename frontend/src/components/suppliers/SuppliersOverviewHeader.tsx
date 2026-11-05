@@ -52,7 +52,7 @@ export function SuppliersOverviewHeader({
       label: "NO FLAGGED EVIDENCE",
       value: compliantCount,
       valueClass: "text-black",
-      sublabel: `${compliantPercent}% of suppliers with stored assessment evidence`,
+      sublabel: `${compliantPercent}% of all suppliers`,
       icon: CheckCircle2,
       iconStyle: "bg-tertiary-100 text-tertiary-700",
     },

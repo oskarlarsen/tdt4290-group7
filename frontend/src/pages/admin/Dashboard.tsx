@@ -196,7 +196,7 @@ export default function Dashboard() {
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <h2 className="font-headline text-base font-semibold text-neutral-900">Supplier risk classification</h2>
         <p className="mb-4 text-xs text-neutral-400">
-          Assessment uses persisted vehicle findings and certificate expiry dates; unassessed suppliers are excluded.
+          Assessment uses persisted vehicle findings and certificate expiry dates; suppliers with no evidence yet are listed as Not assessed.
         </p>
         <RiskClassificationBar data={data.riskClassification} />
       </section>

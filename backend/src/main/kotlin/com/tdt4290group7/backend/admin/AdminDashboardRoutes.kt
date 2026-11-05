@@ -60,7 +60,7 @@ data class AlertSeverityCounts(val high: Int, val medium: Int)
 data class RiskCount(val count: Int, val percent: Int)
 
 @Serializable
-data class RiskClassification(val compliant: RiskCount, val medium: RiskCount, val high: RiskCount)
+data class RiskClassification(val compliant: RiskCount, val medium: RiskCount, val high: RiskCount, val unassessed: RiskCount)
 
 @Serializable
 data class DashboardSupplier(
@@ -72,6 +72,8 @@ data class DashboardSupplier(
     val risk: String,
     val mainIssue: String,
     val issueCategory: String? = null,
+    /** Every category that applies, so a supplier with both a vehicle and a certificate problem is in both lists. */
+    val issueCategories: List<String> = emptyList(),
     val onboardingStatus: OnboardingStatus = OnboardingStatus.INVITED,
     val contactName: String? = null,
     val contactEmail: String? = null,
@@ -397,10 +399,18 @@ private fun buildSummary(
     }
     val assessedCount = riskForSupplier.values.count { it != "unassessed" }
     fun percentage(count: Int) = if (assessedCount == 0) 0 else (count * 100.0 / assessedCount).toInt()
+    // The four risk rows share one denominator, all active suppliers, so their percentages add up to about 100.
+    // complianceRatePercent below keeps its own denominator (assessed suppliers only).
+    fun riskRow(level: String): RiskCount {
+        val count = riskForSupplier.values.count { it == level }
+        val total = riskForSupplier.size
+        return RiskCount(count, if (total == 0) 0 else (count * 100.0 / total).toInt())
+    }
     val riskClassification = RiskClassification(
-        compliant = RiskCount(riskForSupplier.values.count { it == "compliant" }, percentage(riskForSupplier.values.count { it == "compliant" })),
-        medium = RiskCount(riskForSupplier.values.count { it == "medium" }, percentage(riskForSupplier.values.count { it == "medium" })),
-        high = RiskCount(riskForSupplier.values.count { it == "high" }, percentage(riskForSupplier.values.count { it == "high" })),
+        compliant = riskRow("compliant"),
+        medium = riskRow("medium"),
+        high = riskRow("high"),
+        unassessed = riskRow("unassessed"),
     )
     val agreementsBySupplier = overview.agreements.groupBy { it.supplierId }
     val onboardingBySupplier = vehicles.onboarding.getAdminSupplierOnboardingSummaries().associateBy { it.supplierId }
@@ -424,6 +434,10 @@ private fun buildSummary(
                 evidence.getValue(supplier.id).hasCertificateFinding -> "CERTIFICATE_EXPIRY"
                 else -> null
             },
+            issueCategories = listOfNotNull(
+                "VEHICLE_DEVIATION".takeIf { evidence.getValue(supplier.id).hasVehicleFinding },
+                "CERTIFICATE_EXPIRY".takeIf { evidence.getValue(supplier.id).hasCertificateFinding },
+            ),
             onboardingStatus = onboarding?.status ?: OnboardingStatus.INVITED,
             contactName = onboarding?.contactName,
             contactEmail = onboarding?.contactEmail,

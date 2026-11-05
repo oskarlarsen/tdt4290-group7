@@ -1,71 +1,45 @@
+import { Link } from "react-router-dom";
 import type { RiskClassification } from "../../types/dashboard";
 
-const SEGMENT_CLASSES = {
-  compliant: "bg-neutral-500",
-  medium: "bg-amber-400",
-  high: "bg-red-500",
-};
+type Level = "high" | "medium" | "compliant" | "unassessed";
 
-const DOT_CLASSES = {
-  compliant: "bg-neutral-500",
-  medium: "bg-amber-400",
-  high: "bg-red-500",
-};
+// High risk first, so the list says where to start. Each row opens the suppliers list at that level.
+const ROWS: { level: Level; label: string; dotClass: string; barClass: string }[] = [
+  { level: "high", label: "High risk", dotClass: "bg-red-500", barClass: "bg-red-500" },
+  { level: "medium", label: "Medium risk", dotClass: "bg-amber-400", barClass: "bg-amber-400" },
+  { level: "compliant", label: "No flagged evidence", dotClass: "bg-neutral-500", barClass: "bg-neutral-500" },
+  { level: "unassessed", label: "Not assessed", dotClass: "bg-neutral-300", barClass: "bg-neutral-300" },
+];
 
 export function RiskClassificationBar({ data }: { data: RiskClassification }) {
-  const total = data.compliant.count + data.medium.count + data.high.count;
+  const total = ROWS.reduce((sum, row) => sum + data[row.level].count, 0);
 
   return (
     <div>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
-        <div className={SEGMENT_CLASSES.compliant} style={{ width: `${data.compliant.percent}%` }} />
-        <div className={SEGMENT_CLASSES.medium} style={{ width: `${data.medium.percent}%` }} />
-        <div className={SEGMENT_CLASSES.high} style={{ width: `${data.high.percent}%` }} />
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-        <Legend
-          dotClass={DOT_CLASSES.compliant}
-          label="No flagged evidence"
-          count={data.compliant.count}
-          percent={data.compliant.percent}
-        />
-        <Legend
-          dotClass={DOT_CLASSES.medium}
-          label="Medium risk"
-          count={data.medium.count}
-          percent={data.medium.percent}
-        />
-        <Legend
-          dotClass={DOT_CLASSES.high}
-          label="High risk"
-          count={data.high.count}
-          percent={data.high.percent}
-        />
-        <span className="ml-auto font-mono text-xs text-neutral-400">{total} suppliers total</span>
-      </div>
+      <ul className="space-y-2">
+        {ROWS.map(({ level, label, dotClass, barClass }) => {
+          const { count, percent } = data[level];
+          return (
+            <li key={level}>
+              <Link
+                to={`/admin/suppliers?risk=${level}`}
+                aria-label={`${count} suppliers, ${label}: open list`}
+                className="block rounded-lg px-2 py-1.5 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/40"
+              >
+                <span className="flex flex-wrap items-center gap-1.5 text-sm">
+                  <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+                  <span className="font-medium text-neutral-800">{count} suppliers</span>
+                  <span className="font-mono text-xs text-neutral-400">({percent}%) {label}</span>
+                </span>
+                <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                  <span className={`block h-full ${barClass}`} style={{ width: `${percent}%` }} />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-right font-mono text-xs text-neutral-400">{total} suppliers total</p>
     </div>
-  );
-}
-
-function Legend({
-  dotClass,
-  label,
-  count,
-  percent,
-}: {
-  dotClass: string;
-  label: string;
-  count: number;
-  percent: number;
-}) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-      <span className="font-medium text-neutral-800">{count} suppliers</span>
-      <span className="font-mono text-xs text-neutral-400">
-        ({percent}%) {label}
-      </span>
-    </span>
   );
 }

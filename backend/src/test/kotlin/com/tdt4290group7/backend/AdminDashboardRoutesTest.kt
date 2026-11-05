@@ -110,6 +110,17 @@ class AdminDashboardRoutesTest {
         assertEquals(1, kpis.getValue("certificatesExpiringWithin90Days").jsonPrimitive.int)
         assertEquals(2, kpis.getValue("activeAlerts").jsonPrimitive.int)
         assertEquals(1, body.getValue("riskClassification").jsonObject.getValue("high").jsonObject.getValue("count").jsonPrimitive.int)
+        val classification = body.getValue("riskClassification").jsonObject
+        // The four risk rows cover every active supplier, including those not assessed.
+        assertEquals(
+            kpis.getValue("totalSuppliers").jsonPrimitive.int,
+            listOf("high", "medium", "compliant", "unassessed").sumOf { classification.getValue(it).jsonObject.getValue("count").jsonPrimitive.int },
+        )
+        assertEquals(100, classification.getValue("high").jsonObject.getValue("percent").jsonPrimitive.int)
+        assertEquals(0, classification.getValue("unassessed").jsonObject.getValue("count").jsonPrimitive.int)
+        val listedSupplier = body.getValue("topRiskSuppliers").jsonArray.single().jsonObject
+        assertEquals("2024/1234 — Municipal transport", listedSupplier.getValue("primaryContract").jsonPrimitive.content)
+        assertEquals(listOf("CERTIFICATE_EXPIRY"), listedSupplier.getValue("issueCategories").jsonArray.map { it.jsonPrimitive.content })
         assertEquals(1, body.getValue("suppliersRequiringAttention").jsonArray.size)
 
         val createResponse = admin.post("/api/admin/alerts") {
