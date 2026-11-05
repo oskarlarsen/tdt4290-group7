@@ -21,11 +21,13 @@ data class SupplierUpdate(val supplier: SupplierInput, val expectedUpdatedAt: St
 
 @Serializable
 data class AgreementInput(val supplierId: String, val startDate: String, val endDate: String,
-    val allowedVehicles: Int, val note: String = "")
+    val allowedVehicles: Int, val note: String = "", val requiresVehicles: Boolean = true,
+    val requiresEnergy: Boolean = false, val requiresProducts: Boolean = false)
 
 @Serializable
 data class FleetAgreement(val id: String, val supplierId: String, val startDate: String, val endDate: String,
-    val allowedVehicles: Int, val note: String, val updatedAt: String, val active: Boolean = true)
+    val allowedVehicles: Int, val note: String, val updatedAt: String, val active: Boolean = true,
+    val requiresVehicles: Boolean = true, val requiresEnergy: Boolean = false, val requiresProducts: Boolean = false)
 
 @Serializable
 data class AgreementUpdate(val agreement: AgreementInput, val expectedUpdatedAt: String)

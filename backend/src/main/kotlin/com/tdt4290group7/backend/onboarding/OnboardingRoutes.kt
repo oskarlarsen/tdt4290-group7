@@ -37,11 +37,15 @@ import io.ktor.utils.io.core.readBytes
 import java.time.Instant
 import java.util.Locale
 
-internal suspend fun ApplicationCall.supplierOrAdminUser(): User? {
+internal suspend fun ApplicationCall.supplierOrAdminUser(repository: OnboardingRepository): User? {
     val id = principal<JWTPrincipal>()?.payload?.let(JwtConfig::userId)
     val user = id?.let(UserRepository::findById)
     if (user == null) {
         respond(HttpStatusCode.Unauthorized, ApiError("Authentication required"))
+        return null
+    }
+    if (user.role == Role.SUPPLIER && !repository.isSupplierActive(user.supplierId.orEmpty())) {
+        respond(HttpStatusCode.Forbidden, ApiError("Supplier organization is no longer active"))
         return null
     }
     return user
@@ -72,13 +76,13 @@ internal fun Route.onboardingRoutes(
 ) {
     route("/api/onboarding") {
         get("/status") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             call.respond(repository.getOrCreateStatus(supplierId, Instant.now()))
         }
 
         post("/profile") {
-            val user = call.supplierOrAdminUser() ?: return@post
+            val user = call.supplierOrAdminUser(repository) ?: return@post
             val supplierId = call.resolveSupplierId(user) ?: return@post
             val input = try {
                 call.receive<SupplierProfileInput>()
@@ -94,7 +98,7 @@ internal fun Route.onboardingRoutes(
         }
 
         get("/templates/{entity}") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             val entityStr = call.parameters["entity"]?.uppercase(Locale.ROOT)
             val entityType = try {
@@ -104,6 +108,10 @@ internal fun Route.onboardingRoutes(
                 return@get
             }
 
+            if (repository.requiredAgreementIds(supplierId, entityType).isEmpty()) {
+                call.respond(HttpStatusCode.Forbidden, ApiError("Your administrator has not requested this information type"))
+                return@get
+            }
             val templateCsv = CsvStreamParser.generateTemplate(entityType)
             val fileName = "${entityType.name.lowercase(Locale.ROOT)}_template.csv"
 
@@ -118,7 +126,7 @@ internal fun Route.onboardingRoutes(
         }
 
         post("/upload/{entity}/preview") {
-            val user = call.supplierOrAdminUser() ?: return@post
+            val user = call.supplierOrAdminUser(repository) ?: return@post
             val supplierId = call.resolveSupplierId(user) ?: return@post
             val entityStr = call.parameters["entity"]?.uppercase(Locale.ROOT)
             val entityType = try {
@@ -165,7 +173,7 @@ internal fun Route.onboardingRoutes(
         }
 
         post("/upload/{entity}/confirm") {
-            val user = call.supplierOrAdminUser() ?: return@post
+            val user = call.supplierOrAdminUser(repository) ?: return@post
             val supplierId = call.resolveSupplierId(user) ?: return@post
             val request = try {
                 call.receive<CsvConfirmRequest>()
@@ -183,7 +191,7 @@ internal fun Route.onboardingRoutes(
         }
 
         post("/submit") {
-            val user = call.supplierOrAdminUser() ?: return@post
+            val user = call.supplierOrAdminUser(repository) ?: return@post
             val supplierId = call.resolveSupplierId(user) ?: return@post
             try {
                 call.respond(repository.submitOnboarding(supplierId, Instant.now()))
@@ -217,37 +225,37 @@ internal fun Route.onboardingRoutes(
 
     route("/api/supplier") {
         get("/overview") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             call.respond(repository.getSupplierOverview(supplierId, Instant.now()))
         }
 
         get("/agreements") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             call.respond(repository.getSupplierAgreements(supplierId))
         }
 
         get("/vehicles") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             call.respond(repository.getSupplierVehicles(supplierId))
         }
 
         get("/energy") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             call.respond(repository.getSupplierEnergy(supplierId))
         }
 
         get("/products") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             call.respond(repository.getSupplierProducts(supplierId))
         }
 
         get("/certificates") {
-            val user = call.supplierOrAdminUser() ?: return@get
+            val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             if (certificateRepository == null) {
                 call.respond(emptyList<Certificate>())

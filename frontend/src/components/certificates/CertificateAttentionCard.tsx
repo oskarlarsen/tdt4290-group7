@@ -1,48 +1,11 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
-import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   CERTIFICATE_STANDARD_LABELS,
   formatCertificateDate,
   getCertificateStatus,
 } from "../../types/certificate";
 import type { CertificateRow } from "./CertificateTable";
-
-function buildNoticeMessage(row: CertificateRow): string {
-  const { certificate, contract } = row;
-  const status = getCertificateStatus(certificate);
-  const standard = CERTIFICATE_STANDARD_LABELS[certificate.standard];
-  const certificateDescription = `${standard} certificate${
-    certificate.certificateNumber ? ` (${certificate.certificateNumber})` : ""
-  }`;
-  const contractDescription = contract?.contractName
-    ? ` for "${contract.contractName}"`
-    : "";
-
-  if (status.status === "expired") {
-    const expiryDate = certificate.validUntil
-      ? `, which expired on ${formatCertificateDate(certificate.validUntil)}`
-      : "";
-    return `Please provide an updated copy of the expired ${certificateDescription}${expiryDate}${contractDescription} and confirm when the renewal will be completed.`;
-  }
-
-  if (status.status === "missing-documentation") {
-    return `Please provide the missing ${certificateDescription} documentation${contractDescription} and confirm when it will be available.`;
-  }
-
-  if (status.status === "critical" || status.status === "expiring") {
-    const expiryDate = certificate.validUntil
-      ? ` on ${formatCertificateDate(certificate.validUntil)}`
-      : "";
-    const daysRemaining =
-      status.status === "critical" && status.daysRemaining !== null
-        ? ` (${status.daysRemaining} days remaining)`
-        : "";
-    return `Please provide an update on the renewal of the ${certificateDescription}${contractDescription}, which is approaching expiry${expiryDate}${daysRemaining}, and confirm the planned next steps.`;
-  }
-
-  return `Please review the ${certificateDescription}${contractDescription} and provide an update on any actions needed to maintain its validity.`;
-}
 
 // Built only from real fields of the most urgent certificate. Legal citations and
 // penalty language from the visual reference were deliberately not reproduced.
@@ -53,9 +16,6 @@ export function CertificateAttentionCard({
   rows: CertificateRow[];
   onViewDetails: (row: CertificateRow) => void;
 }) {
-  const [isNoticeInfoOpen, setIsNoticeInfoOpen] = useState(false);
-  const [isNoticeRecorded, setIsNoticeRecorded] = useState(false);
-  const [noticeMessageDraft, setNoticeMessageDraft] = useState("");
   const [activeAttentionIndex, setActiveAttentionIndex] = useState(0);
 
   const seenContractIds = new Set<string>();
@@ -72,12 +32,6 @@ export function CertificateAttentionCard({
   useEffect(() => {
     setActiveAttentionIndex(0);
   }, [rows]);
-
-  useEffect(() => {
-    if (!isNoticeRecorded) return;
-    const timeout = window.setTimeout(() => setIsNoticeRecorded(false), 4000);
-    return () => window.clearTimeout(timeout);
-  }, [isNoticeRecorded]);
 
   if (!row) return null;
 
@@ -103,19 +57,6 @@ export function CertificateAttentionCard({
         ? `${standard} is required for contract "${contractName}", but no documentation has been submitted.`
         : `${standard} expires on ${formatCertificateDate(certificate.validUntil!)} (in ${days} day${days === 1 ? "" : "s"}) for contract "${contractName}".`;
 
-  const noticeReason =
-    info.status === "expired"
-      ? "The certificate has expired."
-      : info.status === "missing-documentation"
-        ? "Required certificate documentation is missing."
-        : info.status === "critical"
-          ? "The certificate expires within 30 days."
-          : contract?.risk === "high"
-            ? "Environmental compliance is non-compliant."
-            : contract?.risk === "medium"
-              ? "Environmental compliance is partial and requires follow-up."
-              : "The certificate is expiring soon.";
-
   return (
     <>
       <div className="rounded-xl border border-neutral-100 bg-white p-4">
@@ -133,17 +74,6 @@ export function CertificateAttentionCard({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            <button
-              onClick={() => {
-                setIsNoticeRecorded(false);
-                setNoticeMessageDraft(buildNoticeMessage(row));
-                setIsNoticeInfoOpen(true);
-              }}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
-            >
-              <Mail className="h-3.5 w-3.5" />
-              Send Notice
-            </button>
             <button
               onClick={() => onViewDetails(row)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
@@ -183,32 +113,10 @@ export function CertificateAttentionCard({
             </button>
           </div>
         </div>
+        <p className="mt-3 text-xs text-neutral-500">
+          Supplier notices are not yet sent or tracked by the backend.
+        </p>
       </div>
-
-      {isNoticeInfoOpen && (
-        <NoticeReviewDialog
-          contractName={contract?.contractName ?? "Unknown contract"}
-          supplierName={contract?.supplierName ?? "Unknown supplier"}
-          reason={noticeReason}
-          message={noticeMessageDraft}
-          onMessageChange={setNoticeMessageDraft}
-          onCancel={() => setIsNoticeInfoOpen(false)}
-          onConfirm={() => {
-            setIsNoticeInfoOpen(false);
-            setIsNoticeRecorded(true);
-          }}
-        />
-      )}
-
-      {isNoticeRecorded && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 right-6 z-50 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
-        >
-          Notice recorded successfully.
-        </div>
-      )}
     </>
   );
 }

@@ -2,6 +2,9 @@ package com.tdt4290group7.backend.certificates
 
 import com.tdt4290group7.backend.adminClient
 import com.tdt4290group7.backend.module
+import com.tdt4290group7.backend.vehicles.AgreementInput
+import com.tdt4290group7.backend.vehicles.ChangeActor
+import com.tdt4290group7.backend.vehicles.SupplierInput
 import com.tdt4290group7.backend.vehicles.VehicleRepository
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.MultiPartFormDataContent
@@ -19,6 +22,7 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import java.nio.file.Path
 import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -31,9 +35,24 @@ class CertificateRoutesTest {
     @Test
     fun administratorCanUploadParseAndRetrieveCertificateMetadata() = testApplication {
         val certificateDatabase = databasePath()
+        val vehicleRepository = VehicleRepository(databasePath())
+        val actor = ChangeActor("admin", "Administrator")
+        val supplier = vehicleRepository.fleet.saveSupplier(
+            null,
+            SupplierInput("Example Transport AS", "123456789"),
+            actor,
+            Instant.now(),
+        )
+        val agreement = vehicleRepository.fleet.saveAgreement(
+            null,
+            AgreementInput(supplier.id, "2026-01-01", "2028-12-31", 2, "Transport"),
+            null,
+            actor,
+            Instant.now(),
+        )
         application {
             module(
-                VehicleRepository(databasePath()),
+                vehicleRepository,
                 null,
                 Duration.ofDays(14),
                 CertificateRepository(certificateDatabase),
@@ -50,8 +69,8 @@ class CertificateRoutesTest {
             setBody(
                 MultiPartFormDataContent(
                     formData {
-                        append("supplierName", "Example Transport AS")
-                        append("contractId", "sup-a")
+                        append("supplierName", "Incorrect client value")
+                        append("contractId", agreement.id)
                         append(
                             "file",
                             pdf,
@@ -69,7 +88,27 @@ class CertificateRoutesTest {
         val uploaded = Json.parseToJsonElement(response.bodyAsText()).jsonObject
         assertEquals("Example Transport AS", uploaded.getValue("supplierName").jsonPrimitive.content)
         assertEquals("ISO 14001", uploaded.getValue("certificateType").jsonPrimitive.content)
-        assertEquals("sup-a", uploaded.getValue("contractId").jsonPrimitive.content)
+        assertEquals(agreement.id, uploaded.getValue("contractId").jsonPrimitive.content)
+
+        val invalidAgreementUpload = adminClient.post("/api/certificates") {
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append("supplierName", "Example Transport AS")
+                        append("contractId", "not-an-active-agreement")
+                        append(
+                            "file",
+                            pdf,
+                            Headers.build {
+                                append(HttpHeaders.ContentType, "application/pdf")
+                                append(HttpHeaders.ContentDisposition, """filename="iso-14001.pdf"""")
+                            },
+                        )
+                    },
+                ),
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, invalidAgreementUpload.status)
 
         val listed = adminClient.get("/api/certificates")
         assertEquals(HttpStatusCode.OK, listed.status)
@@ -83,20 +122,28 @@ class CertificateRoutesTest {
         val edited = adminClient.put("/api/certificates/$certificateId") {
             contentType(ContentType.Application.Json)
             setBody(
-                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2025-01-15","expiryDate":"2028-12-31","contractId":"CONTRACT-42"}""",
+                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2025-01-15","expiryDate":"2028-12-31","contractId":"${agreement.id}"}""",
             )
         }
         assertEquals(HttpStatusCode.OK, edited.status, edited.bodyAsText())
         val editedRecord = Json.parseToJsonElement(edited.bodyAsText()).jsonObject
-        assertEquals("Updated Transport AS", editedRecord.getValue("supplierName").jsonPrimitive.content)
+        assertEquals("Example Transport AS", editedRecord.getValue("supplierName").jsonPrimitive.content)
         assertEquals("2025-01-15", editedRecord.getValue("issueDate").jsonPrimitive.content)
-        assertEquals("CONTRACT-42", editedRecord.getValue("contractId").jsonPrimitive.content)
+        assertEquals(agreement.id, editedRecord.getValue("contractId").jsonPrimitive.content)
         assertEquals("iso-14001.pdf", CertificateRepository(certificateDatabase).getById(certificateId)?.sourceFile)
+
+        val invalidAgreementEdit = adminClient.put("/api/certificates/$certificateId") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2025-01-15","expiryDate":"2028-12-31","contractId":"CONTRACT-42"}""",
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, invalidAgreementEdit.status)
 
         val invalidEdit = adminClient.put("/api/certificates/$certificateId") {
             contentType(ContentType.Application.Json)
             setBody(
-                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2029-01-01","expiryDate":"2028-12-31"}""",
+                """{"supplierName":"Updated Transport AS","certificateType":"ISO 14001","issueDate":"2029-01-01","expiryDate":"2028-12-31","contractId":"${agreement.id}"}""",
             )
         }
         assertEquals(HttpStatusCode.BadRequest, invalidEdit.status)

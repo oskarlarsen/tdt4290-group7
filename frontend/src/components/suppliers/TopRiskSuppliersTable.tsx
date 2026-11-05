@@ -15,6 +15,7 @@ export function TopRiskSuppliersTable({
   actionLabel = "Investigate",
   onSelect,
   getReviewStatus,
+  showOnboardingStatus = false,
   onMarkReviewComplete,
 }: {
   suppliers: TopRiskSupplier[];
@@ -22,6 +23,7 @@ export function TopRiskSuppliersTable({
   onSelect?: (supplier: TopRiskSupplier) => void;
   /** Optional review status used by the Suppliers page; Dashboard usage does not need it */
   getReviewStatus?: (supplierId: string) => FollowUpStatus;
+  showOnboardingStatus?: boolean;
   /** Optional review action used by the Dashboard attention widget, sharing the Suppliers page review status */
   onMarkReviewComplete?: (supplier: TopRiskSupplier) => void;
 }) {
@@ -49,6 +51,7 @@ export function TopRiskSuppliersTable({
             <th className="pb-2 pr-3 font-medium">Primary contract</th>
             <th className="pb-2 pr-3 font-medium">Risk</th>
             <th className="pb-2 pr-3 font-medium">Main issue</th>
+            {showOnboardingStatus && <th className="pb-2 pr-3 font-medium">Onboarding</th>}
             {getReviewStatus && <th className="pb-2 pr-3 font-medium">Review status</th>}
             <th className="pb-2 font-medium">Action</th>
           </tr>
@@ -70,6 +73,11 @@ export function TopRiskSuppliersTable({
                 <RiskBadge level={s.risk} />
               </td>
               <td className="py-3 pr-3 text-neutral-700">{s.mainIssue}</td>
+              {showOnboardingStatus && (
+                <td className="py-3 pr-3 whitespace-nowrap text-xs font-medium text-neutral-700">
+                  {(s.onboardingStatus ?? "INVITED").replace(/_/g, " ")}
+                </td>
+              )}
               {getReviewStatus && (
                 <td className="py-3 pr-3">
                   {(() => {

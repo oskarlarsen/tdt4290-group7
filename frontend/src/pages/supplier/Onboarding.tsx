@@ -6,7 +6,6 @@ import {
   Check,
   CheckCircle2,
   Circle,
-  Download,
   FileCheck2,
   Leaf,
   LoaderCircle,
@@ -14,13 +13,11 @@ import {
   Send,
   ShieldCheck,
   Truck,
-  Upload,
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   confirmCsv,
-  downloadCsvTemplate,
   getOnboardingStatus,
   getSupplierOverview,
   previewCsv,
@@ -36,6 +33,12 @@ import type {
   SupplierOverview,
 } from "@/types/onboarding";
 import { CopyableValue } from "@/components/ui/CopyableValue";
+import { SupplierVehicleEntryForm } from "@/components/supplier/SupplierVehicleEntryForm";
+import { SupplierEnergyEntryForm } from "@/components/supplier/SupplierEnergyEntryForm";
+import { SupplierProductEntryForm } from "@/components/supplier/SupplierProductEntryForm";
+import { FUEL_TECHNOLOGIES } from "@/utils/vehicleCatalog";
+import { ECOLABEL_STANDARDS, PRODUCT_CATEGORIES, UNITS_OF_MEASURE } from "@/utils/productFormCsv";
+import { formatNumber } from "@/utils/formatNumber";
 
 const ENTITY_OPTIONS: Array<{ value: CsvEntity; label: string }> = [
   { value: "vehicles", label: "Vehicles" },
@@ -43,47 +46,77 @@ const ENTITY_OPTIONS: Array<{ value: CsvEntity; label: string }> = [
   { value: "products", label: "Products" },
 ];
 
-const CSV_FIELD_GUIDES: Record<CsvEntity, { description: string; fields: Array<[string, string]> }> = {
-  vehicles: {
-    description: "Contract vehicles and planned vehicles. Fuel technology must match the code in the Statens vegvesen catalog.",
-    fields: [
-      ["agreement_id", "Required. Copy an active agreement ID from the Agreements list."],
-      ["registration_number", "Required for registered vehicles (for example AB12345); leave blank when is_planned is TRUE."],
-      ["is_planned", "Required. TRUE or FALSE."],
-      ["fuel_technology", "Required. Statens vegvesen fuel/propulsion code."],
-      ["is_hybrid", "Required. TRUE or FALSE."],
-      ["full_contract_coverage", "Required. TRUE for the whole agreement period; otherwise FALSE and provide both weeks."],
-      ["start_year_week / end_year_week", "Required when coverage is FALSE. Use YYYY-Www, for example 2026-W08."],
-      ["attachment_reference", "Optional reference to supporting contract documentation."],
-      ["notes", "Optional notes. Do not include personal data such as driver names."],
-    ],
-  },
-  energy: {
-    description: "Annual energy consumption and facility area for each operating location.",
-    fields: [
-      ["agreement_id", "Required. Copy an active agreement ID from the Agreements list."],
-      ["facility_location_code / facility_address", "Both required. Use a stable location code and its postal address."],
-      ["storage_area_sqm / workshop_area_sqm / other_area_sqm", "Optional non-negative square metres; leave unknown values blank."],
-      ["reporting_year", "Required integer from 2020 through 2030."],
-      ["electricity_kwh / district_heating_kwh", "Required, non-negative kWh values."],
-      ["biogas_kwh / fossil_fuel_kwh / self_produced_solar_kwh / self_produced_heatpump_kwh", "Optional non-negative kWh values; blank is recorded as zero."],
-      ["notes", "Optional notes about the location or reported values."],
-    ],
-  },
-  products: {
-    description: "Products delivered under an agreement, including reuse and environmental labels.",
-    fields: [
-      ["agreement_id", "Required. Copy an active agreement ID from the Agreements list."],
-      ["product_code / product_name", "Both required. Use a stable product code and the product's name."],
-      ["product_category", "Required: FURNITURE, IT_EQUIPMENT, FOOD_BEVERAGE, CLEANING_SUPPLIES, or OTHER."],
-      ["ecolabel_standard", "Required: NORDIC_SWAN, EU_ECOLABEL, MOBELFAKTA, BLUE_ANGEL, OEKO_TEX, EPD, or NONE."],
-      ["license_number", "Required when an ecolabel other than NONE is selected."],
-      ["unit_of_measure", "Required: PCS, KG, or LITRE."],
-      ["is_repaired_or_reused", "Required. TRUE or FALSE."],
-      ["notes", "Optional notes, such as spare-parts or reuse information."],
-    ],
-  },
+const ENTITY_API_VALUES: Record<CsvEntity, "VEHICLES" | "ENERGY" | "PRODUCTS"> = {
+  vehicles: "VEHICLES",
+  energy: "ENERGY",
+  products: "PRODUCTS",
 };
+
+const VEHICLE_FIELD_LABELS: Record<string, string> = {
+  agreement_id: "Agreement",
+  registration_number: "Vehicle registration plate",
+  is_planned: "Planned vehicle",
+  fuel_technology: "Fuel or propulsion",
+  is_hybrid: "Hybrid vehicle",
+  full_contract_coverage: "Full agreement-period coverage",
+  start_year_week: "Coverage starts",
+  end_year_week: "Coverage ends",
+  attachment_reference: "Supporting document reference",
+  notes: "Notes",
+};
+
+const ENERGY_FIELD_LABELS: Record<string, string> = {
+  agreement_id: "Agreement",
+  facility_location_code: "Facility or location code",
+  facility_address: "Facility address",
+  reporting_year: "Reporting year",
+  electricity_kwh: "Electricity (kWh)",
+  district_heating_kwh: "District heating (kWh)",
+  biogas_kwh: "Biogas (kWh)",
+  fossil_fuel_kwh: "Fossil fuel (kWh)",
+  self_produced_solar_kwh: "Self-produced solar (kWh)",
+  self_produced_heatpump_kwh: "Self-produced heat pump (kWh)",
+  storage_area_sqm: "Storage area (m²)",
+  workshop_area_sqm: "Workshop area (m²)",
+  other_area_sqm: "Other area (m²)",
+  notes: "Notes",
+};
+
+const PRODUCT_FIELD_LABELS: Record<string, string> = {
+  agreement_id: "Agreement",
+  product_code: "Product code or SKU",
+  product_name: "Product name",
+  product_category: "Product category",
+  ecolabel_standard: "Ecolabel standard",
+  license_number: "License number",
+  unit_of_measure: "Unit of measure",
+  is_repaired_or_reused: "Repaired or reused product",
+  notes: "Notes",
+};
+
+function friendlyFieldLabel(entity: CsvEntity, column: string): string {
+  if (entity === "vehicles") return VEHICLE_FIELD_LABELS[column] ?? column;
+  if (entity === "energy") return ENERGY_FIELD_LABELS[column] ?? column;
+  if (entity === "products") return PRODUCT_FIELD_LABELS[column] ?? column;
+  return column;
+}
+
+function friendlyErrorMessage(entity: CsvEntity, message: string): string {
+  const labels =
+    entity === "vehicles"
+      ? VEHICLE_FIELD_LABELS
+      : entity === "energy"
+        ? ENERGY_FIELD_LABELS
+        : PRODUCT_FIELD_LABELS;
+  return Object.entries(labels).reduce(
+    (result, [field, label]) => result.split(field).join(label),
+    message,
+  );
+}
+
+function friendlyBoolean(value: string | undefined): string {
+  return value === "TRUE" || value === "1" ? "Yes" : value === "FALSE" || value === "0" ? "No" : "";
+}
 
 const STATUS_LABELS: Record<OnboardingStatus, string> = {
   INVITED: "Invited",
@@ -140,8 +173,8 @@ export default function Onboarding() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [entity, setEntity] = useState<CsvEntity>("vehicles");
-  const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CsvPreview | null>(null);
+  const [formVersion, setFormVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +187,9 @@ export default function Onboarding() {
     ]);
     setStatus(nextStatus);
     setOverview(nextOverview);
+    setEntity((current) => nextStatus.requiredEntities.includes(ENTITY_API_VALUES[current])
+      ? current
+      : (ENTITY_OPTIONS.find((option) => nextStatus.requiredEntities.includes(ENTITY_API_VALUES[option.value]))?.value ?? "vehicles"));
     setContactName(nextStatus.contactName ?? "");
     setContactEmail(nextStatus.contactEmail ?? "");
     setContactPhone(nextStatus.contactPhone ?? "");
@@ -166,6 +202,9 @@ export default function Onboarding() {
         if (!active) return;
         setStatus(nextStatus);
         setOverview(nextOverview);
+        setEntity((current) => nextStatus.requiredEntities.includes(ENTITY_API_VALUES[current])
+          ? current
+          : (ENTITY_OPTIONS.find((option) => nextStatus.requiredEntities.includes(ENTITY_API_VALUES[option.value]))?.value ?? "vehicles"));
         setContactName(nextStatus.contactName ?? "");
         setContactEmail(nextStatus.contactEmail ?? "");
         setContactPhone(nextStatus.contactPhone ?? "");
@@ -203,16 +242,18 @@ export default function Onboarding() {
     }, "Contact details saved.");
   }
 
-  async function handlePreview() {
-    if (!file) {
-      setError("Choose a CSV file first.");
-      return;
-    }
+  async function handlePreview(formFile: File) {
     await perform(async () => {
-      const result = await previewCsv(entity, file);
+      const result = await previewCsv(entity, formFile);
       setPreview(result);
-      setNotice(result.canCommit ? "Validation passed. Review the rows before importing." : null);
+      setNotice(result.canCommit ? "Validation passed. Review the entries before importing." : null);
     });
+  }
+
+  function handleFormChange() {
+    setPreview(null);
+    setError(null);
+    setNotice(null);
   }
 
   async function handleConfirm() {
@@ -220,7 +261,7 @@ export default function Onboarding() {
     await perform(async () => {
       const result = await confirmCsv(entity, preview.batchId);
       setPreview(null);
-      setFile(null);
+      setFormVersion((current) => current + 1);
       await refresh();
       setNotice(result.message);
     });
@@ -363,7 +404,7 @@ export default function Onboarding() {
           <div className="mt-6 border-t border-neutral-100 pt-5">
             <h3 className="mb-1 text-sm font-semibold text-neutral-800">Agreements</h3>
             <p className="mb-3 text-xs text-neutral-500">
-              Copy the agreement ID into the <code>agreement_id</code> column of each CSV row.
+              The administrator selects which information is required for each agreement.
             </p>
             {overview.agreements.length === 0 ? (
               <p className="text-sm text-neutral-500">No agreements are linked to this supplier account yet.</p>
@@ -375,7 +416,13 @@ export default function Onboarding() {
                       <span className="block font-medium text-neutral-800">{agreement.note || agreement.id}</span>
                       <CopyableValue label="Agreement ID" value={agreement.id} />
                     </span>
-                    <span className="text-neutral-500">{agreement.activeVehiclesCount} / {agreement.allowedVehicles} vehicles</span>
+                    <span className="text-right text-neutral-500">
+                      {[
+                        agreement.requiresVehicles && "Vehicles",
+                        agreement.requiresEnergy && "Energy",
+                        agreement.requiresProducts && "Products",
+                      ].filter(Boolean).join(" · ")}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -435,38 +482,11 @@ export default function Onboarding() {
       <section className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">Import reporting data</h2>
+            <h2 className="text-lg font-semibold text-neutral-900">Enter reporting data</h2>
             <p className="mt-1 text-sm text-neutral-500">
-                Download a blank template, use the field guide, validate the completed CSV, then confirm the import.
+              Complete the required details in the form. The system will validate and process your submission automatically.
             </p>
           </div>
-
-          <details className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50">
-            <summary className="cursor-pointer px-3 py-2.5 text-sm font-semibold text-neutral-800">
-              {entity[0].toUpperCase() + entity.slice(1)} CSV field guide
-            </summary>
-            <div className="border-t border-neutral-200 p-3">
-              <p className="mb-3 text-sm text-neutral-600">{CSV_FIELD_GUIDES[entity].description}</p>
-              <p className="mb-3 text-xs text-neutral-600">
-                Keep the downloaded column names and order unchanged. The template uses semicolons so Excel opens it in separate columns; comma-delimited CSV files are also accepted. Use TRUE/FALSE values and a dot for decimal separators. Every row must refer to one of the active agreement IDs listed above.
-              </p>
-              <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-                <table className="w-full min-w-[560px] text-left text-xs">
-                  <thead className="bg-neutral-100 text-neutral-700">
-                    <tr><th className="px-3 py-2 font-semibold">CSV column</th><th className="px-3 py-2 font-semibold">What to enter</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {CSV_FIELD_GUIDES[entity].fields.map(([field, description]) => (
-                      <tr key={field}>
-                        <td className="whitespace-nowrap px-3 py-2 font-mono">{field}</td>
-                        <td className="px-3 py-2 text-neutral-600">{description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </details>
           <Boxes className="hidden h-5 w-5 text-primary-700 sm:block" aria-hidden="true" />
         </div>
 
@@ -474,59 +494,66 @@ export default function Onboarding() {
           <p className="mt-5 rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
             Reporting changes are unavailable while this submission is {STATUS_LABELS[status.status].toLowerCase()}.
           </p>
+        ) : status.requiredEntities.length === 0 ? (
+          <p className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+            Your administrator has not assigned any information to collect yet.
+          </p>
         ) : (
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <div className="space-y-3">
+          <div className="mt-5 space-y-5">
+            <div className="max-w-xs">
               <label className="block text-sm font-medium text-neutral-700">
-                Data type
+                Information type
                 <select
                   value={entity}
                   onChange={(event) => {
                     setEntity(event.target.value as CsvEntity);
                     setPreview(null);
+                    setError(null);
+                    setNotice(null);
                   }}
                   disabled={working}
-                  className="mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5"
+                  className="mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm"
                 >
-                  {ENTITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                  {ENTITY_OPTIONS.filter((option) =>
+                    status.requiredEntities.includes(ENTITY_API_VALUES[option.value]),
+                  ).map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
                 </select>
               </label>
-              <button
-                type="button"
-                disabled={working}
-                onClick={() => perform(() => downloadCsvTemplate(entity), "Template downloaded.")}
-                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-                Download {entity} template
-              </button>
             </div>
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-neutral-700">
-                CSV file
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
-                    setPreview(null);
-                  }}
-                  disabled={working}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-200 p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:font-medium"
-                />
-              </label>
-              <button
-                type="button"
-                disabled={working || !file}
-                onClick={handlePreview}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary-900 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {working ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Validate and preview
-              </button>
-            </div>
+
+            {entity === "vehicles" && (
+              <SupplierVehicleEntryForm
+                key={`vehicles-${formVersion}`}
+                agreements={overview.agreements.filter((agreement) => agreement.requiresVehicles)}
+                working={working}
+                onPreview={handlePreview}
+                onChange={handleFormChange}
+              />
+            )}
+
+            {entity === "energy" && (
+              <SupplierEnergyEntryForm
+                key={`energy-${formVersion}`}
+                agreements={overview.agreements.filter((agreement) => agreement.requiresEnergy)}
+                working={working}
+                onPreview={handlePreview}
+                onChange={handleFormChange}
+              />
+            )}
+
+            {entity === "products" && (
+              <SupplierProductEntryForm
+                key={`products-${formVersion}`}
+                agreements={overview.agreements.filter((agreement) => agreement.requiresProducts)}
+                working={working}
+                onPreview={handlePreview}
+                onChange={handleFormChange}
+              />
+            )}
           </div>
         )}
 
@@ -534,9 +561,15 @@ export default function Onboarding() {
           <div className="mt-6 border-t border-neutral-100 pt-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-neutral-900">{preview.fileName}</h3>
+                <h3 className="font-semibold text-neutral-900">
+                  {entity === "vehicles"
+                    ? "Vehicle details"
+                    : entity === "energy"
+                      ? "Energy facility details"
+                      : "Product details"}
+                </h3>
                 <p className="mt-1 text-sm text-neutral-500">
-                  {preview.validRows} valid · {preview.errorRows} with errors · {preview.totalRows} total
+                  {preview.validRows} ready · {preview.errorRows} with errors · {preview.totalRows} total
                 </p>
               </div>
               {preview.canCommit ? (
@@ -560,7 +593,7 @@ export default function Onboarding() {
                   <thead className="bg-red-50 text-red-900">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Row</th>
-                      <th className="px-3 py-2 font-semibold">Column</th>
+                      <th className="px-3 py-2 font-semibold">Field</th>
                       <th className="px-3 py-2 font-semibold">Issue</th>
                     </tr>
                   </thead>
@@ -568,8 +601,12 @@ export default function Onboarding() {
                     {preview.errors.slice(0, 30).map((item, index) => (
                       <tr key={`${item.row}-${item.column}-${index}`}>
                         <td className="px-3 py-2">{item.row}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{item.column}</td>
-                        <td className="px-3 py-2">{item.message}</td>
+                        <td className="px-3 py-2 text-xs font-medium text-neutral-700">
+                          {friendlyFieldLabel(entity, item.column)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {friendlyErrorMessage(entity, item.message)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -584,24 +621,92 @@ export default function Onboarding() {
 
             {preview.previewRows.length > 0 && (
               <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200">
-                <table className="w-full min-w-[620px] text-left text-xs">
-                  <thead className="bg-neutral-50 text-neutral-600">
-                    <tr>
-                      {Object.keys(preview.previewRows[0]).map((key) => (
-                        <th key={key} className="whitespace-nowrap px-3 py-2 font-semibold">{key}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {preview.previewRows.map((row, index) => (
-                      <tr key={index}>
-                        {Object.keys(preview.previewRows[0]).map((key) => (
-                          <td key={key} className="max-w-56 truncate px-3 py-2">{row[key]}</td>
+                {entity === "vehicles" ? (
+                  <table className="w-full min-w-[620px] text-left text-xs">
+                    <thead className="bg-neutral-50 text-neutral-600">
+                      <tr>
+                        {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Coverage"].map((label) => (
+                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {preview.previewRows.map((row, index) => {
+                        const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
+                        const fuel = Object.entries(FUEL_TECHNOLOGIES)
+                          .find(([code]) => code === row.fuel_technology)?.[1] ?? row.fuel_technology;
+                        const coverage = friendlyBoolean(row.full_contract_coverage) === "Yes"
+                          ? "Full agreement period"
+                          : `${row.start_year_week} to ${row.end_year_week}`;
+                        return (
+                          <tr key={index}>
+                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{row.registration_number || "Planned vehicle"}</td>
+                            <td className="px-3 py-2">{fuel}</td>
+                            <td className="px-3 py-2">{friendlyBoolean(row.is_hybrid)}</td>
+                            <td className="px-3 py-2">{coverage}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : entity === "energy" ? (
+                  <table className="w-full min-w-[620px] text-left text-xs">
+                    <thead className="bg-neutral-50 text-neutral-600">
+                      <tr>
+                        {["Agreement", "Facility code", "Address", "Year", "Electricity", "District heating"].map((label) => (
+                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {preview.previewRows.map((row, index) => {
+                        const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
+                        return (
+                          <tr key={index}>
+                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2 font-mono font-medium">{row.facility_location_code}</td>
+                            <td className="px-3 py-2">{row.facility_address}</td>
+                            <td className="px-3 py-2">{row.reporting_year}</td>
+                            <td className="px-3 py-2">{row.electricity_kwh ? `${formatNumber(Number(row.electricity_kwh))} kWh` : "—"}</td>
+                            <td className="px-3 py-2">{row.district_heating_kwh ? `${formatNumber(Number(row.district_heating_kwh))} kWh` : "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full min-w-[620px] text-left text-xs">
+                    <thead className="bg-neutral-50 text-neutral-600">
+                      <tr>
+                        {["Agreement", "Product code", "Product name", "Category", "Ecolabel", "Unit", "Repaired/Reused"].map((label) => (
+                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {preview.previewRows.map((row, index) => {
+                        const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
+                        const category = PRODUCT_CATEGORIES[row.product_category] ?? row.product_category;
+                        const ecolabel = row.ecolabel_standard === "NONE"
+                          ? "None"
+                          : `${ECOLABEL_STANDARDS[row.ecolabel_standard] ?? row.ecolabel_standard}${row.license_number ? ` (#${row.license_number})` : ""}`;
+                        const unit = UNITS_OF_MEASURE[row.unit_of_measure] ?? row.unit_of_measure;
+                        return (
+                          <tr key={index}>
+                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2 font-mono font-medium">{row.product_code}</td>
+                            <td className="px-3 py-2">{row.product_name}</td>
+                            <td className="px-3 py-2">{category}</td>
+                            <td className="px-3 py-2">{ecolabel}</td>
+                            <td className="px-3 py-2">{unit}</td>
+                            <td className="px-3 py-2">{friendlyBoolean(row.is_repaired_or_reused)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
           </div>
@@ -614,10 +719,8 @@ export default function Onboarding() {
           <p className="mt-1 text-sm text-neutral-500">
             Required information is checked by the server before it is sent for municipal review.
           </p>
-          {!status.canSubmit && status.steps.some((step) => step.stepKey === "CERTIFICATES" && !step.isCompleted) && (
-            <p className="mt-2 text-sm text-amber-700">
-              Ask your administrator to upload and link a certificate to an agreement before submitting.
-            </p>
+          {!status.canSubmit && status.requiredEntities.length === 0 && (
+            <p className="mt-2 text-sm text-amber-700">Ask your administrator to assign the information required under the agreement.</p>
           )}
         </div>
         <button

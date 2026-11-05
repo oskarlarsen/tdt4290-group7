@@ -12,7 +12,7 @@ type Props = {
   onAddSupplier: () => void;
 };
 
-// Use the mockup as a visual reference, but show only metrics backed by the shared dashboard summary
+// Risk totals are based on suppliers with persisted vehicle or certificate evidence.
 export function SuppliersOverviewHeader({
   monitoredSuppliers,
   modeledSupplierCount,
@@ -36,7 +36,7 @@ export function SuppliersOverviewHeader({
       label: "HIGH RISK",
       value: highCount,
       valueClass: "text-black",
-      sublabel: "Portfolio-wide, needs immediate follow-up",
+      sublabel: "Assessed suppliers with high-priority findings",
       icon: ShieldAlert,
       iconStyle: "bg-red-100 text-red-700",
     },
@@ -44,15 +44,15 @@ export function SuppliersOverviewHeader({
       label: "MEDIUM RISK",
       value: mediumCount,
       valueClass: "text-black",
-      sublabel: "Portfolio-wide, needs follow-up",
+      sublabel: "Assessed suppliers with findings to review",
       icon: Clock3,
       iconStyle: "bg-amber-100 text-amber-700",
     },
     {
-      label: "COMPLIANT",
+      label: "NO FLAGGED EVIDENCE",
       value: compliantCount,
       valueClass: "text-black",
-      sublabel: `${compliantPercent}% of monitored suppliers`,
+      sublabel: `${compliantPercent}% of suppliers with stored assessment evidence`,
       icon: CheckCircle2,
       iconStyle: "bg-tertiary-100 text-tertiary-700",
     },

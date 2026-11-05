@@ -19,6 +19,7 @@ const fleetPath = "/vehicle-fleet";
 export const getFleet = () => vehicleFetch<FleetOverview>(fleetPath);
 export const getFleetHistory = (page: number) => vehicleFetch<FleetChange[]>(`${fleetPath}/history?page=${page}`);
 export const saveSupplier = (input: { name: string; orgNumber: string }, existing?: FleetSupplier) => vehicleFetch<FleetSupplier>(`${fleetPath}/suppliers${existing ? `/${encodeURIComponent(existing.id)}` : ""}`, { method: existing ? "PUT" : "POST", body: JSON.stringify(existing ? { supplier: input, expectedUpdatedAt: existing.updatedAt } : input) });
+export const removeSupplier = (supplier: FleetSupplier) => vehicleFetch<void>(`${fleetPath}/suppliers/${encodeURIComponent(supplier.id)}`, { method: "DELETE", body: JSON.stringify({ expectedUpdatedAt: supplier.updatedAt }) });
 export const inviteSupplier = (supplierId: string, email: string) => vehicleFetch<{ email: string; token: string; expiresAt: string }>(
   `${fleetPath}/suppliers/${encodeURIComponent(supplierId)}/invitations`,
   { method: "POST", body: JSON.stringify({ email }) }

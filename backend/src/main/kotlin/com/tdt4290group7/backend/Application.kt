@@ -3,6 +3,7 @@ package com.tdt4290group7.backend
 import com.tdt4290group7.backend.config.AppEnvironment
 import com.tdt4290group7.backend.config.resetTokenLoggingEnabled
 import com.tdt4290group7.backend.certificates.CertificateRepository
+import com.tdt4290group7.backend.admin.AdminInsightsRepository
 import com.tdt4290group7.backend.plugins.configureBodyLimit
 import com.tdt4290group7.backend.plugins.configureCORS
 import com.tdt4290group7.backend.plugins.configureMonitoring
@@ -38,6 +39,7 @@ fun Application.module(
     registry: VehicleRegistryClient? = svvApiKey()?.let(::VegvesenVehicleRegistryClient),
     cacheTtl: Duration = Duration.ofDays(svvCacheTtlDays()),
     certificateRepository: CertificateRepository? = null,
+    adminInsightsRepository: AdminInsightsRepository? = null,
 ) {
     // Read and validate config first, so a bad combination stops startup before anything runs.
     val environment = AppEnvironment.parse(backendSetting("APP_ENV"))
@@ -59,7 +61,11 @@ fun Application.module(
     val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
     val certificateDatabasePath = Path.of(backendSetting("CERTIFICATE_DB_PATH") ?: "data/certificates.db")
     val resolvedCertificateRepository = certificateRepository ?: CertificateRepository(certificateDatabasePath)
-    configureRouting(vehicleRepository, registry, cacheTtl, resolvedCertificateRepository)
-    configureCertificateRoutes(resolvedCertificateRepository)
-    configureAuthRoutes(logResetTokens)
+    val insightsDatabasePath = Path.of(backendSetting("ADMIN_INSIGHTS_DB_PATH") ?: "data/admin-insights.db")
+    val resolvedAdminInsightsRepository = adminInsightsRepository ?: AdminInsightsRepository(insightsDatabasePath)
+    configureRouting(vehicleRepository, registry, cacheTtl, resolvedCertificateRepository, resolvedAdminInsightsRepository)
+    configureCertificateRoutes(resolvedCertificateRepository, (vehicleRepository as? VehicleRepository)?.fleet)
+    configureAuthRoutes(logResetTokens) { supplierId ->
+        (vehicleRepository as? VehicleRepository)?.fleet?.isSupplierActive(supplierId) ?: true
+    }
 }

@@ -56,7 +56,10 @@ data class ErrorResponse(val message: String)
  * [logResetTokens]: there is no email delivery yet, so the only way to get a reset token is to log
  * it. See [com.tdt4290group7.backend.config.resetTokenLoggingEnabled] for when that's allowed.
  */
-fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
+fun Application.configureAuthRoutes(
+    logResetTokens: Boolean = false,
+    supplierIsActive: (String) -> Boolean = { true }
+) {
     if (logResetTokens) {
         logger.warn(
             "ALLOW_DEV_PASSWORD_RESET_LOG=true: password reset tokens will be written to the log. " +
@@ -96,7 +99,8 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     // Same generic error, and the same response time, whether the account doesn't
                     // exist or the password is wrong, so the endpoint can't enumerate accounts.
                     val user = UserRepository.authenticate(email, request.password)
-                    if (user == null) {
+                    if (user == null || (user.role == com.tdt4290group7.backend.model.Role.SUPPLIER &&
+                            !supplierIsActive(user.supplierId.orEmpty()))) {
                         LoginAttemptTracker.recordFailure(email)
                         call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
                         return@post
@@ -170,7 +174,8 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     }
                     val user = UserRepository.acceptSupplierInvitation(
                         request.token.trim(),
-                        request.newPassword
+                        request.newPassword,
+                        supplierIsActive = supplierIsActive
                     )
                     if (user == null) {
                         call.respond(
@@ -189,7 +194,8 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     val userId = principal?.payload?.let { JwtConfig.userId(it) }
                     val user = userId?.let { UserRepository.findById(it) }
 
-                    if (user == null) {
+                    if (user == null || (user.role == com.tdt4290group7.backend.model.Role.SUPPLIER &&
+                            !supplierIsActive(user.supplierId.orEmpty()))) {
                         call.respond(HttpStatusCode.Unauthorized)
                         return@get
                     }

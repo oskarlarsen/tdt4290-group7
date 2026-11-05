@@ -93,6 +93,7 @@ data class OnboardingStatusResponse(
     val contactEmail: String? = null,
     val contactPhone: String? = null,
     val reviewerNotes: String? = null,
+    val requiredEntities: List<BatchEntityType> = emptyList(),
     val canSubmit: Boolean
 )
 
@@ -175,7 +176,10 @@ data class SupplierAgreementSummary(
     val endDate: String,
     val allowedVehicles: Int,
     val activeVehiclesCount: Int,
-    val active: Boolean
+    val active: Boolean,
+    val requiresVehicles: Boolean = true,
+    val requiresEnergy: Boolean = false,
+    val requiresProducts: Boolean = false
 )
 
 @Serializable
@@ -206,6 +210,23 @@ data class SupplierDashboardOverview(
     val totalCertificates: Int,
     val totalEnergyRecords: Int,
     val totalProducts: Int
+)
+
+@Serializable
+data class AdminSupplierOnboardingSummary(
+    val supplierId: String,
+    val status: OnboardingStatus,
+    val contactName: String? = null,
+    val contactEmail: String? = null,
+    val contactPhone: String? = null,
+    val reviewerNotes: String? = null,
+    val submittedAt: String? = null,
+    val reviewedAt: String? = null,
+    val agreementCount: Int,
+    val vehicleCount: Int,
+    val certificateCount: Int,
+    val energyRecordCount: Int,
+    val productCount: Int
 )
 
 @Serializable

@@ -13,7 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useCertificates } from "../../hooks/useCertificates";
-import { useContracts } from "../../hooks/useContracts";
+import { useFleet } from "../../hooks/useVehicles";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { CertificateTable } from "../../components/certificates/CertificateTable";
 import type { CertificateRow } from "../../components/certificates/CertificateTable";
@@ -30,6 +30,7 @@ import {
 } from "../../types/certificate";
 import { downloadCsv, toCsv } from "../../utils/csv";
 import { useSearchParams } from "react-router-dom";
+import { getActiveCertificateContracts } from "../../utils/certificateContracts";
 
 type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired";
 
@@ -58,7 +59,7 @@ function compareBySeverity(a: CertificateRow, b: CertificateRow): number {
 export default function Certificates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates();
-  const { data: contracts, isLoading: contractsLoading, isError: contractsError } = useContracts();
+  const { data: fleet, isLoading: contractsLoading, isError: contractsError } = useFleet();
   const removeCertificate = useDeleteCertificate();
 
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
@@ -91,12 +92,13 @@ export default function Certificates() {
   }
 
   const rows = useMemo<CertificateRow[]>(() => {
-    if (!certificates || !contracts) return [];
+    if (!certificates || !fleet) return [];
+    const contracts = getActiveCertificateContracts(fleet);
     const contractById = new Map(contracts.map((c) => [c.id, c]));
     return certificates
       .map((certificate) => ({ certificate, contract: contractById.get(certificate.contractId) }))
       .sort(compareBySeverity);
-  }, [certificates, contracts]);
+  }, [certificates, fleet]);
 
   const counts = useMemo(() => {
     const result: Record<CertificateFilter | "criticalExpired", number> = {
@@ -164,12 +166,13 @@ export default function Certificates() {
     );
   }
 
-  if (certsError || contractsError || !certificates || !contracts) {
+  if (certsError || contractsError || !certificates || !fleet) {
     return <div className="text-sm text-red-700">Couldn't load certificates. Try again.</div>;
   }
 
   // Every KPI is a direct count over the certificate records.
   const total = certificates.length;
+  const contracts = getActiveCertificateContracts(fleet);
   const contractCount = new Set(certificates.map((c) => c.contractId).filter(Boolean)).size;
   const validPercent = total > 0 ? Math.round((counts.valid / total) * 100) : null;
   const selectedRow = rows.find((r) => r.certificate.id === selectedId) ?? null;
@@ -346,6 +349,7 @@ export default function Certificates() {
       {editingCertificate && (
         <CertificateEditDialog
           certificate={editingCertificate}
+          contracts={contracts}
           onClose={() => setEditingCertificate(null)}
         />
       )}

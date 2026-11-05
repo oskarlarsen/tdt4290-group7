@@ -32,6 +32,16 @@ export type Certificate = {
   sourceFile?: string;
 };
 
+export type CertificateContract = {
+  id: string;
+  contractName: string;
+  supplierId: string;
+  supplierName: string;
+  supplierOrgId: string;
+  startDate: string;
+  endDate: string;
+};
+
 export type CertificateStatus =
   | "valid"
   | "expiring"

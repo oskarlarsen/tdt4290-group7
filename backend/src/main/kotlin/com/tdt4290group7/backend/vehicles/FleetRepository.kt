@@ -50,11 +50,40 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         }
     }
 
+    fun isSupplierActive(id: String): Boolean = database.read { db ->
+        row(db, "suppliers", id)?.get("active") == 1
+    }
+
+    fun activeAgreementEvidence(id: String): AgreementEvidence? = database.read { db ->
+        val agreementRow = row(db, "agreements", id)?.takeIf { it["active"] == 1 } ?: return@read null
+        val supplierRow = row(db, "suppliers", agreementRow["supplier_id"] as String)
+            ?.takeIf { it["active"] == 1 } ?: return@read null
+        AgreementEvidence(agreement(agreementRow), supplier(supplierRow))
+    }
+
+    fun removeSupplier(id: String, expectedUpdatedAt: String, actor: ChangeActor, now: Instant) =
+        change(actor, now, null, "Removed supplier") { writer ->
+            val previous = requireActive(writer.db, "suppliers", id)
+            expect(previous, expectedUpdatedAt)
+            writer.description = "Removed supplier ${previous["name"]}"
+            rows(writer.db, "agreements", "supplier_id = ? AND active = 1", listOf(id)).forEach { agreement ->
+                val agreementId = agreement["id"] as String
+                rows(writer.db, "vehicles", "agreement_id = ? AND listed = 1", listOf(agreementId)).forEach {
+                    writer.save("vehicles", it + ("listed" to 0))
+                }
+                writer.save("agreements", agreement + ("active" to 0))
+            }
+            writer.save("suppliers", previous + ("active" to 0))
+        }
+
     fun saveAgreement(id: String?, input: AgreementInput, expectedUpdatedAt: String?, actor: ChangeActor, now: Instant): FleetAgreement {
         val start = date(input.startDate); val end = date(input.endDate)
         require(start <= end) { "End date must be on or after start date" }
         require(input.allowedVehicles in 0..10000) { "Vehicle allowance must be between 0 and 10000" }
         require(input.note.length <= 4000) { "Note must be at most 4000 characters" }
+        require(input.requiresVehicles || input.requiresEnergy || input.requiresProducts) {
+            "Select at least one type of supplier information to collect"
+        }
         return change(actor, now, id, if (id == null) "Created agreement" else "Updated agreement") { writer ->
             requireActive(writer.db, "suppliers", input.supplierId)
             val agreementId = id ?: UUID.randomUUID().toString()
@@ -66,7 +95,10 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             val result = mapOf("id" to agreementId, "supplier_id" to input.supplierId,
                 "start_date" to input.startDate, "end_date" to input.endDate,
                 "allowed_vehicles" to input.allowedVehicles, "note" to input.note.trim(),
-                "updated_at" to now.storageTimestamp(), "active" to 1)
+                "updated_at" to now.storageTimestamp(), "active" to 1,
+                "requires_vehicles" to if (input.requiresVehicles) 1 else 0,
+                "requires_energy" to if (input.requiresEnergy) 1 else 0,
+                "requires_products" to if (input.requiresProducts) 1 else 0)
             // Reducing an allowance is permitted even when more vehicles remain listed.
             writer.save("agreements", result)
             writer.agreementId = agreementId
@@ -240,7 +272,10 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         row["active"] == 1, row["updated_at"] as String)
     private fun agreement(row: Map<String, Any?>) = FleetAgreement(row["id"] as String, row["supplier_id"] as String,
         row["start_date"] as String, row["end_date"] as String, (row["allowed_vehicles"] as Number).toInt(), row["note"] as String,
-        row["updated_at"] as String, row["active"] == 1)
+        row["updated_at"] as String, row["active"] == 1,
+        (row["requires_vehicles"] as Number).toInt() == 1,
+        (row["requires_energy"] as Number).toInt() == 1,
+        (row["requires_products"] as Number).toInt() == 1)
     private fun vehicle(row: Map<String, Any?>) = Vehicle(row["registration_number"] as String, row["created_at"] as String,
         row["agreement_id"] as String?, row["planned"] == 1, row["listed"] == 1, row["updated_at"] as String)
 }

@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { X, Send } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X, Send, Eye } from "lucide-react";
 import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useSupplierNotes, useAddSupplierNote } from "../../hooks/useSupplierNotes";
 import type { FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
 import type { TopRiskSupplier, RecentAlert } from "../../types/dashboard";
+import { reviewSupplierOnboarding } from "../../api/onboarding";
+import { SupplierReportingDataDialog } from "./SupplierReportingDataDialog";
 
 const ISSUE_CATEGORY_LABELS: Record<NonNullable<TopRiskSupplier["issueCategory"]>, string> = {
   VEHICLE_DEVIATION: "Vehicle deviation",
@@ -37,6 +40,23 @@ export function SupplierDetailsDrawer({
   const { data: notes = [] } = useSupplierNotes(supplier?.id ?? null);
   const addNote = useAddSupplierNote(supplier?.id ?? null);
   const [noteText, setNoteText] = useState("");
+  const [onboardingNotes, setOnboardingNotes] = useState("");
+  const [showReportingData, setShowReportingData] = useState(false);
+  const queryClient = useQueryClient();
+  const onboardingReview = useMutation({
+    mutationFn: ({ action, notes }: { action: "APPROVE" | "REQUEST_CHANGES"; notes?: string }) =>
+      reviewSupplierOnboarding(supplier!.id, action, notes),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setOnboardingNotes("");
+    },
+  });
+
+  useEffect(() => {
+    setOnboardingNotes("");
+    setShowReportingData(false);
+    onboardingReview.reset();
+  }, [supplier?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -99,8 +119,84 @@ export function SupplierDetailsDrawer({
             <div className="flex-1 space-y-5 p-4">
               <Section title="Supplier information">
                 <Field label="Org ID" value={supplier.orgId} />
-                {supplier.email && <Field label="Email address" value={supplier.email} />}
+                {(supplier.contactEmail || supplier.email) && (
+                  <Field label="Contact email" value={supplier.contactEmail || supplier.email || ""} />
+                )}
+                {supplier.contactName && <Field label="Contact name" value={supplier.contactName} />}
+                {supplier.contactPhone && <Field label="Contact phone" value={supplier.contactPhone} />}
                 <Field label="Primary contract" value={supplier.primaryContract} />
+              </Section>
+
+              <Section title="Supplier onboarding">
+                <Field label="Status" value={(supplier.onboardingStatus ?? "INVITED").replace(/_/g, " ")} />
+                <Field label="Registered accounts" value={String(supplier.registeredAccountCount ?? 0)} />
+                {supplier.submittedAt && (
+                  <Field label="Submitted" value={new Date(supplier.submittedAt).toLocaleString()} />
+                )}
+                <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-neutral-600">
+                  <span>{supplier.agreementCount ?? 0} agreements</span>
+                  <span>{supplier.vehicleCount ?? 0} vehicles</span>
+                  <span>{supplier.certificateCount ?? 0} certificates</span>
+                  <span>{supplier.energyRecordCount ?? 0} energy records</span>
+                  <span>{supplier.productCount ?? 0} products</span>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportingData(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+                  >
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    View submitted reporting data
+                  </button>
+                </div>
+                {supplier.reviewerNotes && (
+                  <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
+                    Review feedback: {supplier.reviewerNotes}
+                  </p>
+                )}
+                {(supplier.onboardingStatus === "SUBMITTED" || supplier.onboardingStatus === "UNDER_REVIEW") && (
+                  <div className="mt-3 space-y-2">
+                    <textarea
+                      value={onboardingNotes}
+                      onChange={(event) => setOnboardingNotes(event.target.value)}
+                      placeholder="Feedback for the supplier (required when requesting changes)"
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
+                    />
+                    {onboardingReview.isError && (
+                      <p role="alert" className="text-sm text-red-700">
+                        {onboardingReview.error instanceof Error
+                          ? onboardingReview.error.message
+                          : "Could not update onboarding review."}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={onboardingReview.isPending || !onboardingNotes.trim()}
+                        onClick={() => onboardingReview.mutate({
+                          action: "REQUEST_CHANGES",
+                          notes: onboardingNotes.trim(),
+                        })}
+                        className="rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                      >
+                        Request changes
+                      </button>
+                      <button
+                        type="button"
+                        disabled={onboardingReview.isPending}
+                        onClick={() => onboardingReview.mutate({
+                          action: "APPROVE",
+                          notes: onboardingNotes.trim() || undefined,
+                        })}
+                        className="rounded-lg bg-primary-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        Approve onboarding
+                      </button>
+                    </div>
+                  </div>
+                )}
               </Section>
 
               <Section title="Risk level & main issue">
@@ -208,17 +304,17 @@ export function SupplierDetailsDrawer({
                 </div>
               </Section>
 
-              <Section title="Contracts, vehicles & certificates">
-                <p className="text-sm text-neutral-400">
-                  Detailed contract history, vehicle records, and certificate data aren't part of
-                  the current mock dataset — this section will populate once the backend provides
-                  per-supplier records.
-                </p>
-              </Section>
             </div>
           </>
         )}
       </div>
+
+      {showReportingData && supplier && (
+        <SupplierReportingDataDialog
+          supplier={{ id: supplier.id, name: supplier.displayName }}
+          onClose={() => setShowReportingData(false)}
+        />
+      )}
     </>
   );
 }

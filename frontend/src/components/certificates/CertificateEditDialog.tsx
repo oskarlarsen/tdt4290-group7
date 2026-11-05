@@ -1,13 +1,15 @@
 import type { FormEvent } from "react";
 import { X } from "lucide-react";
 import { useUpdateCertificate } from "../../hooks/useCertificates";
-import type { Certificate } from "../../types/certificate";
+import type { Certificate, CertificateContract } from "../../types/certificate";
 
 export function CertificateEditDialog({
   certificate,
+  contracts,
   onClose,
 }: {
   certificate: Certificate;
+  contracts: CertificateContract[];
   onClose: () => void;
 }) {
   const update = useUpdateCertificate();
@@ -105,13 +107,22 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700 sm:col-span-2">
-            Contract reference
-            <input
-              maxLength={200}
+            Agreement
+            <select
               name="contractId"
               defaultValue={certificate.contractId}
               className="mt-1 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm font-normal outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-            />
+            >
+              <option value="">Not linked</option>
+              {certificate.contractId && !contracts.some((contract) => contract.id === certificate.contractId) && (
+                <option value={certificate.contractId}>Existing agreement no longer active</option>
+              )}
+              {contracts.map((contract) => (
+                <option key={contract.id} value={contract.id}>
+                  {contract.supplierName} — {contract.contractName}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 

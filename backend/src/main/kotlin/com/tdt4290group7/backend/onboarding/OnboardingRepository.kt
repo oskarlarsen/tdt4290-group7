@@ -48,6 +48,8 @@ internal class OnboardingRepository(
         certificateRepository = repository
     }
 
+    internal fun isSupplierActive(supplierId: String): Boolean = fleet.isSupplierActive(supplierId)
+
     init {
         database.write { db ->
             db.createStatement().use { statement ->
@@ -100,10 +102,19 @@ internal class OnboardingRepository(
         val reviewerNotes = row["reviewer_notes"] as? String
         val agreements = querySupplierAgreements(db, supplierId)
         val vehicleCount = querySupplierVehicleCount(db, supplierId)
-        val certificateCount = querySupplierCertificatesCount(agreements.map { it.id }.toSet())
         val energyCount = querySupplierEnergyCount(db, supplierId)
+        val productsCount = querySupplierProductsCount(db, supplierId)
         val profileComplete = !contactName.isNullOrBlank() && !contactEmail.isNullOrBlank()
-        val fleetComplete = vehicleCount > 0
+        val requiredEntities = buildSet {
+            if (agreements.any { it.requiresVehicles }) add(BatchEntityType.VEHICLES)
+            if (agreements.any { it.requiresEnergy }) add(BatchEntityType.ENERGY)
+            if (agreements.any { it.requiresProducts }) add(BatchEntityType.PRODUCTS)
+        }.toList()
+        val missingVehicleAgreements = agreements.count { it.requiresVehicles && countAgreementRecords(db, "vehicles", it.id) == 0 }
+        val missingEnergyAgreements = agreements.count { it.requiresEnergy && countAgreementRecords(db, "facility_energy", it.id) == 0 }
+        val missingProductAgreements = agreements.count { it.requiresProducts && countAgreementRecords(db, "contract_products", it.id) == 0 }
+        val requiredDataComplete = requiredEntities.isNotEmpty() &&
+            missingVehicleAgreements == 0 && missingEnergyAgreements == 0 && missingProductAgreements == 0
 
         return OnboardingStatusResponse(
             supplierId = supplierId,
@@ -113,18 +124,28 @@ internal class OnboardingRepository(
                     if (profileComplete) "$contactName ($contactEmail)" else "Contact details required"),
                 OnboardingStepStatus("AGREEMENTS", "Framework Agreements Linked", agreements.isNotEmpty(),
                     "${agreements.size} active contract(s) registered"),
-                OnboardingStepStatus("FLEET", "Contract Vehicle Fleet", fleetComplete,
-                    "$vehicleCount vehicle(s) registered"),
-                OnboardingStepStatus("CERTIFICATES", "Environmental Certifications (ISO/Miljøfyrtårn)", certificateCount > 0,
-                    "$certificateCount certificate(s) uploaded"),
-                OnboardingStepStatus("ENERGY", "Facilities & Energy Balance (Optional/Conditional)", energyCount > 0,
-                    "$energyCount facility record(s) submitted")
-            ),
+                if (BatchEntityType.VEHICLES in requiredEntities) OnboardingStepStatus(
+                    "VEHICLES", "Vehicles", missingVehicleAgreements == 0,
+                    if (missingVehicleAgreements == 0) "$vehicleCount vehicle(s) registered"
+                    else "$missingVehicleAgreements agreement(s) still need vehicle information"
+                ) else null,
+                if (BatchEntityType.ENERGY in requiredEntities) OnboardingStepStatus(
+                    "ENERGY", "Energy", missingEnergyAgreements == 0,
+                    if (missingEnergyAgreements == 0) "$energyCount energy record(s) submitted"
+                    else "$missingEnergyAgreements agreement(s) still need energy information"
+                ) else null,
+                if (BatchEntityType.PRODUCTS in requiredEntities) OnboardingStepStatus(
+                    "PRODUCTS", "Products", missingProductAgreements == 0,
+                    if (missingProductAgreements == 0) "$productsCount product(s) submitted"
+                    else "$missingProductAgreements agreement(s) still need product information"
+                ) else null
+            ).filterNotNull(),
             contactName = contactName,
             contactEmail = contactEmail,
             contactPhone = contactPhone,
             reviewerNotes = reviewerNotes,
-            canSubmit = profileComplete && (fleetComplete || agreements.isEmpty()) && certificateCount > 0 &&
+            requiredEntities = requiredEntities,
+            canSubmit = profileComplete && agreements.isNotEmpty() && requiredDataComplete &&
                 (status == OnboardingStatus.DATA_DRAFT || status == OnboardingStatus.REVISION_REQUIRED)
         )
     }
@@ -293,7 +314,10 @@ internal class OnboardingRepository(
         now: Instant
     ): CsvPreviewResponse {
         database.read { db -> requireEditableSupplier(db, supplierId) }
-        val allowedAgreements = getSupplierAgreementIds(supplierId)
+        val allowedAgreements = requiredAgreementIds(supplierId, entityType)
+        require(allowedAgreements.isNotEmpty()) {
+            "Your administrator has not requested ${entityType.name.lowercase(Locale.ROOT)} information"
+        }
         val hash = sha256(fileBytes)
         val parseResult = CsvStreamParser.parseAndValidate(
             inputStream = fileBytes.inputStream(),
@@ -375,13 +399,11 @@ internal class OnboardingRepository(
             ) { it.getString("status") }.firstOrNull()
             require(batchStatus == BatchStatus.PREVIEWED.name) { "Batch has already been confirmed or is no longer available" }
 
-            val activeAgreementIds = database.query(
-                db,
-                "SELECT id FROM agreements WHERE supplier_id = ? AND active = 1",
-                listOf(supplierId)
-            ) { it.getString("id") }.toSet()
-            require(cached.rows.all { row -> row["agreement_id"]?.let(activeAgreementIds::contains) == true }) {
-                "One or more agreements are no longer active for your organization"
+            val requestedAgreementIds = queryRequiredAgreementIds(db, supplierId, cached.entityType)
+            require(requestedAgreementIds.isNotEmpty() && cached.rows.all { row ->
+                row["agreement_id"]?.let(requestedAgreementIds::contains) == true
+            }) {
+                "One or more agreements are no longer active or do not request this information type"
             }
 
             when (cached.entityType) {
@@ -594,6 +616,9 @@ internal class OnboardingRepository(
         }
     }
 
+    fun requiredAgreementIds(supplierId: String, entityType: BatchEntityType): Set<String> =
+        database.read { db -> queryRequiredAgreementIds(db, supplierId, entityType) }
+
     fun getSupplierAgreements(supplierId: String): List<SupplierAgreementSummary> {
         return database.read { db -> querySupplierAgreements(db, supplierId) }
     }
@@ -725,6 +750,36 @@ internal class OnboardingRepository(
         }
     }
 
+    fun getAdminSupplierOnboardingSummaries(): List<AdminSupplierOnboardingSummary> {
+        return database.read { db ->
+            val supplierIds = database.query(
+                db,
+                "SELECT id FROM suppliers WHERE active = 1 ORDER BY name COLLATE NOCASE"
+            ) { it.getString("id") }
+
+            supplierIds.map { supplierId ->
+                val statusRow = queryStatusRow(db, supplierId)
+                val agreements = querySupplierAgreements(db, supplierId)
+                AdminSupplierOnboardingSummary(
+                    supplierId = supplierId,
+                    status = statusRow?.get("status")?.let { OnboardingStatus.valueOf(it as String) }
+                        ?: OnboardingStatus.INVITED,
+                    contactName = statusRow?.get("contact_name") as? String,
+                    contactEmail = statusRow?.get("contact_email") as? String,
+                    contactPhone = statusRow?.get("contact_phone") as? String,
+                    reviewerNotes = statusRow?.get("reviewer_notes") as? String,
+                    submittedAt = statusRow?.get("submitted_at") as? String,
+                    reviewedAt = statusRow?.get("reviewed_at") as? String,
+                    agreementCount = agreements.size,
+                    vehicleCount = querySupplierVehicleCount(db, supplierId),
+                    certificateCount = querySupplierCertificatesCount(agreements.map { it.id }.toSet()),
+                    energyRecordCount = querySupplierEnergyCount(db, supplierId),
+                    productCount = querySupplierProductsCount(db, supplierId)
+                )
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Private Helpers
     // -------------------------------------------------------------------------
@@ -754,6 +809,7 @@ internal class OnboardingRepository(
     private fun querySupplierAgreements(db: Connection, supplierId: String): List<SupplierAgreementSummary> {
         val sql = """
             SELECT a.id, a.note, a.start_date, a.end_date, a.allowed_vehicles, a.active,
+                   a.requires_vehicles, a.requires_energy, a.requires_products,
                    (SELECT COUNT(*) FROM vehicles v WHERE v.agreement_id = a.id AND v.listed = 1) AS vehicle_count
             FROM agreements a
             WHERE a.supplier_id = ? AND a.active = 1
@@ -767,10 +823,47 @@ internal class OnboardingRepository(
                 endDate = row.getString("end_date"),
                 allowedVehicles = row.getInt("allowed_vehicles"),
                 activeVehiclesCount = row.getInt("vehicle_count"),
-                active = row.getInt("active") == 1
+                active = row.getInt("active") == 1,
+                requiresVehicles = row.getInt("requires_vehicles") == 1,
+                requiresEnergy = row.getInt("requires_energy") == 1,
+                requiresProducts = row.getInt("requires_products") == 1
             )
         }
     }
+
+    private fun queryRequiredAgreementIds(
+        db: Connection,
+        supplierId: String,
+        entityType: BatchEntityType
+    ): Set<String> {
+        val requirementColumn = when (entityType) {
+            BatchEntityType.VEHICLES -> "requires_vehicles"
+            BatchEntityType.ENERGY -> "requires_energy"
+            BatchEntityType.PRODUCTS -> "requires_products"
+        }
+        return database.query(
+            db,
+            "SELECT id FROM agreements WHERE supplier_id = ? AND active = 1 AND $requirementColumn = 1",
+            listOf(supplierId)
+        ) { it.getString("id") }.toSet()
+    }
+
+    private fun countAgreementRecords(db: Connection, table: String, agreementId: String): Int {
+        require(table in setOf("vehicles", "facility_energy", "contract_products"))
+        val listedClause = if (table == "vehicles") " AND listed = 1" else ""
+        return database.query(
+            db,
+            "SELECT COUNT(*) FROM $table WHERE agreement_id = ?$listedClause",
+            listOf(agreementId)
+        ) { it.getInt(1) }.single()
+    }
+
+    private fun countAgreementRecords(db: Connection, entityType: BatchEntityType, agreementId: String): Int =
+        countAgreementRecords(db, when (entityType) {
+            BatchEntityType.VEHICLES -> "vehicles"
+            BatchEntityType.ENERGY -> "facility_energy"
+            BatchEntityType.PRODUCTS -> "contract_products"
+        }, agreementId)
 
     private fun querySupplierVehicleCount(db: Connection, supplierId: String): Int {
         val sql = """

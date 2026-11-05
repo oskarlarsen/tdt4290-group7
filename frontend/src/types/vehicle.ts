@@ -4,7 +4,16 @@ export type Decimal = string;
 export type DataSource = "LIVE" | "CACHE" | "STALE_CACHE" | "UNAVAILABLE";
 export type Vehicle = { registrationNumber: string; createdAt: string; agreementId: string | null; planned: boolean; listed: boolean; updatedAt: string };
 export type FleetSupplier = { id: string; name: string; orgNumber: string; active: boolean; updatedAt: string | null };
-export type AgreementInput = { supplierId: string; startDate: string; endDate: string; allowedVehicles: number; note: string };
+export type AgreementInput = {
+  supplierId: string;
+  startDate: string;
+  endDate: string;
+  allowedVehicles: number;
+  note: string;
+  requiresVehicles: boolean;
+  requiresEnergy: boolean;
+  requiresProducts: boolean;
+};
 export type FleetAgreement = AgreementInput & { id: string; updatedAt: string; active: boolean };
 export type AgreementEvidence = { agreement: FleetAgreement; supplier: FleetSupplier };
 export type FleetChange = { id: string; occurredAt: string; actorName: string; description: string; agreementId: string | null; reversedBy: string | null; undoOf: string | null; canUndo: boolean };

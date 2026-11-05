@@ -1,8 +1,5 @@
 import { apiFetch } from "./client";
 import type { Certificate, CertificateStandard } from "../types/certificate";
-import * as db from "../mocks/db";
-
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 type CertificateResponse = {
   id: string;
@@ -57,8 +54,6 @@ function toCertificate(response: CertificateResponse): Certificate {
 }
 
 export async function getCertificates(): Promise<Certificate[]> {
-  if (USE_MOCKS) return Promise.resolve(db.getCertificates());
-
   const certificates = await apiFetch<CertificateResponse[]>("/certificates");
   return certificates.map(toCertificate);
 }

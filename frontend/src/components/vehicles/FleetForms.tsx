@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
 import type { FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
 import { agreementDuration, validDate, validPlate } from "../../utils/vehicle";
-import { VehicleDialog, Field, ErrorNotice, buttonClass, primaryClass, inputClass } from "./VehicleDialog";
+import { VehicleDialog, Field, ErrorNotice, buttonClass, dangerClass, primaryClass, inputClass } from "./VehicleDialog";
 import { RegistrationNumberInput } from "./VehicleInputs";
 import { FieldTooltip } from "./FieldTooltip";
 import { ConfirmAction } from "./ConfirmAction";
@@ -15,7 +15,7 @@ function FormFooter({ busy, label, onClose }: { busy: boolean; label: string; on
   </footer>;
 }
 
-export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: () => void }) {
+export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: (savedSupplier: FleetSupplier) => void }) {
   const [name, setName] = useState(supplier?.name ?? "");
   const [orgNumber, setOrgNumber] = useState(supplier?.orgNumber ?? "");
   const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier), onSuccess: onSaved, retry: false });
@@ -26,6 +26,31 @@ export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetS
       <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Save supplier" onClose={onClose} />
     </form>
   </VehicleDialog>;
+}
+
+export function RemoveSupplierAction({ supplier, agreementCount, vehicleCount, onRemoved }: {
+  supplier: FleetSupplier; agreementCount: number; vehicleCount: number; onRemoved: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => api.removeSupplier(supplier),
+    onSuccess: () => { setConfirming(false); onRemoved(); },
+    retry: false,
+  });
+  return <>
+    <button type="button" className={dangerClass} disabled={remove.isPending} onClick={() => { remove.reset(); setConfirming(true); }}>Remove</button>
+    {confirming && <ConfirmAction
+      title={`Remove supplier ${supplier.name}?`}
+      label="Remove supplier"
+      busy={remove.isPending}
+      error={remove.error}
+      onCancel={() => { setConfirming(false); remove.reset(); }}
+      onConfirm={() => remove.mutate()}
+    >
+      <p>This removes the organization and deactivates its {agreementCount} active agreement{agreementCount === 1 ? "" : "s"} and {vehicleCount} listed vehicle{vehicleCount === 1 ? "" : "s"}.</p>
+      <p className="mt-2">Historical records are kept. You can undo this from Change history.</p>
+    </ConfirmAction>}
+  </>;
 }
 
 export function InviteSupplierForm({ supplier, onClose }: { supplier: FleetSupplier; onClose: () => void }) {
@@ -73,10 +98,14 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
   const [endDate, setEnd] = useState(agreement?.endDate ?? "");
   const [allowed, setAllowed] = useState(String(agreement?.allowedVehicles ?? ""));
   const [note, setNote] = useState(agreement?.note ?? "");
+  const [requiresVehicles, setRequiresVehicles] = useState(agreement?.requiresVehicles ?? true);
+  const [requiresEnergy, setRequiresEnergy] = useState(agreement?.requiresEnergy ?? false);
+  const [requiresProducts, setRequiresProducts] = useState(agreement?.requiresProducts ?? false);
   const save = useMutation({ mutationFn: () => {
     if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("Enter a valid agreement period.");
     if (!/^\d+$/.test(allowed) || Number(allowed) > 10000) throw new Error("Enter a vehicle allowance between 0 and 10000.");
-    return api.saveAgreement({ supplierId: supplier.id, startDate, endDate, allowedVehicles: Number(allowed), note }, agreement);
+    if (!requiresVehicles && !requiresEnergy && !requiresProducts) throw new Error("Select at least one type of supplier information to collect.");
+    return api.saveAgreement({ supplierId: supplier.id, startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
   }, onSuccess: onSaved, retry: false });
   return <VehicleDialog title={`${agreement ? "Edit" : "Add"} agreement · ${supplier.name}`} onClose={onClose} busy={save.isPending}>
     <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate(); }}>
@@ -86,6 +115,21 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
       </div>
       {agreementDuration(startDate, endDate) && <p className="text-sm text-neutral-500">{agreementDuration(startDate, endDate)}</p>}
       <Field label="Maximum vehicles"><input type="number" required min={0} max={10000} step={1} className={inputClass} value={allowed} onChange={e => setAllowed(e.target.value)} /></Field>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-neutral-700">Information required from supplier</legend>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" checked={requiresVehicles} onChange={event => setRequiresVehicles(event.target.checked)} />
+          Vehicles
+        </label>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" checked={requiresEnergy} onChange={event => setRequiresEnergy(event.target.checked)} />
+          Energy
+        </label>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" checked={requiresProducts} onChange={event => setRequiresProducts(event.target.checked)} />
+          Products
+        </label>
+      </fieldset>
       <Field label="Note (optional)"><textarea maxLength={4000} rows={3} className={inputClass} value={note} onChange={e => setNote(e.target.value)} /></Field>
       <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Save agreement" onClose={onClose} />
     </form>

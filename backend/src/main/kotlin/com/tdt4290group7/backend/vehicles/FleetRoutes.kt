@@ -79,6 +79,13 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
         val request = decodeFleetRequest(call.receiveText(), SupplierUpdate.serializer())
         call.respond(fleet.saveSupplier(call.parameters["id"]!!, request.supplier, actor, Instant.now(), request.expectedUpdatedAt))
     }
+    delete("/api/vehicle-fleet/suppliers/{id}") {
+        val actor = call.adminActor() ?: return@delete
+        val id = call.parameters["id"] ?: throw IllegalArgumentException("Supplier ID is required")
+        val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
+        fleet.removeSupplier(id, request.expectedUpdatedAt, actor, Instant.now())
+        call.respond(HttpStatusCode.NoContent)
+    }
     post("/api/vehicle-fleet/agreements") {
         val actor = call.adminActor() ?: return@post
         call.respond(HttpStatusCode.Created, fleet.saveAgreement(null, decodeFleetRequest(call.receiveText(), AgreementInput.serializer()), null, actor, Instant.now()))

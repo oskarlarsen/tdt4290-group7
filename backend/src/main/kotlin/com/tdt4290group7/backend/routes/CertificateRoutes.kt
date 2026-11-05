@@ -9,6 +9,7 @@ import com.tdt4290group7.backend.pdf.extractTextWithOcr
 import com.tdt4290group7.backend.plugins.AUTH_JWT
 import com.tdt4290group7.backend.plugins.ApiError
 import com.tdt4290group7.backend.vehicles.adminActor
+import com.tdt4290group7.backend.vehicles.FleetRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.http.content.PartData
@@ -64,7 +65,7 @@ private data class UpdateCertificateRequest(
     val contractId: String? = null,
 )
 
-fun Application.configureCertificateRoutes(repository: CertificateRepository) {
+fun Application.configureCertificateRoutes(repository: CertificateRepository, fleet: FleetRepository? = null) {
     routing {
         authenticate(AUTH_JWT) {
             route("/api/certificates") {
@@ -94,15 +95,23 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository) {
                         return@put
                     }
 
-                    val supplierName = request.supplierName.trim()
+                    val requestedSupplierName = request.supplierName.trim()
                     val certificateType = request.certificateType.trim()
                     val contractId = request.contractId?.trim()?.ifEmpty { null }
-                    if (supplierName.isEmpty() || supplierName.length > 200 ||
+                    if (requestedSupplierName.isEmpty() || requestedSupplierName.length > 200 ||
                         certificateType.isEmpty() || certificateType.length > 200 ||
                         (contractId != null && contractId.length > 200)
                     ) {
                         call.respond(HttpStatusCode.BadRequest, ApiError("Invalid certificate details"))
                         return@put
+                    }
+                    val supplierName = if (contractId == null) {
+                        requestedSupplierName
+                    } else {
+                        fleet?.activeAgreementEvidence(contractId)?.supplier?.name ?: run {
+                            call.respond(HttpStatusCode.BadRequest, ApiError("Select an active supplier agreement"))
+                            return@put
+                        }
                     }
 
                     val issueDate = request.issueDate.toLocalDateOrNull()
@@ -149,6 +158,14 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository) {
                         call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid certificate upload"))
                         return@post
                     }
+                    val supplierName = if (upload.contractId == null) {
+                        upload.supplierName
+                    } else {
+                        fleet?.activeAgreementEvidence(upload.contractId)?.supplier?.name ?: run {
+                            call.respond(HttpStatusCode.BadRequest, ApiError("Select an active supplier agreement"))
+                            return@post
+                        }
+                    }
 
                     val tempFile = try {
                         Files.createTempFile("certificate-upload-", ".pdf")
@@ -193,7 +210,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository) {
                         val parsed = CertificateParser.parse(text, upload.sourceFile)
                         val certificate = Certificate(
                             id = UUID.randomUUID().toString(),
-                            supplierName = upload.supplierName,
+                            supplierName = supplierName,
                             certificateType = parsed.certificateType,
                             issueDate = parsed.issueDate,
                             expiryDate = parsed.expiryDate,
