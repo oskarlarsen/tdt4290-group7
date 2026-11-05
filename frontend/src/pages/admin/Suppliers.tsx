@@ -1,20 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useDashboardSummary } from "../../hooks/useDashboardSummary";
 import { useSupplierReviewStatus, type FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
 import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
-import { useContracts } from "../../hooks/useContracts";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
 import { InviteSupplierForm, SupplierForm } from "../../components/vehicles/FleetForms";
 import { ErrorNotice, buttonClass, primaryClass } from "../../components/vehicles/VehicleDialog";
 import { toCsv, downloadCsv } from "../../utils/csv";
-import type { DashboardSummary, NewSupplierInput, TopRiskSupplier } from "../../types/dashboard";
+import type { TopRiskSupplier } from "../../types/dashboard";
 import type { FleetSupplier } from "../../types/vehicle";
-import { createSupplier } from "../../api/suppliers";
 
 const RISK_ORDER: Record<TopRiskSupplier["risk"], number> = {
   high: 0,
@@ -28,8 +25,6 @@ export default function Suppliers() {
   const { data, isLoading, isError } = useDashboardSummary();
   const fleet = useFleet();
   const refreshFleet = useRefreshVehicles();
-  const contractsQuery = useContracts();
-  const queryClient = useQueryClient();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [organizationForm, setOrganizationForm] = useState<FleetSupplier | "new" | null>(null);
@@ -39,14 +34,9 @@ export default function Suppliers() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [successMessage, setSuccessMessage] = useState("");
-  const preservePageAfterAdd = useRef(false);
   const { getStatus, setStatus } = useSupplierReviewStatus();
 
   useEffect(() => {
-    if (preservePageAfterAdd.current) {
-      preservePageAfterAdd.current = false;
-      return;
-    }
     setPage(1);
   }, [search, riskFilter, reviewStatusFilter]);
 
@@ -68,6 +58,7 @@ export default function Suppliers() {
   function handleOrganizationSaved() {
     setOrganizationForm(null);
     void refreshFleet();
+    setSuccessMessage("Supplier organization saved successfully.");
   }
 
   const sortedSuppliers = [...(data?.topRiskSuppliers ?? [])].sort(
@@ -91,29 +82,6 @@ export default function Suppliers() {
   const pageStart = (currentPage - 1) * SUPPLIERS_PAGE_SIZE;
   const paginatedSuppliers = filteredSuppliers.slice(pageStart, pageStart + SUPPLIERS_PAGE_SIZE);
   const selectedSupplier = sortedSuppliers.find((s) => s.id === selectedSupplierId) ?? null;
-
-  async function handleAddSupplier(input: NewSupplierInput) {
-    const supplier = await createSupplier(input);
-    const updatedSuppliers = [...sortedSuppliers, supplier].sort(
-      (a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk]
-    );
-    const supplierIndex = updatedSuppliers.findIndex((item) => item.id === supplier.id);
-    const targetPage = Math.floor(supplierIndex / SUPPLIERS_PAGE_SIZE) + 1;
-    const filtersWillReset =
-      search !== "" || riskFilter !== "all" || reviewStatusFilter !== "all";
-
-    if (filtersWillReset) preservePageAfterAdd.current = true;
-    queryClient.setQueryData<DashboardSummary>(["dashboard-summary"], (current) =>
-      current
-        ? { ...current, topRiskSuppliers: [...current.topRiskSuppliers, supplier] }
-        : current
-    );
-    setSearch("");
-    setRiskFilter("all");
-    setReviewStatusFilter("all");
-    setPage(targetPage);
-    setSuccessMessage(`${supplier.displayName} was added successfully.`);
-  }
 
   function handleExportDirectory() {
     const csv = toCsv(
@@ -147,11 +115,7 @@ export default function Suppliers() {
           compliantCount={data.riskClassification.compliant.count}
           compliantPercent={data.riskClassification.compliant.percent}
           onExport={handleExportDirectory}
-          existingSuppliers={sortedSuppliers}
-          contracts={contractsQuery.data ?? []}
-          contractsLoading={contractsQuery.isLoading}
-          contractsError={contractsQuery.isError}
-          onAddSupplier={handleAddSupplier}
+          onAddSupplier={() => setOrganizationForm("new")}
         />
       )}
 

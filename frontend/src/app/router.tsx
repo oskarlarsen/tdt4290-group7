@@ -19,6 +19,7 @@ import Alerts from "../pages/admin/Alerts";
 import SupplierDetails from "../pages/admin/SupplierDetails";
 
 import SupplierDashboard from "../pages/supplier/Dashboard";
+import SupplierOnboarding from "../pages/supplier/Onboarding";
 import MyCompany from "../pages/supplier/MyCompany";
 import MyContracts from "../pages/supplier/MyContracts";
 import MyVehicles from "../pages/supplier/MyVehicles";
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { path: "dashboard", element: <SupplierDashboard /> },
+      { path: "onboarding", element: <SupplierOnboarding /> },
       { path: "company", element: <MyCompany /> },
       { path: "contracts", element: <MyContracts /> },
       { path: "vehicles", element: <MyVehicles /> },
