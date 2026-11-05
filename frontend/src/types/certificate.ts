@@ -32,6 +32,10 @@ export type Certificate = {
   sourceFile?: string;
   /** Set when the certificate was archived: kept as history, but it raises no alerts and counts in no risk. */
   archivedAt?: string | null;
+  /** ADMIN or SUPPLIER; null for certificates uploaded before this was recorded. */
+  uploadedByRole?: string | null;
+  /** On a supplier's renewal: the older certificate it replaces once an admin confirms. */
+  archivePendingFor?: string | null;
 };
 
 export type CertificateContract = {

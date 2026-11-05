@@ -22,6 +22,7 @@ import { CertificateDetailsDrawer } from "../../components/certificates/Certific
 import { CertificateAttentionCard } from "../../components/certificates/CertificateAttentionCard";
 import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
 import { useArchiveCertificate, useRestoreCertificate } from "../../hooks/useCertificates";
+import { PendingRenewalsCard } from "../../components/certificates/PendingRenewalsCard";
 import type { Certificate } from "../../types/certificate";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -265,6 +266,8 @@ export default function Certificates() {
           iconClassName="bg-red-100 text-red-700"
         />
       </div>
+
+      <PendingRenewalsCard certificates={certificates ?? []} />
 
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

@@ -21,6 +21,16 @@ object CertificateTypes {
         }
     }
 
+    /** Two certificates are the same kind when their normalised type matches; an unknown or blank type matches nothing. */
+    fun sameType(a: String, b: String): Boolean {
+        val kindA = kind(a)
+        if (kindA != CertificateKind.OTHER) return kindA == kind(b)
+        val flatA = flatten(a)
+        return flatA.isNotEmpty() && flatA != "unknown" && flatA == flatten(b)
+    }
+
+    private fun flatten(type: String) = type.lowercase().filter { it.isLetterOrDigit() }
+
     /** How many days before expiry the first alert is raised. */
     fun warningDays(certificateType: String): Long =
         if (kind(certificateType) == CertificateKind.OTHER) DEFAULT_WARNING_DAYS else LONG_LEAD_WARNING_DAYS

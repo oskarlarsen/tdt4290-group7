@@ -30,7 +30,7 @@ class CertificateRepository(databasePath: Path) {
                 val existing = statement.executeQuery("PRAGMA table_info(certificates)").use { rows ->
                     buildSet { while (rows.next()) add(rows.getString("name")) }
                 }
-                for (column in listOf("archived_at", "archived_by")) {
+                for (column in listOf("archived_at", "archived_by", "archived_reason", "uploaded_by_role", "archive_pending_for")) {
                     if (column !in existing) statement.execute("ALTER TABLE certificates ADD COLUMN $column TEXT")
                 }
             }
@@ -41,8 +41,8 @@ class CertificateRepository(databasePath: Path) {
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
                 """INSERT INTO certificates
-                    (id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                    (id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, uploaded_by_role, archive_pending_for)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, certificate.id)
                 statement.setString(2, certificate.supplierName)
@@ -51,6 +51,8 @@ class CertificateRepository(databasePath: Path) {
                 statement.setString(5, certificate.expiryDate?.toString())
                 statement.setString(6, certificate.sourceFile)
                 statement.setString(7, certificate.contractId)
+                statement.setString(8, certificate.uploadedByRole)
+                statement.setString(9, certificate.archivePendingFor)
                 statement.executeUpdate()
             }
         }
@@ -91,7 +93,7 @@ class CertificateRepository(databasePath: Path) {
     private fun query(where: String): List<Certificate> =
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
-                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at
+                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at, uploaded_by_role, archive_pending_for
                     FROM certificates $where""".trimIndent(),
             ).use { statement ->
                 statement.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.toCertificate()) } }
@@ -101,7 +103,7 @@ class CertificateRepository(databasePath: Path) {
     fun getById(id: String): Certificate? =
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
-                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at
+                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at, uploaded_by_role, archive_pending_for
                     FROM certificates WHERE id = ?""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, id)
@@ -110,17 +112,27 @@ class CertificateRepository(databasePath: Path) {
         }
 
     /** Archiving keeps the record and its document; it only takes the certificate out of alerts, risk and the live lists. */
-    fun archive(id: String, actorId: String, now: java.time.Instant): Boolean =
+    /** [replacedBy] is the certificate that replaced this one, when the archive comes from a renewal. */
+    fun archive(id: String, actorId: String, now: java.time.Instant, replacedBy: String? = null): Boolean =
         DriverManager.getConnection(databaseUrl).use { db ->
-            db.prepareStatement("UPDATE certificates SET archived_at = ?, archived_by = ? WHERE id = ? AND archived_at IS NULL").use {
-                it.setString(1, now.toString()); it.setString(2, actorId); it.setString(3, id)
+            db.prepareStatement("UPDATE certificates SET archived_at = ?, archived_by = ?, archived_reason = ? WHERE id = ? AND archived_at IS NULL").use {
+                it.setString(1, now.toString()); it.setString(2, actorId); it.setString(3, replacedBy); it.setString(4, id)
+                it.executeUpdate() == 1
+            }
+        }
+
+    /** Drops the pending-archive mark from a renewal, after an admin confirmed or rejected it. */
+    fun clearPendingArchive(id: String): Boolean =
+        DriverManager.getConnection(databaseUrl).use { db ->
+            db.prepareStatement("UPDATE certificates SET archive_pending_for = NULL WHERE id = ? AND archive_pending_for IS NOT NULL").use {
+                it.setString(1, id)
                 it.executeUpdate() == 1
             }
         }
 
     fun restore(id: String): Boolean =
         DriverManager.getConnection(databaseUrl).use { db ->
-            db.prepareStatement("UPDATE certificates SET archived_at = NULL, archived_by = NULL WHERE id = ? AND archived_at IS NOT NULL").use {
+            db.prepareStatement("UPDATE certificates SET archived_at = NULL, archived_by = NULL, archived_reason = NULL WHERE id = ? AND archived_at IS NOT NULL").use {
                 it.setString(1, id)
                 it.executeUpdate() == 1
             }
@@ -136,5 +148,7 @@ class CertificateRepository(databasePath: Path) {
         status = calculateStatus(getString("expiry_date")?.let(LocalDate::parse)),
         contractId = getString("contract_id"),
         archivedAt = getString("archived_at"),
+        uploadedByRole = getString("uploaded_by_role"),
+        archivePendingFor = getString("archive_pending_for"),
     )
 }

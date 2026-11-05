@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
+import { SupplierCertificateUploadDialog } from "../../components/certificates/SupplierCertificateUploadDialog";
 import { Loader2, FileText } from "lucide-react";
 import { formatDate } from "../../utils/formatDate";
 import { CERTIFICATE_STANDARD_LABELS, getCertificateStatus } from "../../types/certificate";
 
 export default function MyCertificates() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
+  // undefined = closed; "" = open with no agreement chosen; an id = a renewal for that agreement.
+  const [uploadFor, setUploadFor] = useState<string | undefined>(undefined);
 
   if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (isError || !data) return <div className="p-8 text-center text-sm text-red-700">{error instanceof Error ? error.message : "Error loading data"}</div>;
@@ -15,7 +19,17 @@ export default function MyCertificates() {
 
   return (
     <div className="space-y-4 max-w-4xl">
-      <h1 className="font-headline text-2xl font-semibold text-neutral-900">My Certificates</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-headline text-2xl font-semibold text-neutral-900">My Certificates</h1>
+        <button
+          type="button"
+          onClick={() => setUploadFor("")}
+          disabled={data.agreements.length === 0}
+          className="rounded-lg bg-primary-900 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+        >
+          Upload certificate
+        </button>
+      </div>
 
       {certificates.length === 0 && archived.length === 0 ? (
          <div className="py-12 text-center text-sm text-neutral-500 border border-neutral-100 rounded-xl bg-white">
@@ -37,6 +51,9 @@ export default function MyCertificates() {
                       </span>
                    </div>
 
+                   {cert.archivePendingFor && (
+                      <p className="mb-3 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">Waiting for admin review</p>
+                   )}
                    <div className="space-y-3 mt-auto">
                       <div>
                         <p className="text-xs text-neutral-500 uppercase tracking-wide">Certificate Number</p>
@@ -46,6 +63,15 @@ export default function MyCertificates() {
                         <p className="text-xs text-neutral-500 uppercase tracking-wide">Valid Until</p>
                         <p className="text-sm font-medium text-neutral-900">{cert.validUntil ? formatDate(cert.validUntil) : "Not submitted"}</p>
                       </div>
+                      {status.group !== "valid" && !cert.archivePendingFor && (
+                        <button
+                          type="button"
+                          onClick={() => setUploadFor(cert.contractId)}
+                          className="rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                        >
+                          Renew
+                        </button>
+                      )}
                    </div>
                 </div>
               );
@@ -65,6 +91,14 @@ export default function MyCertificates() {
             ))}
           </ul>
         </section>
+      )}
+
+      {uploadFor !== undefined && (
+        <SupplierCertificateUploadDialog
+          agreements={data.agreements}
+          initialAgreementId={uploadFor || undefined}
+          onClose={() => setUploadFor(undefined)}
+        />
       )}
     </div>
   );

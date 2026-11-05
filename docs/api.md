@@ -61,6 +61,16 @@ Alerts and certificates are archived, not deleted. An archived item is hidden fr
 
 The supplier's own `GET /api/supplier/certificates` includes archived certificates with `archivedAt` set, so a supplier keeps their history. The `DELETE` endpoints still exist for one release so a rollback keeps working, but the app no longer calls them.
 
+### Supplier certificate upload and renewals
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/supplier/certificates` | A supplier uploads a certificate PDF (multipart: `file`, `contractId`). The agreement must be one of the supplier's own active agreements, otherwise `403` or `400`. The supplier name comes from the agreement. Limited to 10 uploads per supplier per hour (`429`). |
+| `POST` | `/api/certificates/{id}/confirm-archive` | Admin: confirm a supplier's renewal, archiving the older certificate it replaces. |
+| `POST` | `/api/certificates/{id}/reject-archive` | Admin: keep both certificates and clear the pending mark. |
+
+A new certificate replaces an older one when it is on the same agreement, has the same normalised type, and expires later. An admin's upload archives the older certificate at once. A supplier's upload only sets `archivePendingFor` on the new certificate; both stay active until an admin confirms or rejects. Certificates with no agreement or no expiry date, and `Unknown` types, are never matched. Certificate responses include `uploadedByRole` and `archivePendingFor`.
+
 ## Fleet management
 
 An agreement belongs to a supplier and specifies dates and vehicle allowance. Vehicles are added to an agreement as registered vehicles or planned entries.

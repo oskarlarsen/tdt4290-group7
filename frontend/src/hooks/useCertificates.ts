@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveCertificate,
+  confirmCertificateArchive,
   getCertificates,
+  rejectCertificateArchive,
+  uploadSupplierCertificate,
   restoreCertificate,
   updateCertificate,
   uploadCertificate,
@@ -38,7 +41,7 @@ export function useUpdateCertificate() {
 function useArchiveChange(mutationFn: (id: string) => Promise<void>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn,
+    mutationFn: (id: string) => mutationFn(id),
     onSuccess: () => Promise.all([
       queryClient.invalidateQueries({ queryKey: ["certificates"] }),
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
@@ -48,3 +51,17 @@ function useArchiveChange(mutationFn: (id: string) => Promise<void>) {
 
 export function useArchiveCertificate() { return useArchiveChange(archiveCertificate); }
 export function useRestoreCertificate() { return useArchiveChange(restoreCertificate); }
+export function useConfirmCertificateArchive() { return useArchiveChange(confirmCertificateArchive); }
+export function useRejectCertificateArchive() { return useArchiveChange(rejectCertificateArchive); }
+
+export function useUploadSupplierCertificate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, contractId }: { file: File; contractId: string }) => uploadSupplierCertificate(file, contractId),
+    // The supplier's workspace holds their certificates, so it is refreshed along with the admin lists.
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["supplier-workspace"] }),
+      queryClient.invalidateQueries({ queryKey: ["certificates"] }),
+    ]),
+  });
+}

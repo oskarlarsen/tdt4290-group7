@@ -2,12 +2,15 @@ package com.tdt4290group7.backend.certificates
 
 import com.tdt4290group7.backend.adminClient
 import com.tdt4290group7.backend.module
+import com.tdt4290group7.backend.routes.SupplierUploadLimiter
+import com.tdt4290group7.backend.supplierClient
 import com.tdt4290group7.backend.vehicles.AgreementInput
 import com.tdt4290group7.backend.vehicles.ChangeActor
 import com.tdt4290group7.backend.vehicles.SupplierInput
 import com.tdt4290group7.backend.vehicles.VehicleRepository
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -150,6 +153,139 @@ class CertificateRoutesTest {
 
         assertEquals(HttpStatusCode.NoContent, adminClient.delete("/api/certificates/$certificateId").status)
         assertEquals(0, CertificateRepository(certificateDatabase).getAll().size)
+    }
+
+    private suspend fun HttpClient.uploadPdf(path: String, contractId: String?, pdf: ByteArray) = post(path) {
+        setBody(
+            MultiPartFormDataContent(
+                formData {
+                    append("supplierName", "Ignored by the server when an agreement is chosen")
+                    if (contractId != null) append("contractId", contractId)
+                    append("file", pdf, Headers.build {
+                        append(HttpHeaders.ContentType, "application/pdf")
+                        append(HttpHeaders.ContentDisposition, """filename="iso-14001.pdf"""")
+                    })
+                },
+            ),
+        )
+    }
+
+    private val isoPdf by lazy { javaClass.classLoader.getResourceAsStream("test-pdf/test-certificate-iso14001.pdf")!!.use { it.readBytes() } }
+
+    @Test
+    fun supplierUploadsOnlyAgainstItsOwnAgreementsAndTheServerSetsTheSupplier() = testApplication {
+        SupplierUploadLimiter.reset()
+        val vehicles = VehicleRepository(databasePath())
+        val actor = ChangeActor("admin", "Administrator")
+        val mine = vehicles.fleet.saveSupplier(null, SupplierInput("My Transport AS", "123456789"), actor, Instant.now())
+        val other = vehicles.fleet.saveSupplier(null, SupplierInput("Other Transport AS", "987654321"), actor, Instant.now())
+        fun agreementFor(supplierId: String) = vehicles.fleet.saveAgreement(
+            null, AgreementInput(supplierId, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now(),
+        )
+        val myAgreement = agreementFor(mine.id); val otherAgreement = agreementFor(other.id)
+        val certificates = CertificateRepository(databasePath())
+        application { module(vehicles, null, Duration.ofDays(14), certificates) }
+        val supplier = supplierClient(mine.id)
+
+        val ok = supplier.uploadPdf("/api/supplier/certificates", myAgreement.id, isoPdf)
+        assertEquals(HttpStatusCode.Created, ok.status, ok.bodyAsText())
+        val body = Json.parseToJsonElement(ok.bodyAsText()).jsonObject
+        assertEquals("My Transport AS", body.getValue("supplierName").jsonPrimitive.content)
+        assertEquals("SUPPLIER", body.getValue("uploadedByRole").jsonPrimitive.content)
+
+        assertEquals(HttpStatusCode.Forbidden, supplier.uploadPdf("/api/supplier/certificates", otherAgreement.id, isoPdf).status)
+        assertEquals(HttpStatusCode.BadRequest, supplier.uploadPdf("/api/supplier/certificates", null, isoPdf).status)
+        assertEquals(HttpStatusCode.BadRequest, supplier.uploadPdf("/api/supplier/certificates", "no-such-agreement", isoPdf).status)
+        assertEquals(1, certificates.getAll().size)
+        // Admins use their own route; the supplier route is for suppliers only.
+        assertEquals(HttpStatusCode.Forbidden, adminClient().uploadPdf("/api/supplier/certificates", myAgreement.id, isoPdf).status)
+    }
+
+    @Test
+    fun supplierUploadsAreRateLimitedPerSupplier() {
+        SupplierUploadLimiter.reset()
+        val now = Instant.now()
+        repeat(SupplierUploadLimiter.MAX_PER_HOUR) { assertEquals(true, SupplierUploadLimiter.tryAcquire("s1", now)) }
+        assertEquals(false, SupplierUploadLimiter.tryAcquire("s1", now))
+        assertEquals(true, SupplierUploadLimiter.tryAcquire("s2", now))
+        assertEquals(true, SupplierUploadLimiter.tryAcquire("s1", now.plusSeconds(3601)))
+    }
+
+    private fun renewalFixture(certificates: CertificateRepository, contractId: String, supplierName: String, type: String = "ISO 14001") {
+        certificates.add(Certificate("old-cert", supplierName, type, null, java.time.LocalDate.of(2000, 1, 1), "old.pdf", CertificateStatus.EXPIRED, contractId, uploadedByRole = "ADMIN"))
+    }
+
+    @Test
+    fun supplierRenewalWaitsForAnAdminAndAdminRenewalArchivesAtOnce() = testApplication {
+        SupplierUploadLimiter.reset()
+        val vehicles = VehicleRepository(databasePath())
+        val actor = ChangeActor("admin", "Administrator")
+        val mine = vehicles.fleet.saveSupplier(null, SupplierInput("My Transport AS", "123456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(
+            null, AgreementInput(mine.id, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now(),
+        )
+        val certificates = CertificateRepository(databasePath())
+        renewalFixture(certificates, agreement.id, mine.name)
+        application { module(vehicles, null, Duration.ofDays(14), certificates) }
+        val supplier = supplierClient(mine.id)
+        val admin = adminClient()
+        suspend fun liveIds() = Json.parseToJsonElement(admin.get("/api/certificates").bodyAsText()).jsonArray
+            .map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet()
+
+        // The supplier's renewal is recorded as pending; the old certificate stays live.
+        val renewal = Json.parseToJsonElement(supplier.uploadPdf("/api/supplier/certificates", agreement.id, isoPdf).bodyAsText()).jsonObject
+        val renewalId = renewal.getValue("id").jsonPrimitive.content
+        assertEquals("old-cert", renewal.getValue("archivePendingFor").jsonPrimitive.content)
+        assertEquals(setOf("old-cert", renewalId), liveIds())
+
+        // Reject keeps both and clears the mark; a second reject finds nothing.
+        assertEquals(HttpStatusCode.NoContent, admin.post("/api/certificates/$renewalId/reject-archive").status)
+        assertEquals(setOf("old-cert", renewalId), liveIds())
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/certificates/$renewalId/reject-archive").status)
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/certificates/$renewalId/confirm-archive").status)
+
+        // A second supplier renewal, this time confirmed. The first renewal has the same expiry, so it is not
+        // older than the new one and is not proposed for archive; the 2000 certificate still is.
+        val again = Json.parseToJsonElement(supplier.uploadPdf("/api/supplier/certificates", agreement.id, isoPdf).bodyAsText()).jsonObject
+        val againId = again.getValue("id").jsonPrimitive.content
+        assertEquals("old-cert", again.getValue("archivePendingFor").jsonPrimitive.content)
+        assertEquals(HttpStatusCode.Forbidden, supplier.post("/api/certificates/$againId/confirm-archive").status)
+        assertEquals(HttpStatusCode.NoContent, admin.post("/api/certificates/$againId/confirm-archive").status)
+        assertEquals(setOf(renewalId, againId), liveIds())
+        assertEquals(listOf("old-cert"), certificates.getArchived().map { it.id })
+        assertEquals(null, certificates.getById(againId)?.archivePendingFor)
+    }
+
+    @Test
+    fun adminRenewalArchivesTheOlderCertificateImmediately() = testApplication {
+        val vehicles = VehicleRepository(databasePath())
+        val actor = ChangeActor("admin", "Administrator")
+        val mine = vehicles.fleet.saveSupplier(null, SupplierInput("My Transport AS", "123456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(
+            null, AgreementInput(mine.id, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now(),
+        )
+        val certificates = CertificateRepository(databasePath())
+        renewalFixture(certificates, agreement.id, mine.name)
+        // A different type, a certificate with no agreement, and one on another agreement are never replaced.
+        certificates.add(Certificate("other-type", mine.name, "Retura", null, java.time.LocalDate.of(2000, 1, 1), "r.pdf", CertificateStatus.EXPIRED, agreement.id))
+        certificates.add(Certificate("no-agreement", mine.name, "ISO 14001", null, java.time.LocalDate.of(2000, 1, 1), "n.pdf", CertificateStatus.EXPIRED, null))
+        application { module(vehicles, null, Duration.ofDays(14), certificates) }
+        val admin = adminClient()
+
+        val renewal = Json.parseToJsonElement(admin.uploadPdf("/api/certificates", agreement.id, isoPdf).bodyAsText()).jsonObject
+        assertEquals("ADMIN", renewal.getValue("uploadedByRole").jsonPrimitive.content)
+        assertEquals(setOf("other-type", "no-agreement", renewal.getValue("id").jsonPrimitive.content), certificates.getAll().map { it.id }.toSet())
+        assertEquals(listOf("old-cert"), certificates.getArchived().map { it.id })
+    }
+
+    @Test
+    fun certificateTypesMatchOnTheirNormalisedForm() {
+        assertEquals(true, CertificateTypes.sameType("ISO 14001", "iso-14001"))
+        assertEquals(true, CertificateTypes.sameType("Miljøfyrtårn", "miljofyrtarn"))
+        assertEquals(true, CertificateTypes.sameType("Retura", " retura "))
+        assertEquals(false, CertificateTypes.sameType("Retura", "Grønt Punkt Norge"))
+        assertEquals(false, CertificateTypes.sameType("Unknown", "Unknown"))
+        assertEquals(false, CertificateTypes.sameType("", ""))
     }
 
     private fun databasePath() = Path.of("build", "test-data", "certificate-${UUID.randomUUID()}.db")

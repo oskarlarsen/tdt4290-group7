@@ -10,6 +10,8 @@ type CertificateResponse = {
   sourceFile: string;
   contractId: string | null;
   archivedAt?: string | null;
+  uploadedByRole?: string | null;
+  archivePendingFor?: string | null;
 };
 
 export type CertificateUpdate = {
@@ -52,6 +54,8 @@ function toCertificate(response: CertificateResponse): Certificate {
     issueDate: response.issueDate,
     sourceFile: response.sourceFile,
     archivedAt: response.archivedAt ?? null,
+    uploadedByRole: response.uploadedByRole ?? null,
+    archivePendingFor: response.archivePendingFor ?? null,
   };
 }
 
@@ -95,4 +99,21 @@ export function archiveCertificate(id: string): Promise<void> {
 
 export function restoreCertificate(id: string): Promise<void> {
   return apiFetch<void>(`/certificates/${encodeURIComponent(id)}/restore`, { method: "POST" });
+}
+
+export function confirmCertificateArchive(id: string): Promise<void> {
+  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}/confirm-archive`, { method: "POST" });
+}
+
+export function rejectCertificateArchive(id: string): Promise<void> {
+  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}/reject-archive`, { method: "POST" });
+}
+
+/** A supplier uploads against one of its own agreements; the server takes the supplier from the login. */
+export async function uploadSupplierCertificate(file: File, contractId: string): Promise<Certificate> {
+  const form = new FormData();
+  form.append("contractId", contractId);
+  form.append("file", file);
+  const response = await apiFetch<CertificateResponse>("/supplier/certificates", { method: "POST", body: form });
+  return toCertificate(response);
 }
