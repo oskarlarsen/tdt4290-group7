@@ -13,6 +13,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { ProfileMenu } from "../components/ui/ProfileMenu";
+import { NotificationBell } from "../components/ui/NotificationBell";
 
 const NAV = [
   { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -77,7 +78,8 @@ export function SupplierLayout() {
         {/* Supplier-safe Top Bar */}
         <div className="flex items-center justify-end gap-4 border-b border-neutral-100 bg-white px-6 py-3 h-14">
           <div className="flex items-center gap-2">
-            {/* Omitted SearchSuppliers and NotificationBell as per constraints */}
+            {/* The bell lists this supplier's own notifications only; the supplier search stays admin-only. */}
+            <NotificationBell />
             <ProfileMenu variant="compact" />
           </div>
         </div>

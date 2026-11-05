@@ -16,6 +16,7 @@ import io.ktor.server.application.log
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.auth.principal
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -144,6 +145,47 @@ data class ManualAlertInput(
 )
 
 /** Every field is optional. dueDate: absent keeps it, an empty string clears it, a date sets it. */
+/** What a supplier sees of an alert: no reason, affected item, admin workflow status or internal notes. */
+@Serializable
+data class SupplierAlert(
+    val id: String,
+    val title: String,
+    val description: String,
+    val severity: String,
+    val category: String,
+    val dueDate: String? = null,
+    /** Only OPEN or RESOLVED: the admin's In progress and Under review steps are internal. */
+    val status: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class Notification(
+    val id: String,
+    val type: String,
+    val title: String,
+    val message: String,
+    val severity: String,
+    val alertId: String,
+    val timeAgo: String,
+    val read: Boolean,
+)
+
+/** Every alert-linked notification type the frontend already knows how to show. */
+private fun notificationType(category: String) = when (category) {
+    "VEHICLE_COMPLIANCE" -> "VEHICLE_DEVIATION"
+    "CERTIFICATES" -> "CERTIFICATE_EXPIRY"
+    "ENERGY_FUEL" -> "FUEL_DEVIATION"
+    else -> "SYSTEM"
+}
+
+private fun notifySupplierUsers(insights: AdminInsightsRepository, alert: AdminAlertRecord, now: Instant) {
+    val supplierId = alert.supplierId ?: return
+    val recipients = UserRepository.supplierUserIds(supplierId)
+    val message = alert.description.take(160)
+    runCatching { insights.addNotifications(recipients, alert, notificationType(alert.category), message, now) }
+}
+
 @Serializable
 data class AlertUpdate(
     val status: String? = null,
@@ -221,6 +263,44 @@ fun Route.adminDashboardRoutes(
         call.respond(records.map(::toRecentAlert))
     }
 
+    // ---- Supplier side: the supplier's own alerts, and in-app notifications for any signed-in user ----
+
+    get("/api/supplier/alerts") {
+        val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        val supplierId = user.supplierId?.takeIf { user.role == com.tdt4290group7.backend.model.Role.SUPPLIER }
+            ?: return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Supplier access required"))
+        refreshFindings(fleet, vehicles, certificates, insights)
+        val category = call.request.queryParameters["category"]
+        call.respond(
+            insights.supplierAlerts(supplierId)
+                .filter { category == null || it.category == category }
+                .map {
+                    SupplierAlert(
+                        id = it.id, title = it.title, description = it.description, severity = it.severity, category = it.category,
+                        dueDate = it.dueDate, status = if (it.status == "RESOLVED") "RESOLVED" else "OPEN", createdAt = it.createdAt,
+                    )
+                },
+        )
+    }
+
+    get("/api/notifications") {
+        val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        call.respond(insights.notificationsFor(user.id).map { it.toNotification() })
+    }
+
+    post("/api/notifications/{id}/read") {
+        val user = call.signedInUser() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (!insights.markNotificationRead(user.id, id, Instant.now())) return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Notification not found"))
+        call.respondText("", status = HttpStatusCode.NoContent)
+    }
+
+    post("/api/notifications/read-all") {
+        val user = call.signedInUser() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        insights.markAllNotificationsRead(user.id, Instant.now())
+        call.respondText("", status = HttpStatusCode.NoContent)
+    }
+
     post("/api/admin/alerts/{id}/archive") {
         val actor = call.adminActor() ?: return@post
         val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -251,6 +331,7 @@ fun Route.adminDashboardRoutes(
             dueDate = input.dueDate,
             now = Instant.now(),
         )
+        notifySupplierUsers(insights, alert, Instant.now())
         call.application.log.info("admin_alert_created alertId={} actorId={}", alert.id, actor.id)
         call.respond(HttpStatusCode.Created, toRecentAlert(alert))
     }
@@ -428,7 +509,11 @@ private fun refreshFindings(
         )
     }
     findings += certificateAgreementLinks
-    findings.forEach(insights::upsertFinding)
+    // A newly raised automatic alert (including a certificate reaching its next warning level) notifies the supplier.
+    findings.filter { it.supplierId != null }.forEach { finding ->
+        if (insights.upsertFinding(finding)) notifySupplierUsers(insights, finding, now)
+    }
+    findings.filter { it.supplierId == null }.forEach(insights::upsertFinding)
     insights.resolveInactiveFindings(findings.mapNotNull { it.findingKey }.toSet())
     val syncedAt = now.toString()
     insights.setLastSyncedAt(syncedAt)
@@ -623,4 +708,19 @@ private fun toRecentAlert(record: AdminAlertRecord): RecentAlert {
         reason = record.reason,
         supplierId = record.supplierId,
     )
+}
+
+private fun io.ktor.server.application.ApplicationCall.signedInUser() =
+    principal<io.ktor.server.auth.jwt.JWTPrincipal>()?.payload?.let(com.tdt4290group7.backend.auth.JwtConfig::userId)?.let(UserRepository::findById)
+
+private fun NotificationRecord.toNotification(): Notification {
+    val seconds = ChronoUnit.SECONDS.between(Instant.parse(createdAt), Instant.now()).coerceAtLeast(0)
+    val age = when {
+        seconds < 60 -> "Just now"
+        seconds < 3600 -> "${seconds / 60}m ago"
+        seconds < 86400 -> "${seconds / 3600}h ago"
+        seconds < 604800 -> "${seconds / 86400}d ago"
+        else -> Instant.parse(createdAt).atZone(OSLO_ZONE).toLocalDate().toString()
+    }
+    return Notification(id, type, title, message, when (severity) { "high" -> "HIGH"; "medium" -> "MEDIUM"; else -> "INFO" }, alertId, age, read)
 }

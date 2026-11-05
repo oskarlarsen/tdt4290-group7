@@ -309,6 +309,76 @@ class AdminDashboardRoutesTest {
     }
 
     @Test
+    fun suppliersSeeOnlyTheirOwnVisibleAlertsInASafeShapeAndAreNotified() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val certificateRepository = CertificateRepository(databasePath("certificates"))
+        val insightsPath = databasePath("insights")
+        val insights = AdminInsightsRepository(insightsPath)
+        val actor = ChangeActor("admin", "Administrator")
+        val mine = vehicles.fleet.saveSupplier(null, SupplierInput("Mine AS", "123456789"), actor, Instant.now())
+        val other = vehicles.fleet.saveSupplier(null, SupplierInput("Other AS", "987654321"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(null, AgreementInput(mine.id, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now())
+        certificateRepository.add(Certificate("c1", mine.name, "Retura", null, LocalDate.now(ZoneId.of("Europe/Oslo")).plusDays(10), "c.pdf", CertificateStatus.EXPIRES_30D, agreement.id))
+        application { module(vehicles, null, certificateRepository = certificateRepository, adminInsightsRepository = insights) }
+        val admin = adminClient()
+        val supplierA = supplierClient(mine.id); val supplierB = supplierClient(mine.id); val outsider = supplierClient(other.id)
+        suspend fun create(supplierId: String, title: String, category: String = "VEHICLE_COMPLIANCE") = Json.parseToJsonElement(admin.post("/api/admin/alerts") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"$title","supplierId":"$supplierId","category":"$category","severity":"high","findingType":"CONFIRMED_DEVIATION","description":"Please fix this"}""")
+        }.bodyAsText()).jsonObject.getValue("id").jsonPrimitive.content
+        suspend fun feed(client: io.ktor.client.HttpClient, query: String = "") = Json.parseToJsonElement(client.get("/api/supplier/alerts$query").bodyAsText()).jsonArray.map { it.jsonObject }
+        suspend fun notifications(client: io.ktor.client.HttpClient) = Json.parseToJsonElement(client.get("/api/notifications").bodyAsText()).jsonArray.map { it.jsonObject }
+
+        val visible = create(mine.id, "Visible manual"); val hidden = create(mine.id, "Legacy manual"); val inCertificates = create(mine.id, "About certificates", "CERTIFICATES")
+        create(other.id, "Someone else's")
+        // An alert from before suppliers could see alerts stays hidden.
+        java.sql.DriverManager.getConnection("jdbc:sqlite:${insightsPath.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.execute("UPDATE admin_alerts SET visible_to_supplier = 0 WHERE id = '$hidden'") }
+        }
+
+        val titles = feed(supplierA).map { it.getValue("title").jsonPrimitive.content }.toSet()
+        // The automatic certificate alert is visible too; the legacy manual one and another supplier's are not.
+        assertEquals(setOf("Visible manual", "About certificates", "Certificate expires in 10 days"), titles)
+        // Safe shape: nothing the admin keeps to themselves.
+        val shape = feed(supplierA).first { it.getValue("title").jsonPrimitive.content == "Visible manual" }
+        assertEquals(setOf("id", "title", "description", "severity", "category", "dueDate", "status", "createdAt"), shape.keys)
+        assertEquals(setOf("About certificates", "Certificate expires in 10 days"), feed(supplierA, "?category=CERTIFICATES").map { it.getValue("title").jsonPrimitive.content }.toSet())
+        assertEquals(setOf("Someone else's"), feed(outsider).map { it.getValue("title").jsonPrimitive.content }.toSet())
+
+        // Admin workflow steps are not shown: only open or resolved.
+        admin.patch("/api/admin/alerts/$visible") { contentType(ContentType.Application.Json); setBody("""{"status":"UNDER_REVIEW"}""") }
+        assertEquals("OPEN", feed(supplierA).first { it.getValue("id").jsonPrimitive.content == visible }.getValue("status").jsonPrimitive.content)
+        admin.patch("/api/admin/alerts/$visible") { contentType(ContentType.Application.Json); setBody("""{"status":"RESOLVED"}""") }
+        assertEquals("RESOLVED", feed(supplierA).first { it.getValue("id").jsonPrimitive.content == visible }.getValue("status").jsonPrimitive.content)
+        // Archived alerts disappear.
+        admin.post("/api/admin/alerts/$inCertificates/archive")
+        assertEquals(false, feed(supplierA).any { it.getValue("id").jsonPrimitive.content == inCertificates })
+
+        // Every account at the supplier is notified once per alert, however often the alerts are refreshed. Admins are not.
+        repeat(2) { admin.get("/api/admin/alerts") }
+        val forA = notifications(supplierA)
+        assertEquals(forA.map { it.getValue("alertId").jsonPrimitive.content }.toSet().size, forA.size)
+        assertEquals(forA.map { it.getValue("alertId").jsonPrimitive.content }.toSet(), notifications(supplierB).map { it.getValue("alertId").jsonPrimitive.content }.toSet())
+        assertEquals(true, forA.any { it.getValue("title").jsonPrimitive.content == "Visible manual" && it.getValue("type").jsonPrimitive.content == "VEHICLE_DEVIATION" && it.getValue("severity").jsonPrimitive.content == "HIGH" })
+        assertEquals(0, notifications(admin).size)
+        assertEquals(1, notifications(outsider).size)
+
+        // Reading: only your own notifications, and all at once.
+        val first = forA.first().getValue("id").jsonPrimitive.content
+        assertEquals(HttpStatusCode.NotFound, supplierB.post("/api/notifications/$first/read").status)
+        assertEquals(HttpStatusCode.NoContent, supplierA.post("/api/notifications/$first/read").status)
+        assertEquals(true, notifications(supplierA).first { it.getValue("id").jsonPrimitive.content == first }.getValue("read").jsonPrimitive.content.toBoolean())
+        assertEquals(HttpStatusCode.NoContent, supplierA.post("/api/notifications/read-all").status)
+        assertEquals(true, notifications(supplierA).all { it.getValue("read").jsonPrimitive.content.toBoolean() })
+        assertEquals(false, notifications(supplierB).any { it.getValue("read").jsonPrimitive.content.toBoolean() })
+
+        // Admins have no supplier feed, and anonymous callers have neither route.
+        assertEquals(HttpStatusCode.Forbidden, admin.get("/api/supplier/alerts").status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/supplier/alerts").status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/notifications").status)
+    }
+
+    @Test
     fun supplierNotesAreAdminOnlyAndSelfNotesBelongToTheirAuthor() = testApplication {
         val vehicles = VehicleRepository(databasePath("fleet"))
         val insights = AdminInsightsRepository(databasePath("insights"))

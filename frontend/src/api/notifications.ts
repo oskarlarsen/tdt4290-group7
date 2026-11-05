@@ -4,10 +4,10 @@ import type { Notification } from "../types/notification";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
-// Mock-only: pass userId explicitly until the backend can resolve it from the auth token
+// The server resolves the user from the login; userId is only used by the mock layer.
 export function getNotifications(userId: string): Promise<Notification[]> {
   if (USE_MOCKS) return Promise.resolve(db.getNotifications(userId));
-  return apiFetch<Notification[]>("/admin/notifications");
+  return apiFetch<Notification[]>("/notifications");
 }
 
 export function markNotificationAsRead(userId: string, id: string): Promise<void> {
@@ -15,7 +15,7 @@ export function markNotificationAsRead(userId: string, id: string): Promise<void
     db.markNotificationAsRead(userId, id);
     return Promise.resolve();
   }
-  return apiFetch<void>(`/admin/notifications/${id}/read`, { method: "POST" });
+  return apiFetch<void>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" });
 }
 
 export function markAllNotificationsAsRead(userId: string): Promise<void> {
@@ -23,5 +23,5 @@ export function markAllNotificationsAsRead(userId: string): Promise<void> {
     db.markAllNotificationsAsRead(userId);
     return Promise.resolve();
   }
-  return apiFetch<void>("/admin/notifications/read-all", { method: "POST" });
+  return apiFetch<void>("/notifications/read-all", { method: "POST" });
 }

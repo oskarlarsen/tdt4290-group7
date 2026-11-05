@@ -134,6 +134,14 @@ object UserRepository {
 
     fun findById(id: String): User? = read { user(it, "id = ?", id) }
 
+    /** Every account that belongs to this supplier: the people notified about its alerts. */
+    fun supplierUserIds(supplierId: String): List<String> = read { db ->
+        db.prepareStatement("SELECT id FROM users WHERE role = 'SUPPLIER' AND supplier_id = ? ORDER BY id").use { statement ->
+            statement.setString(1, supplierId)
+            statement.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.getString("id")) } }
+        }
+    }
+
     fun supplierAccountCounts(): Map<String, Int> = read { db ->
         db.prepareStatement(
             "SELECT supplier_id, COUNT(*) AS account_count FROM users WHERE role = 'SUPPLIER' AND supplier_id IS NOT NULL GROUP BY supplier_id"

@@ -46,6 +46,19 @@ Certificate routes require an administrator session.
 
 The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
+### Supplier alert feed and notifications
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/supplier/alerts` | A supplier's own alerts that are marked visible, newest first. Optional `?category=VEHICLE_COMPLIANCE` (or another alert category). |
+| `GET` | `/api/notifications` | The signed-in user's notifications, newest first (any role). |
+| `POST` | `/api/notifications/{id}/read` | Mark one of your notifications read. `404` for someone else's. |
+| `POST` | `/api/notifications/read-all` | Mark all of your notifications read. |
+
+A supplier sees `id`, `title`, `description`, `severity`, `category`, `dueDate`, `createdAt` and a `status` of only `OPEN` or `RESOLVED`. The admin's reason, affected item, in-progress and under-review steps and notes are never included, so alert titles and descriptions should be written for the supplier. Archived alerts are not shown.
+
+Alerts created before suppliers could see alerts are hidden from them (`visible_to_supplier` is 0). New manual alerts, and every automatic alert, are visible. Creating a manual alert for a supplier, or the system raising a new automatic alert (including a certificate reaching its next warning level), notifies every account at that supplier once; refreshing again does not repeat it.
+
 ### Editing alerts
 
 `PATCH /api/admin/alerts/{id}` takes any of `status`, `title`, `description`, `severity` and `dueDate` (at least one). `title`, `description`, `severity` and `dueDate` can only be changed on manual alerts: an automatic alert is rebuilt from evidence on every refresh, so editing it returns `409`. For `dueDate`, leave it out to keep it, send `""` to clear it, or send `YYYY-MM-DD`. A body with only `status` works on every alert.

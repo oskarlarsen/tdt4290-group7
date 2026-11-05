@@ -1,17 +1,88 @@
-import { Bell } from "lucide-react";
+import { Bell, Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { useSupplierAlerts } from "../../hooks/useSupplierAlerts";
+import { ALERT_CATEGORIES } from "../../types/dashboard";
+import type { AlertCategory } from "../../types/dashboard";
+import { ALERT_SEVERITY_LABELS } from "../../components/alerts/AlertBadges";
+import { formatDate } from "../../utils/formatDate";
+
+const CATEGORY_LABELS: Record<AlertCategory, string> = {
+  ENVIRONMENTAL_COMPLIANCE: "Environmental compliance",
+  ENERGY_FUEL: "Energy & fuel",
+  VEHICLE_COMPLIANCE: "Vehicle compliance",
+  CERTIFICATES: "Certificates",
+};
+
+const SEVERITY_CLASSES = {
+  high: "bg-red-50 text-red-700",
+  medium: "bg-amber-50 text-amber-800",
+  low: "bg-neutral-100 text-neutral-700",
+};
 
 export default function MyAlerts() {
+  // The category lives in the URL so a link such as ?category=VEHICLE_COMPLIANCE opens the filtered feed.
+  const [params, setParams] = useSearchParams();
+  const categoryParam = params.get("category");
+  const category = ALERT_CATEGORIES.find((candidate) => candidate === categoryParam);
+  const { data: alerts, isLoading, isError, error } = useSupplierAlerts(category);
+
+  function setCategory(next: string) {
+    const nextParams = new URLSearchParams(params);
+    if (next) nextParams.set("category", next);
+    else nextParams.delete("category");
+    setParams(nextParams, { replace: true });
+  }
+
   return (
     <div className="space-y-4 max-w-4xl">
-      <h1 className="font-headline text-2xl font-semibold text-neutral-900">My Alerts</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-headline text-2xl font-semibold text-neutral-900">My Alerts</h1>
+        <label className="flex items-center gap-2 text-xs text-neutral-600">
+          <span className="font-medium text-neutral-700">Category:</span>
+          <select
+            value={category ?? ""}
+            onChange={(event) => setCategory(event.target.value)}
+            aria-label="Filter alerts by category"
+            className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700"
+          >
+            <option value="">All</option>
+            {ALERT_CATEGORIES.map((item) => <option key={item} value={item}>{CATEGORY_LABELS[item]}</option>)}
+          </select>
+        </label>
+      </div>
 
-      <section className="rounded-xl border border-neutral-100 bg-white overflow-hidden">
-        <div className="flex flex-col items-center py-12 text-center text-sm text-neutral-500">
-          <Bell className="mb-3 h-8 w-8 text-neutral-300" />
-          <p>Supplier alert records are not yet available from the backend.</p>
-          <p className="mt-1">This page does not display demonstration alerts as real notifications.</p>
+      {isLoading && <div className="flex h-40 items-center justify-center text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+      {isError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700">
+          {error instanceof Error ? error.message : "Could not load your alerts."}
         </div>
-      </section>
+      )}
+      {alerts && alerts.length === 0 && (
+        <section className="flex flex-col items-center rounded-xl border border-neutral-100 bg-white py-12 text-center text-sm text-neutral-500">
+          <Bell className="mb-3 h-8 w-8 text-neutral-300" />
+          <p>{category ? "No alerts in this category." : "You have no alerts."}</p>
+        </section>
+      )}
+      {alerts && alerts.length > 0 && (
+        <ul className="space-y-3">
+          {alerts.map((alert) => (
+            <li key={alert.id} className={`rounded-xl border border-neutral-100 bg-white p-4 ${alert.status === "RESOLVED" ? "opacity-70" : ""}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-neutral-900">{alert.title}</h2>
+                <span className="flex items-center gap-2 text-xs">
+                  <span className={`rounded-full px-2 py-0.5 font-medium ${SEVERITY_CLASSES[alert.severity]}`}>{ALERT_SEVERITY_LABELS[alert.severity]}</span>
+                  <span className="text-neutral-500">{alert.status === "RESOLVED" ? "Resolved" : "Open"}</span>
+                </span>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-600">{alert.description}</p>
+              <p className="mt-2 text-xs text-neutral-400">
+                {CATEGORY_LABELS[alert.category]} · Raised {formatDate(alert.createdAt)}
+                {alert.dueDate ? ` · Due ${formatDate(alert.dueDate)}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

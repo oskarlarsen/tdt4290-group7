@@ -172,7 +172,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
             Create Manual Alert
           </h2>
           <p className="mt-1 text-sm leading-5 text-neutral-500">
-            Record a follow-up alert for a supplier.
+            Record a follow-up alert for a supplier. The title and description are shown to the supplier, so write them for them.
           </p>
         </div>
         <button

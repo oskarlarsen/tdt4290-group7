@@ -6,6 +6,7 @@ import {
   useMarkNotificationAsRead,
   useMarkAllNotificationsAsRead,
 } from "../../hooks/useNotifications";
+import { useAuth } from "../../hooks/useAuth";
 import type { Notification } from "../../types/notification";
 
 const SEVERITY_DOT: Record<Notification["severity"], string> = {
@@ -19,6 +20,7 @@ export function NotificationBell() {
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,8 +37,9 @@ export function NotificationBell() {
   function handleClick(n: Notification) {
     if (!n.read) markAsRead.mutate(n.id);
     setOpen(false);
-    // Navigate only for notifications that have a supplier destination
-    if (n.supplierId) navigate(`/admin/suppliers/${n.supplierId}`);
+    // A supplier's notification is about one of its alerts; an admin's goes to the supplier it concerns.
+    if (user?.role === "SUPPLIER") navigate("/supplier/alerts");
+    else if (n.supplierId) navigate(`/admin/suppliers/${n.supplierId}`);
   }
 
   return (

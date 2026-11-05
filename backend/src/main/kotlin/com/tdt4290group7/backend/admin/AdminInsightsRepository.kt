@@ -37,6 +37,17 @@ data class SupplierNoteRecord(
     val createdAt: String,
 )
 
+data class NotificationRecord(
+    val id: String,
+    val alertId: String,
+    val type: String,
+    val title: String,
+    val message: String,
+    val severity: String,
+    val createdAt: String,
+    val read: Boolean,
+)
+
 class AdminInsightsRepository(databasePath: Path) {
     private val databaseUrl: String
 
@@ -70,9 +81,26 @@ class AdminInsightsRepository(databasePath: Path) {
                 val existing = statement.executeQuery("PRAGMA table_info(admin_alerts)").use { rows ->
                     buildSet { while (rows.next()) add(rows.getString("name")) }
                 }
-                for ((column, type) in listOf("archived_at" to "TEXT", "archived_by" to "TEXT", "resolved_by_system" to "INTEGER NOT NULL DEFAULT 0")) {
+                // visible_to_supplier is 0 for every alert that existed before suppliers could see alerts, so old manual
+                // alerts, written for admins, stay hidden until someone decides otherwise.
+                for ((column, type) in listOf("archived_at" to "TEXT", "archived_by" to "TEXT", "resolved_by_system" to "INTEGER NOT NULL DEFAULT 0", "visible_to_supplier" to "INTEGER NOT NULL DEFAULT 0")) {
                     if (column !in existing) statement.execute("ALTER TABLE admin_alerts ADD COLUMN $column $type")
                 }
+                statement.execute(
+                    """CREATE TABLE IF NOT EXISTS notifications (
+                        id TEXT PRIMARY KEY,
+                        recipient_user_id TEXT NOT NULL,
+                        alert_id TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        severity TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        read_at TEXT,
+                        UNIQUE(recipient_user_id, alert_id)
+                    )""".trimIndent(),
+                )
+                statement.execute("CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_user_id, read_at)")
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS admin_insights_metadata (
                         name TEXT PRIMARY KEY,
@@ -105,13 +133,18 @@ class AdminInsightsRepository(databasePath: Path) {
         }
     }
 
-    fun upsertFinding(record: AdminAlertRecord) {
-        DriverManager.getConnection(databaseUrl).use { database ->
+    /** Returns true when the alert did not exist before, so the caller can notify the supplier. */
+    fun upsertFinding(record: AdminAlertRecord): Boolean {
+        return DriverManager.getConnection(databaseUrl).use { database ->
+            val existed = database.prepareStatement("SELECT 1 FROM admin_alerts WHERE id = ?").use { statement ->
+                statement.setString(1, record.id)
+                statement.executeQuery().use { it.next() }
+            }
             database.prepareStatement(
                 """INSERT INTO admin_alerts
                     (id, title, description, severity, status, supplier_id, category, finding_type, source,
-                     due_date, affected_item_type, affected_item_name, reason, created_at, finding_key)
-                    VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?, 'AUTOMATIC', ?, ?, ?, ?, ?, ?)
+                     due_date, affected_item_type, affected_item_name, reason, created_at, finding_key, visible_to_supplier)
+                    VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?, 'AUTOMATIC', ?, ?, ?, ?, ?, ?, 1)
                     ON CONFLICT(id) DO UPDATE SET
                       title = excluded.title,
                       description = excluded.description,
@@ -123,6 +156,7 @@ class AdminInsightsRepository(databasePath: Path) {
                       affected_item_type = excluded.affected_item_type,
                       affected_item_name = excluded.affected_item_name,
                       reason = excluded.reason,
+                      visible_to_supplier = 1,
                       -- An alert the system resolved (its evidence went away, e.g. a certificate was archived)
                       -- reopens when the same evidence returns. One an admin resolved stays resolved.
                       status = CASE WHEN admin_alerts.resolved_by_system = 1 THEN 'OPEN' ELSE admin_alerts.status END,
@@ -144,6 +178,7 @@ class AdminInsightsRepository(databasePath: Path) {
                 statement.setString(13, record.findingKey)
                 statement.executeUpdate()
             }
+            !existed
         }
     }
 
@@ -197,8 +232,8 @@ class AdminInsightsRepository(databasePath: Path) {
             database.prepareStatement(
                 """INSERT INTO admin_alerts
                     (id, title, description, severity, status, supplier_id, category, finding_type, source,
-                     due_date, affected_item_type, affected_item_name, reason, created_at, finding_key)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                     due_date, affected_item_type, affected_item_name, reason, created_at, finding_key, visible_to_supplier)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, record.id)
                 statement.setString(2, record.title)
@@ -259,6 +294,80 @@ class AdminInsightsRepository(databasePath: Path) {
                 it.executeUpdate() == 1
             }
         }
+
+    /** What a supplier may see: its own alerts that are marked visible, not archived or deleted. */
+    fun supplierAlerts(supplierId: String): List<AdminAlertRecord> =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement(
+                "SELECT * FROM admin_alerts WHERE supplier_id = ? AND visible_to_supplier = 1 AND deleted = 0 ORDER BY created_at DESC",
+            ).use { statement ->
+                statement.setString(1, supplierId)
+                statement.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.toAlert()) } }
+            }
+        }
+
+    /** One notification per recipient and alert; repeating the call is harmless. */
+    fun addNotifications(recipientIds: List<String>, alert: AdminAlertRecord, type: String, message: String, now: Instant) {
+        if (recipientIds.isEmpty()) return
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement(
+                """INSERT OR IGNORE INTO notifications (id, recipient_user_id, alert_id, type, title, message, severity, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+            ).use { statement ->
+                recipientIds.forEach { recipient ->
+                    statement.setString(1, UUID.randomUUID().toString())
+                    statement.setString(2, recipient)
+                    statement.setString(3, alert.id)
+                    statement.setString(4, type)
+                    statement.setString(5, alert.title)
+                    statement.setString(6, message)
+                    statement.setString(7, alert.severity)
+                    statement.setString(8, now.toString())
+                    statement.addBatch()
+                }
+                statement.executeBatch()
+            }
+        }
+    }
+
+    fun notificationsFor(userId: String, limit: Int = 50): List<NotificationRecord> =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement(
+                """SELECT id, alert_id, type, title, message, severity, created_at, read_at FROM notifications
+                    WHERE recipient_user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?""".trimIndent(),
+            ).use { statement ->
+                statement.setString(1, userId)
+                statement.setInt(2, limit)
+                statement.executeQuery().use { rows ->
+                    buildList {
+                        while (rows.next()) add(
+                            NotificationRecord(
+                                rows.getString("id"), rows.getString("alert_id"), rows.getString("type"), rows.getString("title"),
+                                rows.getString("message"), rows.getString("severity"), rows.getString("created_at"), rows.getString("read_at") != null,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+    /** Marks one notification read, only if it belongs to this user. */
+    fun markNotificationRead(userId: String, id: String, now: Instant): Boolean =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("UPDATE notifications SET read_at = COALESCE(read_at, ?) WHERE id = ? AND recipient_user_id = ?").use {
+                it.setString(1, now.toString()); it.setString(2, id); it.setString(3, userId)
+                it.executeUpdate() == 1
+            }
+        }
+
+    fun markAllNotificationsRead(userId: String, now: Instant) {
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("UPDATE notifications SET read_at = ? WHERE recipient_user_id = ? AND read_at IS NULL").use {
+                it.setString(1, now.toString()); it.setString(2, userId)
+                it.executeUpdate()
+            }
+        }
+    }
 
     fun archivedAlerts(): List<AdminAlertRecord> =
         DriverManager.getConnection(databaseUrl).use { database ->
