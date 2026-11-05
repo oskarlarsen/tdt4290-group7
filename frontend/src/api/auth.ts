@@ -46,7 +46,7 @@ export function resetPassword(payload: {
   });
 }
 
-export function acceptSupplierInvitation(payload: { token: string; newPassword: string }): Promise<void> {
+export function acceptSupplierInvitation(payload: { token: string; newPassword: string; name?: string }): Promise<void> {
   return apiFetch<void>(
     "/auth/accept-invitation",
     { method: "POST", body: JSON.stringify(payload) },

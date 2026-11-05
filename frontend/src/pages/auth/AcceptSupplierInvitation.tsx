@@ -11,6 +11,7 @@ export default function AcceptSupplierInvitation() {
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     return value;
   });
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function AcceptSupplierInvitation() {
     }
     setWorking(true);
     try {
-      await acceptSupplierInvitation({ token, newPassword: password });
+      await acceptSupplierInvitation({ token, newPassword: password, ...(name.trim() ? { name: name.trim() } : {}) });
       setComplete(true);
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "The invitation could not be accepted. Please try again.");
@@ -55,6 +56,10 @@ export default function AcceptSupplierInvitation() {
         ) : (
           <form className="mt-5 space-y-4" onSubmit={submit}>
             <p className="text-sm text-neutral-600">Choose a password to activate the supplier account linked to this invitation.</p>
+            <label className="block space-y-1.5 text-sm text-neutral-700">
+              <span className="block text-xs font-medium">Your name <span className="font-normal text-neutral-400">(required if you were invited as a colleague or administrator)</span></span>
+              <input maxLength={100} autoComplete="name" value={name} onChange={event => setName(event.target.value)} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-900/10" />
+            </label>
             <label className="block space-y-1.5 text-sm text-neutral-700">
               <span className="block text-xs font-medium">Password (at least {MIN_PASSWORD_LENGTH} characters)</span>
               <input required minLength={MIN_PASSWORD_LENGTH} type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-900/10" />

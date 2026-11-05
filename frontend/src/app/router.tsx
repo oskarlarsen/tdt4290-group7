@@ -29,6 +29,8 @@ import MyCompliance from "../pages/supplier/MyCompliance";
 import MyRiskAndPrediction from "../pages/supplier/MyRiskAndPrediction";
 import MyAlerts from "../pages/supplier/MyAlerts";
 import RequiredActions from "../pages/supplier/RequiredActions";
+import MyTeam from "../pages/supplier/MyTeam";
+import Access from "../pages/admin/Access";
 
 const router = createBrowserRouter([
   { path: "/", element: <RoleRedirect /> },
@@ -52,6 +54,7 @@ const router = createBrowserRouter([
       { path: "energy", element: <Energy /> },
       { path: "risk", element: <RiskAndPrediction /> },
       { path: "alerts", element: <Alerts /> },
+      { path: "access", element: <Access /> },
     ],
   },
   {
@@ -72,6 +75,7 @@ const router = createBrowserRouter([
       { path: "compliance", element: <MyCompliance /> },
       { path: "risk", element: <MyRiskAndPrediction /> },
       { path: "alerts", element: <MyAlerts /> },
+      { path: "team", element: <MyTeam /> },
       { path: "required-actions", element: <RequiredActions /> },
     ],
   },

@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   FileText,
   Truck,
   BadgeCheck,
@@ -21,6 +22,7 @@ const NAV = [
   { to: "energy", label: "Energy & Fuel", icon: Zap },
   { to: "risk", label: "Risk & Prediction", icon: ShieldAlert },
   { to: "alerts", label: "Alerts", icon: Bell },
+  { to: "access", label: "Access", icon: UserCog },
 ];
 
 export function AdminLayout() {

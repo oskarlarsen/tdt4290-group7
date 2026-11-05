@@ -11,6 +11,7 @@ import {
   Bell,
   AlertTriangle,
   ClipboardList,
+  Users,
 } from "lucide-react";
 import { ProfileMenu } from "../components/ui/ProfileMenu";
 import { NotificationBell } from "../components/ui/NotificationBell";
@@ -26,6 +27,7 @@ const NAV = [
   { to: "compliance", label: "My Compliance", icon: CheckCircle2 },
   { to: "risk", label: "My Risk & Prediction", icon: ShieldAlert },
   { to: "alerts", label: "My Alerts", icon: Bell },
+  { to: "team", label: "My Team", icon: Users },
   { to: "required-actions", label: "Required Actions", icon: AlertTriangle },
 ];
 
