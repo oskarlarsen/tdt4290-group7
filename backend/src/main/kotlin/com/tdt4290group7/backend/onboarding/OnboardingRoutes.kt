@@ -83,7 +83,7 @@ internal fun Route.onboardingRoutes(
             val input = try {
                 call.receive<SupplierProfileInput>()
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid profile data: ${e.message}"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid profile data"))
                 return@post
             }
             try {
@@ -170,7 +170,7 @@ internal fun Route.onboardingRoutes(
             val request = try {
                 call.receive<CsvConfirmRequest>()
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid request JSON: ${e.message}"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid request JSON"))
                 return@post
             }
 
@@ -204,7 +204,7 @@ internal fun Route.onboardingRoutes(
             val request = try {
                 call.receive<AdminReviewRequest>()
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid review request JSON: ${e.message}"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid review request JSON"))
                 return@post
             }
             try {
