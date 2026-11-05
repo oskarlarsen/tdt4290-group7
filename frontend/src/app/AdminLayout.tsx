@@ -15,7 +15,7 @@ import { ProfileMenu } from "../components/ui/ProfileMenu";
 const NAV = [
   { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "suppliers", label: "Suppliers", icon: Users },
-  { to: "contracts", label: "Contracts", icon: FileText },
+  { to: "contracts", label: "Agreements", icon: FileText },
   { to: "vehicles", label: "Vehicles", icon: Truck },
   { to: "certificates", label: "Environmental Certificates", icon: BadgeCheck },
   { to: "energy", label: "Energy & Fuel", icon: Zap },

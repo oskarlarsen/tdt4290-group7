@@ -17,7 +17,7 @@ class FleetRepositoryTest {
     private fun repository() = VehicleRepository(Path.of("build", "test-data", "fleet-${UUID.randomUUID()}.db"))
     private fun agreement(repo: VehicleRepository, capacity: Int = 2): FleetAgreement {
         val supplier = repo.fleet.saveSupplier(null, SupplierInput("Test supplier", "123456789"), actor, now)
-        return repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2026-12-31", capacity), null, actor, now)
+        return repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2026-12-31", capacity, saksnr = "2024/1234"), null, actor, now)
     }
 
     @Test fun capacityIncludesPlannedVehiclesAndFailedAddsAreAtomic() {
@@ -35,7 +35,7 @@ class FleetRepositoryTest {
     @Test fun lowerAllowanceKeepsVehiclesAndAllowsReplacementButBlocksNewPlaces() {
         val repo = repository(); val agreement = agreement(repo, 1)
         val old = repo.fleet.addVehicle(agreement.id, VehicleEntryInput("AB12345"), actor, now)
-        repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, agreement.endDate, 0), agreement.updatedAt, actor, now.plusSeconds(1))
+        repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, agreement.endDate, 0, saksnr = "2024/1234"), agreement.updatedAt, actor, now.plusSeconds(1))
         assertEquals(1, repo.fleet.overview().vehicles.count { it.listed })
         assertFailsWith<FleetConflictException> { repo.fleet.addVehicle(agreement.id, VehicleEntryInput("CD12345"), actor, now) }
         val replacement = repo.fleet.replaceVehicle(old.registrationNumber, ReplacementRequest(VehicleEntryInput("CD12345"), old.updatedAt), actor, now.plusSeconds(2))
@@ -72,7 +72,7 @@ class FleetRepositoryTest {
 
     @Test fun oneAgreementPerVehicleAndInvalidReplacementNeverRemovesOriginal() {
         val repo = repository(); val first = agreement(repo)
-        val second = repo.fleet.saveAgreement(null, AgreementInput(first.supplierId, first.startDate, first.endDate, 2), null, actor, now)
+        val second = repo.fleet.saveAgreement(null, AgreementInput(first.supplierId, first.startDate, first.endDate, 2, saksnr = "2024/1234"), null, actor, now)
         val old = repo.fleet.addVehicle(first.id, VehicleEntryInput("AB12345"), actor, now)
         assertFailsWith<FleetConflictException> { repo.fleet.addVehicle(second.id, VehicleEntryInput("AB12345"), actor, now) }
         assertFailsWith<IllegalArgumentException> { repo.fleet.replaceVehicle(old.registrationNumber, ReplacementRequest(VehicleEntryInput("invalid"), old.updatedAt), actor, now.plusSeconds(1)) }
@@ -124,7 +124,7 @@ class FleetRepositoryTest {
         val repo = repository()
         val supplier = repo.fleet.saveSupplier(null, SupplierInput("Supplier to remove", "123456789"), actor, now)
         val agreements = (1..2).map {
-            repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2026-12-31", 2), null, actor, now)
+            repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2026-12-31", 2, saksnr = "2024/1234"), null, actor, now)
         }
         agreements.forEachIndexed { index, agreement ->
             repo.fleet.addVehicle(agreement.id, VehicleEntryInput(if (index == 0) "AB12345" else "CD12345"), actor, now)
@@ -196,11 +196,40 @@ class FleetRepositoryTest {
         repo.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip(co2GramsPerKm = "123.456".toBigDecimal(), totalTripKm = "1000".toBigDecimal()))), now)
         val check = VehicleCheckService(repo, null, clock = Clock.fixed(now, ZoneId.of("Europe/Oslo"))).check(VehicleCheckRequest("AB12345"))
         assertEquals("123.456", check.tripRows.single().estimatedCo2Kg!!.toPlainString())
-        repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, "2027-12-31", 0, "Changed"), agreement.updatedAt, actor, now.plusSeconds(1))
+        repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, "2027-12-31", 0, "Changed", saksnr = "2024/1234"), agreement.updatedAt, actor, now.plusSeconds(1))
         repo.fleet.replaceVehicle(vehicle.registrationNumber, ReplacementRequest(VehicleEntryInput("CD12345"), vehicle.updatedAt), actor, now.plusSeconds(2))
         repo.fleet.undo(repo.fleet.overview().changes.first().id, actor, now.plusSeconds(3))
         val reopened = VehicleRepository(path)
         assertEquals(check, reopened.findCheck(check.id))
         assertTrue(reopened.fleet.history(1).any { it.undoOf != null })
+    }
+
+    @Test fun saksnrIsRequiredTrimmedAndMayBeShared() {
+        val repo = repository(); val first = agreement(repo)
+        val supplierId = first.supplierId
+        for (bad in listOf("", "   ", "x".repeat(51))) {
+            assertFailsWith<IllegalArgumentException> {
+                repo.fleet.saveAgreement(null, AgreementInput(supplierId, "2026-01-01", "2026-12-31", 1, saksnr = bad), null, actor, now)
+            }
+        }
+        val shared = repo.fleet.saveAgreement(null, AgreementInput(supplierId, "2026-01-01", "2026-12-31", 1, saksnr = "  2024/1234 "), null, actor, now)
+        assertEquals("2024/1234", shared.saksnr)
+        assertEquals(listOf("2024/1234", "2024/1234"), repo.fleet.overview().agreements.map { it.saksnr })
+    }
+
+    @Test fun undoAfterSaksnrEditRestoresThePreviousValue() {
+        val repo = repository(); val agreement = agreement(repo)
+        repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, agreement.endDate, 2, saksnr = "2025/9999"),
+            agreement.updatedAt, actor, now.plusSeconds(1))
+        assertEquals("2025/9999", repo.fleet.overview().agreements.single().saksnr)
+        repo.fleet.undo(repo.fleet.overview().changes.first().id, actor, now.plusSeconds(2))
+        assertEquals("2024/1234", repo.fleet.overview().agreements.single().saksnr)
+    }
+
+    @Test fun agreementLabelCombinesSaksnrAndNote() {
+        assertEquals("2024/1234 — Skolerute", agreementLabel("2024/1234", " Skolerute "))
+        assertEquals("2024/1234", agreementLabel("2024/1234", ""))
+        assertEquals("Saksnr missing — Skolerute", agreementLabel(null, "Skolerute"))
+        assertEquals("Saksnr missing", agreementLabel("  ", ""))
     }
 }

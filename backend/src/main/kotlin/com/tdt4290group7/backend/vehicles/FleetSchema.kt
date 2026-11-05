@@ -10,6 +10,7 @@ private fun agreementColumns(references: Boolean) = """
     requires_vehicles INTEGER NOT NULL DEFAULT 1 CHECK(requires_vehicles IN (0,1)),
     requires_energy INTEGER NOT NULL DEFAULT 0 CHECK(requires_energy IN (0,1)),
     requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1)),
+    saksnr TEXT,
     CHECK(start_date <= end_date)
 """.trimIndent()
 private fun vehicleColumns(references: Boolean) = """

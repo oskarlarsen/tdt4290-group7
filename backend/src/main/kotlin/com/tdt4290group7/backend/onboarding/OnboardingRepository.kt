@@ -808,7 +808,7 @@ internal class OnboardingRepository(
 
     private fun querySupplierAgreements(db: Connection, supplierId: String): List<SupplierAgreementSummary> {
         val sql = """
-            SELECT a.id, a.note, a.start_date, a.end_date, a.allowed_vehicles, a.active,
+            SELECT a.id, a.note, a.saksnr, a.start_date, a.end_date, a.allowed_vehicles, a.active,
                    a.requires_vehicles, a.requires_energy, a.requires_products,
                    (SELECT COUNT(*) FROM vehicles v WHERE v.agreement_id = a.id AND v.listed = 1) AS vehicle_count
             FROM agreements a
@@ -819,6 +819,7 @@ internal class OnboardingRepository(
             SupplierAgreementSummary(
                 id = row.getString("id"),
                 note = row.getString("note"),
+                saksnr = row.getString("saksnr"),
                 startDate = row.getString("start_date"),
                 endDate = row.getString("end_date"),
                 allowedVehicles = row.getInt("allowed_vehicles"),

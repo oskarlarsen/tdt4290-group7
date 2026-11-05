@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import Contracts from "../src/pages/admin/Contracts";
 
 const supplier = { id: "supplier-1", name: "Canonical Transport AS", orgNumber: "123456789", active: true, updatedAt: "2026-10-01T10:00:00Z" };
-const agreement = { id: "agreement-1", supplierId: supplier.id, startDate: "2026-01-01", endDate: "2027-12-31", allowedVehicles: 4, note: "Transport services", updatedAt: "2026-10-01T10:00:00Z", active: true };
+const agreement = { id: "agreement-1", supplierId: supplier.id, startDate: "2026-01-01", endDate: "2027-12-31", allowedVehicles: 4, note: "Transport services", saksnr: "2024/1234", updatedAt: "2026-10-01T10:00:00Z", active: true };
 
 function mount() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -33,13 +33,14 @@ describe("admin supplier agreements page", () => {
     vi.stubGlobal("fetch", fetch);
     mount();
 
-    expect(await screen.findByText("Canonical Transport AS · Transport services")).toBeTruthy();
+    expect(await screen.findByText("Canonical Transport AS · 2024/1234 — Transport services")).toBeTruthy();
     expect(screen.getByText(/Environmental compliance is not assessed/)).toBeTruthy();
     expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet");
 
     fireEvent.click(screen.getByRole("button", { name: "Add agreement" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Supplier" }), { target: { value: supplier.id } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.change(screen.getByLabelText(/Saksnr/), { target: { value: " 2025/77 " } });
     fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-11-01" } });
     fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2027-10-31" } });
     fireEvent.change(screen.getByRole("spinbutton", { name: "Maximum vehicles" }), { target: { value: "3" } });
@@ -52,6 +53,7 @@ describe("admin supplier agreements page", () => {
     expect(request?.[0]).toContain("/vehicle-fleet/agreements");
     expect(JSON.parse(String(request?.[1]?.body))).toEqual({
       supplierId: supplier.id,
+      saksnr: "2025/77",
       startDate: "2026-11-01",
       endDate: "2027-10-31",
       allowedVehicles: 3,
@@ -60,5 +62,20 @@ describe("admin supplier agreements page", () => {
       requiresEnergy: true,
       requiresProducts: false,
     });
+  });
+
+  it("flags agreements without a saksnr and can filter to them", async () => {
+    const old = { ...agreement, id: "agreement-old", saksnr: null, note: "Old agreement" };
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ suppliers: [supplier], agreements: [agreement, old], vehicles: [], changes: [] }), { status: 200 })));
+    mount();
+
+    expect(await screen.findByText("Canonical Transport AS · Saksnr missing — Old agreement")).toBeTruthy();
+    expect(screen.getAllByText("Saksnr missing")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Add saksnr" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Agreement status"), { target: { value: "Missing saksnr" } });
+    expect(screen.queryByText("Canonical Transport AS · 2024/1234 — Transport services")).toBeNull();
+    expect(screen.getByText("Canonical Transport AS · Saksnr missing — Old agreement")).toBeTruthy();
   });
 });

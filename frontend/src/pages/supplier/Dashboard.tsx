@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { BadgeCheck, Building2, ClipboardList, LoaderCircle, Package, Truck, Zap } from "lucide-react";
 import { getOnboardingStatus, getSupplierOverview } from "@/api/onboarding";
 import type { OnboardingStatusResponse, SupplierOverview } from "@/types/onboarding";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 const DASHBOARD_STATUSES = new Set(["SUBMITTED", "UNDER_REVIEW", "APPROVED"]);
 
@@ -128,7 +129,7 @@ export default function Dashboard() {
             {overview.agreements.map((agreement) => (
               <li key={agreement.id} className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
                 <div>
-                  <p className="font-medium text-neutral-900">{agreement.note || "Supplier agreement"}</p>
+                  <p className="font-medium text-neutral-900">{agreementLabel(agreement)}</p>
                   <p className="mt-1 text-sm text-neutral-500">
                     {agreement.startDate} – {agreement.endDate}
                   </p>

@@ -18,7 +18,7 @@ internal class VehicleDatabase(path: Path) {
         databaseUrl = "jdbc:sqlite:$absolute"
         write { db ->
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            // Version 10 is accepted before any release writes it, so a rollback from 10 still starts.
+            // Version 10 adds agreements.saksnr; versions 8 and 9 are upgraded in place below.
             check(version == 0 || version == 8 || version == 9 || version == 10) {
                 "Incompatible vehicle database schema (version $version). Stop the backend and run scripts/reset-vehicle-data.ps1 after confirming that the data can be wiped."
             }
@@ -26,23 +26,27 @@ internal class VehicleDatabase(path: Path) {
             db.createStatement().use { statement ->
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
             }
-            if (version == 8) migrateAgreementRequirements(db)
-            if (version != 10) db.createStatement().use { it.execute("PRAGMA user_version = 9") }
+            // Columns added after a database was created; ADD COLUMN only, so older releases can still read the file.
+            if (version != 0) addMissingColumns(db)
+            db.createStatement().use { it.execute("PRAGMA user_version = 10") }
         }
     }
 
-    private fun migrateAgreementRequirements(db: Connection) {
+    private fun addMissingColumns(db: Connection) {
         val columnsByTable = mapOf(
             "agreements" to listOf(
                 "requires_vehicles INTEGER NOT NULL DEFAULT 1 CHECK(requires_vehicles IN (0,1))",
                 "requires_energy INTEGER NOT NULL DEFAULT 0 CHECK(requires_energy IN (0,1))",
-                "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))"
+                "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))",
+                "saksnr TEXT"
             ),
             "change_agreements" to listOf(
                 "requires_vehicles INTEGER NOT NULL DEFAULT 1 CHECK(requires_vehicles IN (0,1))",
                 "requires_energy INTEGER NOT NULL DEFAULT 0 CHECK(requires_energy IN (0,1))",
-                "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))"
-            )
+                "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))",
+                "saksnr TEXT"
+            ),
+            "vehicle_checks" to listOf("agreement_saksnr TEXT")
         )
         columnsByTable.forEach { (table, definitions) ->
             val existing = query(db, "PRAGMA table_info($table)") { it.getString("name") }.toSet()

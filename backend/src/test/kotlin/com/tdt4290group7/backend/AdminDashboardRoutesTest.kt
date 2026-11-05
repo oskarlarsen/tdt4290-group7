@@ -50,7 +50,7 @@ class AdminDashboardRoutesTest {
         )
         val agreement = vehicles.fleet.saveAgreement(
             null,
-            AgreementInput(supplier.id, "2026-01-01", "2027-12-31", 2, "Municipal transport"),
+            AgreementInput(supplier.id, "2026-01-01", "2027-12-31", 2, "Municipal transport", saksnr = "2024/1234"),
             null,
             actor,
             Instant.now(),

@@ -9,6 +9,7 @@ import {
   UNITS_OF_MEASURE,
   type ProductFormRow,
 } from "../../utils/productFormCsv";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 const fieldClass =
   "mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50";
@@ -91,7 +92,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
                 <option value="">Choose an agreement</option>
                 {agreements.map((agreement) => (
                   <option key={agreement.id} value={agreement.id}>
-                    {agreement.note || agreement.id}
+                    {agreementLabel(agreement)}
                   </option>
                 ))}
               </select>

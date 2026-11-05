@@ -49,6 +49,7 @@ export type SupplierOverview = {
   agreements: Array<{
     id: string;
     note: string;
+    saksnr: string | null;
     startDate: string;
     endDate: string;
     allowedVehicles: number;

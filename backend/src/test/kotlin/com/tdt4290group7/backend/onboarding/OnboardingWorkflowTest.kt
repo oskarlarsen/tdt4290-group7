@@ -59,7 +59,7 @@ class OnboardingWorkflowTest {
         }
         val agreement = repo.fleet.saveAgreement(
             null,
-            AgreementInput("nordvik-transport", "2026-01-01", "2027-12-31", 10, "Nordvik School Bus Agreement"),
+            AgreementInput("nordvik-transport", "2026-01-01", "2027-12-31", 10, "Nordvik School Bus Agreement", saksnr = "2024/1234"),
             null,
             actor,
             now
@@ -234,7 +234,8 @@ class OnboardingWorkflowTest {
                 note = "Energy reporting",
                 requiresVehicles = false,
                 requiresEnergy = true,
-                requiresProducts = false
+                requiresProducts = false,
+                saksnr = "2024/1234"
             ),
             null,
             ChangeActor("admin-seed", "Advisor Hansen"),
@@ -308,7 +309,7 @@ class OnboardingWorkflowTest {
         )
         val otherAgreement = repo.fleet.saveAgreement(
             null,
-            AgreementInput(otherSupplier.id, "2026-01-01", "2027-12-31", 10, "Other agreement"),
+            AgreementInput(otherSupplier.id, "2026-01-01", "2027-12-31", 10, "Other agreement", saksnr = "2024/1234"),
             null,
             actor,
             now
@@ -383,7 +384,8 @@ class OnboardingWorkflowTest {
                 note = "Energy Services Agreement",
                 requiresVehicles = false,
                 requiresEnergy = true,
-                requiresProducts = false
+                requiresProducts = false,
+                saksnr = "2024/1234"
             ),
             null,
             actor,
@@ -400,7 +402,8 @@ class OnboardingWorkflowTest {
                 note = "Sustainable Goods Agreement",
                 requiresVehicles = false,
                 requiresEnergy = false,
-                requiresProducts = true
+                requiresProducts = true,
+                saksnr = "2024/1234"
             ),
             null,
             actor,

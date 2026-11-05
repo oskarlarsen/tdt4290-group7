@@ -172,6 +172,7 @@ data class ContractProductRecord(
 data class SupplierAgreementSummary(
     val id: String,
     val note: String,
+    val saksnr: String? = null,
     val startDate: String,
     val endDate: String,
     val allowedVehicles: Int,

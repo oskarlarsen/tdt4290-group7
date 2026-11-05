@@ -7,6 +7,7 @@ import { SupplierVehicleEntryForm } from "../src/components/supplier/SupplierVeh
 const agreements = [{
   id: "agreement-1",
   note: "Transport services",
+  saksnr: "2024/1234",
   startDate: "2026-01-01",
   endDate: "2027-12-31",
   allowedVehicles: 4,
@@ -59,7 +60,7 @@ describe("supplier vehicle entry form", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add another vehicle" }));
     expect(screen.getByText("Vehicle 2")).toBeTruthy();
-    expect(screen.getAllByRole("option", { name: "Transport services" })).toHaveLength(2);
+    expect(screen.getAllByRole("option", { name: "2024/1234 — Transport services" })).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Remove vehicle 2" }));
     expect(screen.queryByText("Vehicle 2")).toBeNull();

@@ -39,6 +39,7 @@ import { SupplierProductEntryForm } from "@/components/supplier/SupplierProductE
 import { FUEL_TECHNOLOGIES } from "@/utils/vehicleCatalog";
 import { ECOLABEL_STANDARDS, PRODUCT_CATEGORIES, UNITS_OF_MEASURE } from "@/utils/productFormCsv";
 import { formatNumber } from "@/utils/formatNumber";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 const ENTITY_OPTIONS: Array<{ value: CsvEntity; label: string }> = [
   { value: "vehicles", label: "Vehicles" },
@@ -413,7 +414,7 @@ export default function Onboarding() {
                 {overview.agreements.map((agreement) => (
                   <li key={agreement.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-sm">
                     <span className="min-w-0">
-                      <span className="block font-medium text-neutral-800">{agreement.note || agreement.id}</span>
+                      <span className="block font-medium text-neutral-800">{agreementLabel(agreement)}</span>
                       <CopyableValue label="Agreement ID" value={agreement.id} />
                     </span>
                     <span className="text-right text-neutral-500">
@@ -640,7 +641,7 @@ export default function Onboarding() {
                           : `${row.start_year_week} to ${row.end_year_week}`;
                         return (
                           <tr key={index}>
-                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
                             <td className="px-3 py-2">{row.registration_number || "Planned vehicle"}</td>
                             <td className="px-3 py-2">{fuel}</td>
                             <td className="px-3 py-2">{friendlyBoolean(row.is_hybrid)}</td>
@@ -664,7 +665,7 @@ export default function Onboarding() {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
                         return (
                           <tr key={index}>
-                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
                             <td className="px-3 py-2 font-mono font-medium">{row.facility_location_code}</td>
                             <td className="px-3 py-2">{row.facility_address}</td>
                             <td className="px-3 py-2">{row.reporting_year}</td>
@@ -694,7 +695,7 @@ export default function Onboarding() {
                         const unit = UNITS_OF_MEASURE[row.unit_of_measure] ?? row.unit_of_measure;
                         return (
                           <tr key={index}>
-                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
                             <td className="px-3 py-2 font-mono font-medium">{row.product_code}</td>
                             <td className="px-3 py-2">{row.product_name}</td>
                             <td className="px-3 py-2">{category}</td>

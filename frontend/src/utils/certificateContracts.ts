@@ -1,3 +1,4 @@
+import { agreementLabel } from "./agreementLabel";
 import type { CertificateContract } from "../types/certificate";
 import type { FleetOverview } from "../types/vehicle";
 
@@ -12,7 +13,7 @@ export function getActiveCertificateContracts(fleet: FleetOverview): Certificate
 
     return [{
       id: agreement.id,
-      contractName: agreement.note.trim() || `Agreement ${agreement.id}`,
+      contractName: agreementLabel(agreement),
       supplierId: supplier.id,
       supplierName: supplier.name,
       supplierOrgId: supplier.orgNumber,

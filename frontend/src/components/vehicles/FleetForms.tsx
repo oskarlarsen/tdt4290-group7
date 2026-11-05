@@ -94,6 +94,7 @@ export function InviteSupplierForm({ supplier, onClose }: { supplier: FleetSuppl
 }
 
 export function AgreementForm({ supplier, agreement, onClose, onSaved }: { supplier: FleetSupplier; agreement?: FleetAgreement; onClose: () => void; onSaved: () => void }) {
+  const [saksnr, setSaksnr] = useState(agreement?.saksnr ?? "");
   const [startDate, setStart] = useState(agreement?.startDate ?? "");
   const [endDate, setEnd] = useState(agreement?.endDate ?? "");
   const [allowed, setAllowed] = useState(String(agreement?.allowedVehicles ?? ""));
@@ -102,15 +103,20 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
   const [requiresEnergy, setRequiresEnergy] = useState(agreement?.requiresEnergy ?? false);
   const [requiresProducts, setRequiresProducts] = useState(agreement?.requiresProducts ?? false);
   const save = useMutation({ mutationFn: () => {
+    if (!saksnr.trim() || saksnr.trim().length > 50) throw new Error("Enter the saksnr (case number), up to 50 characters.");
     if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("Enter a valid agreement period.");
     if (!/^\d+$/.test(allowed) || Number(allowed) > 10000) throw new Error("Enter a vehicle allowance between 0 and 10000.");
     if (!requiresVehicles && !requiresEnergy && !requiresProducts) throw new Error("Select at least one type of supplier information to collect.");
-    return api.saveAgreement({ supplierId: supplier.id, startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
+    return api.saveAgreement({ supplierId: supplier.id, saksnr: saksnr.trim(), startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
   }, onSuccess: onSaved, retry: false });
   return <VehicleDialog title={`${agreement ? "Edit" : "Add"} agreement · ${supplier.name}`} onClose={onClose} busy={save.isPending}>
     <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate(); }}>
+      <Field label="Saksnr (case number)">
+        <input autoFocus required maxLength={50} className={inputClass} value={saksnr} onChange={e => setSaksnr(e.target.value)} placeholder="2024/1234" />
+        <span className="mt-1 block text-xs text-neutral-500">The case number from your archive system, for example 2024/1234.</span>
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Start date"><input autoFocus type="date" required className={inputClass} value={startDate} onChange={e => setStart(e.target.value)} /></Field>
+        <Field label="Start date"><input type="date" required className={inputClass} value={startDate} onChange={e => setStart(e.target.value)} /></Field>
         <Field label="End date"><input type="date" required min={startDate} className={inputClass} value={endDate} onChange={e => setEnd(e.target.value)} /></Field>
       </div>
       {agreementDuration(startDate, endDate) && <p className="text-sm text-neutral-500">{agreementDuration(startDate, endDate)}</p>}

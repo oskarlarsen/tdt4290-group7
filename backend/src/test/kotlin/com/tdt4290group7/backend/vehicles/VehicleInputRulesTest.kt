@@ -154,6 +154,31 @@ class VehicleInputRulesTest {
         }
     }
 
+    @Test
+    fun versionNineDatabaseGetsSaksnrAndBecomesVersionTen() {
+        val path = path()
+        VehicleRepository(path)
+        // Rebuild the version-9 shape: same tables, no saksnr column.
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use {
+                it.execute("ALTER TABLE agreements DROP COLUMN saksnr")
+                it.execute("ALTER TABLE change_agreements DROP COLUMN saksnr")
+                it.execute("PRAGMA user_version=9")
+            }
+        }
+        VehicleRepository(path)
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            for (table in listOf("agreements", "change_agreements")) {
+                val columns = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info($table)").use { rows ->
+                    buildList { while (rows.next()) add(rows.getString("name")) } } }
+                assertTrue("saksnr" in columns, "$table is missing saksnr")
+            }
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
+                rows.next(); assertEquals(10, rows.getInt(1))
+            } }
+        }
+    }
+
 
 
 }

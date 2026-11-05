@@ -4,6 +4,7 @@ import com.tdt4290group7.backend.certificates.Certificate
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.vehicles.DeviationPriority
 import com.tdt4290group7.backend.vehicles.FleetRepository
+import com.tdt4290group7.backend.vehicles.agreementLabel
 import com.tdt4290group7.backend.vehicles.VehicleRepository
 import com.tdt4290group7.backend.vehicles.adminActor
 import com.tdt4290group7.backend.onboarding.OnboardingStatus
@@ -415,7 +416,7 @@ private fun buildSummary(
             id = supplier.id,
             displayName = supplier.name,
             orgId = supplier.orgNumber,
-            primaryContract = agreement?.note?.takeIf(String::isNotBlank) ?: agreement?.id ?: "No active agreement",
+            primaryContract = agreement?.let { agreementLabel(it.saksnr, it.note) } ?: "No active agreement",
             risk = risk,
             mainIssue = mainIssue,
             issueCategory = when {

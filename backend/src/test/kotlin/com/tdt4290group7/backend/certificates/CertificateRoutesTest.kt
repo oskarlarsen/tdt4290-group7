@@ -45,7 +45,7 @@ class CertificateRoutesTest {
         )
         val agreement = vehicleRepository.fleet.saveAgreement(
             null,
-            AgreementInput(supplier.id, "2026-01-01", "2028-12-31", 2, "Transport"),
+            AgreementInput(supplier.id, "2026-01-01", "2028-12-31", 2, "Transport", saksnr = "2024/1234"),
             null,
             actor,
             Instant.now(),

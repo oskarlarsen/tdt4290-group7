@@ -8,6 +8,7 @@ import { AgreementForm, VehicleEntryForm } from "./FleetForms";
 import { ConfirmAction } from "./ConfirmAction";
 import { ErrorNotice, buttonClass, dangerClass, primaryClass } from "./VehicleDialog";
 import { CopyableValue } from "../ui/CopyableValue";
+import { hasSaksnr } from "../../utils/agreementLabel";
 
 export function VehicleAllowance({ count, allowed }: { count: number; allowed: number }) {
   return <span className={`text-sm font-medium ${count > allowed ? "text-red-700" : "text-neutral-700"}`}>{count} of {allowed} vehicles</span>;
@@ -39,6 +40,9 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
       <div className="space-y-1">
         <h3 className="font-medium text-neutral-900">{vehicleDate(agreement.startDate)} – {vehicleDate(agreement.endDate)}</h3>
         <p className="text-xs text-neutral-500">{agreementDuration(agreement.startDate, agreement.endDate)}</p>
+        {hasSaksnr(agreement)
+          ? <p className="text-xs text-neutral-500">Saksnr {agreement.saksnr}</p>
+          : <p className="flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-red-100 px-2 py-0.5 font-medium text-red-700">Saksnr missing</span><button className="font-medium text-secondary-700 underline" onClick={() => setEditing(true)}>Add saksnr</button></p>}
         <CopyableValue label="Agreement ID (for supplier CSV)" value={agreement.id} />
       </div>
       <VehicleAllowance count={listed.length} allowed={agreement.allowedVehicles} />

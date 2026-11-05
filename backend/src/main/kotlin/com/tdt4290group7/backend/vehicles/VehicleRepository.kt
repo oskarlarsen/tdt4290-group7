@@ -150,6 +150,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 "agreement_id" to agreement?.id, "agreement_start" to agreement?.startDate, "agreement_end" to agreement?.endDate,
                 "agreement_allowed" to agreement?.allowedVehicles, "agreement_note" to agreement?.note,
                 "agreement_updated_at" to agreement?.updatedAt, "agreement_active" to agreement?.active?.asInteger(),
+                "agreement_saksnr" to agreement?.saksnr,
             ))
             check.tripRows.forEachIndexed { index, row -> insert(db, "vehicle_check_trip_rows", mapOf(
                 "check_id" to check.id, "trip_row_id" to row.id, "registration_number" to check.vehicle.registrationNumber, "ordinal" to index)) }
@@ -176,7 +177,8 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             }
             val evidence = row.getString("agreement_id")?.let { agreementId -> AgreementEvidence(
                 FleetAgreement(agreementId, row.getString("supplier_id"), row.getString("agreement_start"), row.getString("agreement_end"),
-                    row.getInt("agreement_allowed"), row.getString("agreement_note"), row.getString("agreement_updated_at"), row.getInt("agreement_active") == 1),
+                    row.getInt("agreement_allowed"), row.getString("agreement_note"), row.getString("agreement_updated_at"), row.getInt("agreement_active") == 1,
+                    saksnr = row.getString("agreement_saksnr")),
                 FleetSupplier(row.getString("supplier_id"), row.getString("supplier_name"), row.getString("supplier_org_number"),
                     updatedAt = row.getString("supplier_updated_at"))) }
 

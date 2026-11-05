@@ -2,6 +2,7 @@ import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
 import { Loader2, FileText } from "lucide-react";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { formatDate } from "../../utils/formatDate";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 export default function MyContracts() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
@@ -37,7 +38,7 @@ export default function MyContracts() {
                  <FileText className="h-5 w-5" />
                </div>
                <div>
-                  <h2 className="font-headline text-lg font-semibold text-neutral-900">{agreement.note || "Supplier agreement"}</h2>
+                  <h2 className="font-headline text-lg font-semibold text-neutral-900">{agreementLabel(agreement)}</h2>
                   <p className="text-sm text-neutral-500">Agreement ID: {agreement.id}</p>
                 </div>
               </div>
