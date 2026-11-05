@@ -30,6 +30,8 @@ export type Certificate = {
   certificateType?: string;
   issueDate?: string | null;
   sourceFile?: string;
+  /** Set when the certificate was archived: kept as history, but it raises no alerts and counts in no risk. */
+  archivedAt?: string | null;
 };
 
 export type CertificateContract = {

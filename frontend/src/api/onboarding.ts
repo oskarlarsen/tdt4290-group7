@@ -66,6 +66,7 @@ type SupplierCertificateResponse = {
   expiryDate: string | null;
   sourceFile: string;
   contractId: string | null;
+  archivedAt?: string | null;
 };
 
 function certificateStandard(value: string): Certificate["standard"] {
@@ -124,6 +125,7 @@ export async function getSupplierCertificates(): Promise<Certificate[]> {
     validUntil: certificate.expiryDate,
     issueDate: certificate.issueDate,
     sourceFile: certificate.sourceFile,
+    archivedAt: certificate.archivedAt ?? null,
   }));
 }
 

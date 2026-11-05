@@ -46,6 +46,21 @@ Certificate routes require an administrator session.
 
 The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
+### Archiving alerts and certificates
+
+Alerts and certificates are archived, not deleted. An archived item is hidden from lists and counts, raises no alerts, and can be restored.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/admin/alerts/{id}/archive` | Archive an alert. `404` if it is missing or already archived. |
+| `POST` | `/api/admin/alerts/{id}/restore` | Restore an archived alert. Alerts deleted before archiving existed cannot be restored. |
+| `GET` | `/api/admin/alerts?includeArchived=true` | List alerts including archived ones (they carry `archivedAt`). |
+| `POST` | `/api/certificates/{id}/archive` | Archive a certificate. Its alert is closed by the system. |
+| `POST` | `/api/certificates/{id}/restore` | Restore a certificate. An alert the system closed reopens; one an admin resolved stays resolved. |
+| `GET` | `/api/certificates?includeArchived=true` | List certificates including archived ones. |
+
+The supplier's own `GET /api/supplier/certificates` includes archived certificates with `archivedAt` set, so a supplier keeps their history. The `DELETE` endpoints still exist for one release so a rollback keeps working, but the app no longer calls them.
+
 ## Fleet management
 
 An agreement belongs to a supplier and specifies dates and vehicle allowance. Vehicles are added to an agreement as registered vehicles or planned entries.

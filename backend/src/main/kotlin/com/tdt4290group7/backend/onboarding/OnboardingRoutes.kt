@@ -1,7 +1,8 @@
 package com.tdt4290group7.backend.onboarding
 
 import com.tdt4290group7.backend.auth.JwtConfig
-import com.tdt4290group7.backend.certificates.Certificate
+import com.tdt4290group7.backend.routes.CertificateResponse
+import com.tdt4290group7.backend.routes.toResponse
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
@@ -258,14 +259,15 @@ internal fun Route.onboardingRoutes(
             val user = call.supplierOrAdminUser(repository) ?: return@get
             val supplierId = call.resolveSupplierId(user) ?: return@get
             if (certificateRepository == null) {
-                call.respond(emptyList<Certificate>())
+                call.respond(emptyList<CertificateResponse>())
                 return@get
             }
             val agreements = repository.getSupplierAgreementIds(supplierId)
-            val filtered = certificateRepository.getAll().filter { cert ->
+            // Archived certificates stay visible to the supplier as history; they carry archivedAt.
+            val filtered = certificateRepository.getAllIncludingArchived().filter { cert ->
                 cert.contractId != null && agreements.contains(cert.contractId)
             }
-            call.respond(filtered)
+            call.respond(filtered.map { it.toResponse() })
         }
     }
 }

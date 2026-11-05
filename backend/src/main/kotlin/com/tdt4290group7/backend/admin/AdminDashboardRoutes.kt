@@ -114,6 +114,7 @@ data class RecentAlert(
     val category: String,
     val source: String,
     val dueDate: String? = null,
+    val archivedAt: String? = null,
     val findingType: String,
     val affectedItem: AffectedItem? = null,
     val reason: String? = null,
@@ -209,7 +210,24 @@ fun Route.adminDashboardRoutes(
     get("/api/admin/alerts") {
         if (call.adminActor() == null) return@get
         refreshFindings(fleet, vehicles, certificates, insights)
-        call.respond(insights.allAlerts().map(::toRecentAlert))
+        val records = if (call.request.queryParameters["includeArchived"] == "true") insights.allAlerts() + insights.archivedAlerts() else insights.allAlerts()
+        call.respond(records.map(::toRecentAlert))
+    }
+
+    post("/api/admin/alerts/{id}/archive") {
+        val actor = call.adminActor() ?: return@post
+        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (!insights.archive(id, actor.id, Instant.now())) return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Alert not found"))
+        call.application.log.info("admin_alert_archived alertId={} actorId={}", id, actor.id)
+        call.respondText("", status = HttpStatusCode.NoContent)
+    }
+
+    post("/api/admin/alerts/{id}/restore") {
+        val actor = call.adminActor() ?: return@post
+        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (!insights.restore(id)) return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Archived alert not found"))
+        call.application.log.info("admin_alert_restored alertId={} actorId={}", id, actor.id)
+        call.respondText("", status = HttpStatusCode.NoContent)
     }
 
     post("/api/admin/alerts") {
@@ -569,6 +587,7 @@ private fun toRecentAlert(record: AdminAlertRecord): RecentAlert {
         category = record.category,
         source = record.source,
         dueDate = record.dueDate,
+        archivedAt = record.archivedAt,
         findingType = record.findingType,
         affectedItem = record.affectedItemType?.let { AffectedItem(it, record.affectedItemName) },
         reason = record.reason,

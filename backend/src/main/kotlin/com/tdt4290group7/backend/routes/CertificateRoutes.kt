@@ -45,7 +45,7 @@ private const val MAX_PDF_PAGES = 25
 private val OSLO_ZONE: ZoneId = ZoneId.of("Europe/Oslo")
 
 @Serializable
-private data class CertificateResponse(
+internal data class CertificateResponse(
     val id: String,
     val supplierName: String,
     val certificateType: String,
@@ -54,6 +54,7 @@ private data class CertificateResponse(
     val sourceFile: String,
     val status: CertificateStatus,
     val contractId: String?,
+    val archivedAt: String? = null,
 )
 
 @Serializable
@@ -72,7 +73,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                 get {
                     if (call.adminActor() == null) return@get
                     val today = LocalDate.now(OSLO_ZONE)
-                    val certificates = repository.getAll()
+                    val certificates = (if (call.request.queryParameters["includeArchived"] == "true") repository.getAllIncludingArchived() else repository.getAll())
                         .map { it.copy(status = calculateStatus(it.expiryDate, today)) }
                         .sortedWith(compareBy<Certificate> { it.status.priority }.thenBy { it.expiryDate })
                         .map(Certificate::toResponse)
@@ -137,6 +138,28 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         return@put
                     }
                     call.respond(updated.toResponse())
+                }
+
+                post("/{id}/archive") {
+                    val actor = call.adminActor() ?: return@post
+                    val id = call.parameters["id"]
+                    if (id == null || !repository.archive(id, actor.id, java.time.Instant.now())) {
+                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found or already archived"))
+                        return@post
+                    }
+                    call.application.log.info("certificate_archived certificateId={} actorId={}", id, actor.id)
+                    call.respond(HttpStatusCode.NoContent)
+                }
+
+                post("/{id}/restore") {
+                    val actor = call.adminActor() ?: return@post
+                    val id = call.parameters["id"]
+                    if (id == null || !repository.restore(id)) {
+                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found or not archived"))
+                        return@post
+                    }
+                    call.application.log.info("certificate_restored certificateId={} actorId={}", id, actor.id)
+                    call.respond(HttpStatusCode.NoContent)
                 }
 
                 delete("/{id}") {
@@ -311,7 +334,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.receiveCertificat
     return CertificateUpload(name, filename, bytes, selectedContractId)
 }
 
-private fun Certificate.toResponse() = CertificateResponse(
+internal fun Certificate.toResponse() = CertificateResponse(
     id = id,
     supplierName = supplierName,
     certificateType = certificateType,
@@ -320,6 +343,7 @@ private fun Certificate.toResponse() = CertificateResponse(
     sourceFile = sourceFile,
     status = status,
     contractId = contractId,
+    archivedAt = archivedAt,
 )
 
 private val CertificateStatus.priority: Int

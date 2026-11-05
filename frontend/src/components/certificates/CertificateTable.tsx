@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil } from "lucide-react";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -15,13 +15,15 @@ export function CertificateTable({
   rows,
   onSelect,
   onEdit,
-  onDelete,
+  onArchive,
+  onRestore,
   emptyMessage = "No certificates to show.",
 }: {
   rows: CertificateRow[];
   onSelect: (row: CertificateRow) => void;
   onEdit: (certificate: Certificate) => void;
-  onDelete: (certificate: Certificate) => void;
+  onArchive: (certificate: Certificate) => void;
+  onRestore: (certificate: Certificate) => void;
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
@@ -96,14 +98,25 @@ export function CertificateTable({
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(certificate)}
-                      aria-label={`Delete ${certificate.supplierName ?? "certificate"}`}
-                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {certificate.archivedAt ? (
+                      <button
+                        type="button"
+                        onClick={() => onRestore(certificate)}
+                        aria-label={`Restore ${certificate.supplierName ?? "certificate"}`}
+                        className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                      >
+                        <ArchiveRestore className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onArchive(certificate)}
+                        aria-label={`Archive ${certificate.supplierName ?? "certificate"}`}
+                        className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

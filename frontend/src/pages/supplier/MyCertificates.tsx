@@ -9,13 +9,15 @@ export default function MyCertificates() {
   if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (isError || !data) return <div className="p-8 text-center text-sm text-red-700">{error instanceof Error ? error.message : "Error loading data"}</div>;
 
-  const { certificates } = data;
+  // Archived certificates stay as history: they are replaced or withdrawn, and raise no alerts.
+  const certificates = data.certificates.filter((cert) => !cert.archivedAt);
+  const archived = data.certificates.filter((cert) => cert.archivedAt);
 
   return (
     <div className="space-y-4 max-w-4xl">
       <h1 className="font-headline text-2xl font-semibold text-neutral-900">My Certificates</h1>
 
-      {certificates.length === 0 ? (
+      {certificates.length === 0 && archived.length === 0 ? (
          <div className="py-12 text-center text-sm text-neutral-500 border border-neutral-100 rounded-xl bg-white">
             No certificate records are linked to your agreements.
          </div>
@@ -49,6 +51,20 @@ export default function MyCertificates() {
               );
            })}
         </div>
+      )}
+
+      {archived.length > 0 && (
+        <section aria-labelledby="archived-certificates" className="pt-4">
+          <h2 id="archived-certificates" className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Archived</h2>
+          <ul className="mt-2 divide-y divide-neutral-100 rounded-xl border border-neutral-100 bg-white">
+            {archived.map((cert) => (
+              <li key={cert.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-neutral-600">
+                <span className="font-medium text-neutral-800">{CERTIFICATE_STANDARD_LABELS[cert.standard]}</span>
+                <span>{cert.validUntil ? `Valid until ${formatDate(cert.validUntil)}` : "No date submitted"}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

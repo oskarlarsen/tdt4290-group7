@@ -23,6 +23,7 @@ data class AdminAlertRecord(
     val reason: String?,
     val createdAt: String,
     val findingKey: String?,
+    val archivedAt: String? = null,
 )
 
 data class SupplierNoteRecord(
@@ -65,6 +66,13 @@ class AdminInsightsRepository(databasePath: Path) {
                         deleted INTEGER NOT NULL DEFAULT 0
                     )""".trimIndent(),
                 )
+                // Added after first release: nullable ADD COLUMN only, so an older release can still read the file.
+                val existing = statement.executeQuery("PRAGMA table_info(admin_alerts)").use { rows ->
+                    buildSet { while (rows.next()) add(rows.getString("name")) }
+                }
+                for ((column, type) in listOf("archived_at" to "TEXT", "archived_by" to "TEXT", "resolved_by_system" to "INTEGER NOT NULL DEFAULT 0")) {
+                    if (column !in existing) statement.execute("ALTER TABLE admin_alerts ADD COLUMN $column $type")
+                }
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS admin_insights_metadata (
                         name TEXT PRIMARY KEY,
@@ -114,7 +122,11 @@ class AdminInsightsRepository(databasePath: Path) {
                       due_date = excluded.due_date,
                       affected_item_type = excluded.affected_item_type,
                       affected_item_name = excluded.affected_item_name,
-                      reason = excluded.reason
+                      reason = excluded.reason,
+                      -- An alert the system resolved (its evidence went away, e.g. a certificate was archived)
+                      -- reopens when the same evidence returns. One an admin resolved stays resolved.
+                      status = CASE WHEN admin_alerts.resolved_by_system = 1 THEN 'OPEN' ELSE admin_alerts.status END,
+                      resolved_by_system = 0
                     WHERE admin_alerts.deleted = 0""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, record.id)
@@ -143,7 +155,7 @@ class AdminInsightsRepository(databasePath: Path) {
                 statement.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.getString(1)) } }
             }
             database.prepareStatement(
-                "UPDATE admin_alerts SET status = 'RESOLVED' WHERE finding_key = ? AND status != 'RESOLVED'",
+                "UPDATE admin_alerts SET status = 'RESOLVED', resolved_by_system = 1 WHERE finding_key = ? AND status != 'RESOLVED'",
             ).use { statement ->
                 existingKeys.filterNot(activeFindingKeys::contains).forEach { key ->
                     statement.setString(1, key)
@@ -218,7 +230,7 @@ class AdminInsightsRepository(databasePath: Path) {
 
     fun updateStatus(id: String, status: String): AdminAlertRecord? =
         DriverManager.getConnection(databaseUrl).use { database ->
-            database.prepareStatement("UPDATE admin_alerts SET status = ? WHERE id = ? AND deleted = 0").use {
+            database.prepareStatement("UPDATE admin_alerts SET status = ?, resolved_by_system = 0 WHERE id = ? AND deleted = 0").use {
                 it.setString(1, status)
                 it.setString(2, id)
                 if (it.executeUpdate() != 1) return null
@@ -226,6 +238,31 @@ class AdminInsightsRepository(databasePath: Path) {
             database.prepareStatement("SELECT * FROM admin_alerts WHERE id = ?").use { statement ->
                 statement.setString(1, id)
                 statement.executeQuery().use { rows -> if (rows.next()) rows.toAlert() else null }
+            }
+        }
+
+    fun archivedAlerts(): List<AdminAlertRecord> =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("SELECT * FROM admin_alerts WHERE archived_at IS NOT NULL ORDER BY archived_at DESC").use { statement ->
+                statement.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.toAlert()) } }
+            }
+        }
+
+    /** Archiving also sets deleted = 1, so a release that does not know about archive keeps hiding the alert. */
+    fun archive(id: String, actorId: String, now: Instant): Boolean =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("UPDATE admin_alerts SET deleted = 1, archived_at = ?, archived_by = ? WHERE id = ? AND deleted = 0").use {
+                it.setString(1, now.toString()); it.setString(2, actorId); it.setString(3, id)
+                it.executeUpdate() == 1
+            }
+        }
+
+    /** Only restores archived alerts; ones that were deleted before archive existed stay deleted. */
+    fun restore(id: String): Boolean =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("UPDATE admin_alerts SET deleted = 0, archived_at = NULL, archived_by = NULL WHERE id = ? AND archived_at IS NOT NULL").use {
+                it.setString(1, id)
+                it.executeUpdate() == 1
             }
         }
 
@@ -356,5 +393,6 @@ class AdminInsightsRepository(databasePath: Path) {
         reason = getString("reason"),
         createdAt = getString("created_at"),
         findingKey = getString("finding_key"),
+        archivedAt = getString("archived_at"),
     )
 }

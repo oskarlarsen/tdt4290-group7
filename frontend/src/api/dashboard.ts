@@ -63,9 +63,9 @@ export function getRiskLogRows(): Promise<Array<Record<string, string>>> {
   return apiFetch<Array<Record<string, string>>>("/admin/risk-log");
 }
 
-export function getAlerts(): Promise<RecentAlert[]> {
-  if (USE_MOCKS) return Promise.resolve([...db.getAllAlerts()]);
-  return apiFetch<RecentAlert[]>("/admin/alerts");
+export function getAlerts(includeArchived = false): Promise<RecentAlert[]> {
+  if (USE_MOCKS) return Promise.resolve([...db.getAllAlerts(includeArchived)]);
+  return apiFetch<RecentAlert[]>(includeArchived ? "/admin/alerts?includeArchived=true" : "/admin/alerts");
 }
 
 export function createManualAlert(input: NewManualAlertInput): Promise<RecentAlert> {
@@ -79,6 +79,22 @@ export function deleteAlert(id: string): Promise<void> {
     return Promise.resolve();
   }
   return apiFetch<void>(`/admin/alerts/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function archiveAlert(id: string): Promise<void> {
+  if (USE_MOCKS) {
+    db.archiveAlert(id);
+    return Promise.resolve();
+  }
+  return apiFetch<void>(`/admin/alerts/${encodeURIComponent(id)}/archive`, { method: "POST" });
+}
+
+export function restoreAlert(id: string): Promise<void> {
+  if (USE_MOCKS) {
+    db.restoreAlert(id);
+    return Promise.resolve();
+  }
+  return apiFetch<void>(`/admin/alerts/${encodeURIComponent(id)}/restore`, { method: "POST" });
 }
 
 export function getSupplierReviewStatuses(): Promise<Record<string, FollowUpStatus>> {

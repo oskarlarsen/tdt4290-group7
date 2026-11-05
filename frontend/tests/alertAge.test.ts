@@ -62,7 +62,8 @@ describe("alert creation date and age formatting", () => {
       createElement(AlertsTable, {
         rows: [{ alert: rowAlert }],
         onSelect: () => {},
-        onDelete: () => {},
+        onArchive: () => {},
+        onRestore: () => {},
       })
     );
     const headers = Array.from(html.matchAll(/<th(?:\s[^>]*)?>(.*?)<\/th>/g), ([, label]) => label);
@@ -75,7 +76,7 @@ describe("alert creation date and age formatting", () => {
     expect(html).toContain("aria-label=\"View details for Test alert\"");
     expect(html.indexOf(">Action</th>")).toBeLessThan(html.indexOf("aria-label=\"View details for Test alert\""));
     expect(html.indexOf("aria-label=\"View details for Test alert\""))
-      .toBeLessThan(html.indexOf("aria-label=\"Delete Test alert\""));
+      .toBeLessThan(html.indexOf("aria-label=\"Archive Test alert\""));
     expect(html).toContain(">Low</span>");
     expect(html).toContain(formatAlertCreatedDate(rowAlert.createdAt));
     expect(html).not.toContain(">Age</th>");

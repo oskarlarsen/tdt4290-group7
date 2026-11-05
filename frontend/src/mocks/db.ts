@@ -148,7 +148,7 @@ let alerts: RecentAlert[] = [
 ];
 
 export function getUnresolvedAlerts(): RecentAlert[] {
-  return alerts.filter((alert) => alert.status !== "RESOLVED");
+  return alerts.filter((alert) => alert.status !== "RESOLVED" && !alert.archivedAt);
 }
 
 export function updateAlertStatus(id: string, status: RecentAlert["status"]): void {
@@ -164,6 +164,16 @@ export function deleteAlert(id: string): void {
     throw new Error(`Alert "${id}" was not found.`);
   }
   alerts = alerts.filter((alert) => alert.id !== id);
+}
+
+export function archiveAlert(id: string): void {
+  if (!alerts.some((alert) => alert.id === id)) throw new Error(`Alert "${id}" was not found.`);
+  alerts = alerts.map((alert) => (alert.id === id ? { ...alert, archivedAt: new Date().toISOString() } : alert));
+}
+
+export function restoreAlert(id: string): void {
+  if (!alerts.some((alert) => alert.id === id && alert.archivedAt)) throw new Error(`Archived alert "${id}" was not found.`);
+  alerts = alerts.map((alert) => (alert.id === id ? { ...alert, archivedAt: null } : alert));
 }
 
 export function addManualAlert(input: NewManualAlertInput): RecentAlert {
@@ -483,6 +493,6 @@ export function getEnergyData(): EnergyData {
   return { requirements: MOCK_ENERGY_REQUIREMENTS, records: MOCK_ENERGY_RECORDS };
 }
 
-export function getAllAlerts(): RecentAlert[] {
-  return alerts;
+export function getAllAlerts(includeArchived = false): RecentAlert[] {
+  return includeArchived ? alerts : alerts.filter((alert) => !alert.archivedAt);
 }

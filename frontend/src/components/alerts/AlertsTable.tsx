@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore } from "lucide-react";
 import { AlertFindingBadge, AlertStatusBadge, SeverityBadge } from "./AlertBadges";
 import type { RecentAlert, TopRiskSupplier } from "../../types/dashboard";
 import { formatAlertCreatedDate } from "../../utils/alertAge";
@@ -16,12 +16,14 @@ export type AlertRow = {
 export function AlertsTable({
   rows,
   onSelect,
-  onDelete,
+  onArchive,
+  onRestore,
   emptyMessage = "No alerts to show",
 }: {
   rows: AlertRow[];
   onSelect: (row: AlertRow) => void;
-  onDelete: (row: AlertRow) => void;
+  onArchive: (row: AlertRow) => void;
+  onRestore: (row: AlertRow) => void;
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
@@ -97,14 +99,25 @@ export function AlertsTable({
                   >
                     View Details
                   </button>
-                  <button
-                    onClick={() => onDelete(row)}
-                    aria-label={`Delete ${alert.title}`}
-                    className="mt-1 inline-flex h-7 w-[95px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Delete
-                  </button>
+                  {alert.archivedAt ? (
+                    <button
+                      onClick={() => onRestore(row)}
+                      aria-label={`Restore ${alert.title}`}
+                      className="mt-1 inline-flex h-7 w-[95px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                    >
+                      <ArchiveRestore className="h-3 w-3" />
+                      Restore
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onArchive(row)}
+                      aria-label={`Archive ${alert.title}`}
+                      className="mt-1 inline-flex h-7 w-[95px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                    >
+                      <Archive className="h-3 w-3" />
+                      Archive
+                    </button>
+                  )}
                 </td>
               </tr>
             );

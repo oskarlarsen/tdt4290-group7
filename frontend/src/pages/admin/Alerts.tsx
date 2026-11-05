@@ -5,7 +5,7 @@ import { useAlerts } from "../../hooks/useAlerts";
 import { useFleet } from "../../hooks/useVehicles";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardSummary, useUpdateAlertStatus } from "../../hooks/useDashboardSummary";
-import { createManualAlert, deleteAlert } from "../../api/alerts";
+import { createManualAlert, archiveAlert, restoreAlert } from "../../api/alerts";
 import { addSupplierNote } from "../../api/notes";
 import { useAuth } from "../../hooks/useAuth";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -41,7 +41,8 @@ type PendingAlertDelete = { deadline: number; isDeleting: boolean };
 export default function Alerts() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { data: alerts, isLoading: alertsLoading, isError: alertsError } = useAlerts();
+  const [showArchived, setShowArchived] = useState(false);
+  const { data: alerts, isLoading: alertsLoading, isError: alertsError } = useAlerts(showArchived);
   // Agreement names are a convenience column: if the fleet data is unavailable the page still works without them.
   const fleet = useFleet();
   const contracts = useMemo(() => (fleet.data ? getActiveCertificateContracts(fleet.data) : []), [fleet.data]);
@@ -54,8 +55,15 @@ export default function Alerts() {
       await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
+  // Archive keeps the alert (it can be restored); there is no permanent delete here.
   const permanentDelete = useMutation({
-    mutationFn: (id: string) => deleteAlert(id),
+    mutationFn: (id: string) => archiveAlert(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    },
+  });
+  const restore = useMutation({
+    mutationFn: (id: string) => restoreAlert(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
@@ -109,7 +117,7 @@ export default function Alerts() {
       });
       setDeleteErrors((current) => ({
         ...current,
-        [id]: error instanceof Error ? error.message : "Could not delete the alert.",
+        [id]: error instanceof Error ? error.message : "Could not archive the alert.",
       }));
     } finally {
       finalizingDeleteIds.current.delete(id);
@@ -148,6 +156,7 @@ export default function Alerts() {
       resolved: 0,
     };
     for (const { alert } of rows) {
+      if (alert.archivedAt) continue;
       if (alert.status === "RESOLVED") {
         result.resolved += 1;
       } else {
@@ -410,6 +419,10 @@ export default function Alerts() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs text-neutral-600">
+              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+              <span className="font-medium text-neutral-700">Show archived</span>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-neutral-600">
               <span className="font-medium text-neutral-700">Status:</span>
               <select
                 value={statusFilter}
@@ -459,7 +472,8 @@ export default function Alerts() {
         <AlertsTable
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.alert.id)}
-          onDelete={handleDeleteAlert}
+          onArchive={handleDeleteAlert}
+          onRestore={(row) => restore.mutate(row.alert.id)}
           emptyMessage={emptyMessage}
         />
 
@@ -587,7 +601,7 @@ function AlertDeleteUndoNotice({
       className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
     >
       <span className="min-w-0 truncate">
-        {isDeleting ? "Deleting alert…" : `Alert deleted: ${title}`}
+        {isDeleting ? "Archiving alert…" : `Alert archived: ${title}`}
       </span>
       {isDeleting ? (
         <span className="shrink-0 text-neutral-300">Please wait</span>

@@ -188,6 +188,80 @@ class AdminDashboardRoutesTest {
     }
 
     @Test
+    fun archivedAlertsLeaveTheListAndCanBeRestoredButDeletedOnesCannot() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Archive AS", "123456789"), ChangeActor("admin", "Administrator"), Instant.now())
+        application { module(vehicles, null, adminInsightsRepository = insights) }
+        val admin = adminClient()
+        suspend fun create(title: String) = Json.parseToJsonElement(admin.post("/api/admin/alerts") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"$title","supplierId":"${supplier.id}","category":"VEHICLE_COMPLIANCE","severity":"medium","findingType":"CONFIRMED_DEVIATION","description":"d"}""")
+        }.bodyAsText()).jsonObject.getValue("id").jsonPrimitive.content
+        suspend fun titles(query: String = "") = Json.parseToJsonElement(admin.get("/api/admin/alerts$query").bodyAsText()).jsonArray
+            .map { it.jsonObject.getValue("title").jsonPrimitive.content }
+        val kept = create("Kept"); val archived = create("Archived"); val deleted = create("Deleted")
+
+        assertEquals(HttpStatusCode.NoContent, admin.post("/api/admin/alerts/$archived/archive").status)
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/admin/alerts/$deleted").status)
+        assertEquals(listOf("Kept"), titles())
+        assertEquals(setOf("Kept", "Archived"), titles("?includeArchived=true").toSet())
+        val archivedRow = Json.parseToJsonElement(admin.get("/api/admin/alerts?includeArchived=true").bodyAsText()).jsonArray
+            .map { it.jsonObject }.single { it.getValue("title").jsonPrimitive.content == "Archived" }
+        assertTrue(archivedRow["archivedAt"]!!.jsonPrimitive.content.isNotEmpty())
+        // Archived alerts no longer count as unresolved.
+        assertEquals(1, Json.parseToJsonElement(admin.get("/api/admin/dashboard/summary").bodyAsText()).jsonObject
+            .getValue("kpis").jsonObject.getValue("activeAlerts").jsonPrimitive.int)
+
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/admin/alerts/$archived/archive").status)
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/admin/alerts/$deleted/restore").status)
+        assertEquals(HttpStatusCode.NoContent, admin.post("/api/admin/alerts/$archived/restore").status)
+        assertEquals(setOf("Kept", "Archived"), titles().toSet())
+        assertEquals(HttpStatusCode.Forbidden, supplierClient(supplier.id).post("/api/admin/alerts/$kept/archive").status)
+    }
+
+    @Test
+    fun archivingACertificateClosesItsAlertAndRestoreReopensItUnlessAnAdminResolvedIt() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val certificateRepository = CertificateRepository(databasePath("certificates"))
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val actor = ChangeActor("admin", "Administrator")
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Cert AS", "123456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(
+            null, AgreementInput(supplier.id, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now(),
+        )
+        val today = LocalDate.now(ZoneId.of("Europe/Oslo"))
+        certificateRepository.add(Certificate("cert-1", supplier.name, "ISO 14001", null, today.plusDays(20), "a.pdf", CertificateStatus.EXPIRES_30D, agreement.id))
+        application { module(vehicles, null, certificateRepository = certificateRepository, adminInsightsRepository = insights) }
+        val admin = adminClient()
+        suspend fun alert() = Json.parseToJsonElement(admin.get("/api/admin/alerts").bodyAsText()).jsonArray.map { it.jsonObject }.single()
+        suspend fun certificates(query: String = "") = Json.parseToJsonElement(admin.get("/api/certificates$query").bodyAsText()).jsonArray.size
+        assertEquals("OPEN", alert().getValue("status").jsonPrimitive.content)
+
+        assertEquals(HttpStatusCode.NoContent, admin.post("/api/certificates/cert-1/archive").status)
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/certificates/cert-1/archive").status)
+        assertEquals(0, certificates())
+        assertEquals(1, certificates("?includeArchived=true"))
+        assertEquals("RESOLVED", alert().getValue("status").jsonPrimitive.content)
+        val kpis = Json.parseToJsonElement(admin.get("/api/admin/dashboard/summary").bodyAsText()).jsonObject.getValue("kpis").jsonObject
+        assertEquals(0, kpis.getValue("certificatesTracked").jsonPrimitive.int)
+        assertEquals(0, kpis.getValue("activeAlerts").jsonPrimitive.int)
+
+        assertEquals(HttpStatusCode.NoContent, admin.post("/api/certificates/cert-1/restore").status)
+        assertEquals(HttpStatusCode.NotFound, admin.post("/api/certificates/cert-1/restore").status)
+        assertEquals(1, certificates())
+        assertEquals("OPEN", alert().getValue("status").jsonPrimitive.content)
+
+        // An alert an admin resolved by hand stays resolved through an archive and restore.
+        val alertId = alert().getValue("id").jsonPrimitive.content
+        admin.patch("/api/admin/alerts/$alertId") { contentType(ContentType.Application.Json); setBody("""{"status":"RESOLVED"}""") }
+        admin.post("/api/certificates/cert-1/archive"); alert()
+        admin.post("/api/certificates/cert-1/restore")
+        assertEquals("RESOLVED", alert().getValue("status").jsonPrimitive.content)
+        assertEquals(HttpStatusCode.Forbidden, supplierClient(supplier.id).post("/api/certificates/cert-1/archive").status)
+    }
+
+    @Test
     fun supplierNotesAreAdminOnlyAndSelfNotesBelongToTheirAuthor() = testApplication {
         val vehicles = VehicleRepository(databasePath("fleet"))
         val insights = AdminInsightsRepository(databasePath("insights"))

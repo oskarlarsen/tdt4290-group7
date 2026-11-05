@@ -21,7 +21,7 @@ import { CertificateEditDialog } from "../../components/certificates/Certificate
 import { CertificateDetailsDrawer } from "../../components/certificates/CertificateDetailsDrawer";
 import { CertificateAttentionCard } from "../../components/certificates/CertificateAttentionCard";
 import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
-import { useDeleteCertificate } from "../../hooks/useCertificates";
+import { useArchiveCertificate, useRestoreCertificate } from "../../hooks/useCertificates";
 import type { Certificate } from "../../types/certificate";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -58,9 +58,12 @@ function compareBySeverity(a: CertificateRow, b: CertificateRow): number {
 
 export default function Certificates() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates();
+  const [showArchived, setShowArchived] = useState(false);
+  const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates(showArchived);
   const { data: fleet, isLoading: contractsLoading, isError: contractsError } = useFleet();
-  const removeCertificate = useDeleteCertificate();
+  const archiveCertificate = useArchiveCertificate();
+  const restoreCertificate = useRestoreCertificate();
+  const archiveError = archiveCertificate.error ?? restoreCertificate.error;
 
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
   const [search, setSearch] = useState("");
@@ -78,17 +81,21 @@ export default function Certificates() {
     });
   }
 
-  function handleDelete(certificate: Certificate) {
-    const supplier = certificate.supplierName ?? "this supplier";
-    if (!window.confirm(`Delete the ${certificate.certificateType ?? "certificate"} for ${supplier}? This cannot be undone.`)) {
-      return;
-    }
-    removeCertificate.reset();
-    removeCertificate.mutate(certificate.id, {
+  // Archive keeps the certificate and its document; it only takes it out of alerts, risk and the live counts.
+  function handleArchive(certificate: Certificate) {
+    archiveCertificate.reset();
+    restoreCertificate.reset();
+    archiveCertificate.mutate(certificate.id, {
       onSuccess: () => {
         if (selectedId === certificate.id) setSelectedId(null);
       },
     });
+  }
+
+  function handleRestore(certificate: Certificate) {
+    archiveCertificate.reset();
+    restoreCertificate.reset();
+    restoreCertificate.mutate(certificate.id);
   }
 
   const rows = useMemo<CertificateRow[]>(() => {
@@ -109,6 +116,7 @@ export default function Certificates() {
       criticalExpired: 0,
     };
     for (const { certificate } of rows) {
+      if (certificate.archivedAt) continue;
       const status = getCertificateStatus(certificate).status;
       if (status === "valid") result.valid += 1;
       else if (status === "expiring" || status === "critical") result["expiring-soon"] += 1;
@@ -270,6 +278,10 @@ export default function Certificates() {
             />
           </div>
           <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
+            <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+            <span className="font-medium text-neutral-700">Show archived</span>
+          </label>
+          <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
             <span className="font-medium text-neutral-700">Status:</span>
             <div className="relative">
               <select
@@ -293,18 +305,17 @@ export default function Certificates() {
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.certificate.id)}
           onEdit={setEditingCertificate}
-          onDelete={handleDelete}
+          onArchive={handleArchive}
+          onRestore={handleRestore}
           emptyMessage={
             certificates.length === 0
               ? "No certificate records available"
               : "No certificates match the current filters"
           }
         />
-        {removeCertificate.isError && (
+        {archiveError && (
           <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {removeCertificate.error instanceof Error
-              ? removeCertificate.error.message
-              : "Could not delete certificate."}
+            {archiveError instanceof Error ? archiveError.message : "Could not update the certificate."}
           </p>
         )}
 

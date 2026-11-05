@@ -11,7 +11,8 @@ data class Certificate(
     val expiryDate: LocalDate?,
     val sourceFile: String,
     val status: CertificateStatus,
-    val contractId: String? = null
+    val contractId: String? = null,
+    val archivedAt: String? = null
 )
 
 fun calculateStatus(expiryDate: LocalDate?, today: LocalDate = LocalDate.now()): CertificateStatus {

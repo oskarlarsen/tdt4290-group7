@@ -9,6 +9,7 @@ type CertificateResponse = {
   expiryDate: string | null;
   sourceFile: string;
   contractId: string | null;
+  archivedAt?: string | null;
 };
 
 export type CertificateUpdate = {
@@ -50,11 +51,12 @@ function toCertificate(response: CertificateResponse): Certificate {
     certificateType: response.certificateType,
     issueDate: response.issueDate,
     sourceFile: response.sourceFile,
+    archivedAt: response.archivedAt ?? null,
   };
 }
 
-export async function getCertificates(): Promise<Certificate[]> {
-  const certificates = await apiFetch<CertificateResponse[]>("/certificates");
+export async function getCertificates(includeArchived = false): Promise<Certificate[]> {
+  const certificates = await apiFetch<CertificateResponse[]>(includeArchived ? "/certificates?includeArchived=true" : "/certificates");
   return certificates.map(toCertificate);
 }
 
@@ -84,4 +86,13 @@ export async function updateCertificate(id: string, updates: CertificateUpdate):
 
 export function deleteCertificate(id: string): Promise<void> {
   return apiFetch<void>(`/certificates/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+
+export function archiveCertificate(id: string): Promise<void> {
+  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}/archive`, { method: "POST" });
+}
+
+export function restoreCertificate(id: string): Promise<void> {
+  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}/restore`, { method: "POST" });
 }

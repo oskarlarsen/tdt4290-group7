@@ -133,6 +133,8 @@ export type RecentAlert = {
   category?: AlertCategory;
   source?: AlertSource;
   dueDate?: string;
+  /** Set when an admin archived the alert; archived alerts are hidden unless asked for. */
+  archivedAt?: string | null;
   findingType?: AlertFindingType;
   affectedItem?: {
     type: "Vehicle" | "Document";
