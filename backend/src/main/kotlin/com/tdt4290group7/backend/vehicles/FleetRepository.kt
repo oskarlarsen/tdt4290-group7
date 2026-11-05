@@ -50,6 +50,25 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         }
     }
 
+    fun isSupplierActive(id: String): Boolean = database.read { db ->
+        row(db, "suppliers", id)?.get("active") == 1
+    }
+
+    fun removeSupplier(id: String, expectedUpdatedAt: String, actor: ChangeActor, now: Instant) =
+        change(actor, now, null, "Removed supplier") { writer ->
+            val previous = requireActive(writer.db, "suppliers", id)
+            expect(previous, expectedUpdatedAt)
+            writer.description = "Removed supplier ${previous["name"]}"
+            rows(writer.db, "agreements", "supplier_id = ? AND active = 1", listOf(id)).forEach { agreement ->
+                val agreementId = agreement["id"] as String
+                rows(writer.db, "vehicles", "agreement_id = ? AND listed = 1", listOf(agreementId)).forEach {
+                    writer.save("vehicles", it + ("listed" to 0))
+                }
+                writer.save("agreements", agreement + ("active" to 0))
+            }
+            writer.save("suppliers", previous + ("active" to 0))
+        }
+
     fun saveAgreement(id: String?, input: AgreementInput, expectedUpdatedAt: String?, actor: ChangeActor, now: Instant): FleetAgreement {
         val start = date(input.startDate); val end = date(input.endDate)
         require(start <= end) { "End date must be on or after start date" }

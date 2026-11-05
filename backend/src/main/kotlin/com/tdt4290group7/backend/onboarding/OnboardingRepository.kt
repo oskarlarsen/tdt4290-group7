@@ -35,6 +35,8 @@ internal class OnboardingRepository(
         certificateRepository = repository
     }
 
+    internal fun isSupplierActive(supplierId: String): Boolean = fleet.isSupplierActive(supplierId)
+
     init {
         database.write { db ->
             db.createStatement().use { statement ->

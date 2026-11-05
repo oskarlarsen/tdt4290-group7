@@ -120,6 +120,46 @@ class FleetRepositoryTest {
         assertTrue(repo.fleet.overview().vehicles.single().listed)
     }
 
+    @Test fun removingSupplierDeactivatesAgreementsAndVehiclesAndCanBeUndone() {
+        val repo = repository()
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Supplier to remove", "123456789"), actor, now)
+        val agreements = (1..2).map {
+            repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2026-12-31", 2), null, actor, now)
+        }
+        agreements.forEachIndexed { index, agreement ->
+            repo.fleet.addVehicle(agreement.id, VehicleEntryInput(if (index == 0) "AB12345" else "CD12345"), actor, now)
+        }
+
+        repo.fleet.removeSupplier(supplier.id, supplier.updatedAt!!, actor, now.plusSeconds(1))
+
+        val removed = repo.fleet.overview()
+        assertTrue(removed.suppliers.isEmpty())
+        assertTrue(removed.agreements.isEmpty())
+        assertTrue(removed.vehicles.none { it.listed })
+        val removal = removed.changes.first()
+        assertTrue(removal.canUndo)
+        assertFalse(repo.fleet.isSupplierActive(supplier.id))
+
+        repo.fleet.undo(removal.id, actor, now.plusSeconds(2))
+        val restored = repo.fleet.overview()
+        assertEquals(1, restored.suppliers.size)
+        assertEquals(2, restored.agreements.size)
+        assertEquals(2, restored.vehicles.count { it.listed })
+        assertTrue(repo.fleet.isSupplierActive(supplier.id))
+    }
+
+    @Test fun removingSupplierRejectsStaleVersionWithoutChangingAnyRecords() {
+        val repo = repository()
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Supplier", "123456789"), actor, now)
+        repo.fleet.saveSupplier(supplier.id, SupplierInput("Updated", "123456789"), actor, now.plusSeconds(1), supplier.updatedAt)
+        val before = repo.fleet.overview()
+
+        assertFailsWith<FleetConflictException> {
+            repo.fleet.removeSupplier(supplier.id, supplier.updatedAt!!, actor, now.plusSeconds(2))
+        }
+        assertEquals(before, repo.fleet.overview())
+    }
+
     @Test fun supplierEditsCanBeUndoneUnlessTheirPreviousOrganizationNumberWasReused() {
         val repo = repository()
         val supplier = repo.fleet.saveSupplier(null, SupplierInput("First name", "123456789"), actor, now)

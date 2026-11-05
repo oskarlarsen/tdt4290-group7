@@ -59,5 +59,7 @@ fun Application.module(
     val resolvedCertificateRepository = certificateRepository ?: CertificateRepository(certificateDatabasePath)
     configureRouting(vehicleRepository, registry, cacheTtl, resolvedCertificateRepository)
     configureCertificateRoutes(resolvedCertificateRepository)
-    configureAuthRoutes(logResetTokens)
+    configureAuthRoutes(logResetTokens) { supplierId ->
+        (vehicleRepository as? VehicleRepository)?.fleet?.isSupplierActive(supplierId) ?: true
+    }
 }

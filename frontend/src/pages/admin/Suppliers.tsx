@@ -7,7 +7,7 @@ import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
-import { InviteSupplierForm, SupplierForm } from "../../components/vehicles/FleetForms";
+import { InviteSupplierForm, RemoveSupplierAction, SupplierForm } from "../../components/vehicles/FleetForms";
 import { ErrorNotice, buttonClass, primaryClass } from "../../components/vehicles/VehicleDialog";
 import { toCsv, downloadCsv } from "../../utils/csv";
 import type { TopRiskSupplier } from "../../types/dashboard";
@@ -59,6 +59,11 @@ export default function Suppliers() {
     setOrganizationForm(null);
     void refreshFleet();
     setSuccessMessage("Supplier organization saved successfully.");
+  }
+
+  function handleOrganizationRemoved() {
+    void refreshFleet();
+    setSuccessMessage("Supplier organization removed successfully.");
   }
 
   const sortedSuppliers = [...(data?.topRiskSuppliers ?? [])].sort(
@@ -157,6 +162,12 @@ export default function Suppliers() {
                   <button type="button" className={buttonClass} onClick={() => setOrganizationForm(supplier)}>Edit</button>
                   <button type="button" className={buttonClass} onClick={() => setInvitationSupplier(supplier)}>Invite contact</button>
                   <Link to="/admin/vehicles" className={buttonClass}>Manage agreements and vehicles</Link>
+                  <RemoveSupplierAction
+                    supplier={supplier}
+                    agreementCount={fleet.data.agreements.filter((agreement) => agreement.supplierId === supplier.id && agreement.active).length}
+                    vehicleCount={fleet.data.vehicles.filter((vehicle) => vehicle.listed && fleet.data.agreements.some((agreement) => agreement.id === vehicle.agreementId && agreement.supplierId === supplier.id && agreement.active)).length}
+                    onRemoved={handleOrganizationRemoved}
+                  />
                 </div>
               </li>
             ))}

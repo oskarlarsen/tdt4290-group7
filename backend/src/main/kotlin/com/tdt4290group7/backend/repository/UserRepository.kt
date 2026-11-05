@@ -184,7 +184,12 @@ object UserRepository {
     }
 
     /** Returns null for unknown, expired, or already-consumed invitation tokens. */
-    fun acceptSupplierInvitation(token: String, password: String, now: Instant = Instant.now()): User? {
+    fun acceptSupplierInvitation(
+        token: String,
+        password: String,
+        now: Instant = Instant.now(),
+        supplierIsActive: (String) -> Boolean = { true }
+    ): User? {
         if (token.length !in 32..128) return null
         val tokenHash = sha256(token)
         return write { db ->
@@ -204,7 +209,7 @@ object UserRepository {
                     )
                 }
             } ?: return@write null
-            if (!invite.expiresAt.isAfter(now) || user(db, "email = ?", invite.email) != null) return@write null
+            if (!invite.expiresAt.isAfter(now) || !supplierIsActive(invite.supplierId) || user(db, "email = ?", invite.email) != null) return@write null
 
             val userId = UUID.randomUUID().toString()
             db.prepareStatement(

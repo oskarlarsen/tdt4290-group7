@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
 import type { FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
 import { agreementDuration, validDate, validPlate } from "../../utils/vehicle";
-import { VehicleDialog, Field, ErrorNotice, buttonClass, primaryClass, inputClass } from "./VehicleDialog";
+import { VehicleDialog, Field, ErrorNotice, buttonClass, dangerClass, primaryClass, inputClass } from "./VehicleDialog";
 import { RegistrationNumberInput } from "./VehicleInputs";
 import { FieldTooltip } from "./FieldTooltip";
 import { ConfirmAction } from "./ConfirmAction";
@@ -26,6 +26,31 @@ export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetS
       <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Save supplier" onClose={onClose} />
     </form>
   </VehicleDialog>;
+}
+
+export function RemoveSupplierAction({ supplier, agreementCount, vehicleCount, onRemoved }: {
+  supplier: FleetSupplier; agreementCount: number; vehicleCount: number; onRemoved: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => api.removeSupplier(supplier),
+    onSuccess: () => { setConfirming(false); onRemoved(); },
+    retry: false,
+  });
+  return <>
+    <button type="button" className={dangerClass} disabled={remove.isPending} onClick={() => { remove.reset(); setConfirming(true); }}>Remove</button>
+    {confirming && <ConfirmAction
+      title={`Remove supplier ${supplier.name}?`}
+      label="Remove supplier"
+      busy={remove.isPending}
+      error={remove.error}
+      onCancel={() => { setConfirming(false); remove.reset(); }}
+      onConfirm={() => remove.mutate()}
+    >
+      <p>This removes the organization and deactivates its {agreementCount} active agreement{agreementCount === 1 ? "" : "s"} and {vehicleCount} listed vehicle{vehicleCount === 1 ? "" : "s"}.</p>
+      <p className="mt-2">Historical records are kept. You can undo this from Change history.</p>
+    </ConfirmAction>}
+  </>;
 }
 
 export function InviteSupplierForm({ supplier, onClose }: { supplier: FleetSupplier; onClose: () => void }) {

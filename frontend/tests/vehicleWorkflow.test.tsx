@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import * as api from "../src/api/vehicles";
 import { ApiError } from "../src/api/client";
-import { AgreementForm, SupplierForm, VehicleEntryForm } from "../src/components/vehicles/FleetForms";
+import { AgreementForm, RemoveSupplierAction, SupplierForm, VehicleEntryForm } from "../src/components/vehicles/FleetForms";
 import { StatisticsForm } from "../src/components/vehicles/VehicleForms";
 import { AgreementCard } from "../src/components/vehicles/AgreementCard";
 import { VehicleDetails } from "../src/components/vehicles/VehicleDetails";
@@ -50,6 +50,20 @@ describe("vehicle registration and consequential actions", () => {
     expect(saved).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalledTimes(1);
     expect(save.mock.calls[0]).toEqual([{ name: "My edit", orgNumber: supplier.orgNumber }, supplier]);
+  });
+  it("confirms supplier removal and reports the affected agreements and vehicles", async () => {
+    const remove = vi.spyOn(api, "removeSupplier").mockResolvedValue(undefined);
+    const removed = vi.fn();
+    mount(<RemoveSupplierAction supplier={supplier} agreementCount={2} vehicleCount={3} onRemoved={removed} />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    const confirmation = screen.getByRole("dialog", { name: "Remove supplier Test supplier?" });
+    expect(confirmation.textContent).toContain("2 active agreements and 3 listed vehicles");
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Remove supplier Test supplier?" })).getByRole("button", { name: "Remove supplier" }));
+    await waitFor(() => expect(removed).toHaveBeenCalledTimes(1));
+    expect(remove).toHaveBeenCalledWith(supplier);
   });
   it("saves an ordinary agreement edit without extra confirmation", async () => {
     const save = vi.spyOn(api, "saveAgreement").mockResolvedValue({ ...agreement, allowedVehicles: 1 });
