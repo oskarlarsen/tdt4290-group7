@@ -46,7 +46,7 @@ export function SupplierReportingDataDialog({ supplier, onClose }: Props) {
                   ? <ul className="mt-2 space-y-1 text-sm text-neutral-600">
                     {query.data.vehicles.map((vehicle) => {
                       const fuel = vehicle.fuelTechnology
-                        ? (FUEL_TECHNOLOGIES[vehicle.fuelTechnology] ?? vehicle.fuelTechnology)
+                        ? ((FUEL_TECHNOLOGIES as Record<string, string>)[vehicle.fuelTechnology] ?? vehicle.fuelTechnology)
                         : "—";
                       const coverage = vehicle.fullContractCoverage === null
                         ? "—"
