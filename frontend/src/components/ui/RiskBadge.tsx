@@ -4,7 +4,7 @@ import type { SupplierRisk } from "../../types/dashboard";
 const CONFIG: Record<SupplierRisk, { label: string; className: string }> = {
   high: { label: "High", className: "bg-red-100 text-red-700" },
   medium: { label: "Medium", className: "bg-amber-100 text-amber-800" },
-  compliant: { label: "Compliant", className: "bg-neutral-100 text-neutral-700" },
+  compliant: { label: "No flagged evidence", className: "bg-neutral-100 text-neutral-700" },
   unassessed: { label: "Unassessed", className: "bg-neutral-100 text-neutral-500" },
 };
 

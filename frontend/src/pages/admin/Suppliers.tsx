@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useDashboardSummary } from "../../hooks/useDashboardSummary";
@@ -6,8 +7,9 @@ import { useSupplierReviewStatus, type FollowUpStatus } from "../../hooks/useSup
 import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
+import { SupplierReportingDataDialog } from "../../components/suppliers/SupplierReportingDataDialog";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
-import { InviteSupplierForm, RemoveSupplierAction, SupplierForm } from "../../components/vehicles/FleetForms";
+import { AgreementForm, InviteSupplierForm, RemoveSupplierAction, SupplierForm } from "../../components/vehicles/FleetForms";
 import { ErrorNotice, buttonClass, primaryClass } from "../../components/vehicles/VehicleDialog";
 import { toCsv, downloadCsv } from "../../utils/csv";
 import type { TopRiskSupplier } from "../../types/dashboard";
@@ -23,18 +25,21 @@ const SUPPLIERS_PAGE_SIZE = 3;
 
 export default function Suppliers() {
   const { data, isLoading, isError } = useDashboardSummary();
+  const queryClient = useQueryClient();
   const fleet = useFleet();
   const refreshFleet = useRefreshVehicles();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [organizationForm, setOrganizationForm] = useState<FleetSupplier | "new" | null>(null);
+  const [agreementSupplier, setAgreementSupplier] = useState<FleetSupplier | null>(null);
   const [invitationSupplier, setInvitationSupplier] = useState<FleetSupplier | null>(null);
+  const [reportingSupplier, setReportingSupplier] = useState<FleetSupplier | null>(null);
   const [riskFilter, setRiskFilter] = useState<"all" | TopRiskSupplier["risk"]>("all");
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | FollowUpStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [successMessage, setSuccessMessage] = useState("");
-  const { getStatus, setStatus } = useSupplierReviewStatus();
+  const { getStatus, setStatus, errorMessage: reviewStatusError } = useSupplierReviewStatus();
 
   useEffect(() => {
     setPage(1);
@@ -55,14 +60,30 @@ export default function Suppliers() {
     }
   }
 
-  function handleOrganizationSaved() {
+  function handleOrganizationSaved(savedSupplier: FleetSupplier) {
+    const isNewSupplier = organizationForm === "new";
     setOrganizationForm(null);
     void refreshFleet();
-    setSuccessMessage("Supplier organization saved successfully.");
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    if (isNewSupplier) {
+      setAgreementSupplier(savedSupplier);
+      setSuccessMessage("Supplier created. Configure the agreement and required information before inviting the contact.");
+    } else {
+      setSuccessMessage("Supplier organization saved successfully.");
+    }
+  }
+
+  function handleAgreementSaved() {
+    const supplier = agreementSupplier;
+    setAgreementSupplier(null);
+    void refreshFleet();
+    if (supplier) setInvitationSupplier(supplier);
+    setSuccessMessage("Agreement saved. Create an invitation for the supplier contact.");
   }
 
   function handleOrganizationRemoved() {
     void refreshFleet();
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     setSuccessMessage("Supplier organization removed successfully.");
   }
 
@@ -103,6 +124,11 @@ export default function Suppliers() {
 
   return (
     <div className="space-y-4 p-4">
+      {reviewStatusError && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          Could not save supplier review status: {reviewStatusError}
+        </p>
+      )}
       {isLoading && (
         <div role="status" className="flex h-12 items-center gap-2 text-sm text-neutral-400">
           <Loader2 className="h-5 w-5 animate-spin" /> Loading supplier risk dashboard…
@@ -135,7 +161,7 @@ export default function Suppliers() {
           <div>
             <h2 className="text-lg font-semibold text-neutral-900">Supplier organizations</h2>
             <p className="mt-1 max-w-2xl text-sm text-neutral-500">
-              Create organizations and invite the contacts who will use the supplier workspace. The risk directory below currently uses separate demo data.
+              Create a supplier, configure its agreement and required reporting categories, then invite its contact to submit only the requested information.
             </p>
           </div>
           <button type="button" className={primaryClass} onClick={() => setOrganizationForm("new")}>
@@ -160,6 +186,7 @@ export default function Suppliers() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className={buttonClass} onClick={() => setOrganizationForm(supplier)}>Edit</button>
+                  <button type="button" className={buttonClass} onClick={() => setReportingSupplier(supplier)}>Submitted information</button>
                   <button type="button" className={buttonClass} onClick={() => setInvitationSupplier(supplier)}>Invite contact</button>
                   <Link to="/admin/vehicles" className={buttonClass}>Manage agreements and vehicles</Link>
                   <RemoveSupplierAction
@@ -230,6 +257,7 @@ export default function Suppliers() {
             actionLabel="View Details"
             onSelect={(supplier) => setSelectedSupplierId(supplier.id)}
             getReviewStatus={getStatus}
+            showOnboardingStatus
           />
         )}
 
@@ -278,8 +306,18 @@ export default function Suppliers() {
           onSaved={handleOrganizationSaved}
         />
       )}
+      {agreementSupplier && (
+        <AgreementForm
+          supplier={agreementSupplier}
+          onClose={() => setAgreementSupplier(null)}
+          onSaved={handleAgreementSaved}
+        />
+      )}
       {invitationSupplier && (
         <InviteSupplierForm supplier={invitationSupplier} onClose={() => setInvitationSupplier(null)} />
+      )}
+      {reportingSupplier && (
+        <SupplierReportingDataDialog supplier={reportingSupplier} onClose={() => setReportingSupplier(null)} />
       )}
     </div>
   );

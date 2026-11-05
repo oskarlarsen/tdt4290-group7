@@ -6,10 +6,10 @@ import {
   getCertificateStatus,
 } from "../../types/certificate";
 import type { Certificate } from "../../types/certificate";
-import type { DerivedContract } from "../../types/contract";
+import type { CertificateContract } from "../../types/certificate";
 
 // contract is optional: shown "where available" if a certificate's contract can't be found.
-export type CertificateRow = { certificate: Certificate; contract?: DerivedContract };
+export type CertificateRow = { certificate: Certificate; contract?: CertificateContract };
 
 export function CertificateTable({
   rows,
@@ -66,7 +66,7 @@ export function CertificateTable({
                     {CERTIFICATE_STANDARD_LABELS[certificate.standard]}
                   </div>
                   <div className="font-mono text-xs text-neutral-400">
-                    {certificate.certificateNumber ?? "No certificate on file"}
+                    {certificate.certificateNumber ?? "Not extracted"}
                   </div>
                 </td>
                 <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "Not linked"}</td>

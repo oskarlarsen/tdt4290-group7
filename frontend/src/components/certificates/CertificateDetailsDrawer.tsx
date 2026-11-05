@@ -133,8 +133,7 @@ export function CertificateDetailsDrawer({
               </Section>
 
               <p className="rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-500">
-                Extracted details should be reviewed before being used as compliance evidence. The
-                original PDF is not retained, and certificates are not yet linked to live contract records.
+                Review extracted details before relying on them as compliance evidence. The original PDF is not retained.
               </p>
             </div>
           </>

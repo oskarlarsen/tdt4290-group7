@@ -23,6 +23,7 @@ export type OnboardingStatusResponse = {
   contactEmail: string | null;
   contactPhone: string | null;
   reviewerNotes: string | null;
+  requiredEntities: Array<"VEHICLES" | "ENERGY" | "PRODUCTS">;
   canSubmit: boolean;
 };
 
@@ -53,6 +54,9 @@ export type SupplierOverview = {
     allowedVehicles: number;
     activeVehiclesCount: number;
     active: boolean;
+    requiresVehicles: boolean;
+    requiresEnergy: boolean;
+    requiresProducts: boolean;
   }>;
   totalVehicles: number;
   totalCertificates: number;

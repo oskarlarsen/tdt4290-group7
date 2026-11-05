@@ -26,7 +26,7 @@ export function RiskClassificationBar({ data }: { data: RiskClassification }) {
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <Legend
           dotClass={DOT_CLASSES.compliant}
-          label="Compliant"
+          label="No flagged evidence"
           count={data.compliant.count}
           percent={data.compliant.percent}
         />

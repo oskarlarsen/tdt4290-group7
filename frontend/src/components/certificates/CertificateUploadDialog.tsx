@@ -2,13 +2,13 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { FileText, Loader2, Upload, X } from "lucide-react";
 import { useUploadCertificate } from "../../hooks/useCertificates";
-import type { DerivedContract } from "../../types/contract";
+import type { CertificateContract } from "../../types/certificate";
 
 export function CertificateUploadDialog({
   contracts,
   onClose,
 }: {
-  contracts: DerivedContract[];
+  contracts: CertificateContract[];
   onClose: () => void;
 }) {
   const [contractId, setContractId] = useState("");

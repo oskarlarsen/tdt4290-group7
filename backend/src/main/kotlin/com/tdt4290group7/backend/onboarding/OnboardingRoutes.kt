@@ -108,6 +108,10 @@ internal fun Route.onboardingRoutes(
                 return@get
             }
 
+            if (repository.requiredAgreementIds(supplierId, entityType).isEmpty()) {
+                call.respond(HttpStatusCode.Forbidden, ApiError("Your administrator has not requested this information type"))
+                return@get
+            }
             val templateCsv = CsvStreamParser.generateTemplate(entityType)
             val fileName = "${entityType.name.lowercase(Locale.ROOT)}_template.csv"
 

@@ -134,6 +134,20 @@ object UserRepository {
 
     fun findById(id: String): User? = read { user(it, "id = ?", id) }
 
+    fun supplierAccountCounts(): Map<String, Int> = read { db ->
+        db.prepareStatement(
+            "SELECT supplier_id, COUNT(*) AS account_count FROM users WHERE role = 'SUPPLIER' AND supplier_id IS NOT NULL GROUP BY supplier_id"
+        ).use { statement ->
+            statement.executeQuery().use { rows ->
+                buildMap {
+                    while (rows.next()) {
+                        put(rows.getString("supplier_id"), rows.getInt("account_count"))
+                    }
+                }
+            }
+        }
+    }
+
     /** The user with this email and password, or null, with comparable bcrypt work either way. */
     fun authenticate(email: String, password: String): User? {
         val account = findByEmail(email)

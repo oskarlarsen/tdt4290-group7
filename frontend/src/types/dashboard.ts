@@ -18,6 +18,15 @@ export type AlertFindingType =
   | "UPCOMING_EXPIRY";
 export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "FUEL_DEVIATION";
 export type SupplierRisk = RiskCategory | "unassessed";
+export type SupplierOnboardingStatus =
+  | "INVITED"
+  | "PROFILE_PENDING"
+  | "DATA_DRAFT"
+  | "VALIDATING"
+  | "SUBMITTED"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "REVISION_REQUIRED";
 export type NewSupplierInput = {
   displayName: string;
   orgId: string;
@@ -25,7 +34,29 @@ export type NewSupplierInput = {
   primaryContract?: string;
 };
 
-// TODO: Match this type with the backend response when the dashboard API is ready
+export type AdminDashboardAgreement = {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  supplierOrgNumber: string;
+  note: string;
+  startDate: string;
+  endDate: string;
+  allowedVehicles: number;
+  listedVehicles: number;
+};
+
+export type AdminDashboardSummary = {
+  generatedAt: string;
+  activeSuppliers: number;
+  activeAgreements: number;
+  listedVehicles: number;
+  certificatesTracked: number;
+  expiredCertificates: number;
+  certificatesExpiringWithin90Days: number;
+  agreements: AdminDashboardAgreement[];
+};
+
 export type DashboardKpis = {
   totalSuppliers: number;
   totalSuppliersDeltaThisMonth: number;
@@ -35,6 +66,12 @@ export type DashboardKpis = {
   alertsBySeverity: { high: number; medium: number };
   complianceRatePercent: number;
   complianceTargetPercent: number;
+  assessedSuppliers: number;
+  activeAgreements: number;
+  listedVehicles: number;
+  certificatesTracked: number;
+  expiredCertificates: number;
+  certificatesExpiringWithin90Days: number;
 };
 
 export type RiskClassification = {
@@ -66,6 +103,19 @@ export type TopRiskSupplier = {
   mainIssue: string;
   // Set the issue only for high/medium-risk suppliers
   issueCategory?: SupplierIssueCategory;
+  onboardingStatus?: SupplierOnboardingStatus;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  reviewerNotes?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  agreementCount?: number;
+  vehicleCount?: number;
+  certificateCount?: number;
+  energyRecordCount?: number;
+  productCount?: number;
+  registeredAccountCount?: number;
 };
 
 export type RecentAlert = {
@@ -102,9 +152,17 @@ export type NewManualAlertInput = {
 export type IssueCategoryBreakdown = {
   vehicleDeviation: number;
   certificateExpiry: number;
-  fuelDeviation: number;
-  // All three counts are based on the same supplier total
+  fuelDeviation: number | null;
+  // Counts use suppliers with persisted assessment evidence.
   modeledSupplierCount: number;
+};
+
+export type SupplierNote = {
+  id: string;
+  supplierId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
 };
 
 export type DashboardSummary = {
@@ -115,12 +173,4 @@ export type DashboardSummary = {
   suppliersRequiringAttention: TopRiskSupplier[];
   issueCategoryBreakdown: IssueCategoryBreakdown;
   recentAlerts: RecentAlert[];
-};
-
-export type SupplierNote = {
-  id: string;
-  supplierId: string;
-  authorName: string;
-  text: string;
-  createdAt: string;
 };

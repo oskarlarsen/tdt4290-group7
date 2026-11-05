@@ -6,6 +6,32 @@ afterEach(() => {
 });
 
 describe("certificate API", () => {
+  it("always reads certificates from the backend instead of fixture data", async () => {
+    vi.stubEnv("VITE_USE_MOCKS", "true");
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify([{
+          id: "certificate-1",
+          supplierName: "Example Transport AS",
+          certificateType: "ISO 14001",
+          issueDate: "2025-01-15",
+          expiryDate: "2028-12-31",
+          sourceFile: "iso-14001.pdf",
+          contractId: "agreement-1",
+        }]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const { getCertificates } = await import("../src/api/certificates");
+
+    await expect(getCertificates()).resolves.toMatchObject([
+      { id: "certificate-1", standard: "iso-14001", validUntil: "2028-12-31" },
+    ]);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0][0]).toContain("/certificates");
+  });
+
   it("uploads a PDF with multipart form data and maps the extracted metadata", async () => {
     const fetch = vi.fn().mockResolvedValue(
       new Response(

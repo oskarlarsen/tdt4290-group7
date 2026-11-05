@@ -4,34 +4,31 @@ import type { AlertStatus, DashboardSummary } from "../types/dashboard";
 
 const DASHBOARD_QUERY_KEY = ["dashboard-summary"];
 
- export function useDashboardSummary() {
-   return useQuery({
+export function useDashboardSummary() {
+  return useQuery({
     queryKey: DASHBOARD_QUERY_KEY,
     queryFn: dashboardApi.getDashboardSummary,
-     staleTime: 60_000,
-   });
- }
+   staleTime: 60_000,
+ });
+}
 
 export function useUpdateAlertStatus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: AlertStatus }) =>
       dashboardApi.updateAlertStatus(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY });
+    },
   });
 }
 
 export function useResyncDashboard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => dashboardApi.resyncDashboard(),
-    onSuccess: ({ lastSyncedAt }) => {
-      // Apply the server/mock response immediately so the button never leaves
-      // the dashboard showing the previous sync time while the refetch runs.
-      queryClient.setQueryData<DashboardSummary>(DASHBOARD_QUERY_KEY, (current) =>
-        current ? { ...current, lastSyncedAt } : current
-      );
-      void queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY });
+    mutationFn: dashboardApi.resyncDashboard,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: DASHBOARD_QUERY_KEY });
     },
   });
 }

@@ -34,17 +34,20 @@ export function QuickActions() {
 export function DashboardExportButton({ data }: { data: DashboardSummary | undefined }) {
   const [state, setState] = useState<"idle" | "done">("idle");
 
-  // TODO: Replace the client-side export with the backend report endpoint
   function handleExport() {
     if (!data) return;
     const csv = toCsv([
-      { Metric: "Active contracts", Value: data.kpis.totalSuppliers },
+      { Metric: "Active suppliers", Value: data.kpis.totalSuppliers },
+      { Metric: "Active agreements", Value: data.kpis.activeAgreements },
+      { Metric: "Listed vehicles", Value: data.kpis.listedVehicles },
+      { Metric: "Certificates tracked", Value: data.kpis.certificatesTracked },
       { Metric: "High-risk suppliers", Value: data.kpis.highRiskSuppliers },
       { Metric: "Unresolved alerts", Value: data.kpis.activeAlerts },
-      { Metric: "Compliance rate (%)", Value: data.kpis.complianceRatePercent },
-      { Metric: "Compliant suppliers", Value: data.riskClassification.compliant.count },
+      { Metric: "Suppliers with no flagged evidence (%)", Value: data.kpis.complianceRatePercent },
+      { Metric: "Suppliers with no flagged evidence", Value: data.riskClassification.compliant.count },
       { Metric: "Medium-risk suppliers", Value: data.riskClassification.medium.count },
       { Metric: "High-risk suppliers (classification)", Value: data.riskClassification.high.count },
+      { Metric: "Assessed suppliers", Value: data.kpis.assessedSuppliers },
     ]);
     downloadCsv(`overview-report-${new Date().toISOString().slice(0, 10)}.csv`, csv);
     setState("done");

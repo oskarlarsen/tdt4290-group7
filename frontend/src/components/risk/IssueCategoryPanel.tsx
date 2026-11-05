@@ -7,7 +7,7 @@ export function IssueCategoryPanel({ data }: { data: IssueCategoryBreakdown }) {
     <section className="rounded-xl border border-neutral-100 bg-white p-4">
       <h2 className="font-headline text-base font-semibold text-neutral-900">Issue categories</h2>
       <p className="mb-4 text-xs text-neutral-400">
-        Based on the {data.modeledSupplierCount} fully-modeled suppliers — not a portfolio-wide total
+        Based on persisted vehicle and certificate evidence from {data.modeledSupplierCount} assessed suppliers
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <CategoryStat
@@ -41,7 +41,7 @@ function CategoryStat({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | null;
   total: number;
 }) {
   return (
@@ -49,7 +49,7 @@ function CategoryStat({
       <div className="rounded-lg bg-neutral-50 p-2 text-neutral-500">{icon}</div>
       <div>
         <div className="font-headline text-lg font-semibold text-neutral-900">
-          {value} <span className="text-xs font-normal text-neutral-400">/ {total}</span>
+          {value === null ? "Not assessed" : <>{value} <span className="text-xs font-normal text-neutral-400">/ {total}</span></>}
         </div>
         <div className="text-xs font-mono text-neutral-500">{label}</div>
       </div>

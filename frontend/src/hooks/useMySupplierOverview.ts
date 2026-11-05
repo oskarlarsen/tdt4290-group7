@@ -1,60 +1,45 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
-import { getContracts } from "../api/contracts";
-import { getCertificates } from "../api/certificates";
-import { getFleet } from "../api/vehicles";
-import { getEnergyData } from "../api/energy";
-import { getAlerts } from "../api/alerts";
-import * as db from "../mocks/db"; // Fallback to db for modeled suppliers if api is not ready
-import { buildSupplierOverview, MOCK_SUPPLIER_MAPPING } from "../utils/supplierOverview";
+import {
+  getSupplierAgreements,
+  getSupplierCertificates,
+  getSupplierEnergy,
+  getSupplierOverview,
+  getSupplierProducts,
+  getSupplierVehicles,
+  type SupplierAgreement,
+  type SupplierEnergyRecord,
+  type SupplierProduct,
+  type SupplierVehicle,
+} from "../api/onboarding";
+import type { Certificate } from "../types/certificate";
+import type { SupplierOverview } from "../types/onboarding";
+
+export type SupplierWorkspaceData = {
+  overview: SupplierOverview;
+  agreements: SupplierAgreement[];
+  vehicles: SupplierVehicle[];
+  energy: SupplierEnergyRecord[];
+  products: SupplierProduct[];
+  certificates: Certificate[];
+};
 
 export function useMySupplierOverview() {
   const { user } = useAuth();
-  // Phase 1.1: Map the old "supplier-1" to the real modeled supplier.
-  const authSupplierId = user?.supplierId;
-  const supplierId = authSupplierId === "supplier-1" ? MOCK_SUPPLIER_MAPPING : authSupplierId;
-
   return useQuery({
-    queryKey: ["supplier-overview", supplierId],
-    queryFn: async () => {
-      if (!supplierId) {
-        throw new Error("Your account isn't linked to a supplier");
-      }
-
-      // Fetching all data. The `buildSupplierOverview` function will strictly scope it.
-      const [
-        allContracts,
-        allCertificates,
-        energyData,
-        allAlerts,
-        fleetRes
-      ] = await Promise.all([
-        getContracts(),
-        getCertificates(),
-        getEnergyData(),
-        getAlerts(),
-        getFleet().catch(() => null)
+    queryKey: ["supplier-workspace", user?.id],
+    queryFn: async (): Promise<SupplierWorkspaceData> => {
+      const [overview, agreements, vehicles, energy, products, certificates] = await Promise.all([
+        getSupplierOverview(),
+        getSupplierAgreements(),
+        getSupplierVehicles(),
+        getSupplierEnergy(),
+        getSupplierProducts(),
+        getSupplierCertificates(),
       ]);
-
-      const allSuppliers = db.getTopRiskSuppliers();
-
-      const overview = buildSupplierOverview(
-        supplierId,
-        allSuppliers,
-        allContracts,
-        allCertificates,
-        fleetRes,
-        energyData,
-        allAlerts
-      );
-
-      if (!overview.supplier) {
-          throw new Error("Supplier record not found");
-      }
-
-      return overview;
+      return { overview, agreements, vehicles, energy, products, certificates };
     },
-    enabled: !!user,
+    enabled: user?.role === "SUPPLIER" && !!user.supplierId,
     retry: false,
   });
 }

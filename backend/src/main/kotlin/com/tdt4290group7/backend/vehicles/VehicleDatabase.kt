@@ -18,13 +18,36 @@ internal class VehicleDatabase(path: Path) {
         databaseUrl = "jdbc:sqlite:$absolute"
         write { db ->
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
-            check(version == 0 || version == 8) {
+            check(version == 0 || version == 8 || version == 9) {
                 "Incompatible vehicle database schema (version $version). Stop the backend and run scripts/reset-vehicle-data.ps1 after confirming that the data can be wiped."
             }
             if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") { it.getString(1) }.isEmpty()) { "Vehicle database is not empty; run the development reset." }
             db.createStatement().use { statement ->
                 vehicleSchemaStatements.forEach { statement.executeUpdate(it) }
-                statement.execute("PRAGMA user_version = 8")
+            }
+            if (version == 8) migrateAgreementRequirements(db)
+            db.createStatement().use { it.execute("PRAGMA user_version = 9") }
+        }
+    }
+
+    private fun migrateAgreementRequirements(db: Connection) {
+        val columnsByTable = mapOf(
+            "agreements" to listOf(
+                "requires_vehicles INTEGER NOT NULL DEFAULT 1 CHECK(requires_vehicles IN (0,1))",
+                "requires_energy INTEGER NOT NULL DEFAULT 0 CHECK(requires_energy IN (0,1))",
+                "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))"
+            ),
+            "change_agreements" to listOf(
+                "requires_vehicles INTEGER NOT NULL DEFAULT 1 CHECK(requires_vehicles IN (0,1))",
+                "requires_energy INTEGER NOT NULL DEFAULT 0 CHECK(requires_energy IN (0,1))",
+                "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))"
+            )
+        )
+        columnsByTable.forEach { (table, definitions) ->
+            val existing = query(db, "PRAGMA table_info($table)") { it.getString("name") }.toSet()
+            definitions.forEach { definition ->
+                val column = definition.substringBefore(' ')
+                if (column !in existing) db.createStatement().use { it.execute("ALTER TABLE $table ADD COLUMN $definition") }
             }
         }
     }

@@ -15,7 +15,7 @@ function FormFooter({ busy, label, onClose }: { busy: boolean; label: string; on
   </footer>;
 }
 
-export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: () => void }) {
+export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: (savedSupplier: FleetSupplier) => void }) {
   const [name, setName] = useState(supplier?.name ?? "");
   const [orgNumber, setOrgNumber] = useState(supplier?.orgNumber ?? "");
   const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier), onSuccess: onSaved, retry: false });
@@ -98,10 +98,14 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
   const [endDate, setEnd] = useState(agreement?.endDate ?? "");
   const [allowed, setAllowed] = useState(String(agreement?.allowedVehicles ?? ""));
   const [note, setNote] = useState(agreement?.note ?? "");
+  const [requiresVehicles, setRequiresVehicles] = useState(agreement?.requiresVehicles ?? true);
+  const [requiresEnergy, setRequiresEnergy] = useState(agreement?.requiresEnergy ?? false);
+  const [requiresProducts, setRequiresProducts] = useState(agreement?.requiresProducts ?? false);
   const save = useMutation({ mutationFn: () => {
     if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("Enter a valid agreement period.");
     if (!/^\d+$/.test(allowed) || Number(allowed) > 10000) throw new Error("Enter a vehicle allowance between 0 and 10000.");
-    return api.saveAgreement({ supplierId: supplier.id, startDate, endDate, allowedVehicles: Number(allowed), note }, agreement);
+    if (!requiresVehicles && !requiresEnergy && !requiresProducts) throw new Error("Select at least one type of supplier information to collect.");
+    return api.saveAgreement({ supplierId: supplier.id, startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
   }, onSuccess: onSaved, retry: false });
   return <VehicleDialog title={`${agreement ? "Edit" : "Add"} agreement · ${supplier.name}`} onClose={onClose} busy={save.isPending}>
     <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate(); }}>
@@ -111,6 +115,21 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
       </div>
       {agreementDuration(startDate, endDate) && <p className="text-sm text-neutral-500">{agreementDuration(startDate, endDate)}</p>}
       <Field label="Maximum vehicles"><input type="number" required min={0} max={10000} step={1} className={inputClass} value={allowed} onChange={e => setAllowed(e.target.value)} /></Field>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-neutral-700">Information required from supplier</legend>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" checked={requiresVehicles} onChange={event => setRequiresVehicles(event.target.checked)} />
+          Vehicles
+        </label>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" checked={requiresEnergy} onChange={event => setRequiresEnergy(event.target.checked)} />
+          Energy
+        </label>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" checked={requiresProducts} onChange={event => setRequiresProducts(event.target.checked)} />
+          Products
+        </label>
+      </fieldset>
       <Field label="Note (optional)"><textarea maxLength={4000} rows={3} className={inputClass} value={note} onChange={e => setNote(e.target.value)} /></Field>
       <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Save agreement" onClose={onClose} />
     </form>

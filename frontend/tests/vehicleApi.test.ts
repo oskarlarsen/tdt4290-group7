@@ -33,9 +33,18 @@ describe("real vehicle API client", () => {
     expect(fetch.mock.calls[0][0]).toContain("/trip-rows?search=AB10001&page=2&pageSize=25");
     expect(fetch.mock.calls[0][1].method).toBeUndefined(); expect(fetch).toHaveBeenCalledTimes(1);
   });
-  it("sends only the supplier agreement fields", async () => {
+  it("sends agreement dates, allowance, and requested information categories", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetch);
-    const agreement = { supplierId: "supplier", startDate: "2026-01-01", endDate: "2026-12-31", allowedVehicles: 5, note: "" };
+    const agreement = {
+      supplierId: "supplier",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      allowedVehicles: 5,
+      note: "",
+      requiresVehicles: true,
+      requiresEnergy: true,
+      requiresProducts: false,
+    };
     await saveAgreement(agreement);
     expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet/agreements");
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(agreement);

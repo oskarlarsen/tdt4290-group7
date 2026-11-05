@@ -68,5 +68,6 @@ tasks.test {
     // Auth tests use isolated SQLite stores and never touch local application data.
     environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles-v7.db").get().asFile.absolutePath)
     environment("CERTIFICATE_DB_PATH", layout.buildDirectory.file("test-data/default-certificates.db").get().asFile.absolutePath)
+    environment("ADMIN_INSIGHTS_DB_PATH", layout.buildDirectory.file("test-data/default-admin-insights.db").get().asFile.absolutePath)
     environment("USER_DB_PATH", layout.buildDirectory.file("test-data/default-users.db").get().asFile.absolutePath)
 }
