@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { toCsv, downloadCsv } from "../../utils/csv";
+import { downloadCsv, toSemicolonCsv } from "../../utils/csv";
+import { buildOverviewRows, OVERVIEW_COLUMNS } from "../../utils/overviewExport";
+import { getAlerts } from "../../api/alerts";
 import type { DashboardSummary } from "../../types/dashboard";
 
 export function QuickActions() {
@@ -32,36 +34,36 @@ export function QuickActions() {
 }
 
 export function DashboardExportButton({ data }: { data: DashboardSummary | undefined }) {
-  const [state, setState] = useState<"idle" | "done">("idle");
+  const [state, setState] = useState<"idle" | "preparing" | "done" | "error">("idle");
 
-  function handleExport() {
-    if (!data) return;
-    const csv = toCsv([
-      { Metric: "Active suppliers", Value: data.kpis.totalSuppliers },
-      { Metric: "Active agreements", Value: data.kpis.activeAgreements },
-      { Metric: "Listed vehicles", Value: data.kpis.listedVehicles },
-      { Metric: "Certificates tracked", Value: data.kpis.certificatesTracked },
-      { Metric: "High-risk suppliers", Value: data.kpis.highRiskSuppliers },
-      { Metric: "Unresolved alerts", Value: data.kpis.activeAlerts },
-      { Metric: "Suppliers with no flagged evidence (%)", Value: data.kpis.complianceRatePercent },
-      { Metric: "Suppliers with no flagged evidence", Value: data.riskClassification.compliant.count },
-      { Metric: "Medium-risk suppliers", Value: data.riskClassification.medium.count },
-      { Metric: "High-risk suppliers (classification)", Value: data.riskClassification.high.count },
-      { Metric: "Assessed suppliers", Value: data.kpis.assessedSuppliers },
-    ]);
-    downloadCsv(`overview-report-${new Date().toISOString().slice(0, 10)}.csv`, csv);
-    setState("done");
-    setTimeout(() => setState("idle"), 2000);
+  async function handleExport() {
+    if (!data || state === "preparing") return;
+    setState("preparing");
+    try {
+      // The summary only carries the ten most recent alerts, so the full list is fetched for the report.
+      const alerts = await getAlerts();
+      const csv = toSemicolonCsv(OVERVIEW_COLUMNS, buildOverviewRows(data, alerts));
+      downloadCsv(`overview-report-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+      setState("done");
+      setTimeout(() => setState("idle"), 2000);
+    } catch {
+      setState("error");
+    }
   }
 
   return (
-    <button
-      onClick={handleExport}
-      disabled={!data}
-      className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg bg-primary-900 px-3 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-    >
-      <Download className="h-4 w-4" />
-      {state === "done" ? "Downloaded" : "Export overview report"}
-    </button>
+    <span className="inline-flex flex-col items-end gap-1">
+      <button
+        onClick={() => void handleExport()}
+        disabled={!data || state === "preparing"}
+        className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg bg-primary-900 px-3 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+      >
+        <Download className="h-4 w-4" />
+        {state === "preparing" ? "Preparing…" : state === "done" ? "Downloaded" : "Export overview report"}
+      </button>
+      {state === "error" && (
+        <span role="alert" className="text-xs text-red-700">Could not prepare the export. Try again.</span>
+      )}
+    </span>
   );
 }
