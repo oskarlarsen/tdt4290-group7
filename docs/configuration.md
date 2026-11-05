@@ -30,7 +30,7 @@ The backend and Vite load it when started from their documented directories. Res
 | `JWT_ISSUER` / `JWT_AUDIENCE` | `tdt4290-backend` / `tdt4290-frontend` | Session issuer and audience. |
 | `APP_ENV` | `prod` | Select `dev` to allow development-only password-reset logging. |
 | `ALLOW_DEV_PASSWORD_RESET_LOG` | `false` | Log reset tokens locally; requires `APP_ENV=dev`. Email delivery is not implemented. |
-| `TRUSTED_PROXY_HOPS` | `0` | Number of trusted proxies ahead of the API; leave at zero for direct local access. |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of trusted proxies ahead of the API; leave at zero for direct local access. Set it to the exact count in each deployment: too low and all users behind the proxy share one login rate-limit bucket, too high and clients can spoof their IP to dodge the limit. |
 | `API_ORIGIN` | `http://localhost:8080` | API origin permitted by the Docker frontend's content security policy; match the origin in `VITE_API_BASE_URL`. |
 | `TESSERACT_PATH` | Executable discovery / `tesseract` | Optional executable path for the [certificate parser](certificate-parser.md). |
 
