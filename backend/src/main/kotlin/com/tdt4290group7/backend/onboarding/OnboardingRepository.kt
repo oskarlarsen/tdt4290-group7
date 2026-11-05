@@ -677,11 +677,12 @@ internal class OnboardingRepository(
         latest
     }
 
+    /** Every agreement of the supplier, including ended ones: their certificates stay on the supplier's list as history. */
     fun getSupplierAgreementIds(supplierId: String): Set<String> {
         return database.read { db ->
             database.query(
                 db,
-                "SELECT id FROM agreements WHERE supplier_id = ? AND active = 1",
+                "SELECT id FROM agreements WHERE supplier_id = ?",
                 listOf(supplierId)
             ) { it.getString("id") }.toSet()
         }

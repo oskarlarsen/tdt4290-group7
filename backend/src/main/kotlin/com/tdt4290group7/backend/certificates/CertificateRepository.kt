@@ -30,7 +30,7 @@ class CertificateRepository(databasePath: Path) {
                 val existing = statement.executeQuery("PRAGMA table_info(certificates)").use { rows ->
                     buildSet { while (rows.next()) add(rows.getString("name")) }
                 }
-                for (column in listOf("archived_at", "archived_by", "archived_reason", "uploaded_by_role", "archive_pending_for")) {
+                for (column in listOf("archived_at", "archived_by", "archived_reason", "uploaded_by_role", "archive_pending_for", "uploaded_at")) {
                     if (column !in existing) statement.execute("ALTER TABLE certificates ADD COLUMN $column TEXT")
                 }
             }
@@ -41,8 +41,8 @@ class CertificateRepository(databasePath: Path) {
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
                 """INSERT INTO certificates
-                    (id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, uploaded_by_role, archive_pending_for)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
+                    (id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, uploaded_by_role, archive_pending_for, uploaded_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, certificate.id)
                 statement.setString(2, certificate.supplierName)
@@ -53,6 +53,7 @@ class CertificateRepository(databasePath: Path) {
                 statement.setString(7, certificate.contractId)
                 statement.setString(8, certificate.uploadedByRole)
                 statement.setString(9, certificate.archivePendingFor)
+                statement.setString(10, certificate.uploadedAt)
                 statement.executeUpdate()
             }
         }
@@ -93,7 +94,7 @@ class CertificateRepository(databasePath: Path) {
     private fun query(where: String): List<Certificate> =
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
-                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at, uploaded_by_role, archive_pending_for
+                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at, uploaded_by_role, archive_pending_for, uploaded_at
                     FROM certificates $where""".trimIndent(),
             ).use { statement ->
                 statement.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.toCertificate()) } }
@@ -103,7 +104,7 @@ class CertificateRepository(databasePath: Path) {
     fun getById(id: String): Certificate? =
         DriverManager.getConnection(databaseUrl).use { db ->
             db.prepareStatement(
-                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at, uploaded_by_role, archive_pending_for
+                """SELECT id, supplier_name, certificate_type, issue_date, expiry_date, source_file, contract_id, archived_at, uploaded_by_role, archive_pending_for, uploaded_at
                     FROM certificates WHERE id = ?""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, id)
@@ -150,5 +151,6 @@ class CertificateRepository(databasePath: Path) {
         archivedAt = getString("archived_at"),
         uploadedByRole = getString("uploaded_by_role"),
         archivePendingFor = getString("archive_pending_for"),
+        uploadedAt = getString("uploaded_at"),
     )
 }

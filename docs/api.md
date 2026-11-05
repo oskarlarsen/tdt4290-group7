@@ -91,7 +91,7 @@ Alerts and certificates are archived, not deleted. An archived item is hidden fr
 | `POST` | `/api/certificates/{id}/restore` | Restore a certificate. An alert the system closed reopens; one an admin resolved stays resolved. |
 | `GET` | `/api/certificates?includeArchived=true` | List certificates including archived ones. |
 
-The supplier's own `GET /api/supplier/certificates` includes archived certificates with `archivedAt` set, so a supplier keeps their history. The `DELETE` endpoints still exist for one release so a rollback keeps working, but the app no longer calls them.
+The supplier's own `GET /api/supplier/certificates` includes archived certificates with `archivedAt` set, so a supplier keeps their history. A certificate upload also counts as the supplier's `lastUpdatedAt` on the admin dashboard. The `DELETE` endpoints still exist for one release so a rollback keeps working, but the app no longer calls them.
 
 ### Supplier certificate upload and renewals
 
@@ -240,7 +240,7 @@ Supplier onboarding and portal endpoints support both supplier sessions (strictl
 | `GET` | `/api/supplier/vehicles` | List vehicles linked to the supplier's agreements. |
 | `GET` | `/api/supplier/energy` | List facility energy consumption records. |
 | `GET` | `/api/supplier/products` | List catalog items and eco-labels. |
-| `GET` | `/api/supplier/certificates` | List environmental certificates for the supplier's contracts. |
+| `GET` | `/api/supplier/certificates` | List environmental certificates for all of the supplier's agreements, including ended ones, so older certificates stay as history. |
 
 ### Supplier notes
 

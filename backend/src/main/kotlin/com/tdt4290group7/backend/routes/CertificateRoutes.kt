@@ -344,6 +344,7 @@ private suspend fun ApplicationCall.handleCertificateUpload(repository: Certific
             status = calculateStatus(parsed.expiryDate, LocalDate.now(OSLO_ZONE)),
             contractId = upload.contractId,
             uploadedByRole = uploader.role,
+            uploadedAt = java.time.Instant.now().toString(),
         )
         val renewed = findRenewedCertificate(repository, certificate)
         // A supplier's renewal only proposes the archive: the date is read by OCR from a file the supplier chose,

@@ -3,6 +3,7 @@ package com.tdt4290group7.backend.admin
 import com.tdt4290group7.backend.certificates.Certificate
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.certificates.CertificateTypes
+import com.tdt4290group7.backend.onboarding.OnboardingRepository
 import com.tdt4290group7.backend.vehicles.DeviationPriority
 import com.tdt4290group7.backend.vehicles.FleetRepository
 import com.tdt4290group7.backend.vehicles.agreementLabel
@@ -605,7 +606,17 @@ private fun buildSummary(
     val onboardingBySupplier = vehicles.onboarding.getAdminSupplierOnboardingSummaries().associateBy { it.supplierId }
     val registeredAccountsBySupplier = UserRepository.supplierAccountCounts()
     val lastActiveBySupplier = UserRepository.lastActiveBySupplier()
-    val lastUpdatedBySupplier = vehicles.onboarding.lastUpdatedBySupplier()
+    val lastUpdatedBySupplier = vehicles.onboarding.lastUpdatedBySupplier().toMutableMap()
+    // A certificate upload counts as an update from the supplier it is linked to (through its agreement).
+    val supplierByAgreement = overview.agreements.associate { it.id to it.supplierId }
+    certificates.getAll().forEach { certificate ->
+        val at = certificate.uploadedAt?.let(java.time.Instant::parse) ?: return@forEach
+        val supplierId = certificate.contractId?.let(supplierByAgreement::get) ?: return@forEach
+        val current = lastUpdatedBySupplier[supplierId]
+        if (current == null || at.isAfter(current.at)) {
+            lastUpdatedBySupplier[supplierId] = OnboardingRepository.LastUpdate(at, certificate.uploadedByRole)
+        }
+    }
     val dashboardSuppliers = activeSuppliers.values.map { supplier ->
         val risk = riskForSupplier.getValue(supplier.id)
         val onboarding = onboardingBySupplier[supplier.id]

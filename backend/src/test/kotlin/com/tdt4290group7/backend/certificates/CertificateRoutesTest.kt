@@ -33,6 +33,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class CertificateRoutesTest {
     @Test
@@ -199,6 +200,35 @@ class CertificateRoutesTest {
         assertEquals(1, certificates.getAll().size)
         // Admins use their own route; the supplier route is for suppliers only.
         assertEquals(HttpStatusCode.Forbidden, adminClient().uploadPdf("/api/supplier/certificates", myAgreement.id, isoPdf).status)
+    }
+
+    @Test
+    fun aCertificateUploadCountsAsTheSuppliersLastUpdateAndStaysListedAfterTheAgreementEnds() = testApplication {
+        SupplierUploadLimiter.reset()
+        val vehicles = VehicleRepository(databasePath())
+        val actor = ChangeActor("admin", "Administrator")
+        val mine = vehicles.fleet.saveSupplier(null, SupplierInput("My Transport AS", "123456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(
+            null, AgreementInput(mine.id, "2026-01-01", "2030-12-31", 2, "T", saksnr = "2024/1"), null, actor, Instant.now(),
+        )
+        val certificates = CertificateRepository(databasePath())
+        application { module(vehicles, null, Duration.ofDays(14), certificates) }
+        val supplier = supplierClient(mine.id)
+
+        assertEquals(HttpStatusCode.Created, supplier.uploadPdf("/api/supplier/certificates", agreement.id, isoPdf).status)
+        val uploadedAt = certificates.getAll().single().uploadedAt
+        assertNotNull(uploadedAt)
+
+        val summary = Json.parseToJsonElement(adminClient().get("/api/admin/dashboard/summary").bodyAsText()).jsonObject
+        val row = summary.getValue("topRiskSuppliers").jsonArray.map { it.jsonObject }.single { it.getValue("id").jsonPrimitive.content == mine.id }
+        assertEquals(uploadedAt, row.getValue("lastUpdatedAt").jsonPrimitive.content)
+        assertEquals("SUPPLIER", row.getValue("lastUpdatedBy").jsonPrimitive.content)
+
+        // Once the agreement has ended, its certificates stay on the supplier's own list as history.
+        val current = vehicles.fleet.overview().agreements.single { it.id == agreement.id }
+        vehicles.fleet.removeAgreement(agreement.id, current.updatedAt, actor, Instant.now())
+        val listed = Json.parseToJsonElement(supplier.get("/api/supplier/certificates").bodyAsText()).jsonArray
+        assertEquals(1, listed.size)
     }
 
     @Test
