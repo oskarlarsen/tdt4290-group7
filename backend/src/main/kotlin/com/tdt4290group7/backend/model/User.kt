@@ -17,6 +17,14 @@ data class User(
     val supplierId: String? = null,
     // Embedded in every JWT; bumping it (e.g. on password change) invalidates all issued tokens.
     val tokenVersion: Int = 0,
+    /** When a stand-in's access ends (midnight Oslo after the end date); null for access with no end. */
+    val accessExpiresAt: java.time.Instant? = null,
+    /** Who gave this account its access, so access can end when theirs does. */
+    val grantedBy: String? = null,
+    /** An admin approved the grant: it then survives the granter losing access. */
+    val approved: Boolean = false,
+    /** The seeded administrator: never expires and cannot be revoked. */
+    val permanent: Boolean = false,
 )
 
 /** Public-facing user shape returned to the frontend. */

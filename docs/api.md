@@ -46,6 +46,21 @@ Certificate routes require an administrator session.
 
 The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
+### Shared access: colleagues and stand-ins
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/supplier/colleagues/invitations` | A supplier invites a colleague into its own organization (the organization comes from the login). Body: `email`, optional `accessEndDate` (`YYYY-MM-DD`). Returns the invitation `token` to pass on by hand. |
+| `POST` | `/api/admin/team/invitations` | An admin invites another admin, same body. |
+| `GET` | `/api/access` | Everyone with access: all accounts for an admin, the caller's own organization for a supplier. |
+| `POST` | `/api/access/{id}/renew` | Body `accessEndDate`. Only the person who gave the access, or an admin; only when 14 days or fewer are left (or it has ended); never your own. |
+| `POST` | `/api/access/{id}/revoke` | End access now. The granter or an admin; never your own, and never the seeded administrator. |
+| `POST` | `/api/admin/access/{id}/approve` | An admin approves a grant so it keeps working if the person who gave it later loses access. |
+
+`POST /api/auth/accept-invitation` takes an extra `name` (required for these invitations) so accounts can be told apart.
+
+Rules: an end date is at most 90 days away and cannot be later than the inviter's own access; with no end date, access ends with the inviter's (or has no end if theirs has none). Access ends at midnight Oslo time after the end date. Access is checked at login and on every request, so removing or expiring it takes effect at once. An unapproved grant also ends when the person who gave it loses access; an approved one keeps working until its own end date. A pending invitation from one organization cannot be cancelled or replaced by another.
+
 ### Supplier alert feed and notifications
 
 | Method | Endpoint | Purpose |

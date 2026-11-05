@@ -15,6 +15,7 @@ import com.tdt4290group7.backend.plugins.configureSerialization
 import com.tdt4290group7.backend.plugins.configureStatusPages
 import com.tdt4290group7.backend.repository.UserRepository
 import com.tdt4290group7.backend.routes.configureAuthRoutes
+import com.tdt4290group7.backend.routes.configureAccessRoutes
 import com.tdt4290group7.backend.routes.configureCertificateRoutes
 import com.tdt4290group7.backend.vehicles.VehicleRegistryClient
 import com.tdt4290group7.backend.vehicles.VehicleRepository
@@ -65,6 +66,7 @@ fun Application.module(
     val resolvedAdminInsightsRepository = adminInsightsRepository ?: AdminInsightsRepository(insightsDatabasePath)
     configureRouting(vehicleRepository, registry, cacheTtl, resolvedCertificateRepository, resolvedAdminInsightsRepository)
     configureCertificateRoutes(resolvedCertificateRepository, (vehicleRepository as? VehicleRepository)?.fleet)
+    (vehicleRepository as? VehicleRepository)?.fleet?.let(::configureAccessRoutes)
     configureAuthRoutes(logResetTokens) { supplierId ->
         (vehicleRepository as? VehicleRepository)?.fleet?.isSupplierActive(supplierId) ?: true
     }
