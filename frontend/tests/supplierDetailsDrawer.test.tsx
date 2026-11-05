@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SupplierDetailsDrawer } from "../src/components/suppliers/SupplierDetailsDrawer";
 import type { TopRiskSupplier } from "../src/types/dashboard";
 
+vi.mock("../src/hooks/useAuth", () => ({ useAuth: () => ({ user: { name: "Test admin" } }) }));
+
 const supplier: TopRiskSupplier = {
   id: "supplier-nordvik",
   displayName: "Nordvik Transport AS",
