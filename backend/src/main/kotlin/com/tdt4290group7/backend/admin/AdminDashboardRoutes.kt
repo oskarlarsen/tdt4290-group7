@@ -2,6 +2,7 @@ package com.tdt4290group7.backend.admin
 
 import com.tdt4290group7.backend.certificates.Certificate
 import com.tdt4290group7.backend.certificates.CertificateRepository
+import com.tdt4290group7.backend.certificates.CertificateTypes
 import com.tdt4290group7.backend.vehicles.DeviationPriority
 import com.tdt4290group7.backend.vehicles.FleetRepository
 import com.tdt4290group7.backend.vehicles.agreementLabel
@@ -55,7 +56,7 @@ data class DashboardKpis(
 )
 
 @Serializable
-data class AlertSeverityCounts(val high: Int, val medium: Int)
+data class AlertSeverityCounts(val high: Int, val medium: Int, val low: Int)
 
 @Serializable
 data class RiskCount(val count: Int, val percent: Int)
@@ -347,11 +348,18 @@ private fun refreshFindings(
     val certificateAgreementLinks = certificates.getAll().mapNotNull { certificate ->
         val expiry = certificate.expiryDate ?: return@mapNotNull null
         val daysRemaining = ChronoUnit.DAYS.between(today, expiry)
-        if (daysRemaining > 90) return@mapNotNull null
+        if (daysRemaining > CertificateTypes.warningDays(certificate.certificateType)) return@mapNotNull null
         val supplierId = certificate.contractId?.let(agreements::get)?.supplierId
             ?.takeIf(activeSuppliers::containsKey)
-        val findingKey = "certificate:${certificate.id}:$expiry"
-        val severity = if (daysRemaining < 0 || daysRemaining <= 30) "high" else "medium"
+        // Each warning level is its own alert, so resolving an early, low warning cannot hide a later one.
+        val level = when {
+            daysRemaining < 0 -> "expired"
+            daysRemaining <= 30 -> "30"
+            daysRemaining <= 90 -> "90"
+            else -> "365"
+        }
+        val findingKey = "certificate:${certificate.id}:$expiry:$level"
+        val severity = when (level) { "expired", "30" -> "high"; "90" -> "medium"; else -> "low" }
         val statusText = if (daysRemaining < 0) "has expired" else "expires in $daysRemaining days"
         AdminAlertRecord(
             id = UUID.nameUUIDFromBytes(findingKey.toByteArray()).toString(),
@@ -498,6 +506,7 @@ private fun buildSummary(
     val unresolvedAlerts = alerts.filter { it.status != "RESOLVED" }
     val highCount = unresolvedAlerts.count { it.severity == "high" }
     val mediumCount = unresolvedAlerts.count { it.severity == "medium" }
+    val lowCount = unresolvedAlerts.count { it.severity == "low" }
     val noFlagCount = riskClassification.compliant.count
     val certificateRecords = certificates.getAll()
     val listedVehicleCount = overview.vehicles.count { it.listed }
@@ -515,7 +524,7 @@ private fun buildSummary(
             highRiskSuppliers = riskClassification.high.count,
             monitoredSuppliers = assessedCount,
             activeAlerts = unresolvedAlerts.size,
-            alertsBySeverity = AlertSeverityCounts(highCount, mediumCount),
+            alertsBySeverity = AlertSeverityCounts(highCount, mediumCount, lowCount),
             complianceRatePercent = percentage(noFlagCount).toDouble(),
             complianceTargetPercent = 0,
             assessedSuppliers = assessedCount,

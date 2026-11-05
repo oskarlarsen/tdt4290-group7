@@ -193,19 +193,20 @@ export function addManualAlert(input: NewManualAlertInput): RecentAlert {
   return alert;
 }
 
-export function getAlertsBySeverity(): { high: number; medium: number } {
+export function getAlertsBySeverity(): { high: number; medium: number; low: number } {
   const unresolved = getUnresolvedAlerts();
   const modeledHigh = unresolved.filter((alert) => alert.severity === "high").length;
   const modeledMedium = unresolved.filter((alert) => alert.severity === "medium").length;
   return {
     high: modeledHigh + BULK_HIGH_ALERTS_UNLISTED,
     medium: modeledMedium + BULK_MEDIUM_ALERTS_UNLISTED,
+    low: unresolved.filter((alert) => alert.severity === "low").length,
   };
 }
 
 export function getUnresolvedAlertsCount(): number {
-  const { high, medium } = getAlertsBySeverity();
-  return high + medium;
+  const { high, medium, low } = getAlertsBySeverity();
+  return high + medium + low;
 }
 
 const SYNC_STORAGE_KEY = "last_synced_at";

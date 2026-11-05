@@ -11,10 +11,13 @@ export function CertificateUploadDialog({
   contracts: CertificateContract[];
   onClose: () => void;
 }) {
-  const [contractId, setContractId] = useState("");
+  // The admin types to search supplier name, org number or saksnr; the text must match one agreement exactly.
+  const [typed, setTyped] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const upload = useUploadCertificate();
-  const selectedContract = contracts.find((contract) => contract.id === contractId);
+  const optionLabel = (contract: CertificateContract) =>
+    `${contract.supplierName} (${contract.supplierOrgId}) — ${contract.contractName}`;
+  const selectedContract = contracts.find((contract) => optionLabel(contract) === typed.trim());
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,19 +62,23 @@ export function CertificateUploadDialog({
 
         <label className="mt-5 block text-sm font-medium text-neutral-700">
           Supplier and contract
-          <select
+          <input
             required
-            value={contractId}
-            onChange={(event) => setContractId(event.target.value)}
+            list="certificate-agreements"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="Type a supplier, org number or saksnr"
+            autoComplete="off"
             className="mt-1.5 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-          >
-            <option value="">Select a supplier</option>
+          />
+          <datalist id="certificate-agreements">
             {contracts.map((contract) => (
-              <option key={contract.id} value={contract.id}>
-                {contract.supplierName} — {contract.contractName}
-              </option>
+              <option key={contract.id} value={optionLabel(contract)} />
             ))}
-          </select>
+          </datalist>
+          {typed.trim() && !selectedContract && (
+            <span className="mt-1 block text-xs font-normal text-neutral-500">Pick one of the suggestions to continue.</span>
+          )}
         </label>
 
         <label className="mt-4 block text-sm font-medium text-neutral-700">

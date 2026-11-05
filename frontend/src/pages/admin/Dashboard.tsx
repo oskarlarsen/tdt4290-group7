@@ -179,7 +179,7 @@ export default function Dashboard() {
           label="Unresolved alerts"
           value={data.kpis.activeAlerts}
           sublabel="not yet resolved"
-          note={`${alertsBySeverity.high} high · ${alertsBySeverity.medium} medium`}
+          note={`${alertsBySeverity.high} high · ${alertsBySeverity.medium} medium${alertsBySeverity.low ? ` · ${alertsBySeverity.low} low` : ""}`}
           href="/admin/alerts?status=unresolved"
           icon={<Bell className="h-4 w-4" />}
         />

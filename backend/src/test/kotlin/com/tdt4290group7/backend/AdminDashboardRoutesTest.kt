@@ -149,6 +149,45 @@ class AdminDashboardRoutesTest {
     }
 
     @Test
+    fun longLeadCertificatesGetALowAlertAYearAheadAndOthersDoNot() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val certificateRepository = CertificateRepository(databasePath("certificates"))
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val actor = ChangeActor("admin", "Administrator")
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Renewal Transport AS", "123456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(
+            null, AgreementInput(supplier.id, "2026-01-01", "2030-12-31", 2, "Transport", saksnr = "2024/1"), null, actor, Instant.now(),
+        )
+        val today = LocalDate.now(ZoneId.of("Europe/Oslo"))
+        fun certificate(id: String, type: String, daysLeft: Long) = Certificate(
+            id, supplier.name, type, null, today.plusDays(daysLeft), "$id.pdf", CertificateStatus.VALID, agreement.id,
+        )
+        certificateRepository.add(certificate("iso-far", "ISO 14001", 200))
+        certificateRepository.add(certificate("miljo-edge", "Miljøfyrtårn", 365))
+        certificateRepository.add(certificate("miljo-too-far", "Miljøfyrtårn", 366))
+        certificateRepository.add(certificate("retura-200", "Retura", 200))
+        certificateRepository.add(certificate("iso-soon", "ISO 14001", 60))
+        application { module(vehicles, null, certificateRepository = certificateRepository, adminInsightsRepository = insights) }
+        val admin = adminClient()
+
+        val alerts = Json.parseToJsonElement(admin.get("/api/admin/alerts").bodyAsText()).jsonArray.map { it.jsonObject }
+        val bySeverity = alerts.groupBy { it.getValue("severity").jsonPrimitive.content }
+        // 200 and 365 days left: low. 60 days left: medium. 366 days, and a type that is not long lead at 200 days: none.
+        assertEquals(2, bySeverity.getValue("low").size)
+        assertEquals(1, bySeverity.getValue("medium").size)
+        assertEquals(3, alerts.size)
+        assertTrue(alerts.filter { it.getValue("severity").jsonPrimitive.content == "low" }.all { it.getValue("category").jsonPrimitive.content == "CERTIFICATES" })
+
+        val summary = Json.parseToJsonElement(admin.get("/api/admin/dashboard/summary").bodyAsText()).jsonObject
+        val kpis = summary.getValue("kpis").jsonObject
+        assertEquals(3, kpis.getValue("activeAlerts").jsonPrimitive.int)
+        val counts = kpis.getValue("alertsBySeverity").jsonObject
+        assertEquals(listOf(0, 1, 2), listOf("high", "medium", "low").map { counts.getValue(it).jsonPrimitive.int })
+        // Low alerts are early warnings: they do not make a supplier medium or high risk.
+        assertEquals("medium", summary.getValue("topRiskSuppliers").jsonArray.single().jsonObject.getValue("risk").jsonPrimitive.content)
+    }
+
+    @Test
     fun supplierNotesAreAdminOnlyAndSelfNotesBelongToTheirAuthor() = testApplication {
         val vehicles = VehicleRepository(databasePath("fleet"))
         val insights = AdminInsightsRepository(databasePath("insights"))

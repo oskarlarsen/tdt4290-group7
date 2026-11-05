@@ -63,7 +63,7 @@ export type DashboardKpis = {
   highRiskSuppliers: number;
   monitoredSuppliers: number;
   activeAlerts: number;
-  alertsBySeverity: { high: number; medium: number };
+  alertsBySeverity: { high: number; medium: number; low: number };
   complianceRatePercent: number;
   complianceTargetPercent: number;
   assessedSuppliers: number;
