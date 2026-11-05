@@ -17,6 +17,7 @@ export function CertificateTable({
   onEdit,
   onArchive,
   onRestore,
+  onRenew,
   emptyMessage = "No certificates to show.",
 }: {
   rows: CertificateRow[];
@@ -24,6 +25,8 @@ export function CertificateTable({
   onEdit: (certificate: Certificate) => void;
   onArchive: (certificate: Certificate) => void;
   onRestore: (certificate: Certificate) => void;
+  /** Opens an upload for the certificate's agreement; shown for live certificates that are expiring or expired. */
+  onRenew?: (certificate: Certificate) => void;
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
@@ -90,6 +93,16 @@ export function CertificateTable({
                     >
                       View Details
                     </button>
+                    {onRenew && certificate.contractId && !certificate.archivedAt && info.group !== "valid" && (
+                      <button
+                        type="button"
+                        onClick={() => onRenew(certificate)}
+                        aria-label={`Renew ${certificate.supplierName ?? "certificate"}`}
+                        className="rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                      >
+                        Renew
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onEdit(certificate)}

@@ -72,6 +72,7 @@ export default function Certificates() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null);
   const isUploadOpen = searchParams.get("upload") === "true";
+  const [renewContractId, setRenewContractId] = useState<string | undefined>(undefined);
 
   function setUploadOpen(open: boolean) {
     setSearchParams((current) => {
@@ -310,6 +311,10 @@ export default function Certificates() {
           onEdit={setEditingCertificate}
           onArchive={handleArchive}
           onRestore={handleRestore}
+          onRenew={(certificate) => {
+            setRenewContractId(certificate.contractId);
+            setUploadOpen(true);
+          }}
           emptyMessage={
             certificates.length === 0
               ? "No certificate records available"
@@ -359,7 +364,16 @@ export default function Certificates() {
 
       <CertificateDetailsDrawer row={selectedRow} onClose={() => setSelectedId(null)} />
 
-      {isUploadOpen && <CertificateUploadDialog contracts={contracts} onClose={() => setUploadOpen(false)} />}
+      {isUploadOpen && (
+        <CertificateUploadDialog
+          contracts={contracts}
+          initialContractId={renewContractId}
+          onClose={() => {
+            setUploadOpen(false);
+            setRenewContractId(undefined);
+          }}
+        />
+      )}
       {editingCertificate && (
         <CertificateEditDialog
           certificate={editingCertificate}

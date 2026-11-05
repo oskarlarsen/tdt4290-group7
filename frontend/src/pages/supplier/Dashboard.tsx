@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { BadgeCheck, Building2, ClipboardList, LoaderCircle, Package, Truck, Zap } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
+import { BadgeCheck, Bell, Building2, ClipboardList, LoaderCircle, Package, Truck, Zap } from "lucide-react";
 import { getOnboardingStatus, getSupplierOverview } from "@/api/onboarding";
 import type { OnboardingStatusResponse, SupplierOverview } from "@/types/onboarding";
 import { agreementLabel } from "../../utils/agreementLabel";
+import { useSupplierAlerts } from "../../hooks/useSupplierAlerts";
+import { ALERT_CATEGORIES } from "../../types/dashboard";
+import type { AlertCategory } from "../../types/dashboard";
+
+const CATEGORY_LABELS: Record<AlertCategory, string> = {
+  ENVIRONMENTAL_COMPLIANCE: "Environmental compliance",
+  ENERGY_FUEL: "Energy & fuel",
+  VEHICLE_COMPLIANCE: "Vehicle compliance",
+  CERTIFICATES: "Certificates",
+};
 
 const DASHBOARD_STATUSES = new Set(["SUBMITTED", "UNDER_REVIEW", "APPROVED"]);
 
@@ -43,6 +53,8 @@ export default function Dashboard() {
   const [overview, setOverview] = useState<SupplierOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const alerts = useSupplierAlerts();
+  const openAlerts = (alerts.data ?? []).filter((alert) => alert.status === "OPEN");
 
   useEffect(() => {
     let active = true;
@@ -110,6 +122,33 @@ export default function Dashboard() {
         <Metric icon={BadgeCheck} label="Certificates" value={overview.totalCertificates} />
         <Metric icon={Zap} label="Energy reports" value={overview.totalEnergyRecords} />
         <Metric icon={Package} label="Products" value={overview.totalProducts} />
+      </section>
+
+      <section aria-label="Open issues" className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Bell className="h-5 w-5 text-primary-700" aria-hidden="true" />
+          <h2 className="text-lg font-semibold text-neutral-900">Open issues</h2>
+        </div>
+        {alerts.isError ? (
+          <p className="text-sm text-neutral-500">Couldn't load your issues. Open My Alerts to try again.</p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {ALERT_CATEGORIES.map((category) => {
+              const count = openAlerts.filter((alert) => alert.category === category).length;
+              return (
+                <li key={category}>
+                  <Link
+                    to={`/supplier/alerts?category=${category}`}
+                    className="block rounded-lg border border-neutral-100 p-3 hover:bg-neutral-50"
+                  >
+                    <span className="block text-sm text-neutral-600">{CATEGORY_LABELS[category]}</span>
+                    <span className="mt-1 block text-2xl font-semibold text-neutral-900">{alerts.isLoading ? "…" : count}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">

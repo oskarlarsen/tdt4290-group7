@@ -61,4 +61,20 @@ describe("certificate table", () => {
     expect(onRestore).toHaveBeenCalledWith(archived);
     expect(onArchive).not.toHaveBeenCalled();
   });
+
+  it("offers Renew only on live certificates that are expiring or expired", () => {
+    const onRenew = vi.fn();
+    const expired = { ...certificate, id: "old", validUntil: "2020-01-01" };
+    render(
+      <CertificateTable
+        rows={[{ certificate }, { certificate: expired }, { certificate: { ...expired, id: "gone", archivedAt: "2026-10-01T10:00:00Z" } }]}
+        onSelect={vi.fn()} onEdit={vi.fn()} onArchive={vi.fn()} onRestore={vi.fn()} onRenew={onRenew}
+      />,
+    );
+
+    const buttons = screen.getAllByRole("button", { name: /^Renew/ });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(onRenew).toHaveBeenCalledWith(expired);
+  });
 });

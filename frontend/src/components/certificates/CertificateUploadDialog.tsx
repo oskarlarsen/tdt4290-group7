@@ -6,17 +6,21 @@ import type { CertificateContract } from "../../types/certificate";
 
 export function CertificateUploadDialog({
   contracts,
+  initialContractId,
   onClose,
 }: {
   contracts: CertificateContract[];
+  /** Opens with this agreement already chosen, for a renewal. */
+  initialContractId?: string;
   onClose: () => void;
 }) {
   // The admin types to search supplier name, org number or saksnr; the text must match one agreement exactly.
-  const [typed, setTyped] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const upload = useUploadCertificate();
   const optionLabel = (contract: CertificateContract) =>
     `${contract.supplierName} (${contract.supplierOrgId}) — ${contract.contractName}`;
+  const initial = contracts.find((contract) => contract.id === initialContractId);
+  const [typed, setTyped] = useState(initial ? optionLabel(initial) : "");
+  const [file, setFile] = useState<File | null>(null);
+  const upload = useUploadCertificate();
   const selectedContract = contracts.find((contract) => optionLabel(contract) === typed.trim());
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
