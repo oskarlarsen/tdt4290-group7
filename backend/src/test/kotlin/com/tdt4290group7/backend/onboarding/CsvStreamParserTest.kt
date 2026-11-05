@@ -130,7 +130,7 @@ class CsvStreamParserTest {
     @Test
     fun generatesHeaderOnlyTemplatesWithoutFictionalRecords() {
         val templates = mapOf(
-            BatchEntityType.VEHICLES to CsvStreamParser.VEHICLE_HEADERS,
+            BatchEntityType.VEHICLES to CsvStreamParser.VEHICLE_TEMPLATE_HEADERS,
             BatchEntityType.ENERGY to CsvStreamParser.ENERGY_HEADERS,
             BatchEntityType.PRODUCTS to CsvStreamParser.PRODUCT_HEADERS
         )

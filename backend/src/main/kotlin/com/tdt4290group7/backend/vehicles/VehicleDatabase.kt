@@ -46,7 +46,9 @@ internal class VehicleDatabase(path: Path) {
                 "requires_products INTEGER NOT NULL DEFAULT 0 CHECK(requires_products IN (0,1))",
                 "saksnr TEXT"
             ),
-            "vehicle_checks" to listOf("agreement_saksnr TEXT")
+            "vehicle_checks" to listOf("agreement_saksnr TEXT"),
+            // The category (and so the weight class) Statens vegvesen gave when the fuel was filled in at upload.
+            "vehicle_contract_details" to listOf("vehicle_category TEXT")
         )
         columnsByTable.forEach { (table, definitions) ->
             val existing = query(db, "PRAGMA table_info($table)") { it.getString("name") }.toSet()

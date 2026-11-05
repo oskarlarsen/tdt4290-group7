@@ -1,5 +1,6 @@
 import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
 import { Loader2, Truck } from "lucide-react";
+import { FUEL_TECHNOLOGIES, vehicleWeightRange } from "../../utils/vehicleCatalog";
 
 export default function MyVehicles() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
@@ -28,6 +29,8 @@ export default function MyVehicles() {
               <thead className="bg-neutral-50 text-xs font-medium uppercase tracking-wide text-neutral-500 border-b border-neutral-100">
                 <tr>
                   <th className="px-4 py-3">Registration Number</th>
+                  <th className="px-4 py-3">Fuel or propulsion</th>
+                  <th className="px-4 py-3">Weight</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
@@ -37,6 +40,10 @@ export default function MyVehicles() {
                     <td className="px-4 py-3 font-mono font-medium text-neutral-900">
                         {vehicle.planned ? "Registration pending" : vehicle.registrationNumber}
                     </td>
+                    <td className="px-4 py-3">
+                        {vehicle.fuelTechnology ? (FUEL_TECHNOLOGIES as Record<string, string>)[vehicle.fuelTechnology] ?? vehicle.fuelTechnology : "—"}
+                    </td>
+                    <td className="px-4 py-3">{vehicleWeightRange(vehicle.vehicleCategory) ?? "—"}</td>
                     <td className="px-4 py-3">
                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${vehicle.listed ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-600"}`}>{vehicle.listed ? "Listed" : "Removed"}</span>
                     </td>

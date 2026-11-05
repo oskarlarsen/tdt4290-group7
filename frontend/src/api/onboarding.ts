@@ -16,6 +16,8 @@ export type SupplierVehicle = {
   listed: boolean;
   fuelTechnology: string | null;
   isHybrid: boolean | null;
+  /** Registry category such as N2 (from the upload lookup), the source of the weight range. */
+  vehicleCategory?: string | null;
   fullContractCoverage: boolean | null;
   startYearWeek: string | null;
   endYearWeek: string | null;

@@ -36,10 +36,18 @@ import { CopyableValue } from "@/components/ui/CopyableValue";
 import { SupplierVehicleEntryForm } from "@/components/supplier/SupplierVehicleEntryForm";
 import { SupplierEnergyEntryForm } from "@/components/supplier/SupplierEnergyEntryForm";
 import { SupplierProductEntryForm } from "@/components/supplier/SupplierProductEntryForm";
-import { FUEL_TECHNOLOGIES } from "@/utils/vehicleCatalog";
+import { FUEL_TECHNOLOGIES, vehicleWeightRange } from "@/utils/vehicleCatalog";
 import { ECOLABEL_STANDARDS, PRODUCT_CATEGORIES, UNITS_OF_MEASURE } from "@/utils/productFormCsv";
 import { formatNumber } from "@/utils/formatNumber";
 import { agreementLabel } from "../../utils/agreementLabel";
+
+// What the preview says about where a vehicle's fuel came from.
+const REGISTRY_STATUS_LABELS: Record<string, string> = {
+  FILLED: "Yes, filled in for you",
+  PROVIDED: "No, you entered it",
+  NOT_FOUND: "Plate not found",
+  NOT_CHECKED: "Could not be checked",
+};
 
 const ENTITY_OPTIONS: Array<{ value: CsvEntity; label: string }> = [
   { value: "vehicles", label: "Vehicles" },
@@ -626,7 +634,7 @@ export default function Onboarding() {
                   <table className="w-full min-w-[620px] text-left text-xs">
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
-                        {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Coverage"].map((label) => (
+                        {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Weight", "Checked with Statens vegvesen", "Coverage"].map((label) => (
                           <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
@@ -645,6 +653,8 @@ export default function Onboarding() {
                             <td className="px-3 py-2">{row.registration_number || "Planned vehicle"}</td>
                             <td className="px-3 py-2">{fuel}</td>
                             <td className="px-3 py-2">{friendlyBoolean(row.is_hybrid)}</td>
+                            <td className="px-3 py-2">{vehicleWeightRange(row.vehicle_category) ?? "—"}</td>
+                            <td className="px-3 py-2">{REGISTRY_STATUS_LABELS[row.registry_status] ?? "—"}</td>
                             <td className="px-3 py-2">{coverage}</td>
                           </tr>
                         );

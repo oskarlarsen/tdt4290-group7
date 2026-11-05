@@ -43,6 +43,7 @@ internal val onboardingSchemaStatements = listOf(
         attachment_reference TEXT,
         notes TEXT,
         updated_at TEXT NOT NULL CHECK (julianday(updated_at) IS NOT NULL AND substr(updated_at, -1) = 'Z'),
+        vehicle_category TEXT,
         CHECK (full_contract_coverage = 1 OR (start_year_week IS NOT NULL AND end_year_week IS NOT NULL))
     ) STRICT""",
 

@@ -23,28 +23,68 @@ afterEach(() => {
 });
 
 describe("supplier vehicle entry form", () => {
-  it("turns clear form answers into a generated CSV for server validation", () => {
-    const onPreview = vi.fn();
-    const onChange = vi.fn();
-    render(
-      <SupplierVehicleEntryForm
-        agreements={agreements}
-        working={false}
-        onPreview={onPreview}
-        onChange={onChange}
-      />,
-    );
+  function mount(onPreview = vi.fn(), onChange = vi.fn()) {
+    render(<SupplierVehicleEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={onChange} />);
+    return { onPreview, onChange };
+  }
+
+  async function csvOf(file: File) { return await file.text(); }
+
+  it("needs only the plate, the agreement and the period for a registered vehicle", async () => {
+    const { onPreview, onChange } = mount();
+    const review = screen.getByRole("button", { name: "Review vehicle details" }) as HTMLButtonElement;
+    expect(review.disabled).toBe(true);
 
     fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "agreement-1" } });
-    fireEvent.change(screen.getByLabelText("Is this vehicle planned?"), { target: { value: "false" } });
-    fireEvent.change(screen.getByLabelText("Vehicle registration plate"), { target: { value: "ab12345" } });
-    fireEvent.change(screen.getByLabelText("Fuel or propulsion"), { target: { value: "13" } });
-    fireEvent.change(screen.getByLabelText("Is it a hybrid vehicle?"), { target: { value: "true" } });
-    fireEvent.change(screen.getByLabelText("Does it cover the full agreement period?"), { target: { value: "true" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review vehicle details" }));
+    fireEvent.change(screen.getByLabelText(/has a registration plate yet|have a registration plate yet/), { target: { value: "true" } });
+    fireEvent.change(screen.getByLabelText(/^Registration plate/), { target: { value: "ab12345" } });
+    fireEvent.change(screen.getByLabelText("Will it be used for the whole agreement period?"), { target: { value: "true" } });
+    // No fuel and no hybrid question: Statens vegvesen fills them in at review.
+    expect(screen.queryByLabelText(/hybrid/i)).toBeNull();
+    expect(review.disabled).toBe(false);
+    fireEvent.click(review);
 
     expect(onPreview).toHaveBeenCalledOnce();
-    expect(onPreview.mock.calls[0][0]).toBeInstanceOf(File);
+    const csv = await csvOf(onPreview.mock.calls[0][0] as File);
+    expect(csv).toContain("agreement-1;AB12345;FALSE;;;TRUE;");
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it("asks for a fuel only when the vehicle has no plate yet", async () => {
+    const { onPreview } = mount();
+    fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "agreement-1" } });
+    fireEvent.change(screen.getByLabelText(/have a registration plate yet/), { target: { value: "false" } });
+    fireEvent.change(screen.getByLabelText("Will it be used for the whole agreement period?"), { target: { value: "true" } });
+    const review = screen.getByRole("button", { name: "Review vehicle details" }) as HTMLButtonElement;
+    expect(review.disabled).toBe(true);
+    expect(screen.queryByLabelText(/^Registration plate/)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/^Fuel or propulsion/), { target: { value: "13" } });
+    expect(review.disabled).toBe(false);
+    fireEvent.click(review);
+    expect(await csvOf(onPreview.mock.calls[0][0] as File)).toContain("agreement-1;;TRUE;13;;TRUE;");
+  });
+
+  it("uses a week picker for part-period coverage", async () => {
+    const { onPreview } = mount();
+    fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "agreement-1" } });
+    fireEvent.change(screen.getByLabelText(/have a registration plate yet/), { target: { value: "true" } });
+    fireEvent.change(screen.getByLabelText(/^Registration plate/), { target: { value: "AB12345" } });
+    fireEvent.change(screen.getByLabelText("Will it be used for the whole agreement period?"), { target: { value: "false" } });
+    const from = screen.getByLabelText("Used from week") as HTMLInputElement;
+    expect(from.type).toBe("week");
+    fireEvent.change(from, { target: { value: "2026-W08" } });
+    fireEvent.change(screen.getByLabelText("Used until week"), { target: { value: "2026-W52" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review vehicle details" }));
+    expect(await csvOf(onPreview.mock.calls[0][0] as File)).toContain("FALSE;2026-W08;2026-W52;");
+  });
+
+  it("offers the CSV template and previews an uploaded CSV file", () => {
+    const { onPreview, onChange } = mount();
+    expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
+    const file = new File(["agreement_id;registration_number"], "vehicles.csv", { type: "text/csv" });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    expect(onPreview).toHaveBeenCalledWith(file);
     expect(onChange).toHaveBeenCalled();
   });
 

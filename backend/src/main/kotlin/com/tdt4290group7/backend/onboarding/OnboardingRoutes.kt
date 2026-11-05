@@ -4,6 +4,7 @@ import com.tdt4290group7.backend.auth.JwtConfig
 import com.tdt4290group7.backend.routes.CertificateResponse
 import com.tdt4290group7.backend.routes.toResponse
 import com.tdt4290group7.backend.certificates.CertificateRepository
+import com.tdt4290group7.backend.vehicles.VehicleRegistryLookup
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
 import com.tdt4290group7.backend.plugins.AUTH_JWT
@@ -73,7 +74,8 @@ internal suspend fun ApplicationCall.resolveSupplierId(user: User): String? {
 
 internal fun Route.onboardingRoutes(
     repository: OnboardingRepository,
-    certificateRepository: CertificateRepository? = null
+    certificateRepository: CertificateRepository? = null,
+    registry: VehicleRegistryLookup? = null
 ) {
     route("/api/onboarding") {
         get("/status") {
@@ -161,7 +163,8 @@ internal fun Route.onboardingRoutes(
                     entityType = entityType,
                     fileName = fileName,
                     fileBytes = uploadedBytes,
-                    now = Instant.now()
+                    now = Instant.now(),
+                    registry = registry
                 )
                 call.respond(preview)
             } catch (e: IllegalArgumentException) {

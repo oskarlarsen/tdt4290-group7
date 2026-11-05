@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { Download, FileUp, Plus, Trash2, Upload } from "lucide-react";
+import { downloadCsvTemplate } from "../../api/onboarding";
 import type { SupplierOverview } from "../../types/onboarding";
 import { FUEL_TECHNOLOGIES } from "../../utils/vehicleCatalog";
 import { createVehicleFormRow, vehicleRowsToCsv, type VehicleFormRow } from "../../utils/vehicleFormCsv";
@@ -43,14 +44,41 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
     row.agreementId &&
     (row.isPlanned === true || row.registrationNumber.trim()) &&
     row.isPlanned !== null &&
-    row.fuelTechnology &&
-    row.isHybrid !== null &&
+    // A registered vehicle's fuel is checked with Statens vegvesen; a planned one has no plate, so it needs a fuel.
+    (row.isPlanned === false || row.fuelTechnology) &&
     row.fullContractCoverage !== null &&
     (row.fullContractCoverage || (row.startYearWeek.trim() && row.endYearWeek.trim()))
   );
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-neutral-300 p-3 text-sm text-neutral-600">
+        <span className="mr-auto">Have many vehicles? Fill in a CSV file instead of the form.</span>
+        <button
+          type="button"
+          onClick={() => void downloadCsvTemplate("vehicles")}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+        >
+          <Download className="h-4 w-4" aria-hidden="true" />
+          Download CSV template
+        </button>
+        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 ${working || agreements.length === 0 ? "pointer-events-none opacity-50" : ""}`}>
+          <FileUp className="h-4 w-4" aria-hidden="true" />
+          Upload a filled-in CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            disabled={working || agreements.length === 0}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) { onChange(); onPreview(file); }
+            }}
+          />
+        </label>
+      </div>
+
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
           <legend className="px-1 font-semibold text-neutral-800">Vehicle {index + 1}</legend>
@@ -89,18 +117,19 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <BooleanSelect
-              label="Is this vehicle planned?"
-              value={row.isPlanned}
+              label="Does this vehicle have a registration plate yet?"
+              value={row.isPlanned === null ? null : !row.isPlanned}
               disabled={working}
-              onChange={(value) => updateRow(row.id, {
-                isPlanned: value,
-                registrationNumber: value ? "" : row.registrationNumber,
+              onChange={(hasPlate) => updateRow(row.id, {
+                isPlanned: hasPlate === null ? null : !hasPlate,
+                registrationNumber: hasPlate === false ? "" : row.registrationNumber,
               })}
             />
 
             {row.isPlanned !== true && (
               <label className="block text-sm font-medium text-neutral-700">
-                Vehicle registration plate
+                Registration plate
+                <span className="block text-xs font-normal text-neutral-500">We look up the vehicle with Statens vegvesen, so you do not need to fill in fuel.</span>
                 <input
                   value={row.registrationNumber}
                   onChange={(event) => updateRow(row.id, { registrationNumber: event.target.value.toUpperCase() })}
@@ -114,15 +143,15 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             )}
 
             <label className="block text-sm font-medium text-neutral-700">
-              Fuel or propulsion
+              Fuel or propulsion {row.isPlanned !== true && <span className="font-normal text-neutral-400">(optional: we check it for you)</span>}
               <select
                 value={row.fuelTechnology}
                 onChange={(event) => updateRow(row.id, { fuelTechnology: event.target.value })}
                 disabled={working}
                 className={fieldClass}
-                required
+                required={row.isPlanned === true}
               >
-                <option value="">Choose fuel or propulsion</option>
+                <option value="">{row.isPlanned === true ? "Choose fuel or propulsion" : "Let Statens vegvesen decide"}</option>
                 {Object.entries(FUEL_TECHNOLOGIES).map(([code, label]) => (
                   <option key={code} value={code}>{label}</option>
                 ))}
@@ -130,14 +159,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <BooleanSelect
-              label="Is it a hybrid vehicle?"
-              value={row.isHybrid}
-              disabled={working}
-              onChange={(value) => updateRow(row.id, { isHybrid: value })}
-            />
-
-            <BooleanSelect
-              label="Does it cover the full agreement period?"
+              label="Will it be used for the whole agreement period?"
               value={row.fullContractCoverage}
               disabled={working}
               onChange={(value) => updateRow(row.id, { fullContractCoverage: value })}
@@ -146,24 +168,22 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             {row.fullContractCoverage === false && (
               <>
                 <label className="block text-sm font-medium text-neutral-700">
-                  Coverage starts (year and week)
+                  Used from week
                   <input
+                    type="week"
                     value={row.startYearWeek}
-                    onChange={(event) => updateRow(row.id, { startYearWeek: event.target.value.toUpperCase() })}
-                    placeholder="2026-W08"
-                    pattern="[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])"
+                    onChange={(event) => updateRow(row.id, { startYearWeek: event.target.value })}
                     disabled={working}
                     className={fieldClass}
                     required
                   />
                 </label>
                 <label className="block text-sm font-medium text-neutral-700">
-                  Coverage ends (year and week)
+                  Used until week
                   <input
+                    type="week"
                     value={row.endYearWeek}
-                    onChange={(event) => updateRow(row.id, { endYearWeek: event.target.value.toUpperCase() })}
-                    placeholder="2026-W52"
-                    pattern="[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])"
+                    onChange={(event) => updateRow(row.id, { endYearWeek: event.target.value })}
                     disabled={working}
                     className={fieldClass}
                     required
@@ -173,7 +193,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             )}
 
             <label className="block text-sm font-medium text-neutral-700">
-              Supporting document reference <span className="font-normal text-neutral-400">(optional)</span>
+              Reference to a supporting document <span className="font-normal text-neutral-400">(optional)</span>
               <input
                 value={row.attachmentReference}
                 onChange={(event) => updateRow(row.id, { attachmentReference: event.target.value })}

@@ -103,7 +103,8 @@ class OnboardingWorkflowTest {
         val templateRes = supplier.get("/api/onboarding/templates/vehicles")
         assertEquals(HttpStatusCode.OK, templateRes.status)
         val templateText = templateRes.bodyAsText()
-        assertTrue(templateText.endsWith(CsvStreamParser.VEHICLE_HEADERS.joinToString(";") + "\r\n"))
+        assertTrue(templateText.endsWith(CsvStreamParser.VEHICLE_TEMPLATE_HEADERS.joinToString(";") + "\r\n"))
+        assertFalse(templateText.contains("is_hybrid"))
         assertFalse(templateText.contains(agreementId))
 
         // 4. Two-Phase CSV Upload: Preview valid fleet
