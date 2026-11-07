@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import com.tdt4290group7.backend.vehicles.FuelTechnology
 
 object CsvStreamParser {
 
@@ -243,6 +244,9 @@ object CsvStreamParser {
         val fuel = rowMap["fuel_technology"]?.trim() ?: ""
         if (fuel.isEmpty() && isPlanned) {
             errors.add(CsvCellError(row, "fuel_technology", "fuel_technology is required for planned vehicles: they have no registration number to look up"))
+        }
+        if (fuel.isNotEmpty() && FuelTechnology.entries.none { it.code == fuel }) {
+            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology must be a Statens vegvesen fuel code, for example 2 for Diesel", fuel))
         }
 
         val fullCoverageStr = rowMap["full_contract_coverage"]?.trim()?.uppercase(Locale.ROOT)
