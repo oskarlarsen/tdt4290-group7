@@ -153,12 +153,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {import.meta.env.VITE_USE_MOCKS === "true" && (
-        <p role="note" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Demo data: supplier risk, alerts and the portfolio figures below come from sample data. Vehicle and certificate totals are real.
-        </p>
-      )}
-
       <section aria-label="Portfolio metrics" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Active suppliers"
