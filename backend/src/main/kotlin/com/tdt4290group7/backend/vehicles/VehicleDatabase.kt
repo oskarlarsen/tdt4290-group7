@@ -20,7 +20,7 @@ internal class VehicleDatabase(path: Path) {
             val version = query(db, "PRAGMA user_version") { it.getInt(1) }.single()
             // Version 10 adds agreements.saksnr; versions 8 and 9 are upgraded in place below.
             check(version == 0 || version == 8 || version == 9 || version == 10) {
-                "Incompatible vehicle database schema (version $version). Stop the backend and run scripts/reset-vehicle-data.ps1 after confirming that the data can be wiped."
+                "Incompatible vehicle database schema (version $version). Stop the backend and delete $absolute after confirming that the data can be wiped."
             }
             if (version == 0) check(query(db, "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'") { it.getString(1) }.isEmpty()) { "Vehicle database is not empty; run the development reset." }
             db.createStatement().use { statement ->

@@ -127,7 +127,7 @@ class VehicleInputRulesTest {
                 }
             }
             val error = assertFailsWith<IllegalStateException> { VehicleRepository(path) }
-            assertTrue(error.message!!.contains("reset-vehicle-data.ps1"))
+            assertTrue(error.message!!.contains("delete "))
             DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
                 db.createStatement().use { it.executeQuery("SELECT registration_number FROM vehicles").use { rows ->
                     assertTrue(rows.next()); assertEquals("TEST01", rows.getString(1)); assertFalse(rows.next())
