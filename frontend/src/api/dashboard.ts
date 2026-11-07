@@ -37,7 +37,7 @@ export function getDashboardSummary(): Promise<DashboardSummary> {
       topRiskSuppliers: db.getTopRiskSuppliers(),
       suppliersRequiringAttention: db.getSuppliersRequiringAttention(),
       issueCategoryBreakdown: db.getIssueCategoryBreakdown(),
-      recentAlerts: db.getUnresolvedAlerts(),
+      recentAlerts: db.getUnresolvedAlerts().sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")),
     });
   }
   return apiFetch<DashboardSummary>("/admin/dashboard/summary");
