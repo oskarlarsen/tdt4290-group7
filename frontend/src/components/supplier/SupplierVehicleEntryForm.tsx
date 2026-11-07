@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Download, FileUp, Plus, Trash2, Upload } from "lucide-react";
-import { downloadCsvTemplate } from "../../api/onboarding";
+import { Plus, Trash2, Upload } from "lucide-react";
+import { CsvUploadPanel } from "./CsvUploadPanel";
 import type { SupplierOverview } from "../../types/onboarding";
 import { FUEL_TECHNOLOGIES } from "../../utils/vehicleCatalog";
 import { createVehicleFormRow, vehicleRowsToCsv, type VehicleFormRow } from "../../utils/vehicleFormCsv";
@@ -55,32 +55,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
   return (
     <div className="space-y-4">
       {mode === "csv" && (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-neutral-300 p-3 text-sm text-neutral-600">
-        <span className="mr-auto">Download the template, fill it in, then upload it for review.</span>
-        <button
-          type="button"
-          onClick={() => void downloadCsvTemplate("vehicles")}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-        >
-          <Download className="h-4 w-4" aria-hidden="true" />
-          Download CSV template
-        </button>
-        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 ${working || agreements.length === 0 ? "pointer-events-none opacity-50" : ""}`}>
-          <FileUp className="h-4 w-4" aria-hidden="true" />
-          Upload a filled-in CSV
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="sr-only"
-            disabled={working || agreements.length === 0}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) { onChange(); onPreview(file); }
-            }}
-          />
-        </label>
-      </div>
+        <CsvUploadPanel entity="vehicles" disabled={working || agreements.length === 0} onPreview={onPreview} onChange={onChange} />
       )}
       {agreements.length === 0 && (
         <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>

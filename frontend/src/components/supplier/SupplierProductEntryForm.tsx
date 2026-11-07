@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
+import { CsvUploadPanel } from "./CsvUploadPanel";
 import type { SupplierOverview } from "../../types/onboarding";
 import {
   createProductFormRow,
@@ -19,9 +20,11 @@ type Props = {
   working: boolean;
   onPreview: (file: File) => void;
   onChange: () => void;
+  /** Which way of entering data is showing: the form, or a CSV file. */
+  mode: "form" | "csv";
 };
 
-export function SupplierProductEntryForm({ agreements, working, onPreview, onChange }: Props) {
+export function SupplierProductEntryForm({ agreements, working, onPreview, onChange, mode }: Props) {
   const [rows, setRows] = useState<ProductFormRow[]>([createProductFormRow()]);
 
   function updateRow(id: string, patch: Partial<ProductFormRow>) {
@@ -61,6 +64,15 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
 
   return (
     <div className="space-y-4">
+      {mode === "csv" && (
+        <CsvUploadPanel entity="products" disabled={working || agreements.length === 0} onPreview={onPreview} onChange={onChange} />
+      )}
+      {agreements.length === 0 && (
+        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
+      )}
+
+      {mode === "form" && (
+        <>
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
           <legend className="px-1 font-semibold text-neutral-800">Product {index + 1}</legend>
@@ -250,14 +262,12 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
           {working ? "Validating…" : "Review product details"}
         </button>
       </div>
-
-      {agreements.length === 0 && (
-        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
-      )}
       {!isReady && agreements.length > 0 && (
         <p className="text-xs text-neutral-500">
           Complete each product’s required details. If an ecolabel standard is chosen, the license number is required.
         </p>
+      )}
+        </>
       )}
     </div>
   );

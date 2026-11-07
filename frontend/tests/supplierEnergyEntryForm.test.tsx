@@ -34,6 +34,7 @@ describe("supplier energy entry form", () => {
         working={false}
         onPreview={onPreview}
         onChange={onChange}
+        mode="form"
       />,
     );
 
@@ -60,6 +61,7 @@ describe("supplier energy entry form", () => {
         working={false}
         onPreview={vi.fn()}
         onChange={vi.fn()}
+        mode="form"
       />,
     );
 
@@ -68,5 +70,14 @@ describe("supplier energy entry form", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove facility 2" }));
     expect(screen.queryByText("Facility 2")).toBeNull();
+  });
+
+  it("shows the CSV upload instead of the form in CSV mode", () => {
+    const onPreview = vi.fn();
+    render(<SupplierEnergyEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={vi.fn()} mode="csv" />);
+    expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
+    const file = new File(["a;b"], "energy.csv", { type: "text/csv" });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    expect(onPreview).toHaveBeenCalledWith(file);
   });
 });

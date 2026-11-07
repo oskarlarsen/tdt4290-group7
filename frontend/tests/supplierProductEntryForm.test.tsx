@@ -34,6 +34,7 @@ describe("supplier product entry form", () => {
         working={false}
         onPreview={onPreview}
         onChange={onChange}
+        mode="form"
       />,
     );
 
@@ -63,6 +64,7 @@ describe("supplier product entry form", () => {
         working={false}
         onPreview={vi.fn()}
         onChange={vi.fn()}
+        mode="form"
       />,
     );
 
@@ -71,5 +73,14 @@ describe("supplier product entry form", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove product 2" }));
     expect(screen.queryByText("Product 2")).toBeNull();
+  });
+
+  it("shows the CSV upload instead of the form in CSV mode", () => {
+    const onPreview = vi.fn();
+    render(<SupplierProductEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={vi.fn()} mode="csv" />);
+    expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
+    const file = new File(["a;b"], "products.csv", { type: "text/csv" });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    expect(onPreview).toHaveBeenCalledWith(file);
   });
 });

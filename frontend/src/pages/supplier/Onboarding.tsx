@@ -182,7 +182,7 @@ export default function Onboarding() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [entity, setEntity] = useState<CsvEntity>("vehicles");
-  // Vehicles can be entered in the form or as a CSV file; each way keeps its own preview.
+  // Each kind of data can be entered in a form or as a CSV file; each way keeps its own preview.
   const [method, setMethod] = useState<"form" | "csv">("form");
   const [previews, setPreviews] = useState<Record<"form" | "csv", CsvPreview | null>>({ form: null, csv: null });
   const preview = previews[method];
@@ -540,23 +540,21 @@ export default function Onboarding() {
               </label>
             </div>
 
-            {entity === "vehicles" && (
-              <div role="tablist" aria-label="How to enter vehicles" className="inline-flex rounded-lg border border-neutral-200 p-0.5 text-sm">
-                {([["form", "Fill in a form"], ["csv", "Upload a CSV file"]] as const).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="tab"
-                    aria-selected={method === value}
-                    disabled={working}
-                    onClick={() => { setMethod(value); setError(null); setNotice(null); }}
-                    className={`rounded-md px-3 py-1.5 font-medium ${method === value ? "bg-primary-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div role="tablist" aria-label="How to enter the data" className="inline-flex rounded-lg border border-neutral-200 p-0.5 text-sm">
+              {([["form", "Fill in a form"], ["csv", "Upload a CSV file"]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={method === value}
+                  disabled={working}
+                  onClick={() => { setMethod(value); setError(null); setNotice(null); }}
+                  className={`rounded-md px-3 py-1.5 font-medium ${method === value ? "bg-primary-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
             {entity === "vehicles" && (
               <SupplierVehicleEntryForm
@@ -571,6 +569,7 @@ export default function Onboarding() {
 
             {entity === "energy" && (
               <SupplierEnergyEntryForm
+                mode={method}
                 key={`energy-${formVersion}`}
                 agreements={overview.agreements.filter((agreement) => agreement.requiresEnergy)}
                 working={working}
@@ -581,6 +580,7 @@ export default function Onboarding() {
 
             {entity === "products" && (
               <SupplierProductEntryForm
+                mode={method}
                 key={`products-${formVersion}`}
                 agreements={overview.agreements.filter((agreement) => agreement.requiresProducts)}
                 working={working}

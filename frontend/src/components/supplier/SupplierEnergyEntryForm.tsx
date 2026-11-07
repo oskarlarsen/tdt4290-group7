@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
+import { CsvUploadPanel } from "./CsvUploadPanel";
 import type { SupplierOverview } from "../../types/onboarding";
 import { createEnergyFormRow, energyRowsToCsv, type EnergyFormRow } from "../../utils/energyFormCsv";
 import { agreementLabel } from "../../utils/agreementLabel";
@@ -12,9 +13,11 @@ type Props = {
   working: boolean;
   onPreview: (file: File) => void;
   onChange: () => void;
+  /** Which way of entering data is showing: the form, or a CSV file. */
+  mode: "form" | "csv";
 };
 
-export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChange }: Props) {
+export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChange, mode }: Props) {
   const [rows, setRows] = useState<EnergyFormRow[]>([createEnergyFormRow()]);
 
   function updateRow(id: string, patch: Partial<EnergyFormRow>) {
@@ -67,6 +70,15 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
 
   return (
     <div className="space-y-4">
+      {mode === "csv" && (
+        <CsvUploadPanel entity="energy" disabled={working || agreements.length === 0} onPreview={onPreview} onChange={onChange} />
+      )}
+      {agreements.length === 0 && (
+        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
+      )}
+
+      {mode === "form" && (
+        <>
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
           <legend className="px-1 font-semibold text-neutral-800">Facility {index + 1}</legend>
@@ -324,14 +336,12 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
           {working ? "Validating…" : "Review energy details"}
         </button>
       </div>
-
-      {agreements.length === 0 && (
-        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
-      )}
       {!isReady && agreements.length > 0 && (
         <p className="text-xs text-neutral-500">
           Complete the required fields for each facility (Agreement, Location code, Address, Electricity, and District heating).
         </p>
+      )}
+        </>
       )}
     </div>
   );
