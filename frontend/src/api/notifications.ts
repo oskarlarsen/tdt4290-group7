@@ -5,8 +5,9 @@ import type { Notification } from "../types/notification";
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 // The server resolves the user from the login; userId is only used by the mock layer.
-export function getNotifications(userId: string): Promise<Notification[]> {
-  if (USE_MOCKS) return Promise.resolve(db.getNotifications(userId));
+// The mock notifications describe other suppliers, so a supplier always reads its own from the server.
+export function getNotifications(userId: string, role?: string): Promise<Notification[]> {
+  if (USE_MOCKS && role !== "SUPPLIER") return Promise.resolve(db.getNotifications(userId));
   return apiFetch<Notification[]>("/notifications");
 }
 

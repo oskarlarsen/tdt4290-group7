@@ -10,7 +10,7 @@ export function useNotifications() {
   const { user } = useAuth();
   return useQuery({
     queryKey: queryKeyFor(user?.id),
-    queryFn: () => notificationsApi.getNotifications(user!.id),
+    queryFn: () => notificationsApi.getNotifications(user!.id, user!.role),
     enabled: !!user,
     staleTime: 30_000,
   });
