@@ -40,7 +40,7 @@ describe("certificate table", () => {
     expect(screen.getByText("Not linked")).toBeTruthy();
     expect(screen.getByText("Valid")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "View Details" }));
+    fireEvent.click(screen.getByRole("button", { name: "View details" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit Example Transport AS" }));
     fireEvent.click(screen.getByRole("button", { name: "Archive Example Transport AS" }));
 

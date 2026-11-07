@@ -359,7 +359,7 @@ export default function Alerts() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
               <Plus className="h-3.5 w-3.5" />
-              Create Manual Alert
+              Create manual alert
             </button>
           </div>
         </div>

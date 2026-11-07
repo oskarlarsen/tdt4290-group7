@@ -161,7 +161,7 @@ export function SupplierDetailsDrawer({
                       onClick={() => onChangeReviewStatus("resolved")}
                       className="rounded-lg border border-tertiary-200 px-2.5 py-1.5 text-xs font-medium text-tertiary-700 hover:bg-tertiary-50"
                     >
-                      Mark Resolved
+                      Mark resolved
                     </button>
                   )}
                 </div>

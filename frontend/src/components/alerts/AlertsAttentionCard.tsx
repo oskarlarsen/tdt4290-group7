@@ -78,13 +78,13 @@ export function AlertsAttentionCard({
               className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-red-700 px-3 text-xs font-medium text-white transition-colors hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700/30"
             >
               <Mail className="h-3.5 w-3.5" />
-              Send Notice
+              Send notice
             </button>
             <button
               onClick={() => onViewDetails(visibleRow)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
-              View Details
+              View details
             </button>
           </div>
         </div>

@@ -146,7 +146,7 @@ export function AlertDetailsDrawer({
                 <Field label="Created On" value={formatAlertCreatedDate(alert.createdAt)} />
                 <Field label="Status" value={ALERT_STATUS_LABELS[alert.status]} />
                 <Field label="Source" value={alert.source === "MANUAL" ? "Manual" : "Automatic"} />
-                {alert.category && <Field label="Risk Category" value={CATEGORY_LABELS[alert.category]} />}
+                {alert.category && <Field label="Risk category" value={CATEGORY_LABELS[alert.category]} />}
                 {alert.dueDate && <Field label="Due Date" value={formatAlertCreatedDate(alert.dueDate)} />}
               </Section>
 

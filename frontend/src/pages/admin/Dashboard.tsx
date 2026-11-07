@@ -228,7 +228,7 @@ export default function Dashboard() {
           ) : (
             <TopRiskSuppliersTable
               suppliers={visibleSuppliers}
-              actionLabel="View Details"
+              actionLabel="View details"
               getReviewStatus={getStatus}
               onSelect={(supplier) => navigate(`/admin/suppliers?supplierId=${supplier.id}`)}
               onMarkReviewComplete={(supplier) => setStatus(supplier.id, "resolved")}

@@ -69,9 +69,9 @@ describe("manual alert dialog note to self", () => {
     HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(<CreateManualAlertDialog open suppliers={[supplier]} onClose={vi.fn()} onCreate={onCreate} />);
-    fireEvent.change(screen.getByLabelText(/Alert Title/), { target: { value: "Follow up" } });
+    fireEvent.change(screen.getByLabelText(/Alert title/), { target: { value: "Follow up" } });
     fireEvent.change(screen.getByLabelText(/^Supplier/), { target: { value: supplier.id } });
-    fireEvent.change(screen.getByLabelText(/^Risk Category/), { target: { value: "VEHICLE_COMPLIANCE" } });
+    fireEvent.change(screen.getByLabelText(/^Risk category/), { target: { value: "VEHICLE_COMPLIANCE" } });
     fireEvent.change(screen.getByLabelText(/^Risk \*/), { target: { value: "medium" } });
     fireEvent.change(screen.getByLabelText(/^Alert Type/), { target: { value: "CONFIRMED_DEVIATION" } });
     fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: "Check the vehicles" } });
@@ -80,7 +80,7 @@ describe("manual alert dialog note to self", () => {
 
   it("passes the note along only when the box is ticked", async () => {
     const onCreate = fillAlert();
-    fireEvent.click(screen.getByRole("button", { name: "Create Alert" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
     expect(onCreate.mock.calls[0][1]).toBeUndefined();
   });
@@ -89,7 +89,7 @@ describe("manual alert dialog note to self", () => {
     const onCreate = fillAlert();
     fireEvent.click(screen.getByRole("checkbox", { name: "Save a note to self" }));
     fireEvent.change(screen.getByLabelText(/^Note to self/), { target: { value: "  Call on Monday " } });
-    fireEvent.click(screen.getByRole("button", { name: "Create Alert" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
     expect(onCreate.mock.calls[0][1]).toBe("Call on Monday");
   });
@@ -97,7 +97,7 @@ describe("manual alert dialog note to self", () => {
   it("asks for the note text when the box is ticked but empty", async () => {
     const onCreate = fillAlert();
     fireEvent.click(screen.getByRole("checkbox", { name: "Save a note to self" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create Alert" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
     expect(await screen.findByText(/Write the note, or untick/)).toBeTruthy();
     expect(onCreate).not.toHaveBeenCalled();
   });

@@ -46,7 +46,7 @@ export function AlertCard({
             className="inline-flex items-center justify-center rounded-lg bg-primary-900 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!onInvestigate}
           >
-            View Details
+            View details
           </button>
         )}
       </div>

@@ -297,7 +297,7 @@ export function AddSupplierDialog({
             disabled={isSubmitting}
             className="inline-flex min-h-8 items-center justify-center rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Adding…" : "Add Supplier"}
+            {isSubmitting ? "Adding…" : "Add supplier"}
           </button>
         </footer>
       </form>

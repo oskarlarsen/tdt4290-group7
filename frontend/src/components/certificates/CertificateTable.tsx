@@ -91,7 +91,7 @@ export function CertificateTable({
                       onClick={() => onSelect(row)}
                       className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                     >
-                      View Details
+                      View details
                     </button>
                     {onRenew && certificate.contractId && !certificate.archivedAt && info.group !== "valid" && (
                       <button

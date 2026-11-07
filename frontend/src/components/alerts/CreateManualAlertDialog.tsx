@@ -169,7 +169,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
       <header className="flex items-start justify-between gap-4 border-b border-neutral-100 px-5 py-4">
         <div>
           <h2 id="create-manual-alert-title" className="font-headline text-lg font-semibold text-neutral-900">
-            Create Manual Alert
+            Create manual alert
           </h2>
           <p className="mt-1 text-sm leading-5 text-neutral-500">
             Record a follow-up alert for a supplier. The title and description are shown to the supplier, so write them for them.
@@ -194,7 +194,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         )}
 
         <label className={labelClassName}>
-          Alert Title *
+          Alert title *
           <input
             required
             value={title}
@@ -223,7 +223,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={labelClassName}>
-            Risk Category *
+            Risk category *
             <select
               required
               value={category}
@@ -348,7 +348,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
             disabled={isSaving || suppliers.length === 0}
             className="rounded-lg bg-primary-900 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSaving ? "Creating…" : "Create Alert"}
+            {isSaving ? "Creating…" : "Create alert"}
           </button>
         </div>
       </form>

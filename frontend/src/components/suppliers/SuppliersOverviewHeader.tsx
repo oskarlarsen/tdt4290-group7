@@ -89,7 +89,7 @@ export function SuppliersOverviewHeader({
               className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg bg-[#1f4d46] px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#173a34]"
             >
               <Plus className="h-4 w-4" />
-              Add Supplier
+              Add supplier
             </button>
           </div>
         </div>

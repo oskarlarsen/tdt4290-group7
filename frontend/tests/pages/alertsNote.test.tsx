@@ -35,15 +35,15 @@ function createAlertWithNote() {
     </QueryClientProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: /Create/ }));
-  fireEvent.change(screen.getByLabelText(/Alert Title/), { target: { value: "Follow up" } });
+  fireEvent.change(screen.getByLabelText(/Alert title/), { target: { value: "Follow up" } });
   fireEvent.change(screen.getByLabelText(/^Supplier/), { target: { value: "supplier-1" } });
-  fireEvent.change(screen.getByLabelText(/^Risk Category/), { target: { value: "VEHICLE_COMPLIANCE" } });
+  fireEvent.change(screen.getByLabelText(/^Risk category/), { target: { value: "VEHICLE_COMPLIANCE" } });
   fireEvent.change(screen.getByLabelText(/^Risk \*/), { target: { value: "medium" } });
   fireEvent.change(screen.getByLabelText(/^Alert Type/), { target: { value: "CONFIRMED_DEVIATION" } });
   fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: "Check the vehicles" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Save a note to self" }));
   fireEvent.change(screen.getByLabelText(/^Note to self/), { target: { value: "Call Monday" } });
-  fireEvent.click(screen.getByRole("button", { name: "Create Alert" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
 }
 
 describe("creating a manual alert with a note to self", () => {
