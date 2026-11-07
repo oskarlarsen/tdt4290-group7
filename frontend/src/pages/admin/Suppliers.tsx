@@ -68,10 +68,16 @@ export default function Suppliers() {
   }, [search, riskFilter, issueFilter, reviewStatusFilter]);
 
   /** Open the existing supplier drawer when reached from other pages */
+  const orgParam = searchParams.get("org") ?? searchParams.get("supplierId");
+  const highlightedOrg = fleet.data?.suppliers.find((organization) => organization.id === orgParam)?.id ?? null;
   useEffect(() => {
     const id = searchParams.get("supplierId");
-    if (id) setSelectedSupplierId(id);
-  }, [searchParams]);
+    // A real organization has no drawer: it is highlighted in the list below instead.
+    if (id && !fleet.isLoading && !fleet.data?.suppliers.some((organization) => organization.id === id)) setSelectedSupplierId(id);
+  }, [searchParams, fleet.isLoading, fleet.data]);
+  useEffect(() => {
+    if (highlightedOrg) document.getElementById(`org-${highlightedOrg}`)?.scrollIntoView({ block: "center" });
+  }, [highlightedOrg]);
 
   function handleCloseDrawer() {
     setSelectedSupplierId(null);
@@ -202,7 +208,7 @@ export default function Suppliers() {
         {fleet.data && fleet.data.suppliers.length > 0 && (
           <ul className="space-y-3">
             {fleet.data.suppliers.map((supplier) => (
-              <li key={supplier.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-100 p-3">
+              <li key={supplier.id} id={`org-${supplier.id}`} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${supplier.id === highlightedOrg ? "border-primary-700 ring-2 ring-primary-700/20" : "border-neutral-100"}`}>
                 <div>
                   <p className="font-medium text-neutral-900">{supplier.name}</p>
                   <p className="font-mono text-xs text-neutral-500">{supplier.orgNumber}</p>

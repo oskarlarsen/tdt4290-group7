@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardSummary } from "../../hooks/useDashboardSummary";
+import { useFleet } from "../../hooks/useVehicles";
 
 // TODO: Replace client-side search with the backend search endpoint when available
 export function SearchSuppliers() {
   const { data } = useDashboardSummary();
+  const fleet = useFleet();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -29,6 +31,10 @@ export function SearchSuppliers() {
             s.primaryContract.toLowerCase().includes(q)
         )
       : [];
+  const organizationMatches =
+    q.length > 0
+      ? (fleet.data?.suppliers ?? []).filter((o) => o.name.toLowerCase().includes(q) || o.orgNumber.includes(q))
+      : [];
   const alertMatches =
     q.length > 0
       ? (data?.recentAlerts ?? []).filter(
@@ -51,20 +57,30 @@ export function SearchSuppliers() {
 
       {open && q.length > 0 && (
         <div className="absolute left-0 right-0 z-10 mt-1 max-h-96 overflow-y-auto rounded-lg border border-neutral-100 bg-white p-1 shadow-card">
-          {supplierMatches.length === 0 && alertMatches.length === 0 && (
+          {supplierMatches.length === 0 && organizationMatches.length === 0 && alertMatches.length === 0 && (
             <div className="px-3 py-2 text-sm text-neutral-500">No matches.</div>
           )}
-          {supplierMatches.length > 0 && (
+          {supplierMatches.length + organizationMatches.length > 0 && (
             <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Suppliers</div>
           )}
           {supplierMatches.map((s) => (
             <button
               key={s.id}
-              onClick={() => { setOpen(false); setQuery(""); navigate(`/admin/suppliers/${s.id}`); }}
+              onClick={() => { setOpen(false); setQuery(""); navigate(`/admin/suppliers?supplierId=${s.id}`); }}
               className="block w-full rounded-md px-3 py-2 text-left hover:bg-neutral-50"
             >
               <div className="text-sm font-medium text-neutral-900">{s.displayName}</div>
               <div className="text-xs text-neutral-500">{s.primaryContract} · {s.orgId}</div>
+            </button>
+          ))}
+          {organizationMatches.map((o) => (
+            <button
+              key={o.id}
+              onClick={() => { setOpen(false); setQuery(""); navigate(`/admin/suppliers?org=${o.id}`); }}
+              className="block w-full rounded-md px-3 py-2 text-left hover:bg-neutral-50"
+            >
+              <div className="text-sm font-medium text-neutral-900">{o.name}</div>
+              <div className="text-xs text-neutral-500">Supplier organization · {o.orgNumber}</div>
             </button>
           ))}
           {alertMatches.length > 0 && (
