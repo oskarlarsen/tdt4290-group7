@@ -5,7 +5,8 @@ import {
   getSupplierProducts,
   getSupplierVehicles,
 } from "../../api/onboarding";
-import { ErrorNotice, VehicleDialog } from "../vehicles/VehicleDialog";
+import { ApiError } from "../../api/client";
+import { ErrorNotice, VehicleDialog, buttonClass } from "../vehicles/VehicleDialog";
 import { FUEL_TECHNOLOGIES } from "../../utils/vehicleCatalog";
 import { ECOLABEL_STANDARDS, PRODUCT_CATEGORIES, UNITS_OF_MEASURE } from "../../utils/productFormCsv";
 import { formatNumber } from "../../utils/formatNumber";
@@ -33,7 +34,7 @@ export function SupplierReportingDataDialog({ supplier, onClose }: Props) {
   return (
     <VehicleDialog title={`Submitted information · ${supplier.name}`} onClose={onClose}>
       {query.isLoading && <p role="status" className="text-sm text-neutral-500">Loading submitted information…</p>}
-      {query.isError && <ErrorNotice error={query.error} />}
+      {query.isError && <ErrorNotice error={query.error instanceof ApiError && query.error.status >= 500 ? new Error("Submitted information could not be loaded. This supplier may be demo data without an onboarding record.") : query.error} />}
       {query.data && (
         <div className="space-y-4">
           {query.data.status.requiredEntities.map((entity) => (
@@ -137,6 +138,7 @@ export function SupplierReportingDataDialog({ supplier, onClose }: Props) {
           )}
         </div>
       )}
+      <footer className="mt-4 flex justify-end border-t border-neutral-100 pt-4"><button type="button" className={buttonClass} onClick={onClose}>Close</button></footer>
     </VehicleDialog>
   );
 }
