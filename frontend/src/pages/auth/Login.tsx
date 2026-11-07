@@ -10,7 +10,7 @@ const MIN_PASSWORD_LENGTH = 12;
 const LOGIN_EMAIL_PLACEHOLDER =
   import.meta.env.VITE_USE_MOCK_AUTH === "true"
     ? "admin@kommune.no"
-    : "advisor.hansen@kommune.no";
+    : "name@example.com";
 
 export default function Login() {
   const { user, login, status, error: authError } = useAuth();
