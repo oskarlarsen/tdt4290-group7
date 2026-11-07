@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
 
 type Props = {
@@ -25,6 +26,14 @@ export function NoticeReviewDialog({
   showDemoNote = true,
   wrapReason = false,
 }: Props) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onCancel]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/30 p-4"
@@ -140,7 +149,7 @@ export function NoticeReviewDialog({
             onClick={onConfirm}
             className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
           >
-            Send Notice
+            Send notice
           </button>
         </div>
       </div>
