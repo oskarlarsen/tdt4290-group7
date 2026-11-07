@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { User, Lock, Eye, EyeOff, Info, Loader2, KeyRound} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { requestPasswordReset, resetPassword } from "@/api/auth";
@@ -13,7 +13,7 @@ const LOGIN_EMAIL_PLACEHOLDER =
     : "advisor.hansen@kommune.no";
 
 export default function Login() {
-  const { login, status, error: authError } = useAuth();
+  const { user, login, status, error: authError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -114,6 +114,8 @@ export default function Login() {
   }
 
   const displayError = formError ?? authError;
+
+  if (user) return <Navigate to={from ?? "/"} replace />;
 
   return (
     <main className="min-h-screen bg-[#F8FAF9] flex items-center justify-center px-4 py-10">
