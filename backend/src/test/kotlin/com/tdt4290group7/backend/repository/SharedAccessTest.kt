@@ -125,6 +125,7 @@ class SharedAccessTest {
         assertTrue(UserRepository.pendingInvitations(rival.supplierId, now).none { it.email == open })
         assertTrue(UserRepository.pendingInvitations(owner.supplierId, now.plus(java.time.Duration.ofDays(3))).none { it.email == open })
         assertTrue(UserRepository.pendingInvitations(null, now).any { it.email == open })
+        assertTrue(UserRepository.pendingInvitations(owner.supplierId, now).first { it.email == open }.let { !it.contact && it.supplierId == owner.supplierId })
     }
 
     @Test

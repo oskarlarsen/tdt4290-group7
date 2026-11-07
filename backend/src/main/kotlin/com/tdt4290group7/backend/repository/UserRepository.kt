@@ -404,7 +404,8 @@ object UserRepository {
         }.mapNotNull { user(db, "id = ?", it)?.let { u -> entry(db, u, now) } }
     }
 
-    data class PendingInvitation(val email: String, val role: Role, val supplierName: String?, val expiresAt: Instant, val accessExpiresAt: Instant?)
+    /** [contact] is the first invitation an admin creates for an organization; otherwise a colleague, stand-in or admin invitation. */
+    data class PendingInvitation(val email: String, val role: Role, val supplierId: String?, val supplierName: String?, val expiresAt: Instant, val accessExpiresAt: Instant?, val contact: Boolean)
 
     /** Invitations not yet accepted or expired: everyone's for an admin, one organization's for a supplier. */
     fun pendingInvitations(supplierId: String?, now: Instant = Instant.now()): List<PendingInvitation> = read { db ->
@@ -413,10 +414,10 @@ object UserRepository {
             if (supplierId != null) statement.setString(1, supplierId)
             statement.executeQuery().use { rows -> buildList { while (rows.next()) add(map(rows)) } }
         }
-        (query("SELECT email, role, supplier_name, expires_at, access_expires_at FROM access_invitations WHERE accepted_at IS NULL") {
-            PendingInvitation(it.getString("email"), Role.valueOf(it.getString("role")), it.getString("supplier_name"), Instant.parse(it.getString("expires_at")), it.getString("access_expires_at")?.let(Instant::parse))
-        } + query("SELECT email, supplier_name, expires_at FROM supplier_invitations WHERE accepted_at IS NULL") {
-            PendingInvitation(it.getString("email"), Role.SUPPLIER, it.getString("supplier_name"), Instant.parse(it.getString("expires_at")), null)
+        (query("SELECT email, role, supplier_id, supplier_name, expires_at, access_expires_at FROM access_invitations WHERE accepted_at IS NULL") {
+            PendingInvitation(it.getString("email"), Role.valueOf(it.getString("role")), it.getString("supplier_id"), it.getString("supplier_name"), Instant.parse(it.getString("expires_at")), it.getString("access_expires_at")?.let(Instant::parse), false)
+        } + query("SELECT email, supplier_id, supplier_name, expires_at FROM supplier_invitations WHERE accepted_at IS NULL") {
+            PendingInvitation(it.getString("email"), Role.SUPPLIER, it.getString("supplier_id"), it.getString("supplier_name"), Instant.parse(it.getString("expires_at")), null, true)
         }).filter { it.expiresAt.isAfter(now) }.sortedBy { it.email.lowercase() }
     }
 
