@@ -4,6 +4,7 @@ import { BadgeCheck, Bell, Building2, ClipboardList, LoaderCircle, Package, Truc
 import { getOnboardingStatus, getSupplierOverview } from "@/api/onboarding";
 import type { OnboardingStatusResponse, SupplierOverview } from "@/types/onboarding";
 import { agreementLabel } from "../../utils/agreementLabel";
+import { formatDate } from "../../utils/formatDate";
 import { useSupplierAlerts } from "../../hooks/useSupplierAlerts";
 import { ALERT_CATEGORIES } from "../../types/dashboard";
 import type { AlertCategory } from "../../types/dashboard";
@@ -170,7 +171,7 @@ export default function Dashboard() {
                 <div>
                   <p className="font-medium text-neutral-900">{agreementLabel(agreement)}</p>
                   <p className="mt-1 text-sm text-neutral-500">
-                    {agreement.startDate} – {agreement.endDate}
+                    {formatDate(agreement.startDate)} – {formatDate(agreement.endDate)}
                   </p>
                 </div>
                 <div className="text-right text-sm text-neutral-600">
