@@ -168,6 +168,8 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                   <UserRound className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                   Profile
                 </div>
+                <p className="mt-1.5 text-sm text-neutral-700">{displayName}</p>
+                {user.email && <p className="break-all text-xs text-neutral-500">{user.email}</p>}
               </div>
 
               <div className="border-t border-neutral-100 p-1">
