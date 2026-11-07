@@ -7,11 +7,13 @@ import type { CertificateContract } from "../../types/certificate";
 export function CertificateUploadDialog({
   contracts,
   initialContractId,
+  onUploaded,
   onClose,
 }: {
   contracts: CertificateContract[];
   /** Opens with this agreement already chosen, for a renewal. */
   initialContractId?: string;
+  onUploaded?: () => void;
   onClose: () => void;
 }) {
   // The admin types to search supplier name, org number or saksnr; the text must match one agreement exactly.
@@ -28,7 +30,7 @@ export function CertificateUploadDialog({
     if (!file || !selectedContract) return;
     upload.mutate(
       { file, supplierName: selectedContract.supplierName, contractId: selectedContract.id },
-      { onSuccess: onClose },
+      { onSuccess: () => { onUploaded?.(); onClose(); } },
     );
   }
 

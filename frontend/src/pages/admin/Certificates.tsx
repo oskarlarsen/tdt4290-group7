@@ -33,13 +33,14 @@ import { downloadCsv, toCsv } from "../../utils/csv";
 import { useSearchParams } from "react-router-dom";
 import { getActiveCertificateContracts } from "../../utils/certificateContracts";
 
-type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired";
+type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired" | "missing-documentation";
 
 const FILTERS: { value: CertificateFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "valid", label: "Valid" },
   { value: "expiring-soon", label: "Expiring soon" },
   { value: "expired", label: "Expired" },
+  { value: "missing-documentation", label: "Documentation missing" },
 ];
 
 const PAGE_SIZE = 6; // same as the reference; the logic doesn't assume how many rows exist
@@ -66,6 +67,7 @@ export default function Certificates() {
   const restoreCertificate = useRestoreCertificate();
   const archiveError = archiveCertificate.error ?? restoreCertificate.error;
 
+  const [uploadNotice, setUploadNotice] = useState("");
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -115,6 +117,7 @@ export default function Certificates() {
       valid: 0,
       "expiring-soon": 0,
       expired: 0,
+      "missing-documentation": 0,
       criticalExpired: 0,
     };
     for (const { certificate } of rows) {
@@ -123,6 +126,7 @@ export default function Certificates() {
       if (status === "valid") result.valid += 1;
       else if (status === "expiring" || status === "critical") result["expiring-soon"] += 1;
       else if (status === "expired") result.expired += 1;
+      else if (status === "missing-documentation") result["missing-documentation"] += 1;
       if (status === "critical" || status === "expired" || status === "missing-documentation") {
         result.criticalExpired += 1;
       }
@@ -140,7 +144,8 @@ export default function Certificates() {
             statusFilter === "all" ||
             (statusFilter === "valid" && status === "valid") ||
             (statusFilter === "expiring-soon" && (status === "expiring" || status === "critical")) ||
-            (statusFilter === "expired" && status === "expired");
+            (statusFilter === "expired" && status === "expired") ||
+            (statusFilter === "missing-documentation" && status === "missing-documentation");
           const matchesSearch =
             query.length === 0 ||
             CERTIFICATE_STANDARD_LABELS[certificate.standard].toLowerCase().includes(query) ||
@@ -321,6 +326,9 @@ export default function Certificates() {
               : "No certificates match the current filters"
           }
         />
+        {uploadNotice && (
+          <p role="status" className="mt-3 rounded-md bg-tertiary-50 px-3 py-2 text-sm text-tertiary-700">{uploadNotice}</p>
+        )}
         {archiveError && (
           <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {archiveError instanceof Error ? archiveError.message : "Could not update the certificate."}
@@ -368,6 +376,7 @@ export default function Certificates() {
         <CertificateUploadDialog
           contracts={contracts}
           initialContractId={renewContractId}
+          onUploaded={() => setUploadNotice("Certificate uploaded.")}
           onClose={() => {
             setUploadOpen(false);
             setRenewContractId(undefined);
