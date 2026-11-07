@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RoleRedirect } from "./RoleRedirect";
 import { AdminLayout } from "./AdminLayout";
@@ -17,7 +17,6 @@ import Certificates from "../pages/admin/Certificates";
 import Energy from "../pages/admin/Energy";
 import RiskAndPrediction from "../pages/admin/RiskAndPrediction";
 import Alerts from "../pages/admin/Alerts";
-import SupplierDetails from "../pages/admin/SupplierDetails";
 
 import SupplierDashboard from "../pages/supplier/Dashboard";
 import SupplierOnboarding from "../pages/supplier/Onboarding";
@@ -49,7 +48,7 @@ const router = createBrowserRouter([
     children: [
       { path: "dashboard", element: <AdminDashboard /> },
       { path: "suppliers", element: <Suppliers /> },
-      { path: "suppliers/:id", element: <SupplierDetails /> },
+      { path: "suppliers/:id", element: <Navigate to="/admin/suppliers" replace /> },
       { path: "contracts", element: <Contracts /> },
       { path: "vehicles", element: <Vehicles /> },
       { path: "certificates", element: <Certificates /> },
