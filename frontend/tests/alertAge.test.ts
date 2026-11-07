@@ -68,7 +68,7 @@ describe("alert creation date and age formatting", () => {
     );
     const headers = Array.from(html.matchAll(/<th(?:\s[^>]*)?>(.*?)<\/th>/g), ([, label]) => label);
     expect(headers).toEqual(["Description", "Supplier", "Contract", "Risk", "Status", "Created On", "Action"]);
-    expect(html).toMatch(/<th class="whitespace-nowrap pb-2 pr-3 font-medium">Created On<\/th>/);
+    expect(html).toMatch(/<th scope="col" class="whitespace-nowrap pb-2 pr-3 font-medium">Created On<\/th>/);
     expect(html).not.toContain("Risk / Priority");
     expect(html).toContain(">Low</span>");
     expect(html).toContain("Alert Type:");

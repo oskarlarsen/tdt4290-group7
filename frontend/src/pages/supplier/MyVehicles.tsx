@@ -28,10 +28,10 @@ export default function MyVehicles() {
             <table className="w-full text-left text-sm text-neutral-600">
               <thead className="bg-neutral-50 text-xs font-medium uppercase tracking-wide text-neutral-500 border-b border-neutral-100">
                 <tr>
-                  <th className="px-4 py-3">Registration Number</th>
-                  <th className="px-4 py-3">Fuel or propulsion</th>
-                  <th className="px-4 py-3">Weight</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3">Registration Number</th>
+                  <th scope="col" className="px-4 py-3">Fuel or propulsion</th>
+                  <th scope="col" className="px-4 py-3">Weight</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">

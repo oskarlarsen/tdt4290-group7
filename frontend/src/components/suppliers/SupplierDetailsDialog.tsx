@@ -86,7 +86,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
           <Section title="Supplier onboarding">
             <Field label="Status" value={(supplier.onboardingStatus ?? "INVITED").replace(/_/g, " ")} />
             <Field label="Registered accounts" value={String(supplier.registeredAccountCount ?? 0)} />
-            {supplier.submittedAt && <Field label="Submitted" value={new Date(supplier.submittedAt).toLocaleString()} />}
+            {supplier.submittedAt && <Field label="Submitted" value={new Date(supplier.submittedAt).toLocaleString("en-GB")} />}
             <div className="pt-2">
               <button
                 type="button"
@@ -105,6 +105,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
                 <textarea
                   value={onboardingNotes}
                   onChange={(event) => setOnboardingNotes(event.target.value)}
+                  aria-label="Feedback for the supplier"
                   placeholder="Feedback for the supplier (required when requesting changes)"
                   rows={2}
                   className="w-full resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"

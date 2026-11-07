@@ -21,12 +21,12 @@ export function RiskOutlookTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
-            <th className="pb-2 pr-3 font-medium">Contract</th>
-            <th className="pb-2 pr-3 font-medium">Primary risk driver</th>
-            <th className="pb-2 pr-3 font-medium">Next projected breach</th>
-            <th className="pb-2 pr-3 font-medium">Risk priority</th>
-            <th className="pb-2 font-medium">Action</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Primary risk driver</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Next projected breach</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Risk priority</th>
+            <th scope="col" className="pb-2 font-medium">Action</th>
           </tr>
         </thead>
         <tbody>

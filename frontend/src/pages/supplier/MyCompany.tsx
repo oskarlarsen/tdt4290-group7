@@ -15,15 +15,15 @@ export default function MyCompany() {
       <section className="rounded-xl border border-neutral-100 bg-white p-6">
         <div className="space-y-4">
           <div>
-            <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Company Name</h3>
+            <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Company Name</h2>
             <p className="mt-1 text-base font-medium text-neutral-900">{overview.supplierName}</p>
           </div>
           <div>
-            <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Organisation Number</h3>
+            <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Organisation Number</h2>
             <p className="mt-1 text-base font-medium text-neutral-900">{overview.orgNumber}</p>
           </div>
           <div>
-            <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Primary Contract</h3>
+            <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Primary Contract</h2>
             <p className="mt-1 text-base font-medium text-neutral-900">{agreements.length ? `${agreements.length} agreement${agreements.length === 1 ? "" : "s"}` : "No agreement registered"}</p>
           </div>
         </div>

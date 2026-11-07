@@ -213,6 +213,7 @@ export function SupplierDetailsDrawer({
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
                     maxLength={2000}
+                    aria-label="Note about this supplier"
                     placeholder="Add a note about this supplier…"
                     rows={2}
                     className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"

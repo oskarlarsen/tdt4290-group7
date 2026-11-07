@@ -36,13 +36,13 @@ export function ContractsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th className="pb-2 pr-3 font-medium">Contract</th>
-            <th className="pb-2 pr-3 font-medium">Linked supplier</th>
-            <th className="pb-2 pr-3 font-medium">Contract status</th>
-            <th className="pb-2 pr-3 font-medium">Start date</th>
-            <th className="pb-2 pr-3 font-medium">End date</th>
-            <th className="pb-2 pr-3 font-medium">Environmental compliance</th>
-            <th className="pb-2 font-medium">Actions</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Linked supplier</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract status</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Start date</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">End date</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Environmental compliance</th>
+            <th scope="col" className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>

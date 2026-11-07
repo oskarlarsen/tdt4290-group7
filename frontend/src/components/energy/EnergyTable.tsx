@@ -47,12 +47,12 @@ export function EnergyTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
-            <th className="pb-2 pr-3 font-medium">Contract</th>
-            <th className="pb-2 pr-3 font-medium">Energy / fuel mix</th>
-            <th className="pb-2 pr-3 font-medium">Renewable share</th>
-            <th className="pb-2 pr-3 font-medium">Status</th>
-            <th className="pb-2 font-medium">Action</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Energy / fuel mix</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Renewable share</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Status</th>
+            <th scope="col" className="pb-2 font-medium">Action</th>
           </tr>
         </thead>
         <tbody>

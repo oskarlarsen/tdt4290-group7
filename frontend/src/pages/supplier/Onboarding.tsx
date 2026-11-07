@@ -601,9 +601,9 @@ export default function Onboarding() {
                 <table className="w-full min-w-[560px] text-left text-sm">
                   <thead className="bg-red-50 text-red-900">
                     <tr>
-                      <th className="px-3 py-2 font-semibold">Row</th>
-                      <th className="px-3 py-2 font-semibold">Field</th>
-                      <th className="px-3 py-2 font-semibold">Issue</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Row</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Field</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Issue</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-red-50">
@@ -635,7 +635,7 @@ export default function Onboarding() {
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
                         {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Weight", "Checked with Statens vegvesen", "Coverage"].map((label) => (
-                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -666,7 +666,7 @@ export default function Onboarding() {
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
                         {["Agreement", "Facility code", "Address", "Year", "Electricity", "District heating"].map((label) => (
-                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -691,7 +691,7 @@ export default function Onboarding() {
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
                         {["Agreement", "Product code", "Product name", "Category", "Ecolabel", "Unit", "Repaired/Reused"].map((label) => (
-                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>

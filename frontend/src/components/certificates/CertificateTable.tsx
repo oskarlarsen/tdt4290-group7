@@ -38,12 +38,12 @@ export function CertificateTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
-            <th className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
-            <th className="pb-2 pr-3 font-medium">Contract</th>
-            <th className="pb-2 pr-3 font-medium">Valid until</th>
-            <th className="pb-2 pr-3 font-medium">Status</th>
-            <th className="pb-2 font-medium">Actions</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Valid until</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Status</th>
+            <th scope="col" className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
