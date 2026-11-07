@@ -8,14 +8,23 @@ import type {
   RecentAlert,
 } from "../types/dashboard";
 import type { FollowUpStatus } from "../hooks/useSupplierReviewStatus";
+import { getCertificates } from "./certificates";
+import { getFleet } from "./vehicles";
+import { dashboardTotals } from "../utils/dashboardTotals";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
-export function getDashboardSummary(): Promise<DashboardSummary> {
+export async function getDashboardSummary(): Promise<DashboardSummary> {
   if (USE_MOCKS) {
+    // Vehicle and certificate totals are counted from the real stored records; the rest is sample data.
+    const [fleet, certificates] = await Promise.allSettled([getFleet(), getCertificates()]);
+    const totals = dashboardTotals(
+      fleet.status === "fulfilled" ? fleet.value.vehicles : [],
+      certificates.status === "fulfilled" ? certificates.value : [],
+    );
     const supplierSummary = db.getSupplierPortfolioSummary();
     const { riskClassification } = supplierSummary;
-    return Promise.resolve({
+    return {
       lastSyncedAt: db.getLastSyncedAt(),
       kpis: {
         totalSuppliers: supplierSummary.monitoredSuppliers,
@@ -28,17 +37,14 @@ export function getDashboardSummary(): Promise<DashboardSummary> {
         complianceTargetPercent: 95,
         assessedSuppliers: supplierSummary.monitoredSuppliers,
         activeAgreements: supplierSummary.monitoredSuppliers,
-        listedVehicles: 0,
-        certificatesTracked: 0,
-        expiredCertificates: 0,
-        certificatesExpiringWithin90Days: 0,
+        ...totals,
       },
       riskClassification,
       topRiskSuppliers: db.getTopRiskSuppliers(),
       suppliersRequiringAttention: db.getSuppliersRequiringAttention(),
       issueCategoryBreakdown: db.getIssueCategoryBreakdown(),
       recentAlerts: db.getUnresolvedAlerts().sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")),
-    });
+    };
   }
   return apiFetch<DashboardSummary>("/admin/dashboard/summary");
 }
