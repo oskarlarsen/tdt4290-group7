@@ -10,10 +10,12 @@ export type UploadAgreement = { id: string; note: string; saksnr: string | null 
 export function SupplierCertificateUploadDialog({
   agreements,
   initialAgreementId,
+  onUploaded,
   onClose,
 }: {
   agreements: UploadAgreement[];
   initialAgreementId?: string;
+  onUploaded?: () => void;
   onClose: () => void;
 }) {
   const [agreementId, setAgreementId] = useState(initialAgreementId ?? (agreements.length === 1 ? agreements[0].id : ""));
@@ -23,7 +25,7 @@ export function SupplierCertificateUploadDialog({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file || !agreementId) return;
-    upload.mutate({ file, contractId: agreementId }, { onSuccess: onClose });
+    upload.mutate({ file, contractId: agreementId }, { onSuccess: () => { onUploaded?.(); onClose(); } });
   }
 
   return (

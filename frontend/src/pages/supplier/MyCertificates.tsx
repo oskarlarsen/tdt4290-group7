@@ -9,6 +9,7 @@ export default function MyCertificates() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
   // undefined = closed; "" = open with no agreement chosen; an id = a renewal for that agreement.
   const [uploadFor, setUploadFor] = useState<string | undefined>(undefined);
+  const [uploaded, setUploaded] = useState(false);
 
   if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-500"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (isError || !data) return <div className="p-8 text-center text-sm text-red-700">{error instanceof Error ? error.message : "Error loading data"}</div>;
@@ -93,10 +94,13 @@ export default function MyCertificates() {
         </section>
       )}
 
+      {uploaded && <p role="status" className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">Certificate uploaded.</p>}
+
       {uploadFor !== undefined && (
         <SupplierCertificateUploadDialog
           agreements={data.agreements}
           initialAgreementId={uploadFor || undefined}
+          onUploaded={() => setUploaded(true)}
           onClose={() => setUploadFor(undefined)}
         />
       )}
