@@ -7,6 +7,7 @@ import { SupplierLayout } from "./SupplierLayout";
 import Login from "../pages/auth/Login";
 import AcceptSupplierInvitation from "../pages/auth/AcceptSupplierInvitation";
 import Unauthorized from "../pages/auth/Unauthorized";
+import NotFound from "../pages/auth/NotFound";
 
 import AdminDashboard from "../pages/admin/Dashboard";
 import Suppliers from "../pages/admin/Suppliers";
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
   { path: "/accept-invitation", element: <AcceptSupplierInvitation /> },
   { path: "/unauthorized", element: <Unauthorized /> },
+  { path: "*", element: <NotFound /> },
   {
     path: "/admin",
     element: (
