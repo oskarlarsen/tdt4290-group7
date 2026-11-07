@@ -28,6 +28,7 @@ const NAV = [
 export function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-neutral-50">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-900 focus:shadow-card">Skip to main content</a>
       <aside className="flex w-60 shrink-0 flex-col border-r border-neutral-100 bg-white">
         <div className="flex items-center gap-2 px-4 py-4">
           <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg" />
@@ -72,7 +73,7 @@ export function AdminLayout() {
 
       <div className="flex flex-1 flex-col">
         <TopBar />
-        <main className="flex-1 p-6">
+        <main id="main" tabIndex={-1} className="flex-1 p-6 focus:outline-none">
           <Outlet />
         </main>
       </div>

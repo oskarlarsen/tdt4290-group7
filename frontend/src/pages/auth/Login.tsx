@@ -116,7 +116,7 @@ export default function Login() {
   const displayError = formError ?? authError;
 
   return (
-    <div className="min-h-screen bg-[#F8FAF9] flex items-center justify-center px-4 py-10">
+    <main className="min-h-screen bg-[#F8FAF9] flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-[420px] bg-white rounded-2xl border border-gray-100 shadow-card p-8">
         {/* Logo */}
         <div className="flex justify-center mb-5">
@@ -321,7 +321,7 @@ export default function Login() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 // Only allow redirects back into this app. Rejects protocol-relative ("//evil.com") and
