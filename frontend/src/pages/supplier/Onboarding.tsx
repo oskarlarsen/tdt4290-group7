@@ -470,6 +470,8 @@ export default function Onboarding() {
               Phone <span className="font-normal text-neutral-500">(optional)</span>
               <input
                 type="tel"
+                pattern="\+?[0-9 \(\)\-]{4,20}"
+                title="Enter a phone number, for example +47 123 45 678"
                 value={contactPhone}
                 onChange={(event) => setContactPhone(event.target.value)}
                 disabled={working || locked}
@@ -643,10 +645,10 @@ export default function Onboarding() {
                       {preview.previewRows.map((row, index) => {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
                         const fuel = Object.entries(FUEL_TECHNOLOGIES)
-                          .find(([code]) => code === row.fuel_technology)?.[1] ?? row.fuel_technology;
+                          .find(([code]) => code === row.fuel_technology)?.[1] ?? "—";
                         const coverage = friendlyBoolean(row.full_contract_coverage) === "Yes"
                           ? "Full agreement period"
-                          : `${row.start_year_week} to ${row.end_year_week}`;
+                          : row.start_year_week && row.end_year_week ? `${row.start_year_week} to ${row.end_year_week}` : "—";
                         return (
                           <tr key={index}>
                             <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
