@@ -36,6 +36,8 @@ const whole = (value: string | null | undefined, unit: string) => number(exactRa
 const fuelLabel = (value?: RegistryCode | null) => value ? FUEL_TECHNOLOGIES[value.code as keyof typeof FUEL_TECHNOLOGIES]
   ? catalogLabel(FUEL_TECHNOLOGIES, value.code) : `${value.code} — ${value.name ?? "Unrecognized fuel technology"}` : missing;
 
+const plain = (value?: string | null) => value ? value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, " ") : value;
+
 const titles: Record<string, string> = {
   NOT_ON_AGREEMENT_LIST: "Vehicle is not in the agreement's vehicle list", AGREEMENT_NOT_STARTED: "Supplier agreement has not started",
   AGREEMENT_EXPIRED: "Supplier agreement has ended", AGREEMENT_PERIOD_NOT_COVERED: "Reporting period extends outside the agreement",
@@ -148,8 +150,8 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
         result.note = "Division by zero is undefined. The missing calculated rate must not be substituted with zero.";
         break;
       }
-      compare("Registry lookup", "A successful lookup with the required reference facts", check.registry.lookupOutcome);
-      compare("Registry data source", "Usable reference data", check.registry.dataSource);
+      compare("Registry lookup", "A successful lookup with the required reference facts", plain(check.registry.lookupOutcome));
+      compare("Registry data source", "Usable reference data", plain(check.registry.dataSource));
       compare("Registry fetched (UTC)", "Reference facts available at the saved check time", check.registry.fetchedAt);
       if (row) {
         compare("Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology), data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
