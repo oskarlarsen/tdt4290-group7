@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AccessEntry } from "../src/api/access";
 
-const api = vi.hoisted(() => ({ getAccess: vi.fn(), inviteToAccess: vi.fn(), renewAccess: vi.fn(), revokeAccess: vi.fn(), approveAccess: vi.fn() }));
+const api = vi.hoisted(() => ({ getAccess: vi.fn(), getPendingInvitations: vi.fn(), inviteToAccess: vi.fn(), renewAccess: vi.fn(), revokeAccess: vi.fn(), approveAccess: vi.fn() }));
 vi.mock("../src/api/access", () => api);
 
 import { AccessPanel, canRenew } from "../src/components/access/AccessPanel";
@@ -18,6 +18,7 @@ const entry = (id: string, extra: Partial<AccessEntry> = {}): AccessEntry => ({
 function mount(mode: "supplier" | "admin") {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AccessPanel mode={mode} /></QueryClientProvider>);
 }
+beforeEach(() => { api.getPendingInvitations.mockResolvedValue([]); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("canRenew", () => {
@@ -33,6 +34,14 @@ describe("canRenew", () => {
 });
 
 describe("access panel", () => {
+  it("lists invitations that have not been activated yet", async () => {
+    api.getAccess.mockResolvedValue([]);
+    api.getPendingInvitations.mockResolvedValue([{ email: "waiting@example.no", role: "SUPPLIER", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null }]);
+    mount("admin");
+    expect(await screen.findByText("waiting@example.no")).toBeTruthy();
+    expect(screen.getByText(/Not yet activated/)).toBeTruthy();
+  });
+
   it("invites a colleague and shows the link to pass on", async () => {
     api.getAccess.mockResolvedValue([]);
     api.inviteToAccess.mockResolvedValue({ email: "new@example.no", token: "tok123", expiresAt: "x", accessExpiresAt: null });

@@ -17,6 +17,12 @@ export type AccessEntry = {
 
 export type AccessInvitation = { email: string; token: string; expiresAt: string; accessExpiresAt: string | null };
 
+export type PendingInvitation = { email: string; role: "ADMIN" | "SUPPLIER"; supplierName: string | null; expiresAt: string; accessExpiresAt: string | null };
+
+export function getPendingInvitations(): Promise<PendingInvitation[]> {
+  return apiFetch<PendingInvitation[]>("/access/invitations");
+}
+
 export function getAccess(): Promise<AccessEntry[]> {
   return apiFetch<AccessEntry[]>("/access");
 }

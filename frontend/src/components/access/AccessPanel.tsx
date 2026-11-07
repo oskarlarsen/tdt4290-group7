@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { CopyableValue } from "../ui/CopyableValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { approveAccess, getAccess, inviteToAccess, renewAccess, revokeAccess, type AccessEntry, type AccessInvitation } from "../../api/access";
+import { approveAccess, getAccess, getPendingInvitations, inviteToAccess, renewAccess, revokeAccess, type AccessEntry, type AccessInvitation } from "../../api/access";
 import { formatDate } from "../../utils/formatDate";
 
 const DAY_MS = 86_400_000;
@@ -30,6 +30,7 @@ function describe(entry: AccessEntry): string {
 export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
   const client = useQueryClient();
   const list = useQuery({ queryKey: ["access"], queryFn: getAccess, retry: false });
+  const pending = useQuery({ queryKey: ["access", "invitations"], queryFn: getPendingInvitations, retry: false });
   const refresh = () => client.invalidateQueries({ queryKey: ["access"] });
   const [email, setEmail] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -129,6 +130,23 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
           </li>
         ))}
       </ul>
+
+      {!!pending.data?.length && (
+        <section aria-labelledby="pending-invitations" className="space-y-2">
+          <h2 id="pending-invitations" className="font-headline text-base font-semibold text-neutral-900">Pending invitations</h2>
+          <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-100 bg-white">
+            {pending.data.map((invite) => (
+              <li key={`${invite.role}-${invite.email}`} className="px-4 py-3 text-sm">
+                <span className="font-medium text-neutral-900">{invite.email}</span>
+                <span className="block text-xs text-neutral-500">
+                  {mode === "admin" ? `${invite.role === "ADMIN" ? "Administrator" : "Supplier"}${invite.supplierName ? ` · ${invite.supplierName}` : ""} · ` : ""}
+                  Not yet activated · link expires {formatDate(invite.expiresAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
