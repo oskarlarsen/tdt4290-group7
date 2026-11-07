@@ -56,6 +56,7 @@ const router = createBrowserRouter([
       { path: "risk", element: <RiskAndPrediction /> },
       { path: "alerts", element: <Alerts /> },
       { path: "access", element: <Access /> },
+      { path: "*", element: <NotFound /> },
     ],
   },
   {
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
       { path: "alerts", element: <MyAlerts /> },
       { path: "team", element: <MyTeam /> },
       { path: "required-actions", element: <RequiredActions /> },
+      { path: "*", element: <NotFound /> },
     ],
   },
 ]);
