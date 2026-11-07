@@ -41,12 +41,12 @@ export default function MyCertificates() {
                const status = getCertificateStatus(cert);
               return (
                 <div key={cert.id} className="rounded-xl border border-neutral-100 bg-white p-5 flex flex-col">
-                   <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-2 text-primary-700">
+                   <div className="flex justify-between items-start gap-3 mb-4">
+                      <div className="flex min-w-0 items-center gap-2 text-primary-700">
                          <FileText className="h-5 w-5" />
                          <h3 className="font-semibold text-sm uppercase tracking-wide">{CERTIFICATE_STANDARD_LABELS[cert.standard]}</h3>
                       </div>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${status.tone === "red" ? "bg-red-50 text-red-700" : status.tone === "orange" ? "bg-orange-50 text-orange-700" : status.tone === "yellow" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
+                      <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${status.tone === "red" ? "bg-red-50 text-red-700" : status.tone === "orange" ? "bg-orange-50 text-orange-700" : status.tone === "yellow" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
                           {status.label}
                       </span>
                    </div>
@@ -54,7 +54,7 @@ export default function MyCertificates() {
                    {cert.archivePendingFor && (
                       <p className="mb-3 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">Waiting for admin review</p>
                    )}
-                   <div className="space-y-3 mt-auto">
+                   <div className="space-y-3">
                       <div>
                         <p className="text-xs text-neutral-500 uppercase tracking-wide">Certificate Number</p>
                         <p className="text-sm font-medium text-neutral-900">{cert.certificateNumber || "Not extracted"}</p>
