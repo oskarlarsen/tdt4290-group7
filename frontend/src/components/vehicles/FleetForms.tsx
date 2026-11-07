@@ -110,7 +110,7 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
     return api.saveAgreement({ supplierId: supplier.id, saksnr: saksnr.trim(), startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
   }, onSuccess: onSaved, retry: false });
   return <VehicleDialog title={`${agreement ? "Edit" : "Add"} agreement · ${supplier.name}`} onClose={onClose} busy={save.isPending}>
-    <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate(); }}>
+    <form className="space-y-4" onChange={() => { if (save.isError) save.reset(); }} onSubmit={event => { event.preventDefault(); save.mutate(); }}>
       <Field label="Saksnr (case number)">
         <input autoFocus required maxLength={50} className={inputClass} value={saksnr} onChange={e => setSaksnr(e.target.value)} placeholder="2024/1234" />
         <span className="mt-1 block text-xs text-neutral-500">The case number from your archive system, for example 2024/1234.</span>
