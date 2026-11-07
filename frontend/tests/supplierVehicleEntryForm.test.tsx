@@ -23,8 +23,8 @@ afterEach(() => {
 });
 
 describe("supplier vehicle entry form", () => {
-  function mount(onPreview = vi.fn(), onChange = vi.fn()) {
-    render(<SupplierVehicleEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={onChange} />);
+  function mount(mode: "form" | "csv" = "form", onPreview = vi.fn(), onChange = vi.fn()) {
+    render(<SupplierVehicleEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={onChange} mode={mode} />);
     return { onPreview, onChange };
   }
 
@@ -80,12 +80,22 @@ describe("supplier vehicle entry form", () => {
   });
 
   it("offers the CSV template and previews an uploaded CSV file", () => {
-    const { onPreview, onChange } = mount();
+    const { onPreview, onChange } = mount("csv");
     expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
     const file = new File(["agreement_id;registration_number"], "vehicles.csv", { type: "text/csv" });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
     expect(onPreview).toHaveBeenCalledWith(file);
     expect(onChange).toHaveBeenCalled();
+  });
+
+  it("shows only the form or only the CSV upload, never both", () => {
+    mount("form");
+    expect(screen.queryByRole("button", { name: /Download CSV template/ })).toBeNull();
+    expect(screen.getByText("Vehicle 1")).toBeTruthy();
+    cleanup();
+    mount("csv");
+    expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
+    expect(screen.queryByText("Vehicle 1")).toBeNull();
   });
 
   it("supports adding and removing vehicle rows", () => {
@@ -95,6 +105,7 @@ describe("supplier vehicle entry form", () => {
         working={false}
         onPreview={vi.fn()}
         onChange={vi.fn()}
+        mode="form"
       />,
     );
 

@@ -14,9 +14,11 @@ type Props = {
   working: boolean;
   onPreview: (file: File) => void;
   onChange: () => void;
+  /** Which way of entering vehicles is showing: the form, or a CSV file. */
+  mode: "form" | "csv";
 };
 
-export function SupplierVehicleEntryForm({ agreements, working, onPreview, onChange }: Props) {
+export function SupplierVehicleEntryForm({ agreements, working, onPreview, onChange, mode }: Props) {
   const [rows, setRows] = useState<VehicleFormRow[]>([createVehicleFormRow()]);
 
   function updateRow(id: string, patch: Partial<VehicleFormRow>) {
@@ -52,8 +54,9 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
 
   return (
     <div className="space-y-4">
+      {mode === "csv" && (
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-neutral-300 p-3 text-sm text-neutral-600">
-        <span className="mr-auto">Have many vehicles? Fill in a CSV file instead of the form.</span>
+        <span className="mr-auto">Download the template, fill it in, then upload it for review.</span>
         <button
           type="button"
           onClick={() => void downloadCsvTemplate("vehicles")}
@@ -78,7 +81,13 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
           />
         </label>
       </div>
+      )}
+      {agreements.length === 0 && (
+        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
+      )}
 
+      {mode === "form" && (
+        <>
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
           <legend className="px-1 font-semibold text-neutral-800">Vehicle {index + 1}</legend>
@@ -235,13 +244,12 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
           {working ? "Validating…" : "Review vehicle details"}
         </button>
       </div>
-      {agreements.length === 0 && (
-        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
-      )}
       {!isReady && agreements.length > 0 && (
         <p className="text-xs text-neutral-500">
           Complete each vehicle’s required details. If coverage is partial, enter both year-week dates.
         </p>
+      )}
+        </>
       )}
     </div>
   );

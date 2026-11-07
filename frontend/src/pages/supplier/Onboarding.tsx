@@ -182,7 +182,11 @@ export default function Onboarding() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [entity, setEntity] = useState<CsvEntity>("vehicles");
-  const [preview, setPreview] = useState<CsvPreview | null>(null);
+  // Vehicles can be entered in the form or as a CSV file; each way keeps its own preview.
+  const [method, setMethod] = useState<"form" | "csv">("form");
+  const [previews, setPreviews] = useState<Record<"form" | "csv", CsvPreview | null>>({ form: null, csv: null });
+  const preview = previews[method];
+  const setPreview = (value: CsvPreview | null) => setPreviews((current) => ({ ...current, [method]: value }));
   const [formVersion, setFormVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -518,7 +522,7 @@ export default function Onboarding() {
                   value={entity}
                   onChange={(event) => {
                     setEntity(event.target.value as CsvEntity);
-                    setPreview(null);
+                    setPreviews({ form: null, csv: null });
                     setError(null);
                     setNotice(null);
                   }}
@@ -537,7 +541,26 @@ export default function Onboarding() {
             </div>
 
             {entity === "vehicles" && (
+              <div role="tablist" aria-label="How to enter vehicles" className="inline-flex rounded-lg border border-neutral-200 p-0.5 text-sm">
+                {([["form", "Fill in a form"], ["csv", "Upload a CSV file"]] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={method === value}
+                    disabled={working}
+                    onClick={() => { setMethod(value); setError(null); setNotice(null); }}
+                    className={`rounded-md px-3 py-1.5 font-medium ${method === value ? "bg-primary-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {entity === "vehicles" && (
               <SupplierVehicleEntryForm
+                mode={method}
                 key={`vehicles-${formVersion}`}
                 agreements={overview.agreements.filter((agreement) => agreement.requiresVehicles)}
                 working={working}
