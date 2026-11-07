@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
+import { useSendSupplierNotice } from "../../hooks/useSupplierNotices";
 import {
   CERTIFICATE_STANDARD_LABELS,
   formatCertificateDate,
@@ -68,6 +69,8 @@ export function CertificateAttentionCard({
   });
   const safeAttentionIndex = Math.min(activeAttentionIndex, attentionRows.length - 1);
   const row = attentionRows[safeAttentionIndex];
+
+  const sendNotice = useSendSupplierNotice(row?.contract?.supplierId ?? null);
 
   useEffect(() => {
     setActiveAttentionIndex(0);
@@ -194,8 +197,15 @@ export function CertificateAttentionCard({
           onMessageChange={setNoticeMessageDraft}
           onCancel={() => setIsNoticeInfoOpen(false)}
           onConfirm={() => {
-            setIsNoticeInfoOpen(false);
-            setIsNoticeRecorded(true);
+            sendNotice.mutate({
+              title: title,
+              message: noticeMessageDraft
+            }, {
+              onSuccess: () => {
+                setIsNoticeInfoOpen(false);
+                setIsNoticeRecorded(true);
+              }
+            });
           }}
         />
       )}

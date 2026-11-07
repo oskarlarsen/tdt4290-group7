@@ -22,11 +22,6 @@ import MyCompany from "../pages/supplier/MyCompany";
 import MyContracts from "../pages/supplier/MyContracts";
 import MyVehicles from "../pages/supplier/MyVehicles";
 import MyCertificates from "../pages/supplier/MyCertificates";
-import MyEnergy from "../pages/supplier/MyEnergy";
-import MyCompliance from "../pages/supplier/MyCompliance";
-import MyRiskAndPrediction from "../pages/supplier/MyRiskAndPrediction";
-import MyAlerts from "../pages/supplier/MyAlerts";
-import RequiredActions from "../pages/supplier/RequiredActions";
 
 const router = createBrowserRouter([
   { path: "/", element: <RoleRedirect /> },
@@ -60,15 +55,10 @@ const router = createBrowserRouter([
     ),
     children: [
       { path: "dashboard", element: <SupplierDashboard /> },
-      { path: "company", element: <MyCompany /> },
+      { path: "company", element: <MyCompany /> }, // kept route just in case, but removed from nav
       { path: "contracts", element: <MyContracts /> },
       { path: "vehicles", element: <MyVehicles /> },
       { path: "certificates", element: <MyCertificates /> },
-      { path: "energy", element: <MyEnergy /> },
-      { path: "compliance", element: <MyCompliance /> },
-      { path: "risk", element: <MyRiskAndPrediction /> },
-      { path: "alerts", element: <MyAlerts /> },
-      { path: "required-actions", element: <RequiredActions /> },
     ],
   },
 ]);

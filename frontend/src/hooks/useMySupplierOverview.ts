@@ -37,6 +37,9 @@ export function useMySupplierOverview() {
       ]);
 
       const allSuppliers = db.getTopRiskSuppliers();
+      const pendingReviews = import.meta.env.VITE_USE_MOCKS === "true"
+          ? db.getPendingReviews(supplierId)
+          : [];
 
       const overview = buildSupplierOverview(
         supplierId,
@@ -45,7 +48,8 @@ export function useMySupplierOverview() {
         allCertificates,
         fleetRes,
         energyData,
-        allAlerts
+        allAlerts,
+        pendingReviews
       );
 
       if (!overview.supplier) {

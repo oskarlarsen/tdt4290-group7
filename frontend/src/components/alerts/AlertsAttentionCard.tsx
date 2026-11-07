@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
+import { useSendSupplierNotice } from "../../hooks/useSupplierNotices";
 import type { AlertRow } from "./AlertsTable";
 import { formatAlertCreatedDate } from "../../utils/alertAge";
 
@@ -15,6 +16,8 @@ export function AlertsAttentionCard({
   const [noticeMessage, setNoticeMessage] = useState("");
   const [isNoticeRecorded, setIsNoticeRecorded] = useState(false);
   const [page, setPage] = useState(1);
+
+  const sendNotice = useSendSupplierNotice(noticeRow?.alert.supplierId ?? null);
 
   useEffect(() => {
     setPage(1);
@@ -49,8 +52,16 @@ export function AlertsAttentionCard({
   }
 
   function recordNotice() {
-    closeNotice();
-    setIsNoticeRecorded(true);
+    if (!noticeRow) return;
+    sendNotice.mutate({
+      title: noticeRow.alert.title,
+      message: noticeMessage,
+    }, {
+      onSuccess: () => {
+        closeNotice();
+        setIsNoticeRecorded(true);
+      }
+    });
   }
 
   return (

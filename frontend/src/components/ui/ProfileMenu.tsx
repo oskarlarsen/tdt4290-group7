@@ -168,6 +168,14 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                   <UserRound className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                   Profile
                 </div>
+                {user.role !== "ADMIN" && (
+                  <button
+                    onClick={() => { setOpen(false); navigate("/supplier/company"); }}
+                    className="mt-2 w-full rounded-md px-2.5 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    My Company
+                  </button>
+                )}
               </div>
 
               <div className="border-t border-neutral-100 p-1">
@@ -188,6 +196,16 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                   {roleLabel}
                 </div>
               </div>
+              {user.role !== "ADMIN" && (
+                <div className="border-b border-neutral-100 p-1">
+                  <button
+                    onClick={() => { setOpen(false); navigate("/supplier/company"); }}
+                    className="w-full rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    My Company
+                  </button>
+                </div>
+              )}
               <button
                 onClick={handleLogout}
                 className="mt-1 w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"

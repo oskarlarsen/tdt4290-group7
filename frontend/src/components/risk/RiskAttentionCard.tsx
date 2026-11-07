@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
+import { useSendSupplierNotice } from "../../hooks/useSupplierNotices";
 import { formatProjectedBreach, RISK_PRIORITY_INFO } from "../../types/riskOutlook";
 import type { RiskOutlookRow } from "../../types/riskOutlook";
 
@@ -47,6 +48,12 @@ export function RiskAttentionCard({
     [rows]
   );
 
+  const totalPages = Math.max(1, Math.ceil(attentionRows.length / ATTENTION_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const row = attentionRows[(currentPage - 1) * ATTENTION_PAGE_SIZE];
+
+  const sendNotice = useSendSupplierNotice(row?.contract.supplierId ?? null);
+
   useEffect(() => {
     setPage(1);
   }, [attentionRows]);
@@ -60,9 +67,6 @@ export function RiskAttentionCard({
 
   if (attentionRows.length === 0) return null;
 
-  const totalPages = Math.max(1, Math.ceil(attentionRows.length / ATTENTION_PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const row = attentionRows[(currentPage - 1) * ATTENTION_PAGE_SIZE];
   if (!row || !row.primary) return null;
   const { contract, primary, nextProjected } = row;
   const others = row.indicators.length - 1;
@@ -150,8 +154,15 @@ export function RiskAttentionCard({
           onMessageChange={setNoticeMessageDraft}
           onCancel={() => setIsNoticeOpen(false)}
           onConfirm={() => {
-            setIsNoticeOpen(false);
-            setIsNoticeRecorded(true);
+            sendNotice.mutate({
+              title: `${RISK_PRIORITY_INFO[row.priority].label} Priority: ${primary.title}`,
+              message: noticeMessageDraft
+            }, {
+              onSuccess: () => {
+                setIsNoticeOpen(false);
+                setIsNoticeRecorded(true);
+              }
+            });
           }}
           wrapReason
         />

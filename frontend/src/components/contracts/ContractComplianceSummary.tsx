@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
+import { useSendSupplierNotice } from "../../hooks/useSupplierNotices";
 import type { DerivedContract } from "../../types/contract";
 
 const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2 };
@@ -17,19 +18,21 @@ export function ContractComplianceSummary({
   const [noticeMessageDraft, setNoticeMessageDraft] = useState("");
   const [activeAttentionIndex, setActiveAttentionIndex] = useState(0);
 
+  const sortedContracts = [...contracts].sort(
+    (a, b) => RISK_PRIORITY[a.risk] - RISK_PRIORITY[b.risk]
+  );
+  const attentionContracts = sortedContracts.filter((contract) => contract.risk !== "compliant");
+  const safeAttentionIndex = Math.max(0, Math.min(activeAttentionIndex, attentionContracts.length - 1));
+  const current = attentionContracts[safeAttentionIndex] ?? sortedContracts[0];
+
+  const sendNotice = useSendSupplierNotice(current?.supplierId ?? null);
+
   useEffect(() => {
     if (!isNoticeRecorded) return;
 
     const timeout = window.setTimeout(() => setIsNoticeRecorded(false), 4000);
     return () => window.clearTimeout(timeout);
   }, [isNoticeRecorded]);
-
-  const sortedContracts = [...contracts].sort(
-    (a, b) => RISK_PRIORITY[a.risk] - RISK_PRIORITY[b.risk]
-  );
-  const attentionContracts = sortedContracts.filter((contract) => contract.risk !== "compliant");
-  const safeAttentionIndex = Math.min(activeAttentionIndex, attentionContracts.length - 1);
-  const current = attentionContracts[safeAttentionIndex] ?? sortedContracts[0];
 
   if (!current) return null;
 
@@ -137,8 +140,15 @@ export function ContractComplianceSummary({
           onMessageChange={setNoticeMessageDraft}
           onCancel={() => setIsSendNoticeInfoOpen(false)}
           onConfirm={() => {
-            setIsSendNoticeInfoOpen(false);
-            setIsNoticeRecorded(true);
+            sendNotice.mutate({
+              title: "Contract Compliance Follow-up",
+              message: noticeMessageDraft
+            }, {
+              onSuccess: () => {
+                setIsSendNoticeInfoOpen(false);
+                setIsNoticeRecorded(true);
+              }
+            });
           }}
         />
       )}

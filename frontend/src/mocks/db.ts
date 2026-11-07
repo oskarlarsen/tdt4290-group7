@@ -341,6 +341,58 @@ export function addSupplierNote(supplierId: string, authorName: string, text: st
   return note;
 }
 
+import type { SupplierNotice } from "../types/dashboard";
+
+const NOTICES_STORAGE_KEY = "supplier_notices";
+
+function readStoredNotices(): SupplierNotice[] {
+  try {
+    const stored = localStorage.getItem(NOTICES_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? (parsed as SupplierNotice[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredNotices(notices: SupplierNotice[]) {
+  try {
+    localStorage.setItem(NOTICES_STORAGE_KEY, JSON.stringify(notices));
+  } catch {
+    // Keep the app usable if storage is unavailable.
+  }
+}
+
+let supplierNotices: SupplierNotice[] = readStoredNotices();
+
+export function getSupplierNotices(supplierId: string): SupplierNotice[] {
+  return supplierNotices
+    .filter((n) => n.supplierId === supplierId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function addSupplierNotice(supplierId: string, title: string, message: string): SupplierNotice {
+  const notice: SupplierNotice = {
+    id: `notice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    supplierId,
+    title,
+    message,
+    createdAt: new Date().toISOString(),
+    isRead: false,
+  };
+  supplierNotices = [notice, ...supplierNotices];
+  writeStoredNotices(supplierNotices);
+  return notice;
+}
+
+export function markSupplierNoticeAsRead(noticeId: string): void {
+  supplierNotices = supplierNotices.map(n =>
+    n.id === noticeId ? { ...n, isRead: true } : n
+  );
+  writeStoredNotices(supplierNotices);
+}
+
 // Fictional normalized demo points only; these are not real municipal measurements.
 const MOCK_CONTRACT_DETAILS: Record<
   string,
@@ -472,4 +524,47 @@ export function getEnergyData(): EnergyData {
 
 export function getAllAlerts(): RecentAlert[] {
   return alerts;
+}
+
+export type PendingReview = {
+  id: string;
+  title: string;
+  submittedAt: string;
+  type: string;
+  supplierId: string;
+  contractName?: string;
+  status?: string;
+  documentDetails?: string;
+  feedback?: string;
+};
+
+const MOCK_PENDING_REVIEWS: PendingReview[] = [
+  {
+    id: "rev-1",
+    supplierId: "sup-c",
+    title: "Miljøfyrtårn Certificate (Demo Mock)",
+    submittedAt: "Oct 12",
+    type: "Document",
+    contractName: "Skolebygg Rehabilitering",
+    status: "In Review",
+    documentDetails: "Certification valid until 2026. File attached: miljofyrtarn_2024.pdf",
+    feedback: "Awaiting final verification of issuer credentials from the environmental agency.",
+  }
+];
+
+export function getPendingReviews(supplierId: string): PendingReview[] {
+  return MOCK_PENDING_REVIEWS.filter(r => r.supplierId === supplierId);
+}
+
+export function addMockCertificate(cert: Certificate) {
+  // If replacing a missing cert, remove the placeholder first
+  const existingIndex = MOCK_CERTIFICATES.findIndex(c => c.contractId === cert.contractId && c.certificateNumber === null);
+  if (existingIndex >= 0) {
+    MOCK_CERTIFICATES.splice(existingIndex, 1);
+  }
+  MOCK_CERTIFICATES.push(cert);
+}
+
+export function addMockPendingReview(review: PendingReview) {
+  MOCK_PENDING_REVIEWS.push(review);
 }

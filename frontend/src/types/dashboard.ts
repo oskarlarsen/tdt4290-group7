@@ -124,3 +124,12 @@ export type SupplierNote = {
   text: string;
   createdAt: string;
 };
+
+export type SupplierNotice = {
+  id: string;
+  supplierId: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+};

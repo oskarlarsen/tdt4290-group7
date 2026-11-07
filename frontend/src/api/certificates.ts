@@ -68,6 +68,40 @@ export async function uploadCertificate(
   supplierName: string,
   contractId: string,
 ): Promise<Certificate> {
+  if (USE_MOCKS) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const newCert: Certificate = {
+          id: `cert-mock-${Date.now()}`,
+          standard: "unknown",
+          certificateNumber: null,
+          contractId,
+          validUntil: null,
+          supplierName,
+          certificateType: "Uploaded Document",
+          issueDate: new Date().toISOString(),
+          sourceFile: file.name,
+        };
+        db.addMockCertificate(newCert);
+
+        // Fetch supplier ID roughly based on contract mock structure
+        // In real backend, this maps internally
+        const supplierId = contractId;
+
+        db.addMockPendingReview({
+           id: `rev-${Date.now()}`,
+           supplierId,
+           title: `Certificate Upload: ${file.name}`,
+           submittedAt: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+           type: "Document",
+           status: "Pending Review",
+        });
+
+        resolve(newCert);
+      }, 1500);
+    });
+  }
+
   const form = new FormData();
   form.append("supplierName", supplierName);
   form.append("contractId", contractId);

@@ -7,11 +7,13 @@ import type { DerivedContract } from "../../types/contract";
 export function CertificateUploadDialog({
   contracts,
   onClose,
+  initialContractId,
 }: {
   contracts: DerivedContract[];
   onClose: () => void;
+  initialContractId?: string;
 }) {
-  const [contractId, setContractId] = useState("");
+  const [contractId, setContractId] = useState(initialContractId || "");
   const [file, setFile] = useState<File | null>(null);
   const upload = useUploadCertificate();
   const selectedContract = contracts.find((contract) => contract.id === contractId);
@@ -111,7 +113,7 @@ export function CertificateUploadDialog({
             className="inline-flex items-center gap-2 rounded-lg bg-primary-900 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {upload.isPending ? "Extracting…" : "Upload and extract"}
+            {upload.isPending ? "Submitting…" : "Submit"}
           </button>
         </div>
       </form>

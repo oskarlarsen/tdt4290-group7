@@ -1,29 +1,18 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Building2,
+  Home,
   FileText,
   Truck,
-  BadgeCheck,
-  Zap,
-  CheckCircle2,
-  ShieldAlert,
-  Bell,
-  AlertTriangle
+  BadgeCheck
 } from "lucide-react";
 import { ProfileMenu } from "../components/ui/ProfileMenu";
+import { SupplierTopBar } from "../components/ui/SupplierTopBar";
 
 const NAV = [
-  { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "company", label: "My Company", icon: Building2 },
+  { to: "dashboard", label: "Home", icon: Home },
   { to: "contracts", label: "My Contracts", icon: FileText },
-  { to: "vehicles", label: "My Vehicles", icon: Truck },
-  { to: "certificates", label: "My Certificates", icon: BadgeCheck },
-  { to: "energy", label: "Energy & Fuel", icon: Zap },
-  { to: "compliance", label: "My Compliance", icon: CheckCircle2 },
-  { to: "risk", label: "My Risk & Prediction", icon: ShieldAlert },
-  { to: "alerts", label: "My Alerts", icon: Bell },
-  { to: "required-actions", label: "Required Actions", icon: AlertTriangle },
+  { to: "certificates", label: "Certificates", icon: BadgeCheck },
+  { to: "vehicles", label: "Vehicles", icon: Truck },
 ];
 
 export function SupplierLayout() {
@@ -73,12 +62,7 @@ export function SupplierLayout() {
 
       <div className="flex flex-1 flex-col">
         {/* Supplier-safe Top Bar */}
-        <div className="flex items-center justify-end gap-4 border-b border-neutral-100 bg-white px-6 py-3 h-14">
-          <div className="flex items-center gap-2">
-            {/* Omitted SearchSuppliers and NotificationBell as per constraints */}
-            <ProfileMenu variant="compact" />
-          </div>
-        </div>
+        <SupplierTopBar />
         <main className="flex-1 p-6">
           <Outlet />
         </main>

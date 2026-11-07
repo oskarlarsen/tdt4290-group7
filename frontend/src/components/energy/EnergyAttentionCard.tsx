@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
+import { useSendSupplierNotice } from "../../hooks/useSupplierNotices";
 import { formatKwh, formatPercent } from "../../types/energy";
 import { getEnergyNoticeReason, getEnergySuggestedNoticeMessage } from "./energyFilters";
 import type { EnergyRow } from "./EnergyTable";
@@ -18,6 +19,8 @@ export function EnergyAttentionCard({
   const [noticeMessageDraft, setNoticeMessageDraft] = useState("");
   const [isNoticeRecorded, setIsNoticeRecorded] = useState(false);
   const [page, setPage] = useState(1);
+
+  const sendNotice = useSendSupplierNotice(noticeRow?.contract?.supplierId ?? null);
 
   useEffect(() => {
     setPage(1);
@@ -54,9 +57,17 @@ export function EnergyAttentionCard({
   }
 
   function confirmNotice() {
-    setNoticeRow(null);
-    setNoticeMessageDraft("");
-    setIsNoticeRecorded(true);
+    if (!noticeRow) return;
+    sendNotice.mutate({
+      title: "Energy Compliance Follow-up",
+      message: noticeMessageDraft
+    }, {
+      onSuccess: () => {
+        setNoticeRow(null);
+        setNoticeMessageDraft("");
+        setIsNoticeRecorded(true);
+      }
+    });
   }
 
   return (

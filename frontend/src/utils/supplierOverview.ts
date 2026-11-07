@@ -3,6 +3,7 @@ import type { DerivedContract } from "../types/contract";
 import type { RecentAlert, TopRiskSupplier } from "../types/dashboard";
 import type { EnergyRequirement, EnergyRecord } from "../types/energy";
 import type { FleetOverview } from "../types/vehicle";
+import type { PendingReview } from "../mocks/db";
 
 export const MOCK_SUPPLIER_MAPPING = "sup-c"; // Phase 1.1: Named constant for mapping
 
@@ -11,11 +12,25 @@ export type RequiredAction = {
   reason: string;
   link: string;
   priority: number; // lower is higher priority
+  contractId?: string;
+  contractName?: string;
+};
+
+export type ContractOverview = {
+  contract: DerivedContract;
+  requiredActions: RequiredAction[];
+  pendingReviews: PendingReview[];
+  summaries: {
+    certificates: { valid: number; expiring: number; expired: number; missing: number };
+    vehicles: { tracked: number; flagged: number; state: "normal" | "not-applicable" | "data-missing" };
+  };
 };
 
 export type SupplierOverviewData = {
   supplier: { name: string; orgId: string } | null;
-  contract: DerivedContract | null;
+  contract: DerivedContract | null; // Primary contract (for backwards compatibility)
+  contracts: DerivedContract[]; // All contracts associated with the supplier
+  contractOverviews: ContractOverview[]; // Detailed mapped views per contract
   indicators: TopRiskSupplier | null; // Reusing TopRiskSupplier for indicators
   requiredActions: RequiredAction[];
   summaries: {
@@ -34,6 +49,7 @@ export type SupplierOverviewData = {
     energy: { requirement: EnergyRequirement | undefined; record: EnergyRecord | undefined };
   };
   alerts: RecentAlert[];
+  pendingReviews: PendingReview[];
 };
 
 export function buildSupplierOverview(
@@ -43,14 +59,16 @@ export function buildSupplierOverview(
   allCertificates: Certificate[],
   fleetRes: FleetOverview | null,
   energyData: { requirements: EnergyRequirement[]; records: EnergyRecord[] },
-  allAlerts: RecentAlert[]
+  allAlerts: RecentAlert[],
+  pendingReviews: PendingReview[] = []
 ): SupplierOverviewData {
 
   const supplierRecord = allSuppliers.find(s => s.id === supplierId) || null;
   const supplier = supplierRecord ? { name: supplierRecord.displayName, orgId: supplierRecord.orgId } : null;
 
-  // Contracts are derived 1:1, so contract id = supplier id
-  const contract = allContracts.find(c => c.supplierId === supplierId) || null;
+  // Contracts
+  const myContracts = allContracts.filter(c => c.supplierId === supplierId);
+  const contract = myContracts.length > 0 ? myContracts[0] : null;
   const contractId = contract?.id || supplierId; // Fallback to supplierId as per rules
 
   const indicators = supplierRecord;
@@ -122,36 +140,107 @@ export function buildSupplierOverview(
       }
   }
 
-  // Required Actions mapping
-  const requiredActions: RequiredAction[] = [];
+  // Contract Overviews mapping
+  const contractOverviews: ContractOverview[] = myContracts.map(contractRow => {
+    const cid = contractRow.id;
+    const cCerts = allCertificates.filter(c => c.contractId === cid);
+    const cPending = pendingReviews.filter(p => p.contractName === contractRow.contractName || !p.contractName); // Rough mapping for demo
 
-  if (missingCerts > 0) {
-      requiredActions.push({ title: "Upload certificate documentation", reason: "Certificate documentation missing", link: "/supplier/certificates", priority: 1 });
-  }
-  if (expiredCerts > 0) {
-      requiredActions.push({ title: "Renew the certificate", reason: "Certificate expired", link: "/supplier/certificates", priority: 2 });
-  }
-  if (expiringCerts > 0) {
-      requiredActions.push({ title: "Plan the renewal", reason: "Certificate expiring", link: "/supplier/certificates", priority: 3 });
-  }
-  if (vehicleState === "data-missing") {
-      requiredActions.push({ title: "Submit vehicle data", reason: "Vehicle data not submitted", link: "/supplier/vehicles", priority: 4 });
-  }
-  if (flaggedVehicles > 0) {
-      requiredActions.push({ title: "Review flagged vehicles", reason: "Flagged vehicles", link: "/supplier/vehicles", priority: 5 });
-  }
-  if (energyState === "data-missing") {
-      requiredActions.push({ title: "Submit energy data", reason: "Energy data not submitted", link: "/supplier/energy", priority: 6 });
-  }
-  if (isBreach) {
-      requiredActions.push({ title: "Review energy data", reason: "Energy breach or minor deviation", link: "/supplier/energy", priority: 7 });
-  }
+    let cValidCerts = 0; let cExpiringCerts = 0; let cExpiredCerts = 0; let cMissingCerts = 0;
+    const missingStandards: string[] = [];
+    const expiredStandards: string[] = [];
+    const expiringStandards: string[] = [];
 
-  requiredActions.sort((a, b) => a.priority - b.priority);
+    cCerts.forEach(cert => {
+      if (!cert.certificateNumber && !cert.validUntil) {
+        cMissingCerts++;
+        missingStandards.push(cert.standard);
+      } else if (cert.validUntil) {
+        const validUntilDate = new Date(cert.validUntil);
+        const daysUntilExpiry = Math.ceil((validUntilDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
+        if (daysUntilExpiry < 0) {
+           cExpiredCerts++;
+           expiredStandards.push(cert.standard);
+        } else if (daysUntilExpiry <= 30) {
+           cExpiringCerts++;
+           expiringStandards.push(cert.standard);
+        } else {
+           cValidCerts++;
+        }
+      }
+    });
+
+    const cReqActions: RequiredAction[] = [];
+    if (cMissingCerts > 0) {
+        cReqActions.push({
+           title: "Upload certificate documentation",
+           reason: `Missing ${missingStandards.join(", ")} for ${contractRow.contractName}`,
+           link: "/supplier/certificates",
+           priority: 1,
+           contractId: cid,
+           contractName: contractRow.contractName
+        });
+    }
+    if (cExpiredCerts > 0) {
+        cReqActions.push({
+           title: "Renew the certificate",
+           reason: `Expired ${expiredStandards.join(", ")} for ${contractRow.contractName}`,
+           link: "/supplier/certificates",
+           priority: 2,
+           contractId: cid,
+           contractName: contractRow.contractName
+        });
+    }
+    if (cExpiringCerts > 0) {
+        cReqActions.push({
+           title: "Plan the renewal",
+           reason: `Expiring ${expiringStandards.join(", ")} for ${contractRow.contractName}`,
+           link: "/supplier/certificates",
+           priority: 3,
+           contractId: cid,
+           contractName: contractRow.contractName
+        });
+    }
+
+    let cVehState: "normal" | "not-applicable" | "data-missing" = "normal";
+    if (!fleetRes) {
+        cVehState = "data-missing";
+    } else if (myVehiclesCount === 0) {
+        cVehState = "data-missing";
+    }
+
+    if (cVehState === "data-missing") {
+        cReqActions.push({
+           title: "Submit vehicle data",
+           reason: `Vehicle data not submitted for ${contractRow.contractName}`,
+           link: "/supplier/vehicles",
+           priority: 4,
+           contractId: cid,
+           contractName: contractRow.contractName
+        });
+    }
+
+    cReqActions.sort((a, b) => a.priority - b.priority);
+
+    return {
+      contract: contractRow,
+      requiredActions: cReqActions,
+      pendingReviews: cPending,
+      summaries: {
+        certificates: { valid: cValidCerts, expiring: cExpiringCerts, expired: cExpiredCerts, missing: cMissingCerts },
+        vehicles: { tracked: trackedVehicles, flagged: flaggedVehicles, state: cVehState } // Vehicles roughly mapped at supplier level for now
+      }
+    };
+  });
+
+  // Extract root requiredActions from contractOverviews
+  const requiredActions = contractOverviews.flatMap(co => co.requiredActions).sort((a, b) => a.priority - b.priority);
 
   return {
     supplier,
     contract,
+    contracts: myContracts,
+    contractOverviews,
     indicators,
     requiredActions,
     summaries: {
@@ -164,6 +253,7 @@ export function buildSupplierOverview(
       certificates: myCertificates,
       energy: { requirement: myEnergyReq, record: myEnergyRec }
     },
-    alerts: myAlerts
+    alerts: myAlerts,
+    pendingReviews
   };
 }
