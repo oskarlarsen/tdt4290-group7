@@ -71,7 +71,7 @@ export function AdminLayout() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         <main id="main" tabIndex={-1} className="flex-1 p-6 focus:outline-none">
           <Outlet />

@@ -77,7 +77,7 @@ export function SupplierLayout() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Supplier-safe Top Bar */}
         <div className="flex items-center justify-end gap-4 border-b border-neutral-100 bg-white px-6 py-3 h-14">
           <div className="flex items-center gap-2">
