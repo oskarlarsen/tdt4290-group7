@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { X, Send } from "lucide-react";
 import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -35,6 +36,7 @@ export function SupplierDetailsDrawer({
   onClose,
 }: Props) {
   const isOpen = supplier !== null;
+  const drawerRef = useDrawerFocus(isOpen);
   const { data: notes = [] } = useSupplierNotes(supplier?.id ?? null);
   const addNote = useAddSupplierNote(supplier?.id ?? null);
   const [noteText, setNoteText] = useState("");
@@ -74,6 +76,9 @@ export function SupplierDetailsDrawer({
       />
 
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={supplier ? `${supplier.displayName} details` : undefined}

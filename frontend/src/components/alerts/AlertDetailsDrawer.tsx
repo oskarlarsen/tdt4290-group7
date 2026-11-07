@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { ArrowUpRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AlertFindingBadge, AlertStatusBadge, SeverityBadge, ALERT_SEVERITY_LABELS, ALERT_STATUS_LABELS } from "./AlertBadges";
@@ -34,6 +35,7 @@ export function AlertDetailsDrawer({
 }) {
   const navigate = useNavigate();
   const isOpen = row !== null;
+  const drawerRef = useDrawerFocus(isOpen);
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -109,6 +111,9 @@ export function AlertDetailsDrawer({
         }`}
       />
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={alert ? `${alert.title} details` : undefined}

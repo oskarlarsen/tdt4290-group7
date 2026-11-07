@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { X, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { FleetAgreement, FleetSupplier } from "../../types/vehicle";
@@ -22,6 +23,7 @@ const STATUS_CLASSES = {
 export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
   const navigate = useNavigate();
   const isOpen = agreement !== null && supplier !== null;
+  const drawerRef = useDrawerFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,6 +52,9 @@ export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
       />
 
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={agreement ? `${agreementLabel(agreement)} details` : undefined}

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { X, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -35,6 +36,7 @@ export function CertificateDetailsDrawer({
 }) {
   const navigate = useNavigate();
   const isOpen = row !== null;
+  const drawerRef = useDrawerFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,6 +65,9 @@ export function CertificateDetailsDrawer({
         }`}
       />
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={certificate ? `${CERTIFICATE_STANDARD_LABELS[certificate.standard]} details` : undefined}

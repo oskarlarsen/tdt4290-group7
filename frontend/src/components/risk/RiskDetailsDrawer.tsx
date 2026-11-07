@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { ArrowUpRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -34,6 +35,7 @@ export function RiskDetailsDrawer({
 }) {
   const navigate = useNavigate();
   const isOpen = row !== null;
+  const drawerRef = useDrawerFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -61,6 +63,9 @@ export function RiskDetailsDrawer({
         }`}
       />
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={contract ? `${contract.supplierName} risk details` : undefined}
