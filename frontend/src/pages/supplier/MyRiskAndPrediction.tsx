@@ -6,7 +6,7 @@ import { formatDate } from "../../utils/formatDate";
 export default function MyRiskAndPrediction() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
 
-  if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-500"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (isError || !data) return <div className="p-8 text-center text-sm text-red-700">{error instanceof Error ? error.message : "Error loading data"}</div>;
 
   const { certificates } = data;

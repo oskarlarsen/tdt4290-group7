@@ -70,7 +70,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
 
           <Section title="Alerts">
             {alerts.length === 0 ? (
-              <p className="text-sm text-neutral-400">No unresolved alerts for this supplier.</p>
+              <p className="text-sm text-neutral-500">No unresolved alerts for this supplier.</p>
             ) : (
               <ul className="space-y-2">
                 {alerts.map((alert) => (
@@ -107,7 +107,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
                   onChange={(event) => setOnboardingNotes(event.target.value)}
                   placeholder="Feedback for the supplier (required when requesting changes)"
                   rows={2}
-                  className="w-full resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
+                  className="w-full resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
                 />
                 {onboardingReview.isError && (
                   <p role="alert" className="text-sm text-red-700">
@@ -140,7 +140,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
             <ul className="grid grid-cols-2 gap-2 text-sm text-neutral-700 sm:grid-cols-3">
               {counts.map(([label, value]) => (
                 <li key={label} className="rounded-lg bg-neutral-50 p-2.5">
-                  <span className="block text-xs text-neutral-400">{label}</span>
+                  <span className="block text-xs text-neutral-500">{label}</span>
                   {value ? `${value} ${label.toLowerCase()}` : NOT_PROVIDED}
                 </li>
               ))}
@@ -162,7 +162,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -171,7 +171,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-500">{label}</span>
       <span className="font-medium text-neutral-900">{value}</span>
     </div>
   );

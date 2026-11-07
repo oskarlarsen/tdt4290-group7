@@ -156,7 +156,7 @@ export default function Suppliers() {
         </p>
       )}
       {isLoading && (
-        <div role="status" className="flex h-12 items-center gap-2 text-sm text-neutral-400">
+        <div role="status" className="flex h-12 items-center gap-2 text-sm text-neutral-500">
           <Loader2 className="h-5 w-5 animate-spin" /> Loading supplier risk dashboard…
         </div>
       )}
@@ -231,13 +231,13 @@ export default function Suppliers() {
       {data && <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search suppliers…"
               aria-label="Search suppliers"
-              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
 
@@ -315,7 +315,7 @@ export default function Suppliers() {
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-            <span className="font-mono text-xs text-neutral-400">
+            <span className="font-mono text-xs text-neutral-500">
               Page {currentPage} of {totalPages}
             </span>
             <button

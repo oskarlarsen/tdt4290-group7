@@ -81,7 +81,7 @@ export default function Contracts() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <label className="relative block w-full max-w-sm text-xs font-medium text-neutral-600">
             Search agreements or suppliers
-            <Search className="absolute left-3 top-9 h-4 w-4 text-neutral-400" />
+            <Search className="absolute left-3 top-9 h-4 w-4 text-neutral-500" />
             <input className={`${inputClass} mt-2 pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, organization number or saksnr" />
           </label>
           <label className="text-xs font-medium text-neutral-600">

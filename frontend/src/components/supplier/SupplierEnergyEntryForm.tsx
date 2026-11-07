@@ -182,7 +182,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Biogas (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Biogas (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -196,7 +196,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Fossil fuel (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Fossil fuel (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -210,7 +210,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Self-produced solar (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Self-produced solar (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -224,7 +224,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Self-produced heat pump (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Self-produced heat pump (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -290,7 +290,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
 
           <div className="mt-4 border-t border-neutral-100 pt-3">
             <label className="block text-sm font-medium text-neutral-700">
-              Notes <span className="font-normal text-neutral-400">(optional)</span>
+              Notes <span className="font-normal text-neutral-500">(optional)</span>
               <textarea
                 value={row.notes}
                 onChange={(event) => updateRow(row.id, { notes: event.target.value })}

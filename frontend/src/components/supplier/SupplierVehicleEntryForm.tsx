@@ -143,7 +143,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             )}
 
             <label className="block text-sm font-medium text-neutral-700">
-              Fuel or propulsion {row.isPlanned !== true && <span className="font-normal text-neutral-400">(optional: we check it for you)</span>}
+              Fuel or propulsion {row.isPlanned !== true && <span className="font-normal text-neutral-500">(optional: we check it for you)</span>}
               <select
                 value={row.fuelTechnology}
                 onChange={(event) => updateRow(row.id, { fuelTechnology: event.target.value })}
@@ -193,7 +193,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             )}
 
             <label className="block text-sm font-medium text-neutral-700">
-              Reference to a supporting document <span className="font-normal text-neutral-400">(optional)</span>
+              Reference to a supporting document <span className="font-normal text-neutral-500">(optional)</span>
               <input
                 value={row.attachmentReference}
                 onChange={(event) => updateRow(row.id, { attachmentReference: event.target.value })}
@@ -202,7 +202,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
               />
             </label>
             <label className="block text-sm font-medium text-neutral-700 sm:col-span-2">
-              Notes <span className="font-normal text-neutral-400">(optional; do not include driver personal data)</span>
+              Notes <span className="font-normal text-neutral-500">(optional; do not include driver personal data)</span>
               <textarea
                 value={row.notes}
                 onChange={(event) => updateRow(row.id, { notes: event.target.value })}

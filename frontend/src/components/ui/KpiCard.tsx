@@ -50,7 +50,7 @@ export function KpiCard({
         >
           {value}
         </span>
-        {sublabel && <span className="text-xs text-neutral-400">{sublabel}</span>}
+        {sublabel && <span className="text-xs text-neutral-500">{sublabel}</span>}
         {inlineNote && note && (
           <span className={`min-w-0 flex-1 text-xs font-medium ${NOTE_TONE_CLASSES[noteTone]}`}>
             {note}

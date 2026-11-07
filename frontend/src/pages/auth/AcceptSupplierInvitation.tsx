@@ -57,7 +57,7 @@ export default function AcceptSupplierInvitation() {
           <form className="mt-5 space-y-4" onSubmit={submit}>
             <p className="text-sm text-neutral-600">Choose a password to activate the supplier account linked to this invitation.</p>
             <label className="block space-y-1.5 text-sm text-neutral-700">
-              <span className="block text-xs font-medium">Your name <span className="font-normal text-neutral-400">(required if you were invited as a colleague or administrator)</span></span>
+              <span className="block text-xs font-medium">Your name <span className="font-normal text-neutral-500">(required if you were invited as a colleague or administrator)</span></span>
               <input maxLength={100} autoComplete="name" value={name} onChange={event => setName(event.target.value)} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-900/10" />
             </label>
             <label className="block space-y-1.5 text-sm text-neutral-700">

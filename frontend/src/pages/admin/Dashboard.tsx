@@ -190,7 +190,7 @@ export default function Dashboard() {
 
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <h2 className="font-headline text-base font-semibold text-neutral-900">Supplier risk classification</h2>
-        <p className="mb-4 text-xs text-neutral-400">
+        <p className="mb-4 text-xs text-neutral-500">
           Assessment uses persisted vehicle findings and certificate expiry dates; suppliers with no evidence yet are listed as Not assessed.
         </p>
         <RiskClassificationBar data={data.riskClassification} />
@@ -270,7 +270,7 @@ export default function Dashboard() {
 
         <section className="rounded-xl border border-neutral-100 bg-white p-4">
           <h2 className="font-headline text-base font-semibold text-neutral-900">Recent alerts</h2>
-          <p className="mb-1 text-xs text-neutral-400">Most recent events first</p>
+          <p className="mb-1 text-xs text-neutral-500">Most recent events first</p>
           {data.recentAlerts.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No unresolved alerts.</p>
           ) : (

@@ -180,7 +180,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
           onClick={close}
           disabled={isSaving}
           aria-label="Close Create Manual Alert"
-          className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 disabled:opacity-50"
+          className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 disabled:opacity-50"
         >
           <X className="h-4 w-4" />
         </button>
@@ -329,7 +329,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
                 rows={3}
                 className={fieldClassName}
               />
-              <span className="mt-1 block font-normal text-neutral-400">Only you see this note. It is never shown to the supplier.</span>
+              <span className="mt-1 block font-normal text-neutral-500">Only you see this note. It is never shown to the supplier.</span>
             </label>
           )}
         </div>

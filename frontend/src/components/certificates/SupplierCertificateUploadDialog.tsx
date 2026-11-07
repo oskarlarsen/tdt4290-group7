@@ -57,7 +57,7 @@ export function SupplierCertificateUploadDialog({
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </span>
-          <span className="mt-1 block text-xs text-neutral-400">PDF only, up to 8 MB and 25 pages.</span>
+          <span className="mt-1 block text-xs text-neutral-500">PDF only, up to 8 MB and 25 pages.</span>
         </label>
 
         <p className="text-xs text-neutral-500">

@@ -165,7 +165,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             <label className="block text-sm font-medium text-neutral-700">
               License or certification number
               {row.ecolabelStandard === "NONE" ? (
-                <span className="font-normal text-neutral-400"> (not applicable for None)</span>
+                <span className="font-normal text-neutral-500"> (not applicable for None)</span>
               ) : (
                 <span className="font-normal text-amber-600"> (required)</span>
               )}
@@ -216,7 +216,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700 sm:col-span-2">
-              Notes <span className="font-normal text-neutral-400">(optional)</span>
+              Notes <span className="font-normal text-neutral-500">(optional)</span>
               <textarea
                 value={row.notes}
                 onChange={(event) => updateRow(row.id, { notes: event.target.value })}

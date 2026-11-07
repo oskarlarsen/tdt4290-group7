@@ -80,7 +80,7 @@ export function EnergyDetailsDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -96,7 +96,7 @@ export function EnergyDetailsDrawer({
                   />
                 ))}
                 <Field label="Total" value={formatKwh(analysis.totalKwh)} />
-                <p className="mt-1 text-xs text-neutral-400">
+                <p className="mt-1 text-xs text-neutral-500">
                   All carriers are shown as energy (kWh). Renewable = electric + biogas.
                 </p>
               </Section>
@@ -113,7 +113,7 @@ export function EnergyDetailsDrawer({
                     Fossil energy above the contractual limit: {formatKwh(analysis.fossilExcessKwh)}.
                   </p>
                 )}
-                <p className="mt-1 text-xs text-neutral-400">
+                <p className="mt-1 text-xs text-neutral-500">
                   Minor deviation = within {ENERGY_THRESHOLDS.minorDeviationPoints} percentage points of
                   the minimum (provisional threshold).
                 </p>
@@ -134,7 +134,7 @@ export function EnergyDetailsDrawer({
                     </button>
                   </>
                 ) : (
-                  <p className="text-sm text-neutral-400">Contract not found for this record.</p>
+                  <p className="text-sm text-neutral-500">Contract not found for this record.</p>
                 )}
               </Section>
 
@@ -154,7 +154,7 @@ export function EnergyDetailsDrawer({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -163,7 +163,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-500">{label}</span>
       <span className="text-right font-medium text-neutral-900">{value}</span>
     </div>
   );

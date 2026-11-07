@@ -27,14 +27,14 @@ export function AlertsTable({
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
-    return <div className="py-8 text-center text-sm text-neutral-400">{emptyMessage}</div>;
+    return <div className="py-8 text-center text-sm text-neutral-500">{emptyMessage}</div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
             <th className="pb-2 pr-3 font-medium">Description</th>
             <th className="pb-2 pr-3 font-medium">Supplier</th>
             <th className="pb-2 pr-3 font-medium">Contract</th>
@@ -65,12 +65,12 @@ export function AlertsTable({
                       <div className="font-medium text-neutral-900">
                         {contract?.supplierName ?? supplier?.displayName}
                       </div>
-                      <div className="font-mono text-xs text-neutral-400">
+                      <div className="font-mono text-xs text-neutral-500">
                         {contract?.supplierOrgId ?? supplier?.orgId}
                       </div>
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-400">Not available in demo data</span>
+                    <span className="text-xs text-neutral-500">Not available in demo data</span>
                   )}
                 </td>
                 <td className="py-3 pr-3">
@@ -79,7 +79,7 @@ export function AlertsTable({
                       {contract?.contractName ?? supplier?.primaryContract}
                     </span>
                   ) : (
-                    <span className="text-xs text-neutral-400">Not available in demo data</span>
+                    <span className="text-xs text-neutral-500">Not available in demo data</span>
                   )}
                 </td>
                 <td className="whitespace-nowrap py-3 pr-3">

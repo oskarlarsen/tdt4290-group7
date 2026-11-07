@@ -29,7 +29,7 @@ export function RiskClassificationBar({ data }: { data: RiskClassification }) {
                 <span className="flex flex-wrap items-center gap-1.5 text-sm">
                   <span className={`h-2 w-2 rounded-full ${dotClass}`} />
                   <span className="font-medium text-neutral-800">{count} suppliers</span>
-                  <span className="font-mono text-xs text-neutral-400">({percent}%) {label}</span>
+                  <span className="font-mono text-xs text-neutral-500">({percent}%) {label}</span>
                 </span>
                 <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-neutral-100">
                   <span className={`block h-full ${barClass}`} style={{ width: `${percent}%` }} />
@@ -39,7 +39,7 @@ export function RiskClassificationBar({ data }: { data: RiskClassification }) {
           );
         })}
       </ul>
-      <p className="mt-2 text-right font-mono text-xs text-neutral-400">{total} suppliers total</p>
+      <p className="mt-2 text-right font-mono text-xs text-neutral-500">{total} suppliers total</p>
     </div>
   );
 }

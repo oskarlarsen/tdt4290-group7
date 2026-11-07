@@ -51,7 +51,7 @@ export default function MyAlerts() {
         </label>
       </div>
 
-      {isLoading && <div className="flex h-40 items-center justify-center text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+      {isLoading && <div className="flex h-40 items-center justify-center text-neutral-500"><Loader2 className="h-5 w-5 animate-spin" /></div>}
       {isError && (
         <div role="alert" className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700">
           {error instanceof Error ? error.message : "Could not load your alerts."}
@@ -75,7 +75,7 @@ export default function MyAlerts() {
                 </span>
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-600">{alert.description}</p>
-              <p className="mt-2 text-xs text-neutral-400">
+              <p className="mt-2 text-xs text-neutral-500">
                 {CATEGORY_LABELS[alert.category]} · Raised {formatDate(alert.createdAt)}
                 {alert.dueDate ? ` · Due ${formatDate(alert.dueDate)}` : ""}
               </p>

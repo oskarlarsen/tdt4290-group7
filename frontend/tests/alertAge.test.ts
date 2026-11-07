@@ -167,7 +167,7 @@ describe("alert creation date and age formatting", () => {
     expect(html).toContain("Miljøfyrtårn certificate");
     expect(html).toContain("The existing certificate record has no submitted expiry date or certificate number.");
     expect(
-      html.match(/<div class="py-1 text-sm"><span class="block text-left text-neutral-400">/g)
+      html.match(/<div class="py-1 text-sm"><span class="block text-left text-neutral-500">/g)
     ).toHaveLength(9);
   });
 

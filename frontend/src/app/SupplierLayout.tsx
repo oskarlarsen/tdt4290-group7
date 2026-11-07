@@ -41,13 +41,13 @@ export function SupplierLayout() {
             <div className="font-headline text-sm font-semibold leading-tight text-neutral-900">
               Miljø &amp; Kontrakt
             </div>
-            <div className="text-[10px] font-mono uppercase tracking-wide text-neutral-400">
+            <div className="text-[10px] font-mono uppercase tracking-wide text-neutral-500">
               Supplier Portal
             </div>
           </div>
         </div>
 
-        <div className="px-4 pb-1 pt-3 text-[10px] font-mono uppercase tracking-wide text-neutral-400">
+        <div className="px-4 pb-1 pt-3 text-[10px] font-mono uppercase tracking-wide text-neutral-500">
           Supplier Actions
         </div>
 

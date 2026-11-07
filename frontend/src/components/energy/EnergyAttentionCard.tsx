@@ -112,7 +112,7 @@ export function EnergyAttentionCard({
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-            <span className="font-mono text-xs text-neutral-400">
+            <span className="font-mono text-xs text-neutral-500">
               Page {currentPage} of {totalPages}
             </span>
             <button

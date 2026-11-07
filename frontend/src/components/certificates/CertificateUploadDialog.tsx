@@ -58,7 +58,7 @@ export function CertificateUploadDialog({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+            className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
           </button>
@@ -98,7 +98,7 @@ export function CertificateUploadDialog({
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </span>
-          <span className="mt-1 block text-xs text-neutral-400">PDF only, up to 8 MB and 25 pages.</span>
+          <span className="mt-1 block text-xs text-neutral-500">PDF only, up to 8 MB and 25 pages.</span>
         </label>
 
         {upload.isError && (

@@ -148,7 +148,7 @@ export function AddSupplierDialog({
           onClick={close}
           disabled={isSubmitting}
           aria-label="Close Add Supplier"
-          className="shrink-0 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <X className="h-4 w-4" />
         </button>
@@ -172,7 +172,7 @@ export function AddSupplierDialog({
               }}
               aria-invalid={Boolean(nameError)}
               aria-describedby={nameError ? "supplier-name-error" : undefined}
-              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
             {nameError && (
               <p id="supplier-name-error" role="alert" className="mt-1 text-xs text-red-700">
@@ -196,7 +196,7 @@ export function AddSupplierDialog({
               }}
               aria-invalid={Boolean(orgIdError)}
               aria-describedby={orgIdError ? "supplier-org-id-error" : undefined}
-              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
             {orgIdError && (
               <p id="supplier-org-id-error" role="alert" className="mt-1 text-xs text-red-700">
@@ -222,7 +222,7 @@ export function AddSupplierDialog({
               }}
               aria-invalid={Boolean(emailError)}
               aria-describedby={emailError ? "supplier-email-error" : "supplier-email-help"}
-              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
             {emailError ? (
               <p id="supplier-email-error" role="alert" className="mt-1 text-xs text-red-700">
@@ -237,7 +237,7 @@ export function AddSupplierDialog({
 
           <div>
             <label htmlFor="supplier-contract" className="mb-1.5 block text-xs font-medium text-neutral-700">
-              Primary contract <span className="font-normal text-neutral-400">(optional)</span>
+              Primary contract <span className="font-normal text-neutral-500">(optional)</span>
             </label>
             <select
               id="supplier-contract"

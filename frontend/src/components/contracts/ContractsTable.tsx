@@ -28,14 +28,14 @@ export function ContractsTable({
   const navigate = useNavigate();
 
   if (contracts.length === 0) {
-    return <div className="py-8 text-center text-sm text-neutral-400">No contracts to show.</div>;
+    return <div className="py-8 text-center text-sm text-neutral-500">No contracts to show.</div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
             <th className="pb-2 pr-3 font-medium">Contract</th>
             <th className="pb-2 pr-3 font-medium">Linked supplier</th>
             <th className="pb-2 pr-3 font-medium">Contract status</th>
@@ -57,7 +57,7 @@ export function ContractsTable({
                 >
                   {c.supplierName}
                 </button>
-                <div className="font-mono text-xs text-neutral-400">{c.supplierOrgId}</div>
+                <div className="font-mono text-xs text-neutral-500">{c.supplierOrgId}</div>
               </td>
 
               <td className="py-3 pr-3">

@@ -166,7 +166,7 @@ export function VehicleEntryForm({ agreementId, replacing, onClose, onSaved }: {
         <FieldTooltip label="Registration pending" text="Reserves one vehicle place until the registration number is available." />
       </div>}
       <fieldset disabled={save.isPending}><Field label={planned ? "Planned identifier" : "Registration number"}>
-        {planned ? <input disabled className={`${inputClass} text-neutral-400`} value="Assigned automatically" /> : <RegistrationNumberInput autoFocus value={plate} onChange={setPlate} />}
+        {planned ? <input disabled className={`${inputClass} text-neutral-500`} value="Assigned automatically" /> : <RegistrationNumberInput autoFocus value={plate} onChange={setPlate} />}
       </Field></fieldset>
       {save.isPending && !planned && <p role="status" className="text-sm text-neutral-500">Checking registration with Statens vegvesen…</p>}
       <ErrorNotice error={validationError ?? save.error} /><FormFooter busy={save.isPending} label={save.isError ? "Try again" : replacing?.planned ? "Register vehicle" : replacing ? "Replace vehicle" : "Add vehicle"} onClose={onClose} />

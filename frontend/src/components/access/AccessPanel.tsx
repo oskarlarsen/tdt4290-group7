@@ -62,7 +62,7 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
               className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm" />
           </label>
           <label className="block text-sm font-medium text-neutral-700">
-            Stand-in until <span className="font-normal text-neutral-400">(optional)</span>
+            Stand-in until <span className="font-normal text-neutral-500">(optional)</span>
             <input type="date" value={endDate} min={isoDay(0)} max={isoDay(MAX_DAYS)} onChange={(event) => setEndDate(event.target.value)}
               className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm" />
           </label>

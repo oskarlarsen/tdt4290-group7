@@ -467,7 +467,7 @@ export default function Onboarding() {
               />
             </label>
             <label className="block text-sm font-medium text-neutral-700">
-              Phone <span className="font-normal text-neutral-400">(optional)</span>
+              Phone <span className="font-normal text-neutral-500">(optional)</span>
               <input
                 type="tel"
                 value={contactPhone}

@@ -237,7 +237,7 @@ export default function Login() {
                   />
                 </div>
               </div>
-              <p className="text-xs font-normal text-gray-400 mb-5">
+              <p className="text-xs font-normal text-gray-500 mb-5">
                 Single sign-in for municipal advisors &amp; registered suppliers
               </p>
 

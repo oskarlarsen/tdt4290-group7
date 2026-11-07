@@ -30,14 +30,14 @@ export function CertificateTable({
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
-    return <div className="py-8 text-center text-sm text-neutral-400">{emptyMessage}</div>;
+    return <div className="py-8 text-center text-sm text-neutral-500">{emptyMessage}</div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
             <th className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
             <th className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
             <th className="pb-2 pr-3 font-medium">Contract</th>
@@ -59,18 +59,18 @@ export function CertificateTable({
                         {contract?.supplierName ?? certificate.supplierName}
                       </div>
                       {contract?.supplierOrgId && (
-                        <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                        <div className="font-mono text-xs text-neutral-500">{contract.supplierOrgId}</div>
                       )}
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-400">Contract not found</span>
+                    <span className="text-xs text-neutral-500">Contract not found</span>
                   )}
                 </td>
                 <td className="py-3 pr-3">
                   <div className="font-medium text-neutral-900">
                     {CERTIFICATE_STANDARD_LABELS[certificate.standard]}
                   </div>
-                  <div className="font-mono text-xs text-neutral-400">
+                  <div className="font-mono text-xs text-neutral-500">
                     {certificate.certificateNumber ?? "Not extracted"}
                   </div>
                 </td>

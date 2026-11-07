@@ -38,22 +38,22 @@ export function SearchSuppliers() {
 
   return (
     <div className="relative w-full max-w-sm" ref={ref}>
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
       <input
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         placeholder="Search suppliers, contracts, alerts…"
-        className="w-full rounded-lg border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
+        className="w-full rounded-lg border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-sm text-neutral-700 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
       />
 
       {open && q.length > 0 && (
         <div className="absolute left-0 right-0 z-10 mt-1 max-h-96 overflow-y-auto rounded-lg border border-neutral-100 bg-white p-1 shadow-card">
           {supplierMatches.length === 0 && alertMatches.length === 0 && (
-            <div className="px-3 py-2 text-sm text-neutral-400">No matches.</div>
+            <div className="px-3 py-2 text-sm text-neutral-500">No matches.</div>
           )}
           {supplierMatches.length > 0 && (
-            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-400">Suppliers</div>
+            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Suppliers</div>
           )}
           {supplierMatches.map((s) => (
             <button
@@ -62,11 +62,11 @@ export function SearchSuppliers() {
               className="block w-full rounded-md px-3 py-2 text-left hover:bg-neutral-50"
             >
               <div className="text-sm font-medium text-neutral-900">{s.displayName}</div>
-              <div className="text-xs text-neutral-400">{s.primaryContract} · {s.orgId}</div>
+              <div className="text-xs text-neutral-500">{s.primaryContract} · {s.orgId}</div>
             </button>
           ))}
           {alertMatches.length > 0 && (
-            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-400">Alerts</div>
+            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Alerts</div>
           )}
           {alertMatches.map((a) => (
             <button
@@ -75,7 +75,7 @@ export function SearchSuppliers() {
               className="block w-full rounded-md px-3 py-2 text-left hover:bg-neutral-50"
             >
               <div className="text-sm font-medium text-neutral-900">{a.title}</div>
-              <div className="text-xs text-neutral-400">{a.description}</div>
+              <div className="text-xs text-neutral-500">{a.description}</div>
             </button>
           ))}
         </div>

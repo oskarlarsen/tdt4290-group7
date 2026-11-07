@@ -14,7 +14,7 @@ export function FieldTooltip({ label, text }: { label: string; text: string }) {
   }, [pinned]);
   return <span ref={ref} className="absolute right-0 top-0 z-20" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
     <button type="button" aria-label={`Help for ${label}`} aria-describedby={id} aria-expanded={open}
-      className="rounded p-0.5 text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30"
+      className="rounded p-0.5 text-neutral-500 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30"
       onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setPinned(false); }}
       onClick={() => { setPinned(!pinned); setFocused(false); setHovered(false); }}
       onKeyDown={event => { if (event.key === "Escape" && open) { event.preventDefault(); event.stopPropagation(); setPinned(false); setFocused(false); setHovered(false); } }}>

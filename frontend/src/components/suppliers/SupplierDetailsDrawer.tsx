@@ -95,7 +95,7 @@ export function SupplierDetailsDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -115,7 +115,7 @@ export function SupplierDetailsDrawer({
 
               <Section title="Active alerts">
                 {supplierAlerts.length === 0 ? (
-                  <p className="text-sm text-neutral-400">No active alerts.</p>
+                  <p className="text-sm text-neutral-500">No active alerts.</p>
                 ) : (
                   <ul className="flex flex-wrap gap-1.5">
                     {supplierAlerts.slice(0, MAX_KEYWORDS).map((alert) => (
@@ -165,7 +165,7 @@ export function SupplierDetailsDrawer({
               <Section title="Notes">
                 <div className="space-y-2">
                   {notes.length === 0 && (
-                    <p className="text-sm text-neutral-400">No notes yet for this supplier.</p>
+                    <p className="text-sm text-neutral-500">No notes yet for this supplier.</p>
                   )}
                   {notes.map((note) => (
                     <div key={note.id} className="rounded-lg bg-neutral-50 p-2.5">
@@ -176,7 +176,7 @@ export function SupplierDetailsDrawer({
                             {note.visibility === "SELF" ? "Note to self" : "Internal note"}
                           </span>
                         </span>
-                        <span className="font-mono text-[11px] text-neutral-400">
+                        <span className="font-mono text-[11px] text-neutral-500">
                           {new Date(note.createdAt).toLocaleString("en-GB", {
                             day: "numeric",
                             month: "short",
@@ -201,7 +201,7 @@ export function SupplierDetailsDrawer({
                       Internal note
                     </label>
                   </div>
-                  <p className="mt-1 text-xs text-neutral-400">Notes are never shown to the supplier.</p>
+                  <p className="mt-1 text-xs text-neutral-500">Notes are never shown to the supplier.</p>
                 </fieldset>
                 <div className="mt-2 flex gap-2">
                   <textarea
@@ -210,7 +210,7 @@ export function SupplierDetailsDrawer({
                     maxLength={2000}
                     placeholder="Add a note about this supplier…"
                     rows={2}
-                    className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
+                    className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
                   />
                   <button
                     onClick={handleSubmitNote}
@@ -242,7 +242,7 @@ export function SupplierDetailsDrawer({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -251,7 +251,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-500">{label}</span>
       <span className="font-medium text-neutral-900">{value}</span>
     </div>
   );
