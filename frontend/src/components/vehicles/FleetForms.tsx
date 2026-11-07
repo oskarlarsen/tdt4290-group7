@@ -20,9 +20,9 @@ export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetS
   const [orgNumber, setOrgNumber] = useState(supplier?.orgNumber ?? "");
   const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier), onSuccess: onSaved, retry: false });
   return <VehicleDialog title={supplier ? "Edit supplier" : "Add supplier"} onClose={onClose} busy={save.isPending}>
-    <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate(); }}>
+    <form className="space-y-4" onChange={() => { if (save.isError) save.reset(); }} onSubmit={event => { event.preventDefault(); save.mutate(); }}>
       <Field label="Supplier name"><input autoFocus required maxLength={200} className={inputClass} value={name} onChange={e => setName(e.target.value)} /></Field>
-      <Field label="Organization number"><input required inputMode="numeric" pattern="[0-9]{9}" maxLength={9} className={inputClass} value={orgNumber} onChange={e => setOrgNumber(e.target.value.replace(/\s/g, ""))} /></Field>
+      <Field label="Organization number"><input required inputMode="numeric" pattern="[0-9]{9}" title="Enter the 9-digit organization number" maxLength={9} className={inputClass} value={orgNumber} onChange={e => setOrgNumber(e.target.value.replace(/\s/g, ""))} /></Field>
       <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Save supplier" onClose={onClose} />
     </form>
   </VehicleDialog>;
@@ -53,13 +53,13 @@ export function RemoveSupplierAction({ supplier, agreementCount, vehicleCount, o
   </>;
 }
 
-export function InviteSupplierForm({ supplier, onClose }: { supplier: FleetSupplier; onClose: () => void }) {
+export function InviteSupplierForm({ supplier, onClose, onInvited }: { supplier: FleetSupplier; onClose: () => void; onInvited?: () => void }) {
   const [email, setEmail] = useState("");
   const [invitationUrl, setInvitationUrl] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
   const invite = useMutation({
     mutationFn: () => api.inviteSupplier(supplier.id, email),
-    onSuccess: ({ token }) => setInvitationUrl(`${window.location.origin}/accept-invitation#${token}`),
+    onSuccess: ({ token }) => { setInvitationUrl(`${window.location.origin}/accept-invitation#${token}`); onInvited?.(); },
     retry: false,
   });
   async function copyInvitation() {
@@ -117,11 +117,11 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
         <span className="mt-1 block text-xs text-neutral-500">The case number from your archive system, for example 2024/1234.</span>
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Start date"><input type="date" required className={inputClass} value={startDate} onChange={e => setStart(e.target.value)} /></Field>
-        <Field label="End date"><input type="date" required min={startDate} className={inputClass} value={endDate} onChange={e => setEnd(e.target.value)} /></Field>
+        <Field label="Start date"><input type="date" required aria-label="Start date" className={inputClass} value={startDate} onChange={e => setStart(e.target.value)} /></Field>
+        <Field label="End date"><input type="date" required min={startDate} aria-label="End date" className={inputClass} value={endDate} onChange={e => setEnd(e.target.value)} /></Field>
       </div>
       {agreementDuration(startDate, endDate) && <p className="text-sm text-neutral-500">{agreementDuration(startDate, endDate)}</p>}
-      <Field label="Maximum vehicles"><input type="number" required min={0} max={10000} step={1} className={inputClass} value={allowed} onChange={e => setAllowed(e.target.value)} /></Field>
+      <Field label="Maximum vehicles"><input type="number" required min={0} max={10000} step={1} aria-label="Maximum vehicles" className={inputClass} value={allowed} onChange={e => setAllowed(e.target.value)} /></Field>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-neutral-700">Information required from supplier</legend>
         <label className="flex items-center gap-2 text-sm text-neutral-700">
@@ -152,6 +152,7 @@ export function VehicleEntryForm({ agreementId, replacing, onClose, onSaved }: {
     const input = planned ? { planned: true } : { planned: false, registrationNumber: validPlate(plate) };
     return replacing ? api.replaceVehicle(replacing, input) : api.addVehicle(agreementId, input);
   }, onSuccess: () => { setConfirming(false); onSaved(); }, retry: false });
+  function edited() { setValidationError(undefined); if (save.isError) save.reset(); }
   const title = replacing?.planned ? "Register vehicle" : replacing ? `Replace ${replacing.registrationNumber}` : "Add vehicle";
   function submit(event: FormEvent) {
     event.preventDefault(); if (save.isPending) return;
@@ -162,12 +163,12 @@ export function VehicleEntryForm({ agreementId, replacing, onClose, onSaved }: {
   return <><VehicleDialog title={title} onClose={onClose} busy={save.isPending}>
     <form className="space-y-5" onSubmit={submit}>
       {!replacing?.planned && <div className="relative flex items-center gap-3 pr-8">
-        <button type="button" role="switch" aria-checked={planned} aria-label="Registration pending" disabled={save.isPending} onClick={() => setPlanned(!planned)} className={`relative h-6 w-11 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2 ${planned ? "bg-primary-900" : "bg-neutral-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${planned ? "left-0.5 translate-x-5" : "left-0.5"}`} /></button>
+        <button type="button" role="switch" aria-checked={planned} aria-label="Registration pending" disabled={save.isPending} onClick={() => { setPlanned(!planned); edited(); }} className={`relative h-6 w-11 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2 ${planned ? "bg-primary-900" : "bg-neutral-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${planned ? "left-0.5 translate-x-5" : "left-0.5"}`} /></button>
         <span className="text-sm">Registration pending</span>
         <FieldTooltip label="Registration pending" text="Reserves one vehicle place until the registration number is available." />
       </div>}
       <fieldset disabled={save.isPending}><Field label={planned ? "Planned identifier" : "Registration number"}>
-        {planned ? <input disabled className={`${inputClass} text-neutral-500`} value="Assigned automatically" /> : <RegistrationNumberInput autoFocus value={plate} onChange={setPlate} />}
+        {planned ? <input disabled className={`${inputClass} text-neutral-500`} value="Assigned automatically" /> : <RegistrationNumberInput autoFocus value={plate} onChange={value => { setPlate(value); edited(); }} />}
       </Field></fieldset>
       {save.isPending && !planned && <p role="status" className="text-sm text-neutral-500">Checking registration with Statens vegvesen…</p>}
       <ErrorNotice error={validationError ?? save.error} /><FormFooter busy={save.isPending} label={save.isError ? "Try again" : replacing?.planned ? "Register vehicle" : replacing ? "Replace vehicle" : "Add vehicle"} onClose={onClose} />

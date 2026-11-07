@@ -190,9 +190,6 @@ export default function Suppliers() {
               Create a supplier, configure its agreement and required reporting categories, then invite its contact to submit only the requested information.
             </p>
           </div>
-          <button type="button" className={primaryClass} onClick={() => setOrganizationForm("new")}>
-            Add supplier
-          </button>
         </div>
 
         {fleet.isLoading && <p role="status" className="text-sm text-neutral-500">Loading supplier organizations…</p>}
@@ -293,7 +290,7 @@ export default function Suppliers() {
         ) : (
           <TopRiskSuppliersTable
             suppliers={paginatedSuppliers}
-            actionLabel="View Details"
+            actionLabel="View details"
             onSelect={(supplier) => setSelectedSupplierId(supplier.id)}
             getReviewStatus={getStatus}
             showOnboardingStatus
@@ -363,7 +360,7 @@ export default function Suppliers() {
         />
       )}
       {invitationSupplier && (
-        <InviteSupplierForm supplier={invitationSupplier} onClose={() => setInvitationSupplier(null)} />
+        <InviteSupplierForm supplier={invitationSupplier} onInvited={() => setSuccessMessage(`Invitation created for ${invitationSupplier.name}.`)} onClose={() => setInvitationSupplier(null)} />
       )}
       {reportingSupplier && (
         <SupplierReportingDataDialog supplier={reportingSupplier} onClose={() => setReportingSupplier(null)} />
