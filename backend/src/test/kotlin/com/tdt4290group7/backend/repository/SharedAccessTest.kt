@@ -114,6 +114,20 @@ class SharedAccessTest {
     }
 
     @Test
+    fun pendingInvitationsListOnlyOpenOnesAndStayInsideTheOrganization() {
+        val owner = supplierOwner(); val rival = supplierOwner()
+        val open = "open-${UUID.randomUUID()}@example.no"
+        UserRepository.createAccessInvitation(owner, open, "S", null, now)
+        val accepted = UserRepository.createAccessInvitation(owner, "done-${UUID.randomUUID()}@example.no", "S", null, now)
+        UserRepository.acceptSupplierInvitation(accepted.token, "test-only-supplier-password", now, name = "Ola")
+        val mine = UserRepository.pendingInvitations(owner.supplierId, now).map { it.email }
+        assertTrue(open in mine && mine.none { it.startsWith("done-") })
+        assertTrue(UserRepository.pendingInvitations(rival.supplierId, now).none { it.email == open })
+        assertTrue(UserRepository.pendingInvitations(owner.supplierId, now.plus(java.time.Duration.ofDays(3))).none { it.email == open })
+        assertTrue(UserRepository.pendingInvitations(null, now).any { it.email == open })
+    }
+
+    @Test
     fun anotherOrganizationsPendingInvitationCannotBeCancelledOrTaken() {
         val owner = supplierOwner(); val rival = supplierOwner()
         val email = "contested-${UUID.randomUUID()}@example.no"

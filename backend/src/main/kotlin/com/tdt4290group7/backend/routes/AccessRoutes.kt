@@ -51,6 +51,9 @@ data class AccessEntryResponse(
     val isYou: Boolean,
 )
 
+@Serializable
+data class PendingInvitationResponse(val email: String, val role: String, val supplierName: String? = null, val expiresAt: String, val accessExpiresAt: String? = null)
+
 private fun ApplicationCall.signedIn(): User? =
     principal<JWTPrincipal>()?.payload?.let(JwtConfig::userId)?.let(UserRepository::findById)
 
@@ -85,6 +88,12 @@ fun Application.configureAccessRoutes(fleet: FleetRepository) {
                 call.respond(entries.map {
                     AccessEntryResponse(it.id, it.name, it.email, it.role.name, it.supplierId, it.grantedByName, it.accessExpiresAt?.toString(), it.approved, it.permanent, it.active, it.id == user.id)
                 })
+            }
+
+            get("/api/access/invitations") {
+                val user = call.signedIn() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+                val pending = UserRepository.pendingInvitations(if (user.role == Role.ADMIN) null else user.supplierId)
+                call.respond(pending.map { PendingInvitationResponse(it.email, it.role.name, it.supplierName, it.expiresAt.toString(), it.accessExpiresAt?.toString()) })
             }
 
             post("/api/access/{id}/renew") {

@@ -404,6 +404,22 @@ object UserRepository {
         }.mapNotNull { user(db, "id = ?", it)?.let { u -> entry(db, u, now) } }
     }
 
+    data class PendingInvitation(val email: String, val role: Role, val supplierName: String?, val expiresAt: Instant, val accessExpiresAt: Instant?)
+
+    /** Invitations not yet accepted or expired: everyone's for an admin, one organization's for a supplier. */
+    fun pendingInvitations(supplierId: String?, now: Instant = Instant.now()): List<PendingInvitation> = read { db ->
+        val scope = if (supplierId != null) " AND supplier_id = ?" else ""
+        fun query(sql: String, map: (java.sql.ResultSet) -> PendingInvitation) = db.prepareStatement(sql + scope).use { statement ->
+            if (supplierId != null) statement.setString(1, supplierId)
+            statement.executeQuery().use { rows -> buildList { while (rows.next()) add(map(rows)) } }
+        }
+        (query("SELECT email, role, supplier_name, expires_at, access_expires_at FROM access_invitations WHERE accepted_at IS NULL") {
+            PendingInvitation(it.getString("email"), Role.valueOf(it.getString("role")), it.getString("supplier_name"), Instant.parse(it.getString("expires_at")), it.getString("access_expires_at")?.let(Instant::parse))
+        } + query("SELECT email, supplier_name, expires_at FROM supplier_invitations WHERE accepted_at IS NULL") {
+            PendingInvitation(it.getString("email"), Role.SUPPLIER, it.getString("supplier_name"), Instant.parse(it.getString("expires_at")), null)
+        }).filter { it.expiresAt.isAfter(now) }.sortedBy { it.email.lowercase() }
+    }
+
     private fun mayManage(actor: User, target: User): Boolean =
         actor.role == Role.ADMIN || (actor.role == Role.SUPPLIER && actor.supplierId != null && actor.supplierId == target.supplierId && target.grantedBy == actor.id)
 
