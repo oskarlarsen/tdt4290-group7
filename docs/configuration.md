@@ -11,7 +11,7 @@ The backend and Vite load it when started from their documented directories. Res
 | `JWT_SECRET` | Required | Sign backend sessions. |
 | `SEED_ADMIN_PASSWORD` | Required | Seed `advisor.hansen@kommune.no`. |
 | `VITE_API_BASE_URL` | Template: `http://localhost:8080/api` | API address used by the browser. |
-| `VITE_USE_MOCKS` | Template: `false` | Enable demo data on prototype pages; off by default, including Docker Compose. |
+| `VITE_USE_MOCKS` | Template: `false` | Enable demo data on the Contracts and Energy pages, which have no backend yet; off by default, including Docker Compose. The dashboard, suppliers, risk and alerts pages always use the backend. |
 | `VITE_USE_MOCK_AUTH` | Template: `false` | Enable offline demo sign-in instead of backend authentication. |
 | `SVV_API_KEY` | Optional | Enable live Statens vegvesen Enkeltoppslag requests. Required for adding/replacing registered vehicles. |
 | `SVV_CACHE_TTL_DAYS` | `14` | Age in days before a saved registry snapshot needs refreshing during a check. |
@@ -40,7 +40,7 @@ For isolated tooling, `BACKEND_ENV_FILE` in the process environment selects anot
 
 ## Frontend-only demo
 
-For dashboard, suppliers and contracts without starting the backend, set both `VITE_USE_MOCKS=true` and `VITE_USE_MOCK_AUTH=true`, then start Vite. This mode cannot use the vehicle workflow, which requires a real admin session.
+Only the Contracts and Energy pages can run without the backend: set both `VITE_USE_MOCKS=true` and `VITE_USE_MOCK_AUTH=true`, then start Vite. The dashboard, suppliers, risk, alerts and vehicle workflow need the backend and a real admin session.
 
 | Role | Email | Password |
 |---|---|---|
@@ -61,7 +61,7 @@ Restore `VITE_USE_MOCK_AUTH=false` and restart Vite to use backend sign-in again
 | Sign-in succeeds but the session is lost | Use `localhost` consistently for frontend and API. If the browser rejects Secure cookies over local HTTP, set `AUTH_COOKIE_SECURE=false` and restart the backend. |
 | Login fails after switching demo mode | Use the matching account table and restart Vite after changing `VITE_USE_MOCK_AUTH`. |
 | Vehicles returns `401` or `403` | Sign in with the real backend admin account; mock sign-in and supplier accounts cannot access vehicle APIs. |
-| Other pages fail after turning demo data off | Their backend endpoints are not implemented; restore `VITE_USE_MOCKS=true`. |
+| Contracts or Energy fail after turning demo data off | Their backend endpoints are not implemented; restore `VITE_USE_MOCKS=true`. |
 | Adding a registered vehicle reports the registry is unavailable | Provide a working `SVV_API_KEY` and restart the backend. A cached check does not replace the live lookup required for entry. |
 | Backend reports an incompatible database | Preserve the existing file. For a separate native instance, set `VEHICLE_DB_PATH=data/vehicles-new.db`. Existing data is not migrated into the new file. Container volumes require a separate data-handling decision. |
 | Docker cannot connect to its daemon | Start Docker before running Compose. |
