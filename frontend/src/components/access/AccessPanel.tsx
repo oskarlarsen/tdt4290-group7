@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { CopyableValue } from "../ui/CopyableValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { approveAccess, getAccess, inviteToAccess, renewAccess, revokeAccess, type AccessEntry, type AccessInvitation } from "../../api/access";
 import { formatDate } from "../../utils/formatDate";
@@ -75,10 +76,10 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
           {invite.isPending ? "Creating…" : "Create invitation"}
         </button>
         {invitation && (
-          <p role="status" className="break-all rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700">
-            Send this link to {invitation.email}. It works once, for 48 hours:
-            <br /><span className="font-mono">{`${window.location.origin}/accept-invitation#${invitation.token}`}</span>
-          </p>
+          <div role="status" className="space-y-2 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700">
+            <p>Send this link to {invitation.email}. It works once, for 48 hours.</p>
+            <CopyableValue label="Invitation link" value={`${window.location.origin}/accept-invitation#${invitation.token}`} />
+          </div>
         )}
       </form>
 
