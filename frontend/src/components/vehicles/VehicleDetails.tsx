@@ -36,7 +36,7 @@ export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () 
             {data.agreement && <p className="mt-1 text-xs text-neutral-500">{vehicleDate(data.agreement.agreement.startDate)} – {vehicleDate(data.agreement.agreement.endDate)}</p>}
             {!data.vehicle.listed && <p className="mt-1 text-xs text-red-700">Not in the agreement’s current vehicle list</p>}
           </div>
-          <div className="flex gap-2"><button className={buttonClass} onClick={() => setAddingStatistics(true)}>Add statistics</button><button className={primaryClass} disabled={run.isPending} onClick={() => run.mutate(false)}>{run.isPending ? "Checking…" : "Check for deviations"}</button></div>
+          <div className="flex gap-2"><button className={buttonClass} onClick={() => setAddingStatistics(true)}>Add reported data</button><button className={primaryClass} disabled={run.isPending} onClick={() => run.mutate(false)}>{run.isPending ? "Checking…" : "Check for deviations"}</button></div>
         </div>
         <div role="tablist" aria-label="Vehicle information" className="flex gap-1 border-b border-neutral-200">
           {["Statistics", "Deviations", "History"].map((name, index, tabs) => <button key={name} role="tab" id={`vehicle-tab-${name}`} aria-selected={tab === name} tabIndex={tab === name ? 0 : -1} aria-controls="vehicle-panel" onClick={() => setTab(name)} onKeyDown={event => {

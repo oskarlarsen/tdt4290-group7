@@ -37,7 +37,7 @@ export function StatisticsDirectory({ onOpenVehicle }: { onOpenVehicle: (plate: 
       <ErrorNotice error={statistics.error} />
       {statistics.isError && <button className={`${buttonClass} mt-3`} onClick={() => void statistics.refetch()}>Retry loading statistics</button>}
       {statistics.data && <>
-        {statistics.data.items.length ? <StatisticsTable rows={statistics.data.items} onSelect={setSelected} /> : <p className="py-10 text-center text-sm text-neutral-500">No matching statistics rows. Add statistics or clear the search.</p>}
+        {statistics.data.items.length ? <StatisticsTable rows={statistics.data.items} onSelect={setSelected} /> : <p className="py-10 text-center text-sm text-neutral-500">No matching statistics rows. Add reported data or clear the search.</p>}
         <div className="pb-1"><Paging page={page} total={statistics.data.total} pageSize={25} onChange={setPage} /></div>
       </>}
     </section>
