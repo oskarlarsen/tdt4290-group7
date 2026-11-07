@@ -106,6 +106,7 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
     if (!saksnr.trim() || saksnr.trim().length > 50) throw new Error("Enter the saksnr (case number), up to 50 characters.");
     if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("Enter a valid agreement period.");
     if (!/^\d+$/.test(allowed) || Number(allowed) > 10000) throw new Error("Enter a vehicle allowance between 0 and 10000.");
+    if (requiresVehicles && Number(allowed) === 0) throw new Error("Allow at least one vehicle, or untick Vehicles under required information.");
     if (!requiresVehicles && !requiresEnergy && !requiresProducts) throw new Error("Select at least one type of supplier information to collect.");
     return api.saveAgreement({ supplierId: supplier.id, saksnr: saksnr.trim(), startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
   }, onSuccess: onSaved, retry: false });
