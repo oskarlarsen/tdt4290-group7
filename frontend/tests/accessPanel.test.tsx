@@ -6,6 +6,8 @@ import type { AccessEntry } from "../src/api/access";
 
 const api = vi.hoisted(() => ({ getAccess: vi.fn(), getPendingInvitations: vi.fn(), inviteToAccess: vi.fn(), renewAccess: vi.fn(), revokeAccess: vi.fn(), approveAccess: vi.fn() }));
 vi.mock("../src/api/access", () => api);
+const fleet = vi.hoisted(() => ({ inviteSupplier: vi.fn() }));
+vi.mock("../src/api/vehicles", () => fleet);
 
 import { AccessPanel, canRenew } from "../src/components/access/AccessPanel";
 
@@ -36,10 +38,34 @@ describe("canRenew", () => {
 describe("access panel", () => {
   it("lists invitations that have not been activated yet", async () => {
     api.getAccess.mockResolvedValue([]);
-    api.getPendingInvitations.mockResolvedValue([{ email: "waiting@example.no", role: "SUPPLIER", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null }]);
+    api.getPendingInvitations.mockResolvedValue([{ email: "waiting@example.no", role: "SUPPLIER", supplierId: "s1", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null, contact: false }]);
     mount("admin");
     expect(await screen.findByText("waiting@example.no")).toBeTruthy();
     expect(screen.getByText(/Not yet activated/)).toBeTruthy();
+  });
+
+  it("creates a new link for a pending colleague whose link was lost", async () => {
+    api.getAccess.mockResolvedValue([]);
+    api.getPendingInvitations.mockResolvedValue([{ email: "waiting@example.no", role: "SUPPLIER", supplierId: "s1", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null, contact: false }]);
+    api.inviteToAccess.mockResolvedValue({ email: "waiting@example.no", token: "fresh", expiresAt: "x", accessExpiresAt: null });
+    mount("supplier");
+    fireEvent.click(await screen.findByRole("button", { name: "Create a new link" }));
+    expect(await screen.findByText(/accept-invitation#fresh/)).toBeTruthy();
+    expect(api.inviteToAccess).toHaveBeenCalledWith("supplier", "waiting@example.no", undefined);
+  });
+
+  it("only lets an admin replace a contact invitation", async () => {
+    api.getAccess.mockResolvedValue([]);
+    api.getPendingInvitations.mockResolvedValue([{ email: "contact@example.no", role: "SUPPLIER", supplierId: "s1", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null, contact: true }]);
+    fleet.inviteSupplier.mockResolvedValue({ email: "contact@example.no", token: "again", expiresAt: "x" });
+    mount("supplier");
+    await screen.findByText("contact@example.no");
+    expect(screen.queryByRole("button", { name: "Create a new link" })).toBeNull();
+    cleanup();
+    mount("admin");
+    fireEvent.click(await screen.findByRole("button", { name: "Create a new link" }));
+    expect(await screen.findByText(/accept-invitation#again/)).toBeTruthy();
+    expect(fleet.inviteSupplier).toHaveBeenCalledWith("s1", "contact@example.no");
   });
 
   it("invites a colleague and shows the link to pass on", async () => {

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { CopyableValue } from "../ui/CopyableValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { approveAccess, getAccess, getPendingInvitations, inviteToAccess, renewAccess, revokeAccess, type AccessEntry, type AccessInvitation } from "../../api/access";
+import { approveAccess, getAccess, getPendingInvitations, inviteToAccess, renewAccess, revokeAccess, type AccessEntry, type AccessInvitation, type PendingInvitation } from "../../api/access";
+import { inviteSupplier } from "../../api/vehicles";
 import { formatDate } from "../../utils/formatDate";
 
 const DAY_MS = 86_400_000;
@@ -39,6 +40,18 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
     mutationFn: () => inviteToAccess(mode, email.trim(), endDate || undefined),
     onSuccess: async (created) => { setInvitation(created); setEmail(""); setEndDate(""); await refresh(); },
   });
+  // The server keeps only a hash of each link, so a lost link is replaced by a new one for the same person.
+  const [newLink, setNewLink] = useState<AccessInvitation | null>(null);
+  const regenerate = useMutation({
+    mutationFn: async (pending: PendingInvitation): Promise<AccessInvitation> => {
+      if (pending.contact) return { ...(await inviteSupplier(pending.supplierId!, pending.email)), accessExpiresAt: null };
+      const lastDay = pending.accessExpiresAt ? new Date(new Date(pending.accessExpiresAt).getTime() - 1).toISOString().slice(0, 10) : undefined;
+      return inviteToAccess(pending.role === "ADMIN" ? "admin" : "supplier", pending.email, lastDay);
+    },
+    onSuccess: async (created) => { setNewLink(created); await refresh(); },
+  });
+  const canRegenerate = (pending: PendingInvitation) =>
+    pending.contact ? mode === "admin" && !!pending.supplierId : mode === (pending.role === "ADMIN" ? "admin" : "supplier");
   const act = useMutation({ mutationFn: (run: () => Promise<void>) => run(), onSuccess: refresh });
   const [renewing, setRenewing] = useState<{ id: string; date: string } | null>(null);
 
@@ -49,7 +62,7 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
   }
 
   const entries = list.data ?? [];
-  const error = (invite.error ?? act.error) as Error | null;
+  const error = (invite.error ?? act.error ?? regenerate.error) as Error | null;
 
   return (
     <div className="space-y-6">
@@ -142,6 +155,14 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
                   {mode === "admin" ? `${invite.role === "ADMIN" ? "Administrator" : "Supplier"}${invite.supplierName ? ` · ${invite.supplierName}` : ""} · ` : ""}
                   Not yet activated · link expires {formatDate(invite.expiresAt)}
                 </span>
+                {newLink?.email === invite.email ? (
+                  <div className="mt-2"><CopyableValue label="New invitation link" value={`${window.location.origin}/accept-invitation#${newLink.token}`} /></div>
+                ) : canRegenerate(invite) && (
+                  <button type="button" disabled={regenerate.isPending} onClick={() => regenerate.mutate(invite)}
+                    className="mt-2 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">
+                    Create a new link
+                  </button>
+                )}
               </li>
             ))}
           </ul>

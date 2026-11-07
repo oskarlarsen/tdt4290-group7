@@ -17,7 +17,8 @@ export type AccessEntry = {
 
 export type AccessInvitation = { email: string; token: string; expiresAt: string; accessExpiresAt: string | null };
 
-export type PendingInvitation = { email: string; role: "ADMIN" | "SUPPLIER"; supplierName: string | null; expiresAt: string; accessExpiresAt: string | null };
+/** `contact` marks the first invitation an admin creates for an organization. */
+export type PendingInvitation = { email: string; role: "ADMIN" | "SUPPLIER"; supplierId: string | null; supplierName: string | null; expiresAt: string; accessExpiresAt: string | null; contact: boolean };
 
 export function getPendingInvitations(): Promise<PendingInvitation[]> {
   return apiFetch<PendingInvitation[]>("/access/invitations");
