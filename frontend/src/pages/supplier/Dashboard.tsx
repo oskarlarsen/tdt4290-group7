@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
-import { BadgeCheck, Bell, Building2, ClipboardList, LoaderCircle, Package, Truck, Zap } from "lucide-react";
+import { Link, Navigate, useLocation } from "react-router-dom";
+import { BadgeCheck, Bell, Building2, CheckCircle2, ClipboardList, LoaderCircle, Package, Truck, Zap } from "lucide-react";
 import { getOnboardingStatus, getSupplierOverview } from "@/api/onboarding";
 import type { OnboardingStatusResponse, SupplierOverview } from "@/types/onboarding";
 import { agreementLabel } from "../../utils/agreementLabel";
@@ -50,6 +50,8 @@ function Metric({
 }
 
 export default function Dashboard() {
+  // Set by the onboarding page when it sends the supplier here after submitting.
+  const notice = (useLocation().state as { notice?: string } | null)?.notice;
   const [status, setStatus] = useState<OnboardingStatusResponse | null>(null);
   const [overview, setOverview] = useState<SupplierOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +101,12 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      {notice && (
+        <div role="status" className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          {notice}
+        </div>
+      )}
       <section className="rounded-2xl bg-primary-900 px-6 py-7 text-white sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

@@ -336,18 +336,21 @@ object UserRepository {
      * it cannot outlive the inviter's own access. A null [accessEnd] means access with no end date, which only
      * an inviter whose own access has no end can give.
      */
-    fun createAccessInvitation(inviter: User, email: String, supplierName: String?, accessEnd: java.time.LocalDate?, now: Instant = Instant.now()): AccessInvitation {
+    fun createAccessInvitation(inviter: User, email: String, supplierName: String?, accessEnd: java.time.LocalDate?, now: Instant = Instant.now(), supplierId: String? = null): AccessInvitation {
+        // An admin may invite a colleague into a supplier organization (supplierId); suppliers always use their own.
+        require(supplierId == null || inviter.role == Role.ADMIN) { "Only an administrator can invite into another organization" }
+        val orgId = supplierId ?: inviter.supplierId
+        val role = if (supplierId != null) Role.SUPPLIER.name else inviter.role.name
         val normalizedEmail = email.trim().lowercase()
         require(normalizedEmail.length <= 254 && normalizedEmail.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) { "Enter a valid email address" }
         val accessExpires = grantExpiry(inviter, accessEnd, now)
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(random::nextBytes))
         val expiresAt = now.plus(INVITATION_TTL)
-        val role = inviter.role.name
         write { db ->
             if (user(db, "email = ?", normalizedEmail) != null) throw AccountConflictException("An account already exists for this email address")
-            if (pendingAccessInvitationElsewhere(db, normalizedEmail, role, inviter.supplierId, now) ||
-                pendingSupplierInvitationElsewhere(db, normalizedEmail, inviter.supplierId.takeIf { inviter.role == Role.SUPPLIER }, now) ||
-                (inviter.role == Role.ADMIN && pendingSupplierInvitationElsewhere(db, normalizedEmail, "\u0000none", now))
+            if (pendingAccessInvitationElsewhere(db, normalizedEmail, role, orgId, now) ||
+                pendingSupplierInvitationElsewhere(db, normalizedEmail, orgId.takeIf { role == Role.SUPPLIER.name }, now) ||
+                (role == Role.ADMIN.name && pendingSupplierInvitationElsewhere(db, normalizedEmail, "\u0000none", now))
             ) throw AccountConflictException("This email has a pending invitation from another organization")
             db.prepareStatement("DELETE FROM access_invitations WHERE email = ? AND accepted_at IS NULL").use { it.setString(1, normalizedEmail); it.executeUpdate() }
             db.prepareStatement(
@@ -355,7 +358,7 @@ object UserRepository {
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)"""
             ).use {
                 it.setString(1, UUID.randomUUID().toString()); it.setString(2, normalizedEmail); it.setString(3, role)
-                it.setString(4, inviter.supplierId); it.setString(5, supplierName); it.setString(6, sha256(token))
+                it.setString(4, orgId); it.setString(5, supplierName); it.setString(6, sha256(token))
                 it.setString(7, now.toString()); it.setString(8, expiresAt.toString()); it.setString(9, inviter.id)
                 it.setString(10, accessExpires?.toString())
                 it.executeUpdate()

@@ -46,13 +46,15 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
     mutationFn: async (pending: PendingInvitation): Promise<AccessInvitation> => {
       if (pending.contact) return { ...(await inviteSupplier(pending.supplierId!, pending.email)), accessExpiresAt: null };
       const lastDay = pending.accessExpiresAt ? new Date(new Date(pending.accessExpiresAt).getTime() - 1).toISOString().slice(0, 10) : undefined;
+      // An admin reissuing a supplier colleague's link names the organization; a supplier's own organization is implied.
+      if (mode === "admin" && pending.role === "SUPPLIER") return inviteToAccess("admin", pending.email, lastDay, pending.supplierId!);
       return inviteToAccess(pending.role === "ADMIN" ? "admin" : "supplier", pending.email, lastDay);
     },
     // The earlier link for the same person no longer works, so stop showing it.
     onSuccess: async (created) => { setNewLink(created); setInvitation(current => current?.email === created.email ? null : current); await refresh(); },
   });
   const canRegenerate = (pending: PendingInvitation) =>
-    pending.contact ? mode === "admin" && !!pending.supplierId : mode === (pending.role === "ADMIN" ? "admin" : "supplier");
+    pending.contact || (mode === "admin" && pending.role === "SUPPLIER") ? mode === "admin" && !!pending.supplierId : mode === (pending.role === "ADMIN" ? "admin" : "supplier");
   const act = useMutation({ mutationFn: (run: () => Promise<void>) => run(), onSuccess: refresh });
   const [renewing, setRenewing] = useState<{ id: string; date: string } | null>(null);
 

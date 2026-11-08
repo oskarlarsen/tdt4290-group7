@@ -290,8 +290,7 @@ export default function Onboarding() {
       const result = await submitOnboarding();
       setStatus(result);
       await refresh();
-      setNotice("Your onboarding information has been submitted for review.");
-      navigate("/supplier/dashboard", { replace: true });
+      navigate("/supplier/dashboard", { replace: true, state: { notice: "Your onboarding information has been submitted for review." } });
     });
   }
 
