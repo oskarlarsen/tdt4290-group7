@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
 import type { DerivedContract } from "../../types/contract";
 
-const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2 };
+const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2, unassessed: 3 };
 
 export function ContractComplianceSummary({
   contracts,
@@ -27,13 +27,13 @@ export function ContractComplianceSummary({
   const sortedContracts = [...contracts].sort(
     (a, b) => RISK_PRIORITY[a.risk] - RISK_PRIORITY[b.risk]
   );
-  const attentionContracts = sortedContracts.filter((contract) => contract.risk !== "compliant");
+  const attentionContracts = sortedContracts.filter((contract) => contract.risk === "high" || contract.risk === "medium");
   const safeAttentionIndex = Math.min(activeAttentionIndex, attentionContracts.length - 1);
   const current = attentionContracts[safeAttentionIndex] ?? sortedContracts[0];
 
   if (!current) return null;
 
-  const needsAttention = current.risk !== "compliant";
+  const needsAttention = current.risk === "high" || current.risk === "medium";
   const noticeReason =
     current.status === "Expired"
       ? "The contract has expired."

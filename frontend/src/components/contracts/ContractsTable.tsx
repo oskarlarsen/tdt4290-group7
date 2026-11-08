@@ -9,6 +9,7 @@ const STATUS_CLASSES: Record<DerivedContract["status"], string> = {
 };
 
 const COMPLIANCE_CLASSES: Record<DerivedContract["risk"], string> = {
+  unassessed: "bg-neutral-100 text-neutral-600",
   compliant: "bg-tertiary-100 text-tertiary-700",
   medium: "bg-amber-100 text-amber-800",
   high: "bg-red-100 text-red-700",

@@ -7,9 +7,10 @@ import { RISK_CATEGORY_ICONS } from "./riskCategoryIcons";
 import { RISK_INDICATOR_KIND_LABELS, RISK_PRIORITY_INFO } from "../../types/riskOutlook";
 import { formatCertificateDate } from "../../types/certificate";
 import type { RiskIndicator, RiskIndicatorCategory, RiskOutlookRow } from "../../types/riskOutlook";
-import type { RiskCategory } from "../../types/risk";
+import type { SupplierRisk } from "../../types/dashboard";
 
-const SUPPLIER_RISK_LABELS: Record<RiskCategory, string> = {
+const SUPPLIER_RISK_LABELS: Record<SupplierRisk, string> = {
+  unassessed: "Not yet assessed",
   high: "High",
   medium: "Medium",
   compliant: "Compliant",
@@ -125,9 +126,9 @@ export function RiskDetailsDrawer({
                 <Field label="Contract" value={contract.contractName} />
                 <Field label="Supplier" value={contract.supplierName} />
                 <Field label="Org ID" value={contract.supplierOrgId} />
-                <Field label="Supplier risk badge (mock)" value={SUPPLIER_RISK_LABELS[contract.risk]} />
+                <Field label="Supplier risk badge" value={SUPPLIER_RISK_LABELS[contract.risk]} />
                 <p className="mt-1 text-xs text-neutral-500">
-                  The supplier risk badge shown on other pages is a separate mock value. It is not
+                  The supplier risk badge shown on other pages is the supplier's stored assessment. It is not
                   derived from the indicators above, so the two can differ.
                 </p>
                 <button
