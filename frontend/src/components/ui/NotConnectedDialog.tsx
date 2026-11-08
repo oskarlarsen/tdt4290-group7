@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { X } from "lucide-react";
 
 export function NotConnectedDialog({
@@ -13,6 +13,12 @@ export function NotConnectedDialog({
   onClose: () => void;
 }) {
   const titleId = useId();
+  useEffect(() => {
+    if (!open) return;
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [open, onClose]);
   if (!open) return null;
 
   return (

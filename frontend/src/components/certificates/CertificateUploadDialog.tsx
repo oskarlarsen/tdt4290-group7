@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { FileText, Loader2, Upload, X } from "lucide-react";
 import { useUploadCertificate } from "../../hooks/useCertificates";
@@ -33,6 +33,13 @@ export function CertificateUploadDialog({
       { onSuccess: () => { onUploaded?.(); onClose(); } },
     );
   }
+
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
 
   return (
     <div

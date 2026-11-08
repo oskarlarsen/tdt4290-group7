@@ -99,7 +99,7 @@ export function ContractComplianceSummary({
         {needsAttention && (
           <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
             <p className="text-xs text-neutral-500">
-              Showing {safeAttentionIndex + 1} of {attentionContracts.length} contracts requiring attention
+              Showing {safeAttentionIndex + 1} of {attentionContracts.length} {attentionContracts.length === 1 ? "contract" : "contracts"} requiring attention
             </p>
             <div className="flex items-center gap-1.5">
               <button
