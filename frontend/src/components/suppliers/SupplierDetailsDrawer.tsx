@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Send, Eye } from "lucide-react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
+import { X, Send } from "lucide-react";
 import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useSupplierNotes, useAddSupplierNote } from "../../hooks/useSupplierNotes";
 import type { FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
-import type { TopRiskSupplier, RecentAlert } from "../../types/dashboard";
-import { reviewSupplierOnboarding } from "../../api/onboarding";
-import { SupplierReportingDataDialog } from "./SupplierReportingDataDialog";
-
-const ISSUE_CATEGORY_LABELS: Record<NonNullable<TopRiskSupplier["issueCategory"]>, string> = {
-  VEHICLE_DEVIATION: "Vehicle deviation",
-  CERTIFICATE_EXPIRY: "Certificate expiry",
-  FUEL_DEVIATION: "Fuel/energy deviation",
-};
+import { describeLastActive, describeLastUpdated } from "../../utils/activity";
+import type { TopRiskSupplier, RecentAlert, NoteVisibility } from "../../types/dashboard";
 
 const REVIEW_STATUS_BADGES: Record<FollowUpStatus, { label: string; color: "yellow" | "orange" | "tertiary" }> = {
   "to-review": { label: "To Review", color: "yellow" },
@@ -26,6 +19,10 @@ type Props = {
   alerts: RecentAlert[];
   reviewStatus: FollowUpStatus;
   onChangeReviewStatus: (status: FollowUpStatus) => void;
+  /** When activity tracking started; shown when a supplier has no recorded check-in. */
+  trackingSince?: string;
+  /** Opens the large Details window, which replaces this panel. */
+  onOpenDetails: () => void;
   onClose: () => void;
 };
 
@@ -34,29 +31,17 @@ export function SupplierDetailsDrawer({
   alerts,
   reviewStatus,
   onChangeReviewStatus,
+  onOpenDetails,
+  trackingSince,
   onClose,
 }: Props) {
   const isOpen = supplier !== null;
+  const drawerRef = useDrawerFocus(isOpen);
   const { data: notes = [] } = useSupplierNotes(supplier?.id ?? null);
   const addNote = useAddSupplierNote(supplier?.id ?? null);
   const [noteText, setNoteText] = useState("");
-  const [onboardingNotes, setOnboardingNotes] = useState("");
-  const [showReportingData, setShowReportingData] = useState(false);
-  const queryClient = useQueryClient();
-  const onboardingReview = useMutation({
-    mutationFn: ({ action, notes }: { action: "APPROVE" | "REQUEST_CHANGES"; notes?: string }) =>
-      reviewSupplierOnboarding(supplier!.id, action, notes),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      setOnboardingNotes("");
-    },
-  });
-
-  useEffect(() => {
-    setOnboardingNotes("");
-    setShowReportingData(false);
-    onboardingReview.reset();
-  }, [supplier?.id]);
+  // Chosen before writing; defaults to the private kind so nothing is shared by accident.
+  const [visibility, setVisibility] = useState<NoteVisibility>("SELF");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,11 +56,13 @@ export function SupplierDetailsDrawer({
     };
   }, [isOpen, onClose]);
 
-  const linkedAlert = supplier ? alerts.find((a) => a.supplierId === supplier.id) : undefined;
+  // Key words only: the full alert text is in the Details window.
+  const supplierAlerts = supplier ? alerts.filter((a) => a.supplierId === supplier.id && a.status !== "RESOLVED") : [];
+  const MAX_KEYWORDS = 3;
 
   function handleSubmitNote() {
     if (!noteText.trim()) return;
-    addNote.mutate(noteText.trim(), { onSuccess: () => setNoteText("") });
+    addNote.mutate({ text: noteText.trim(), visibility }, { onSuccess: () => setNoteText("") });
   }
 
   return (
@@ -89,6 +76,9 @@ export function SupplierDetailsDrawer({
       />
 
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={supplier ? `${supplier.displayName} details` : undefined}
@@ -110,127 +100,44 @@ export function SupplierDetailsDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Supplier information">
-                <Field label="Org ID" value={supplier.orgId} />
-                {(supplier.contactEmail || supplier.email) && (
-                  <Field label="Contact email" value={supplier.contactEmail || supplier.email || ""} />
-                )}
-                {supplier.contactName && <Field label="Contact name" value={supplier.contactName} />}
-                {supplier.contactPhone && <Field label="Contact phone" value={supplier.contactPhone} />}
-                <Field label="Primary contract" value={supplier.primaryContract} />
-              </Section>
-
-              <Section title="Supplier onboarding">
-                <Field label="Status" value={(supplier.onboardingStatus ?? "INVITED").replace(/_/g, " ")} />
-                <Field label="Registered accounts" value={String(supplier.registeredAccountCount ?? 0)} />
-                {supplier.submittedAt && (
-                  <Field label="Submitted" value={new Date(supplier.submittedAt).toLocaleString()} />
-                )}
-                <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-neutral-600">
-                  <span>{supplier.agreementCount ?? 0} agreements</span>
-                  <span>{supplier.vehicleCount ?? 0} vehicles</span>
-                  <span>{supplier.certificateCount ?? 0} certificates</span>
-                  <span>{supplier.energyRecordCount ?? 0} energy records</span>
-                  <span>{supplier.productCount ?? 0} products</span>
-                </div>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowReportingData(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
-                  >
-                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                    View submitted reporting data
-                  </button>
-                </div>
-                {supplier.reviewerNotes && (
-                  <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
-                    Review feedback: {supplier.reviewerNotes}
-                  </p>
-                )}
-                {(supplier.onboardingStatus === "SUBMITTED" || supplier.onboardingStatus === "UNDER_REVIEW") && (
-                  <div className="mt-3 space-y-2">
-                    <textarea
-                      value={onboardingNotes}
-                      onChange={(event) => setOnboardingNotes(event.target.value)}
-                      placeholder="Feedback for the supplier (required when requesting changes)"
-                      rows={2}
-                      className="w-full resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
-                    />
-                    {onboardingReview.isError && (
-                      <p role="alert" className="text-sm text-red-700">
-                        {onboardingReview.error instanceof Error
-                          ? onboardingReview.error.message
-                          : "Could not update onboarding review."}
-                      </p>
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={onboardingReview.isPending || !onboardingNotes.trim()}
-                        onClick={() => onboardingReview.mutate({
-                          action: "REQUEST_CHANGES",
-                          notes: onboardingNotes.trim(),
-                        })}
-                        className="rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-                      >
-                        Request changes
-                      </button>
-                      <button
-                        type="button"
-                        disabled={onboardingReview.isPending}
-                        onClick={() => onboardingReview.mutate({
-                          action: "APPROVE",
-                          notes: onboardingNotes.trim() || undefined,
-                        })}
-                        className="rounded-lg bg-primary-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-                      >
-                        Approve onboarding
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Risk level & main issue">
-                <p className="text-sm text-neutral-700">
+              <Section title="Main issue">
+                <p className="text-sm font-semibold text-red-700">
                   {supplier.mainIssue || "No open issues on record."}
                 </p>
               </Section>
 
-              <Section title="Environmental compliance">
-                <p className="text-sm text-neutral-700">
-                  {supplier.issueCategory
-                    ? ISSUE_CATEGORY_LABELS[supplier.issueCategory]
-                    : "No compliance category recorded for this supplier."}
-                </p>
+              <Section title="Activity">
+                <p className="text-sm text-neutral-700">{describeLastActive(supplier.lastActiveAt, trackingSince)}</p>
+                <p className="text-sm text-neutral-500">{describeLastUpdated(supplier.lastUpdatedAt, supplier.lastUpdatedBy)}</p>
               </Section>
 
-              {/* Renamed from "Follow-up status" — this shows a linked
-                  system alert, a different concept from the admin's own
-                  manual review workflow below. Keeping the two visually
-                  and semantically separate was the point of this fix. */}
-              <Section title="Active alert">
-                {linkedAlert ? (
-                  <div className="rounded-lg bg-neutral-50 p-2.5">
-                    <p className="text-sm font-medium text-neutral-900">{linkedAlert.title}</p>
-                    <p className="mt-0.5 text-sm text-neutral-500">{linkedAlert.description}</p>
-                  </div>
+              <Section title="Active alerts">
+                {supplierAlerts.length === 0 ? (
+                  <p className="text-sm text-neutral-500">No active alerts.</p>
                 ) : (
-                  <p className="text-sm text-neutral-400">
-                    No active alerts currently linked to this supplier.
-                  </p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {supplierAlerts.slice(0, MAX_KEYWORDS).map((alert) => (
+                      <li key={alert.id} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700">
+                        {alert.title}
+                      </li>
+                    ))}
+                    {supplierAlerts.length > MAX_KEYWORDS && (
+                      <li className="rounded-full px-2 py-1 text-xs text-neutral-500">
+                        +{supplierAlerts.length - MAX_KEYWORDS} more
+                      </li>
+                    )}
+                  </ul>
                 )}
               </Section>
 
-              <Section title="Review status">
+              <Section title="Follow-up status">
                 <div className="flex items-center gap-2">
                   <StatusBadge
                     status={REVIEW_STATUS_BADGES[reviewStatus].color}
@@ -240,9 +147,6 @@ export function SupplierDetailsDrawer({
                     <span className="text-xs text-neutral-500">Assigned to you</span>
                   )}
                 </div>
-                <p className="mt-1.5 text-xs text-neutral-400">
-                  Your own triage label — stored locally, does not affect risk classification.
-                </p>
                 <div className="mt-2 flex gap-2">
                   {reviewStatus === "to-review" && (
                     <button
@@ -257,22 +161,27 @@ export function SupplierDetailsDrawer({
                       onClick={() => onChangeReviewStatus("resolved")}
                       className="rounded-lg border border-tertiary-200 px-2.5 py-1.5 text-xs font-medium text-tertiary-700 hover:bg-tertiary-50"
                     >
-                      Mark Resolved
+                      Mark resolved
                     </button>
                   )}
                 </div>
               </Section>
 
-              <Section title="Admin notes">
+              <Section title="Notes">
                 <div className="space-y-2">
                   {notes.length === 0 && (
-                    <p className="text-sm text-neutral-400">No notes yet for this supplier.</p>
+                    <p className="text-sm text-neutral-500">No notes yet for this supplier.</p>
                   )}
                   {notes.map((note) => (
                     <div key={note.id} className="rounded-lg bg-neutral-50 p-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-neutral-700">{note.authorName}</span>
-                        <span className="font-mono text-[11px] text-neutral-400">
+                        <span className="text-xs font-medium text-neutral-700">
+                          {note.authorName}
+                          <span className="ml-2 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-normal text-neutral-600">
+                            {note.visibility === "SELF" ? "Note to self" : "Internal note"}
+                          </span>
+                        </span>
+                        <span className="font-mono text-[11px] text-neutral-500">
                           {new Date(note.createdAt).toLocaleString("en-GB", {
                             day: "numeric",
                             month: "short",
@@ -285,13 +194,29 @@ export function SupplierDetailsDrawer({
                     </div>
                   ))}
                 </div>
+                <fieldset className="mt-2">
+                  <legend className="sr-only">Who can see this note</legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-700">
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "SELF"} onChange={() => setVisibility("SELF")} />
+                      Note to self
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "INTERNAL"} onChange={() => setVisibility("INTERNAL")} />
+                      Internal note
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">Notes are never shown to the supplier.</p>
+                </fieldset>
                 <div className="mt-2 flex gap-2">
                   <textarea
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
-                    placeholder="Add a note about this supplier's issue…"
+                    maxLength={2000}
+                    aria-label="Note about this supplier"
+                    placeholder="Add a note about this supplier…"
                     rows={2}
-                    className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
+                    className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
                   />
                   <button
                     onClick={handleSubmitNote}
@@ -304,17 +229,18 @@ export function SupplierDetailsDrawer({
                 </div>
               </Section>
 
+              <button
+                type="button"
+                onClick={onOpenDetails}
+                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+              >
+                Details
+              </button>
             </div>
           </>
         )}
       </div>
 
-      {showReportingData && supplier && (
-        <SupplierReportingDataDialog
-          supplier={{ id: supplier.id, name: supplier.displayName }}
-          onClose={() => setShowReportingData(false)}
-        />
-      )}
     </>
   );
 }
@@ -322,7 +248,7 @@ export function SupplierDetailsDrawer({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -331,7 +257,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-500">{label}</span>
       <span className="font-medium text-neutral-900">{value}</span>
     </div>
   );

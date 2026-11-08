@@ -59,7 +59,7 @@ class OnboardingWorkflowTest {
         }
         val agreement = repo.fleet.saveAgreement(
             null,
-            AgreementInput("nordvik-transport", "2026-01-01", "2027-12-31", 10, "Nordvik School Bus Agreement"),
+            AgreementInput("nordvik-transport", "2026-01-01", "2027-12-31", 10, "Nordvik School Bus Agreement", saksnr = "2024/1234"),
             null,
             actor,
             now
@@ -103,7 +103,8 @@ class OnboardingWorkflowTest {
         val templateRes = supplier.get("/api/onboarding/templates/vehicles")
         assertEquals(HttpStatusCode.OK, templateRes.status)
         val templateText = templateRes.bodyAsText()
-        assertTrue(templateText.endsWith(CsvStreamParser.VEHICLE_HEADERS.joinToString(";") + "\r\n"))
+        assertTrue(templateText.endsWith(CsvStreamParser.VEHICLE_TEMPLATE_HEADERS.joinToString(";") + "\r\n"))
+        assertFalse(templateText.contains("is_hybrid"))
         assertFalse(templateText.contains(agreementId))
 
         // 4. Two-Phase CSV Upload: Preview valid fleet
@@ -234,7 +235,8 @@ class OnboardingWorkflowTest {
                 note = "Energy reporting",
                 requiresVehicles = false,
                 requiresEnergy = true,
-                requiresProducts = false
+                requiresProducts = false,
+                saksnr = "2024/1234"
             ),
             null,
             ChangeActor("admin-seed", "Advisor Hansen"),
@@ -308,7 +310,7 @@ class OnboardingWorkflowTest {
         )
         val otherAgreement = repo.fleet.saveAgreement(
             null,
-            AgreementInput(otherSupplier.id, "2026-01-01", "2027-12-31", 10, "Other agreement"),
+            AgreementInput(otherSupplier.id, "2026-01-01", "2027-12-31", 10, "Other agreement", saksnr = "2024/1234"),
             null,
             actor,
             now
@@ -383,7 +385,8 @@ class OnboardingWorkflowTest {
                 note = "Energy Services Agreement",
                 requiresVehicles = false,
                 requiresEnergy = true,
-                requiresProducts = false
+                requiresProducts = false,
+                saksnr = "2024/1234"
             ),
             null,
             actor,
@@ -400,7 +403,8 @@ class OnboardingWorkflowTest {
                 note = "Sustainable Goods Agreement",
                 requiresVehicles = false,
                 requiresEnergy = false,
-                requiresProducts = true
+                requiresProducts = true,
+                saksnr = "2024/1234"
             ),
             null,
             actor,
@@ -532,5 +536,24 @@ class OnboardingWorkflowTest {
         }.exceptionOrNull()
         assertTrue(oldest is IllegalArgumentException, "oldest preview should have been evicted")
         repo.onboarding.confirmBatch(ids.last(), "nordvik-transport", start.plusSeconds(10))
+    }
+
+    @Test
+    fun lastUpdatedIsTheLatestChangeAndSaysWhoMadeIt() {
+        val repo = testRepository()
+        val agreementId = setupSupplierAndAgreement(repo)
+        val start = Instant.now().plusSeconds(600)
+        // The agreement was created by an admin: that is the only change so far.
+        assertEquals("ADMIN", repo.onboarding.lastUpdatedBySupplier().getValue("nordvik-transport").by)
+
+        val upload = previewVehicle(repo, agreementId, "AB12401", start)
+        repo.onboarding.confirmBatch(upload, "nordvik-transport", start.plusSeconds(60), byRole = "SUPPLIER")
+        val afterUpload = repo.onboarding.lastUpdatedBySupplier().getValue("nordvik-transport")
+        assertEquals("SUPPLIER", afterUpload.by)
+        assertEquals(start.plusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.MILLIS), afterUpload.at.truncatedTo(java.time.temporal.ChronoUnit.MILLIS))
+
+        // A later admin change takes over; an upload with no recorded role is attributed to nobody.
+        repo.fleet.addVehicle(agreementId, com.tdt4290group7.backend.vehicles.VehicleEntryInput(planned = true), ChangeActor("admin", "Admin"), start.plusSeconds(3600))
+        assertEquals("ADMIN", repo.onboarding.lastUpdatedBySupplier().getValue("nordvik-transport").by)
     }
 }

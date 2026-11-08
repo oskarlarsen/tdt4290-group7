@@ -36,9 +36,18 @@ import { CopyableValue } from "@/components/ui/CopyableValue";
 import { SupplierVehicleEntryForm } from "@/components/supplier/SupplierVehicleEntryForm";
 import { SupplierEnergyEntryForm } from "@/components/supplier/SupplierEnergyEntryForm";
 import { SupplierProductEntryForm } from "@/components/supplier/SupplierProductEntryForm";
-import { FUEL_TECHNOLOGIES } from "@/utils/vehicleCatalog";
+import { FUEL_TECHNOLOGIES, vehicleWeightRange } from "@/utils/vehicleCatalog";
 import { ECOLABEL_STANDARDS, PRODUCT_CATEGORIES, UNITS_OF_MEASURE } from "@/utils/productFormCsv";
 import { formatNumber } from "@/utils/formatNumber";
+import { agreementLabel } from "../../utils/agreementLabel";
+
+// What the preview says about where a vehicle's fuel came from.
+const REGISTRY_STATUS_LABELS: Record<string, string> = {
+  FILLED: "Yes, filled in for you",
+  PROVIDED: "No, you entered it",
+  NOT_FOUND: "Plate not found",
+  NOT_CHECKED: "Could not be checked",
+};
 
 const ENTITY_OPTIONS: Array<{ value: CsvEntity; label: string }> = [
   { value: "vehicles", label: "Vehicles" },
@@ -173,7 +182,11 @@ export default function Onboarding() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [entity, setEntity] = useState<CsvEntity>("vehicles");
-  const [preview, setPreview] = useState<CsvPreview | null>(null);
+  // Each kind of data can be entered in a form or as a CSV file; each way keeps its own preview.
+  const [method, setMethod] = useState<"form" | "csv">("form");
+  const [previews, setPreviews] = useState<Record<"form" | "csv", CsvPreview | null>>({ form: null, csv: null });
+  const preview = previews[method];
+  const setPreview = (value: CsvPreview | null) => setPreviews((current) => ({ ...current, [method]: value }));
   const [formVersion, setFormVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -413,7 +426,7 @@ export default function Onboarding() {
                 {overview.agreements.map((agreement) => (
                   <li key={agreement.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-sm">
                     <span className="min-w-0">
-                      <span className="block font-medium text-neutral-800">{agreement.note || agreement.id}</span>
+                      <span className="block font-medium text-neutral-800">{agreementLabel(agreement)}</span>
                       <CopyableValue label="Agreement ID" value={agreement.id} />
                     </span>
                     <span className="text-right text-neutral-500">
@@ -458,9 +471,11 @@ export default function Onboarding() {
               />
             </label>
             <label className="block text-sm font-medium text-neutral-700">
-              Phone <span className="font-normal text-neutral-400">(optional)</span>
+              Phone <span className="font-normal text-neutral-500">(optional)</span>
               <input
                 type="tel"
+                pattern="\+?[0-9 \(\)\-]{4,20}"
+                title="Enter a phone number, for example +47 123 45 678"
                 value={contactPhone}
                 onChange={(event) => setContactPhone(event.target.value)}
                 disabled={working || locked}
@@ -507,7 +522,7 @@ export default function Onboarding() {
                   value={entity}
                   onChange={(event) => {
                     setEntity(event.target.value as CsvEntity);
-                    setPreview(null);
+                    setPreviews({ form: null, csv: null });
                     setError(null);
                     setNotice(null);
                   }}
@@ -525,8 +540,25 @@ export default function Onboarding() {
               </label>
             </div>
 
+            <div role="tablist" aria-label="How to enter the data" className="inline-flex rounded-lg border border-neutral-200 p-0.5 text-sm">
+              {([["form", "Fill in a form"], ["csv", "Upload a CSV file"]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={method === value}
+                  disabled={working}
+                  onClick={() => { setMethod(value); setError(null); setNotice(null); }}
+                  className={`rounded-md px-3 py-1.5 font-medium ${method === value ? "bg-primary-900 text-white" : "text-neutral-600 hover:bg-neutral-50"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {entity === "vehicles" && (
               <SupplierVehicleEntryForm
+                mode={method}
                 key={`vehicles-${formVersion}`}
                 agreements={overview.agreements.filter((agreement) => agreement.requiresVehicles)}
                 working={working}
@@ -537,6 +569,7 @@ export default function Onboarding() {
 
             {entity === "energy" && (
               <SupplierEnergyEntryForm
+                mode={method}
                 key={`energy-${formVersion}`}
                 agreements={overview.agreements.filter((agreement) => agreement.requiresEnergy)}
                 working={working}
@@ -547,6 +580,7 @@ export default function Onboarding() {
 
             {entity === "products" && (
               <SupplierProductEntryForm
+                mode={method}
                 key={`products-${formVersion}`}
                 agreements={overview.agreements.filter((agreement) => agreement.requiresProducts)}
                 working={working}
@@ -592,9 +626,9 @@ export default function Onboarding() {
                 <table className="w-full min-w-[560px] text-left text-sm">
                   <thead className="bg-red-50 text-red-900">
                     <tr>
-                      <th className="px-3 py-2 font-semibold">Row</th>
-                      <th className="px-3 py-2 font-semibold">Field</th>
-                      <th className="px-3 py-2 font-semibold">Issue</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Row</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Field</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Issue</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-red-50">
@@ -625,8 +659,8 @@ export default function Onboarding() {
                   <table className="w-full min-w-[620px] text-left text-xs">
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
-                        {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Coverage"].map((label) => (
-                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                        {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Weight", "Checked with Statens vegvesen", "Coverage"].map((label) => (
+                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -634,16 +668,18 @@ export default function Onboarding() {
                       {preview.previewRows.map((row, index) => {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
                         const fuel = Object.entries(FUEL_TECHNOLOGIES)
-                          .find(([code]) => code === row.fuel_technology)?.[1] ?? row.fuel_technology;
+                          .find(([code]) => code === row.fuel_technology)?.[1] ?? "—";
                         const coverage = friendlyBoolean(row.full_contract_coverage) === "Yes"
                           ? "Full agreement period"
-                          : `${row.start_year_week} to ${row.end_year_week}`;
+                          : row.start_year_week && row.end_year_week ? `${row.start_year_week} to ${row.end_year_week}` : "—";
                         return (
                           <tr key={index}>
-                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
                             <td className="px-3 py-2">{row.registration_number || "Planned vehicle"}</td>
                             <td className="px-3 py-2">{fuel}</td>
                             <td className="px-3 py-2">{friendlyBoolean(row.is_hybrid)}</td>
+                            <td className="px-3 py-2">{vehicleWeightRange(row.vehicle_category) ?? "—"}</td>
+                            <td className="px-3 py-2">{REGISTRY_STATUS_LABELS[row.registry_status] ?? "—"}</td>
                             <td className="px-3 py-2">{coverage}</td>
                           </tr>
                         );
@@ -655,7 +691,7 @@ export default function Onboarding() {
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
                         {["Agreement", "Facility code", "Address", "Year", "Electricity", "District heating"].map((label) => (
-                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -664,7 +700,7 @@ export default function Onboarding() {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
                         return (
                           <tr key={index}>
-                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
                             <td className="px-3 py-2 font-mono font-medium">{row.facility_location_code}</td>
                             <td className="px-3 py-2">{row.facility_address}</td>
                             <td className="px-3 py-2">{row.reporting_year}</td>
@@ -680,7 +716,7 @@ export default function Onboarding() {
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
                         {["Agreement", "Product code", "Product name", "Category", "Ecolabel", "Unit", "Repaired/Reused"].map((label) => (
-                          <th key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -694,7 +730,7 @@ export default function Onboarding() {
                         const unit = UNITS_OF_MEASURE[row.unit_of_measure] ?? row.unit_of_measure;
                         return (
                           <tr key={index}>
-                            <td className="px-3 py-2">{agreement?.note || row.agreement_id}</td>
+                            <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
                             <td className="px-3 py-2 font-mono font-medium">{row.product_code}</td>
                             <td className="px-3 py-2">{row.product_name}</td>
                             <td className="px-3 py-2">{category}</td>

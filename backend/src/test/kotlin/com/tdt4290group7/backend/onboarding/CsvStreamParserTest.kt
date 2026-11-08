@@ -26,6 +26,15 @@ class CsvStreamParserTest {
     }
 
     @Test
+    fun rejectsUnknownFuelTechnologyCode() {
+        val csv = "agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes\n" +
+            "AGR-1,SV12345,FALSE,WARP,FALSE,TRUE,,,,"
+        val result = CsvStreamParser.parseAndValidate(ByteArrayInputStream(csv.toByteArray(StandardCharsets.UTF_8)), BatchEntityType.VEHICLES, setOf("AGR-1"))
+
+        assertTrue(result.errors.any { it.column == "fuel_technology" && it.message.contains("fuel code") })
+    }
+
+    @Test
     fun rejectsFormulaInjectionAttempts() {
         val maliciousCsv = "agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes\n" +
             "AGR-1,SV12345,FALSE,13,FALSE,TRUE,,,=CMD('calc'),Sample bus"
@@ -130,7 +139,7 @@ class CsvStreamParserTest {
     @Test
     fun generatesHeaderOnlyTemplatesWithoutFictionalRecords() {
         val templates = mapOf(
-            BatchEntityType.VEHICLES to CsvStreamParser.VEHICLE_HEADERS,
+            BatchEntityType.VEHICLES to CsvStreamParser.VEHICLE_TEMPLATE_HEADERS,
             BatchEntityType.ENERGY to CsvStreamParser.ENERGY_HEADERS,
             BatchEntityType.PRODUCTS to CsvStreamParser.PRODUCT_HEADERS
         )

@@ -25,7 +25,7 @@ export function AlertCard({
         >
           {alert.severity}
         </span>
-        <span className="font-mono text-xs text-neutral-400">{alert.timeAgo}</span>
+        <span className="font-mono text-xs text-neutral-500">{alert.timeAgo}</span>
       </div>
       <div className="mt-1.5 text-sm font-medium text-neutral-900">{alert.title}</div>
       <p className="mt-0.5 text-sm text-neutral-500">{alert.description}</p>
@@ -46,7 +46,7 @@ export function AlertCard({
             className="inline-flex items-center justify-center rounded-lg bg-primary-900 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!onInvestigate}
           >
-            View Details
+            View details
           </button>
         )}
       </div>

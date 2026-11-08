@@ -9,6 +9,7 @@ import java.sql.ResultSet
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.tdt4290group7.backend.vehicles.VehicleRegistryLookup
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -306,6 +307,36 @@ internal class OnboardingRepository(
     // Two-Phase CSV Upload (Preview & Atomic Commit)
     // -------------------------------------------------------------------------
 
+    private class PreparedBatch(
+        val supplierId: String,
+        val entityType: BatchEntityType,
+        val fileName: String,
+        val hash: String,
+        val parse: CsvStreamParser.ParsedCsvResult,
+        val now: Instant,
+    )
+
+    private fun prepareBatch(
+        supplierId: String,
+        entityType: BatchEntityType,
+        fileName: String,
+        fileBytes: ByteArray,
+        now: Instant
+    ): PreparedBatch {
+        database.read { db -> requireEditableSupplier(db, supplierId) }
+        val allowedAgreements = requiredAgreementIds(supplierId, entityType)
+        require(allowedAgreements.isNotEmpty()) {
+            "Your administrator has not requested ${entityType.name.lowercase(Locale.ROOT)} information"
+        }
+        val parseResult = CsvStreamParser.parseAndValidate(
+            inputStream = fileBytes.inputStream(),
+            entityType = entityType,
+            allowedAgreementIds = allowedAgreements
+        )
+        return PreparedBatch(supplierId, entityType, fileName, sha256(fileBytes), parseResult, now)
+    }
+
+    /** Preview without a registry: vehicles left without a fuel become errors asking the supplier to fill it in. */
     fun createBatchPreview(
         supplierId: String,
         entityType: BatchEntityType,
@@ -313,18 +344,39 @@ internal class OnboardingRepository(
         fileBytes: ByteArray,
         now: Instant
     ): CsvPreviewResponse {
-        database.read { db -> requireEditableSupplier(db, supplierId) }
-        val allowedAgreements = requiredAgreementIds(supplierId, entityType)
-        require(allowedAgreements.isNotEmpty()) {
-            "Your administrator has not requested ${entityType.name.lowercase(Locale.ROOT)} information"
-        }
-        val hash = sha256(fileBytes)
-        val parseResult = CsvStreamParser.parseAndValidate(
-            inputStream = fileBytes.inputStream(),
-            entityType = entityType,
-            allowedAgreementIds = allowedAgreements
-        )
+        val prepared = prepareBatch(supplierId, entityType, fileName, fileBytes, now)
+        val parse = prepared.parse
+        if (entityType != BatchEntityType.VEHICLES || parse.errors.isNotEmpty()) return finishBatch(prepared, parse)
+        val filled = VehicleRegistryFill.withoutRegistry(parse.rows)
+        return finishBatch(prepared, parse.copy(rows = filled.rows, errors = filled.errors))
+    }
 
+    /**
+     * Preview that asks Statens vegvesen for the fuel of registered vehicles the supplier left blank.
+     * The lookups run here, before any database write, so they never hold the SQLite write lock.
+     * A file that already has errors is not looked up, so a broken upload does not use the registry quota.
+     */
+    suspend fun createBatchPreview(
+        supplierId: String,
+        entityType: BatchEntityType,
+        fileName: String,
+        fileBytes: ByteArray,
+        now: Instant,
+        registry: VehicleRegistryLookup?
+    ): CsvPreviewResponse {
+        val prepared = prepareBatch(supplierId, entityType, fileName, fileBytes, now)
+        val parse = prepared.parse
+        if (entityType != BatchEntityType.VEHICLES || parse.errors.isNotEmpty()) return finishBatch(prepared, parse)
+        val filled = VehicleRegistryFill.fillFromRegistry(parse.rows, registry, now)
+        return finishBatch(prepared, parse.copy(rows = filled.rows, errors = filled.errors))
+    }
+
+    private fun finishBatch(prepared: PreparedBatch, parseResult: CsvStreamParser.ParsedCsvResult): CsvPreviewResponse {
+        val supplierId = prepared.supplierId
+        val entityType = prepared.entityType
+        val fileName = prepared.fileName
+        val hash = prepared.hash
+        val now = prepared.now
         val batchId = "batch-" + UUID.randomUUID().toString()
         val totalRows = parseResult.totalRows
         val rowErrors = parseResult.errors.map { it.row }.distinct().count { it > 1 }
@@ -382,7 +434,7 @@ internal class OnboardingRepository(
         )
     }
 
-    fun confirmBatch(batchId: String, supplierId: String, now: Instant): CsvConfirmResponse {
+    fun confirmBatch(batchId: String, supplierId: String, now: Instant, byRole: String? = null): CsvConfirmResponse {
         val cached = batchCache[batchId]?.takeIf { it.cachedAt.plus(batchTtl) > now }
             ?: throw IllegalArgumentException("Batch preview expired or not found. Please upload the CSV again.")
 
@@ -418,7 +470,8 @@ internal class OnboardingRepository(
                 "upload_batches",
                 mapOf(
                     "status" to BatchStatus.COMMITTED.name,
-                    "committed_at" to ts
+                    "committed_at" to ts,
+                    "committed_by_role" to byRole
                 ),
                 "id = ?",
                 listOf(batchId)
@@ -502,7 +555,7 @@ internal class OnboardingRepository(
                 "attachment_reference" to r["attachment_reference"]?.trim()?.takeIf { it.isNotEmpty() },
                 "notes" to r["notes"]?.trim()?.takeIf { it.isNotEmpty() },
                 "updated_at" to timestamp
-            )
+            ) + (r["vehicle_category"]?.trim()?.takeIf { it.isNotEmpty() }?.let { mapOf("vehicle_category" to it) } ?: emptyMap())
             val hasDetails = database.query(
                 db,
                 "SELECT 1 FROM vehicle_contract_details WHERE registration_number = ?",
@@ -606,11 +659,30 @@ internal class OnboardingRepository(
     // Supplier Dashboard Queries
     // -------------------------------------------------------------------------
 
+    /** The latest change to each supplier's data, and whether the supplier or an admin made it (null when unknown). */
+    data class LastUpdate(val at: Instant, val by: String?)
+
+    fun lastUpdatedBySupplier(): Map<String, LastUpdate> = database.read { db ->
+        val sql = """
+            SELECT supplier_id, committed_at AS at, committed_by_role AS role FROM upload_batches
+              WHERE status = 'COMMITTED' AND committed_at IS NOT NULL
+            UNION ALL
+            SELECT a.supplier_id, c.occurred_at, 'ADMIN' FROM fleet_changes c JOIN agreements a ON a.id = c.agreement_id
+        """.trimIndent()
+        val latest = mutableMapOf<String, LastUpdate>()
+        database.query(db, sql, emptyList()) { row ->
+            val update = LastUpdate(Instant.parse(row.getString("at")), row.getString("role"))
+            latest.merge(row.getString("supplier_id"), update) { a, b -> if (b.at.isAfter(a.at)) b else a }
+        }
+        latest
+    }
+
+    /** Every agreement of the supplier, including ended ones: their certificates stay on the supplier's list as history. */
     fun getSupplierAgreementIds(supplierId: String): Set<String> {
         return database.read { db ->
             database.query(
                 db,
-                "SELECT id FROM agreements WHERE supplier_id = ? AND active = 1",
+                "SELECT id FROM agreements WHERE supplier_id = ?",
                 listOf(supplierId)
             ) { it.getString("id") }.toSet()
         }
@@ -629,6 +701,8 @@ internal class OnboardingRepository(
                 SELECT v.registration_number, v.agreement_id, v.planned, v.listed,
                        d.fuel_technology, d.is_hybrid, d.full_contract_coverage,
                        d.start_year_week, d.end_year_week, d.attachment_reference, d.notes,
+                       COALESCE(d.vehicle_category, (SELECT s.vehicle_category FROM svv_snapshots s
+                           WHERE s.registration_number = v.registration_number ORDER BY s.fetched_at DESC, s.id DESC LIMIT 1)) AS vehicle_category,
                        v.created_at, v.updated_at
                 FROM vehicles v
                 JOIN agreements a ON v.agreement_id = a.id
@@ -644,6 +718,7 @@ internal class OnboardingRepository(
                     listed = row.getInt("listed") == 1,
                     fuelTechnology = row.getString("fuel_technology"),
                     isHybrid = row.getObject("is_hybrid")?.let { row.getInt("is_hybrid") == 1 },
+                    vehicleCategory = row.getString("vehicle_category"),
                     fullContractCoverage = row.getObject("full_contract_coverage")?.let { row.getInt("full_contract_coverage") == 1 },
                     startYearWeek = row.getString("start_year_week"),
                     endYearWeek = row.getString("end_year_week"),
@@ -808,7 +883,7 @@ internal class OnboardingRepository(
 
     private fun querySupplierAgreements(db: Connection, supplierId: String): List<SupplierAgreementSummary> {
         val sql = """
-            SELECT a.id, a.note, a.start_date, a.end_date, a.allowed_vehicles, a.active,
+            SELECT a.id, a.note, a.saksnr, a.start_date, a.end_date, a.allowed_vehicles, a.active,
                    a.requires_vehicles, a.requires_energy, a.requires_products,
                    (SELECT COUNT(*) FROM vehicles v WHERE v.agreement_id = a.id AND v.listed = 1) AS vehicle_count
             FROM agreements a
@@ -819,6 +894,7 @@ internal class OnboardingRepository(
             SupplierAgreementSummary(
                 id = row.getString("id"),
                 note = row.getString("note"),
+                saksnr = row.getString("saksnr"),
                 startDate = row.getString("start_date"),
                 endDate = row.getString("end_date"),
                 allowedVehicles = row.getInt("allowed_vehicles"),

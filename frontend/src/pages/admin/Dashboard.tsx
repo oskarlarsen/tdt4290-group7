@@ -19,7 +19,7 @@ type RiskFilter = "all" | "high" | "medium";
 const ATTENTION_WIDGET_VISIBLE_LIMIT = 3;
 
 export default function Dashboard() {
-  const { user, lastActiveAt } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { getStatus, setStatus, errorMessage: reviewStatusError } = useSupplierReviewStatus();
   const { data, isLoading, isError, error, refetch } = useDashboardSummary();
@@ -123,11 +123,6 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              {lastActiveAt && (
-                <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-xs text-neutral-500">
-                  Last active: {formatSyncTime(lastActiveAt)}
-                </span>
-              )}
               <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-xs text-neutral-500">
                 Data refreshed: {formatSyncTime(data.lastSyncedAt)}
               </span>
@@ -172,13 +167,15 @@ export default function Dashboard() {
           sublabel={`/ ${data.kpis.totalSuppliers} active`}
           note={`${data.kpis.assessedSuppliers} assessed from stored evidence`}
           noteTone="danger"
+          href="/admin/suppliers?risk=high"
           icon={<ShieldAlert className="h-4 w-4" />}
         />
         <KpiCard
           label="Unresolved alerts"
           value={data.kpis.activeAlerts}
           sublabel="not yet resolved"
-          note={`${alertsBySeverity.high} high · ${alertsBySeverity.medium} medium`}
+          note={`${alertsBySeverity.high} high · ${alertsBySeverity.medium} medium${alertsBySeverity.low ? ` · ${alertsBySeverity.low} low` : ""}`}
+          href="/admin/alerts?status=unresolved"
           icon={<Bell className="h-4 w-4" />}
         />
         <KpiCard
@@ -193,8 +190,8 @@ export default function Dashboard() {
 
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <h2 className="font-headline text-base font-semibold text-neutral-900">Supplier risk classification</h2>
-        <p className="mb-4 text-xs text-neutral-400">
-          Assessment uses persisted vehicle findings and certificate expiry dates; unassessed suppliers are excluded.
+        <p className="mb-4 text-xs text-neutral-500">
+          Assessment uses persisted vehicle findings and certificate expiry dates; suppliers with no evidence yet are listed as Not assessed.
         </p>
         <RiskClassificationBar data={data.riskClassification} />
       </section>
@@ -231,7 +228,7 @@ export default function Dashboard() {
           ) : (
             <TopRiskSuppliersTable
               suppliers={visibleSuppliers}
-              actionLabel="View Details"
+              actionLabel="View details"
               getReviewStatus={getStatus}
               onSelect={(supplier) => navigate(`/admin/suppliers?supplierId=${supplier.id}`)}
               onMarkReviewComplete={(supplier) => setStatus(supplier.id, "resolved")}
@@ -273,7 +270,7 @@ export default function Dashboard() {
 
         <section className="rounded-xl border border-neutral-100 bg-white p-4">
           <h2 className="font-headline text-base font-semibold text-neutral-900">Recent alerts</h2>
-          <p className="mb-1 text-xs text-neutral-400">Most recent events first</p>
+          <p className="mb-1 text-xs text-neutral-500">Most recent events first</p>
           {data.recentAlerts.length === 0 ? (
             <p className="py-8 text-center text-sm text-neutral-500">No unresolved alerts.</p>
           ) : (

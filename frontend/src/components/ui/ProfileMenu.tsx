@@ -106,7 +106,7 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
             </span>
             <span className="flex min-w-0 flex-1 flex-col items-start text-left">
               <span className="block w-full truncate text-sm font-medium text-neutral-900">{displayName}</span>
-              <span className="block text-xs text-neutral-400">{roleLabel}</span>
+              <span className="block text-xs text-neutral-500">{roleLabel}</span>
             </span>
           </>
         )}
@@ -124,7 +124,7 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                 <Settings className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                 <div>
                   <div className="text-sm font-medium text-neutral-900">Settings</div>
-                  <div className="text-xs text-neutral-400">Dashboard preferences</div>
+                  <div className="text-xs text-neutral-500">Dashboard preferences</div>
                 </div>
               </div>
 
@@ -142,7 +142,7 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                   <option value="en">English</option>
                   <option value="no">Norwegian</option>
                 </select>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-400">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-500">
                   Preference saved on this device; translations can be connected later.
                 </p>
               </div>
@@ -158,7 +158,7 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                     Current
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-400">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-500">
                   Dark mode is not available in the current dashboard theme.
                 </p>
               </div>
@@ -168,6 +168,8 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
                   <UserRound className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                   Profile
                 </div>
+                <p className="mt-1.5 text-sm text-neutral-700">{displayName}</p>
+                {user.email && <p className="break-all text-xs text-neutral-500">{user.email}</p>}
               </div>
 
               <div className="border-t border-neutral-100 p-1">
@@ -183,7 +185,7 @@ export function ProfileMenu({ variant = "compact" }: { variant?: "compact" | "fu
             <>
               <div className="border-b border-neutral-100 px-3 py-2">
                 <div className="text-sm font-medium text-neutral-900">{displayName}</div>
-                <div className="text-xs text-neutral-400">{user.email}</div>
+                <div className="text-xs text-neutral-500">{user.email}</div>
                 <div className="mt-1 inline-block rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-neutral-500">
                   {roleLabel}
                 </div>

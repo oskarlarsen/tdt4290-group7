@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import com.tdt4290group7.backend.vehicles.FuelTechnology
 
 object CsvStreamParser {
 
@@ -24,6 +25,15 @@ object CsvStreamParser {
         "attachment_reference",
         "notes"
     )
+
+    /**
+     * Statens vegvesen fills these in at upload preview when they are left blank, so a file without them is still valid.
+     * Old templates that include them keep working.
+     */
+    val OPTIONAL_VEHICLE_HEADERS = setOf("fuel_technology", "is_hybrid")
+
+    /** The columns a supplier is asked to fill in. is_hybrid is still accepted, but derived when left out. */
+    val VEHICLE_TEMPLATE_HEADERS get() = VEHICLE_HEADERS.filter { it != "is_hybrid" }
 
     val ENERGY_HEADERS = listOf(
         "agreement_id",
@@ -103,7 +113,8 @@ object CsvStreamParser {
         val errors = mutableListOf<CsvCellError>()
 
         // Check required headers
-        val missingHeaders = expectedHeaders.filter { !parsedHeaderCells.contains(it) }
+        val optionalHeaders = if (entityType == BatchEntityType.VEHICLES) OPTIONAL_VEHICLE_HEADERS else emptySet()
+        val missingHeaders = expectedHeaders.filter { it !in optionalHeaders && !parsedHeaderCells.contains(it) }
         if (missingHeaders.isNotEmpty()) {
             errors.add(
                 CsvCellError(
@@ -207,7 +218,8 @@ object CsvStreamParser {
         rowMap: Map<String, String>,
         errors: MutableList<CsvCellError>
     ) {
-        validateBoolean(row, "is_hybrid", rowMap["is_hybrid"], errors)
+        // Blank is allowed: the hybrid flag is worked out from the fuel at preview.
+        if (!rowMap["is_hybrid"].isNullOrBlank()) validateBoolean(row, "is_hybrid", rowMap["is_hybrid"], errors)
         val isPlannedStr = rowMap["is_planned"]?.trim()?.uppercase(Locale.ROOT)
         val isPlanned = isPlannedStr == "TRUE" || isPlannedStr == "1"
 
@@ -228,9 +240,13 @@ object CsvStreamParser {
             }
         }
 
+        // A registered vehicle's fuel is looked up at preview. A planned vehicle has no plate to look up, so it needs one.
         val fuel = rowMap["fuel_technology"]?.trim() ?: ""
-        if (fuel.isEmpty()) {
-            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology cannot be blank"))
+        if (fuel.isEmpty() && isPlanned) {
+            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology is required for planned vehicles: they have no registration number to look up"))
+        }
+        if (fuel.isNotEmpty() && FuelTechnology.entries.none { it.code == fuel }) {
+            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology must be a Statens vegvesen fuel code, for example 2 for Diesel", fuel))
         }
 
         val fullCoverageStr = rowMap["full_contract_coverage"]?.trim()?.uppercase(Locale.ROOT)
@@ -412,7 +428,8 @@ object CsvStreamParser {
 
     fun generateTemplate(entityType: BatchEntityType): String {
         val headers = when (entityType) {
-            BatchEntityType.VEHICLES -> VEHICLE_HEADERS
+            // The hybrid flag is worked out from the fuel, so the template does not ask for it; files that include it still work.
+            BatchEntityType.VEHICLES -> VEHICLE_TEMPLATE_HEADERS
             BatchEntityType.ENERGY -> ENERGY_HEADERS
             BatchEntityType.PRODUCTS -> PRODUCT_HEADERS
         }

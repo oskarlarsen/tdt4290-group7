@@ -51,7 +51,7 @@ class FleetRoutesTest {
         val supplierJson = Json.parseToJsonElement(created.bodyAsText()).jsonObject
         val supplierId = supplierJson.getValue("id").jsonPrimitive.content
         val supplierVersion = supplierJson.getValue("updatedAt").jsonPrimitive.content
-        val agreement = repo.fleet.saveAgreement(null, AgreementInput(supplierId, "2026-01-01", "2027-12-31", 1), null,
+        val agreement = repo.fleet.saveAgreement(null, AgreementInput(supplierId, "2026-01-01", "2027-12-31", 1, saksnr = "2024/1234"), null,
             ChangeActor("admin", "Admin"), java.time.Instant.now())
         repo.fleet.addVehicle(agreement.id, VehicleEntryInput("AB12345"), ChangeActor("admin", "Admin"), java.time.Instant.now())
 
@@ -92,7 +92,7 @@ class FleetRoutesTest {
         val now = java.time.Instant.now()
         val actor = ChangeActor("test", "Test")
         val supplier = repo.fleet.saveSupplier(null, SupplierInput("Test", "123456789"), actor, now)
-        return repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2027-12-31", allowance), null, actor, now)
+        return repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2027-12-31", allowance, saksnr = "2024/1234"), null, actor, now)
     }
 
     @Test fun addingRequiresLiveRegistrySuccessAndPersistsSnapshotWithoutCreatingACheck() = testApplication {
@@ -149,7 +149,7 @@ class FleetRoutesTest {
     @Test fun capacityIsRecheckedAfterRemoteLookupAndFailureDoesNotSaveSnapshot() = testApplication {
         val repo = repository(); val agreement = agreement(repo, 1)
         application { module(repo, VehicleRegistryClient {
-            repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, agreement.endDate, 0),
+            repo.fleet.saveAgreement(agreement.id, AgreementInput(agreement.supplierId, agreement.startDate, agreement.endDate, 0, saksnr = "2024/1234"),
                 agreement.updatedAt, ChangeActor("test", "Concurrent administrator"), java.time.Instant.now())
             RegistryLookup.Found(RegistryVehicleData(it))
         }) }
@@ -170,7 +170,7 @@ class FleetRoutesTest {
             return Json.parseToJsonElement(response.bodyAsText()).jsonObject
         }
         val supplier = post("/api/vehicle-fleet/suppliers", """{"name":"Test supplier","orgNumber":"123456789"}""")
-        val agreement = post("/api/vehicle-fleet/agreements", """{"supplierId":${supplier["id"]},"startDate":"2026-01-01","endDate":"2027-12-31","allowedVehicles":1}""")
+        val agreement = post("/api/vehicle-fleet/agreements", """{"supplierId":${supplier["id"]},"saksnr":"2024/1234","startDate":"2026-01-01","endDate":"2027-12-31","allowedVehicles":1}""")
         val vehicle = post("/api/vehicle-fleet/agreements/${agreement["id"]!!.jsonPrimitive.content}/vehicles", """{"registrationNumber":"ab 12345"}""")
         val next = admin.post("/api/vehicle-fleet/vehicles/AB12345/replace") {
             contentType(ContentType.Application.Json)
@@ -183,6 +183,23 @@ class FleetRoutesTest {
         assertEquals(HttpStatusCode.NoContent, admin.post("/api/vehicle-fleet/history/${event.id}/undo").status)
         assertEquals("AB12345", repo.fleet.overview().vehicles.single { it.listed }.registrationNumber)
         assertEquals(HttpStatusCode.Conflict, admin.post("/api/vehicle-fleet/history/${event.id}/undo").status)
+    }
+
+    @Test fun agreementWithoutSaksnrIsRejected() = testApplication {
+        val repo = repository()
+        application { module(repo, null) }
+        val admin = adminClient()
+        val created = admin.post("/api/vehicle-fleet/suppliers") {
+            contentType(ContentType.Application.Json); setBody("""{"name":"Saksnr test","orgNumber":"123456789"}""")
+        }
+        val supplierId = Json.parseToJsonElement(created.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content
+        suspend fun create(extra: String) = admin.post("/api/vehicle-fleet/agreements") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"supplierId":"$supplierId","startDate":"2026-01-01","endDate":"2027-12-31","allowedVehicles":1$extra}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, create("").status)
+        assertEquals(HttpStatusCode.BadRequest, create(""","saksnr":"  """").status)
+        assertEquals(HttpStatusCode.Created, create(""","saksnr":"2024/1234"""").status)
     }
 
     @Test fun fleetRoutesRequireAnAdminAndIgnoreClientSuppliedActor() = testApplication {

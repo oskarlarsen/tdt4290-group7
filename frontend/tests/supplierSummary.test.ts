@@ -83,6 +83,7 @@ describe("buildSupplierPortfolioSummary", () => {
       compliant: { count: 0, percent: 0 },
       medium: { count: 0, percent: 0 },
       high: { count: 0, percent: 0 },
+      unassessed: { count: 0, percent: 0 },
     });
   });
 });

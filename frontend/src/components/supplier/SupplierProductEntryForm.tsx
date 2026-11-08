@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
+import { CsvUploadPanel } from "./CsvUploadPanel";
 import type { SupplierOverview } from "../../types/onboarding";
 import {
   createProductFormRow,
@@ -9,6 +10,7 @@ import {
   UNITS_OF_MEASURE,
   type ProductFormRow,
 } from "../../utils/productFormCsv";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 const fieldClass =
   "mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50";
@@ -18,9 +20,11 @@ type Props = {
   working: boolean;
   onPreview: (file: File) => void;
   onChange: () => void;
+  /** Which way of entering data is showing: the form, or a CSV file. */
+  mode: "form" | "csv";
 };
 
-export function SupplierProductEntryForm({ agreements, working, onPreview, onChange }: Props) {
+export function SupplierProductEntryForm({ agreements, working, onPreview, onChange, mode }: Props) {
   const [rows, setRows] = useState<ProductFormRow[]>([createProductFormRow()]);
 
   function updateRow(id: string, patch: Partial<ProductFormRow>) {
@@ -60,6 +64,15 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
 
   return (
     <div className="space-y-4">
+      {mode === "csv" && (
+        <CsvUploadPanel entity="products" disabled={working || agreements.length === 0} onPreview={onPreview} onChange={onChange} />
+      )}
+      {agreements.length === 0 && (
+        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
+      )}
+
+      {mode === "form" && (
+        <>
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
           <legend className="px-1 font-semibold text-neutral-800">Product {index + 1}</legend>
@@ -91,7 +104,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
                 <option value="">Choose an agreement</option>
                 {agreements.map((agreement) => (
                   <option key={agreement.id} value={agreement.id}>
-                    {agreement.note || agreement.id}
+                    {agreementLabel(agreement)}
                   </option>
                 ))}
               </select>
@@ -164,7 +177,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             <label className="block text-sm font-medium text-neutral-700">
               License or certification number
               {row.ecolabelStandard === "NONE" ? (
-                <span className="font-normal text-neutral-400"> (not applicable for None)</span>
+                <span className="font-normal text-neutral-500"> (not applicable for None)</span>
               ) : (
                 <span className="font-normal text-amber-600"> (required)</span>
               )}
@@ -215,7 +228,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700 sm:col-span-2">
-              Notes <span className="font-normal text-neutral-400">(optional)</span>
+              Notes <span className="font-normal text-neutral-500">(optional)</span>
               <textarea
                 value={row.notes}
                 onChange={(event) => updateRow(row.id, { notes: event.target.value })}
@@ -249,14 +262,12 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
           {working ? "Validating…" : "Review product details"}
         </button>
       </div>
-
-      {agreements.length === 0 && (
-        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
-      )}
       {!isReady && agreements.length > 0 && (
         <p className="text-xs text-neutral-500">
           Complete each product’s required details. If an ecolabel standard is chosen, the license number is required.
         </p>
+      )}
+        </>
       )}
     </div>
   );

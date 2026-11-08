@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { FieldTooltip } from "./FieldTooltip";
 
-export const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10 disabled:bg-neutral-50 read-only:bg-neutral-50";
+export const inputClass = "w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10 disabled:bg-neutral-50 read-only:bg-neutral-50";
 const buttonBase = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50";
 export const buttonClass = `${buttonBase} border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50`;
 export const primaryClass = `${buttonBase} border-transparent bg-primary-900 text-white shadow-sm hover:bg-primary-700`;
@@ -23,7 +23,7 @@ export function VehicleDialog({ title, children, onClose, busy = false, wide = f
     className={`fixed z-50 overflow-y-auto overscroll-contain border border-neutral-100 bg-white p-0 text-neutral-800 shadow-card backdrop:bg-neutral-900/30 ${wide ? "inset-0 m-auto h-[calc(100dvh_-_3rem)] max-h-[calc(100dvh_-_3rem)] w-[calc(100%_-_2rem)] max-w-5xl rounded-xl" : "inset-0 m-auto h-fit max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl rounded-xl"}`}>
     <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-neutral-100 bg-white px-4 py-4 sm:px-5">
       <h2 className="font-headline text-lg font-semibold text-neutral-900">{title}</h2>
-      <button type="button" onClick={onClose} disabled={busy} aria-label={`Close ${title}`} className="shrink-0 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"><X className="h-4 w-4" /></button>
+      <button type="button" onClick={onClose} disabled={busy} aria-label={`Close ${title}`} className="shrink-0 rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"><X className="h-4 w-4" /></button>
     </header>
     <div className="p-4 sm:p-5">{children}</div>
   </dialog>;

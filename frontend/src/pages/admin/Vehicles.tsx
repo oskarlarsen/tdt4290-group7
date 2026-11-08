@@ -33,7 +33,7 @@ export default function Vehicles() {
   return <div className="space-y-5 p-4">
     <header className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="font-headline text-2xl font-semibold tracking-tight text-neutral-900">Vehicles</h1>
-      <div className="flex gap-2"><button className={buttonClass} onClick={() => setStatistics(true)}>Add statistics</button></div>
+      <div className="flex gap-2"><button className={buttonClass} onClick={() => setStatistics(true)}>Add reported data</button></div>
     </header>
     <p className="text-sm text-neutral-500">Create organizations and invite supplier contacts from <Link to="/admin/suppliers" className="font-medium text-primary-900 underline">Suppliers</Link>.</p>
     <ActionNotice latest={data?.changes[0]} ready={!!data} />

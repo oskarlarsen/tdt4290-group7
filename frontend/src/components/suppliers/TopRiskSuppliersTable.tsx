@@ -36,7 +36,7 @@ export function TopRiskSuppliersTable({
 
   if (suppliers.length === 0) {
     return (
-      <div className="py-8 text-center text-sm text-neutral-400">
+      <div className="py-8 text-center text-sm text-neutral-500">
         No suppliers to show.
       </div>
     );
@@ -46,14 +46,14 @@ export function TopRiskSuppliersTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
-            <th className="pb-2 pr-3 font-medium">Supplier &amp; org ID</th>
-            <th className="pb-2 pr-3 font-medium">Primary contract</th>
-            <th className="pb-2 pr-3 font-medium">Risk</th>
-            <th className="pb-2 pr-3 font-medium">Main issue</th>
-            {showOnboardingStatus && <th className="pb-2 pr-3 font-medium">Onboarding</th>}
-            {getReviewStatus && <th className="pb-2 pr-3 font-medium">Review status</th>}
-            <th className="pb-2 font-medium">Action</th>
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
+            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org ID</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Primary contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Risk</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Main issue</th>
+            {showOnboardingStatus && <th scope="col" className="pb-2 pr-3 font-medium">Onboarding</th>}
+            {getReviewStatus && <th scope="col" className="pb-2 pr-3 font-medium">Review status</th>}
+            <th scope="col" className="pb-2 font-medium">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -66,7 +66,7 @@ export function TopRiskSuppliersTable({
                 >
                   {s.displayName}
                 </button>
-                <div className="font-mono text-xs text-neutral-400">{s.orgId}</div>
+                <div className="font-mono text-xs text-neutral-500">{s.orgId}</div>
               </td>
               <td className="py-3 pr-3 text-neutral-700">{s.primaryContract}</td>
               <td className="py-3 pr-3">

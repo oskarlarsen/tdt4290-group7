@@ -172,6 +172,7 @@ data class ContractProductRecord(
 data class SupplierAgreementSummary(
     val id: String,
     val note: String,
+    val saksnr: String? = null,
     val startDate: String,
     val endDate: String,
     val allowedVehicles: Int,
@@ -190,6 +191,8 @@ data class SupplierVehicleSummary(
     val listed: Boolean,
     val fuelTechnology: String? = null,
     val isHybrid: Boolean? = null,
+    /** Registry vehicle category such as N2, from the upload lookup or the latest registry snapshot. */
+    val vehicleCategory: String? = null,
     val fullContractCoverage: Boolean? = null,
     val startYearWeek: String? = null,
     val endYearWeek: String? = null,

@@ -37,7 +37,7 @@ export function NotConnectedDialog({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+            className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
           </button>

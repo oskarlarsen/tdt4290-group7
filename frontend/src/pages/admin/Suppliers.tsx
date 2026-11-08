@@ -7,6 +7,8 @@ import { useSupplierReviewStatus, type FollowUpStatus } from "../../hooks/useSup
 import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
 import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
+import { SupplierDetailsDialog } from "../../components/suppliers/SupplierDetailsDialog";
+import { useAlerts } from "../../hooks/useAlerts";
 import { SupplierReportingDataDialog } from "../../components/suppliers/SupplierReportingDataDialog";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
 import { AgreementForm, InviteSupplierForm, RemoveSupplierAction, SupplierForm } from "../../components/vehicles/FleetForms";
@@ -29,12 +31,32 @@ export default function Suppliers() {
   const fleet = useFleet();
   const refreshFleet = useRefreshVehicles();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  // The large Details window replaces the side panel while it is open.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { data: allAlerts = [] } = useAlerts();
   const [searchParams, setSearchParams] = useSearchParams();
   const [organizationForm, setOrganizationForm] = useState<FleetSupplier | "new" | null>(null);
   const [agreementSupplier, setAgreementSupplier] = useState<FleetSupplier | null>(null);
   const [invitationSupplier, setInvitationSupplier] = useState<FleetSupplier | null>(null);
   const [reportingSupplier, setReportingSupplier] = useState<FleetSupplier | null>(null);
-  const [riskFilter, setRiskFilter] = useState<"all" | TopRiskSupplier["risk"]>("all");
+  // The risk filter lives in the URL so dashboard links such as ?risk=high can set it.
+  const riskParam = searchParams.get("risk");
+  const riskFilter: "all" | TopRiskSupplier["risk"] =
+    riskParam === "high" || riskParam === "medium" || riskParam === "compliant" || riskParam === "unassessed" ? riskParam : "all";
+  function setRiskFilter(next: "all" | TopRiskSupplier["risk"]) {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("risk");
+    else params.set("risk", next);
+    setSearchParams(params, { replace: true });
+  }
+  const issueParam = searchParams.get("issue");
+  const issueFilter: "all" | "vehicle" | "certificate" = issueParam === "vehicle" || issueParam === "certificate" ? issueParam : "all";
+  function setIssueFilter(next: "all" | "vehicle" | "certificate") {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("issue");
+    else params.set("issue", next);
+    setSearchParams(params, { replace: true });
+  }
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | FollowUpStatus>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -43,16 +65,23 @@ export default function Suppliers() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, riskFilter, reviewStatusFilter]);
+  }, [search, riskFilter, issueFilter, reviewStatusFilter]);
 
   /** Open the existing supplier drawer when reached from other pages */
+  const orgParam = searchParams.get("org") ?? searchParams.get("supplierId");
+  const highlightedOrg = fleet.data?.suppliers.find((organization) => organization.id === orgParam)?.id ?? null;
   useEffect(() => {
     const id = searchParams.get("supplierId");
-    if (id) setSelectedSupplierId(id);
-  }, [searchParams]);
+    // A real organization has no drawer: it is highlighted in the list below instead.
+    if (id && !fleet.isLoading && !fleet.data?.suppliers.some((organization) => organization.id === id)) setSelectedSupplierId(id);
+  }, [searchParams, fleet.isLoading, fleet.data]);
+  useEffect(() => {
+    if (highlightedOrg) document.getElementById(`org-${highlightedOrg}`)?.scrollIntoView({ block: "center" });
+  }, [highlightedOrg]);
 
   function handleCloseDrawer() {
     setSelectedSupplierId(null);
+    setDetailsOpen(false);
     if (searchParams.get("supplierId")) {
       const next = new URLSearchParams(searchParams);
       next.delete("supplierId");
@@ -93,6 +122,9 @@ export default function Suppliers() {
   const query = search.trim().toLowerCase();
   const filteredSuppliers = sortedSuppliers.filter((supplier) => {
     const matchesRisk = riskFilter === "all" || supplier.risk === riskFilter;
+    const categories = supplier.issueCategories ?? (supplier.issueCategory ? [supplier.issueCategory] : []);
+    const matchesIssue =
+      issueFilter === "all" || categories.includes(issueFilter === "vehicle" ? "VEHICLE_DEVIATION" : "CERTIFICATE_EXPIRY");
     const matchesReviewStatus =
       reviewStatusFilter === "all" || getStatus(supplier.id) === reviewStatusFilter;
     const matchesSearch =
@@ -101,7 +133,7 @@ export default function Suppliers() {
       supplier.orgId.toLowerCase().includes(query) ||
       supplier.primaryContract.toLowerCase().includes(query) ||
       supplier.mainIssue.toLowerCase().includes(query);
-    return matchesRisk && matchesReviewStatus && matchesSearch;
+    return matchesRisk && matchesIssue && matchesReviewStatus && matchesSearch;
   });
   const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / SUPPLIERS_PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -130,7 +162,7 @@ export default function Suppliers() {
         </p>
       )}
       {isLoading && (
-        <div role="status" className="flex h-12 items-center gap-2 text-sm text-neutral-400">
+        <div role="status" className="flex h-12 items-center gap-2 text-sm text-neutral-500">
           <Loader2 className="h-5 w-5 animate-spin" /> Loading supplier risk dashboard…
         </div>
       )}
@@ -164,9 +196,6 @@ export default function Suppliers() {
               Create a supplier, configure its agreement and required reporting categories, then invite its contact to submit only the requested information.
             </p>
           </div>
-          <button type="button" className={primaryClass} onClick={() => setOrganizationForm("new")}>
-            Add supplier
-          </button>
         </div>
 
         {fleet.isLoading && <p role="status" className="text-sm text-neutral-500">Loading supplier organizations…</p>}
@@ -179,7 +208,7 @@ export default function Suppliers() {
         {fleet.data && fleet.data.suppliers.length > 0 && (
           <ul className="space-y-3">
             {fleet.data.suppliers.map((supplier) => (
-              <li key={supplier.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-100 p-3">
+              <li key={supplier.id} id={`org-${supplier.id}`} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${supplier.id === highlightedOrg ? "border-primary-700 ring-2 ring-primary-700/20" : "border-neutral-100"}`}>
                 <div>
                   <p className="font-medium text-neutral-900">{supplier.name}</p>
                   <p className="font-mono text-xs text-neutral-500">{supplier.orgNumber}</p>
@@ -205,13 +234,13 @@ export default function Suppliers() {
       {data && <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search suppliers…"
               aria-label="Search suppliers"
-              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
 
@@ -229,6 +258,19 @@ export default function Suppliers() {
                 <option value="medium">Medium</option>
                 <option value="compliant">Compliant</option>
                 <option value="unassessed">Unassessed</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-neutral-600">
+              <span className="font-medium text-neutral-700">Issue:</span>
+              <select
+                value={issueFilter}
+                onChange={(event) => setIssueFilter(event.target.value as "all" | "vehicle" | "certificate")}
+                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+                aria-label="Filter suppliers by issue category"
+              >
+                <option value="all">All</option>
+                <option value="vehicle">Vehicle deviations</option>
+                <option value="certificate">Certificate issues</option>
               </select>
             </label>
 
@@ -254,7 +296,7 @@ export default function Suppliers() {
         ) : (
           <TopRiskSuppliersTable
             suppliers={paginatedSuppliers}
-            actionLabel="View Details"
+            actionLabel="View details"
             onSelect={(supplier) => setSelectedSupplierId(supplier.id)}
             getReviewStatus={getStatus}
             showOnboardingStatus
@@ -276,7 +318,7 @@ export default function Suppliers() {
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-            <span className="font-mono text-xs text-neutral-400">
+            <span className="font-mono text-xs text-neutral-500">
               Page {currentPage} of {totalPages}
             </span>
             <button
@@ -293,12 +335,22 @@ export default function Suppliers() {
       </section>}
 
       <SupplierDetailsDrawer
-        supplier={selectedSupplier}
-        alerts={data?.recentAlerts ?? []}
+        supplier={detailsOpen ? null : selectedSupplier}
+        alerts={allAlerts}
         reviewStatus={selectedSupplier ? getStatus(selectedSupplier.id) : "to-review"}
         onChangeReviewStatus={(status) => selectedSupplier && setStatus(selectedSupplier.id, status)}
+        trackingSince={data?.activityTrackingSince}
+        onOpenDetails={() => setDetailsOpen(true)}
         onClose={handleCloseDrawer}
       />
+      {detailsOpen && selectedSupplier && (
+        <SupplierDetailsDialog
+          supplier={selectedSupplier}
+          trackingSince={data?.activityTrackingSince}
+          alerts={allAlerts.filter((alert) => alert.supplierId === selectedSupplier.id && alert.status !== "RESOLVED")}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
       {organizationForm && (
         <SupplierForm
           supplier={organizationForm === "new" ? undefined : organizationForm}
@@ -314,7 +366,7 @@ export default function Suppliers() {
         />
       )}
       {invitationSupplier && (
-        <InviteSupplierForm supplier={invitationSupplier} onClose={() => setInvitationSupplier(null)} />
+        <InviteSupplierForm supplier={invitationSupplier} onInvited={() => setSuccessMessage(`Invitation created for ${invitationSupplier.name}.`)} onClose={() => setInvitationSupplier(null)} />
       )}
       {reportingSupplier && (
         <SupplierReportingDataDialog supplier={reportingSupplier} onClose={() => setReportingSupplier(null)} />

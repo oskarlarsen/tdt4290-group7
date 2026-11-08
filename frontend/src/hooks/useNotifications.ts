@@ -10,7 +10,7 @@ export function useNotifications() {
   const { user } = useAuth();
   return useQuery({
     queryKey: queryKeyFor(user?.id),
-    queryFn: () => notificationsApi.getNotifications(user!.id),
+    queryFn: () => notificationsApi.getNotifications(),
     enabled: !!user,
     staleTime: 30_000,
   });
@@ -20,7 +20,7 @@ export function useMarkNotificationAsRead() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => notificationsApi.markNotificationAsRead(user!.id, id),
+    mutationFn: (id: string) => notificationsApi.markNotificationAsRead(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeyFor(user?.id) }),
   });
 }
@@ -29,7 +29,7 @@ export function useMarkAllNotificationsAsRead() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => notificationsApi.markAllNotificationsAsRead(user!.id),
+    mutationFn: () => notificationsApi.markAllNotificationsAsRead(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeyFor(user?.id) }),
   });
 }

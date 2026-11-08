@@ -1,19 +1,29 @@
 import { useEffect } from "react";
-import { X, ArrowUpRight, FileText, ExternalLink } from "lucide-react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
+import { X, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { RiskBadge } from "../ui/RiskBadge";
-import { getEnvironmentalComplianceLabel } from "../../types/contract";
-import type { DerivedContract } from "../../types/contract";
+import type { FleetAgreement, FleetSupplier } from "../../types/vehicle";
+import { agreementLabel } from "../../utils/agreementLabel";
+import { agreementStatusText, getAgreementStatus } from "../../utils/agreementStatus";
+import { formatDate } from "../../utils/formatDate";
 
 type Props = {
-  contract: DerivedContract | null;
+  agreement: FleetAgreement | null;
+  supplier: FleetSupplier | null;
   onClose: () => void;
 };
 
-// Keep the drawer limited to real supplier-linked data; contract-specific details are not available yet.
-export function ContractDetailsDrawer({ contract, onClose }: Props) {
+const STATUS_CLASSES = {
+  Expired: "bg-red-100 text-red-700",
+  "Expiring soon": "bg-amber-100 text-amber-800",
+  Upcoming: "bg-blue-100 text-blue-700",
+  Active: "bg-tertiary-100 text-tertiary-700",
+} as const;
+
+export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
   const navigate = useNavigate();
-  const isOpen = contract !== null;
+  const isOpen = agreement !== null && supplier !== null;
+  const drawerRef = useDrawerFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -28,125 +38,68 @@ export function ContractDetailsDrawer({ contract, onClose }: Props) {
     };
   }, [isOpen, onClose]);
 
+  const requested = agreement
+    ? [agreement.requiresVehicles && "Vehicles", agreement.requiresEnergy && "Energy", agreement.requiresProducts && "Products"].filter(Boolean).join(", ")
+    : "";
+  const status = agreement ? getAgreementStatus(agreement) : null;
+
   return (
     <>
       <div
         onClick={onClose}
         aria-hidden={!isOpen}
-        className={`fixed inset-0 z-40 bg-neutral-900/30 transition-opacity ${
-          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        className={`fixed inset-0 z-40 bg-neutral-900/30 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
 
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
-        aria-label={contract ? `${contract.contractName} details` : undefined}
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        aria-label={agreement ? `${agreementLabel(agreement)} details` : undefined}
+        aria-hidden={!isOpen}
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${isOpen ? "translate-x-0" : "translate-x-full"}`}
       >
-        {contract && (
+        {agreement && supplier && status && (
           <>
             <div className="flex items-start justify-between border-b border-neutral-100 p-4">
               <div>
-                <h2 className="font-headline text-lg font-semibold text-neutral-900">
-                  {contract.contractName}
-                </h2>
-                <div className="mt-1.5">
-                  <RiskBadge level={contract.risk} />
-                </div>
+                <h2 className="font-headline text-lg font-semibold text-neutral-900">{agreementLabel(agreement)}</h2>
+                <span className={`mt-1.5 inline-block rounded px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[status]}`}>
+                  {agreementStatusText(agreement)}
+                </span>
               </div>
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Contract">
-                <Field label="Contract name" value={contract.contractName} />
-                <Field label="Status" value={contract.status} />
-                <Field
-                  label="Start date"
-                  value={new Date(contract.startDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                />
-                <Field
-                  label="End date"
-                  value={new Date(contract.endDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                />
+              <Section title="Agreement">
+                <Field label="Saksnr" value={agreement.saksnr?.trim() || "Saksnr missing"} />
+                {agreement.note.trim() && <Field label="Note" value={agreement.note.trim()} />}
+                <Field label="Status" value={status} />
+                <Field label="Start date" value={formatDate(agreement.startDate)} />
+                <Field label="End date" value={formatDate(agreement.endDate)} />
+                <Field label="Maximum vehicles" value={String(agreement.allowedVehicles)} />
+                <Field label="Information from supplier" value={requested || "None"} />
               </Section>
 
               <Section title="Linked supplier">
-                <Field label="Supplier" value={contract.supplierName} />
-                <Field label="Org ID" value={contract.supplierOrgId} />
+                <Field label="Supplier" value={supplier.name} />
+                <Field label="Org ID" value={supplier.orgNumber} />
                 <button
-                  onClick={() => navigate(`/admin/suppliers?supplierId=${contract.supplierId}`)}
+                  onClick={() => navigate(`/admin/suppliers?supplierId=${supplier.id}`)}
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-secondary-700 hover:text-secondary-800"
                 >
                   View linked supplier
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </button>
-              </Section>
-
-              <Section title="Risk & main issue">
-                <p className="text-xs text-neutral-400">
-                  This is the linked supplier's risk, not an independently assessed contract
-                  risk — see note below.
-                </p>
-                <p className="mt-1.5 text-sm text-neutral-700">
-                  {contract.mainIssue || "No open issues on record."}
-                </p>
-              </Section>
-
-              <Section title="Environmental compliance">
-                <p className="text-sm text-neutral-700">
-                  {getEnvironmentalComplianceLabel(contract.risk)}
-                </p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Based on the linked supplier's current risk level, not a separate contract-level
-                  assessment.
-                </p>
-              </Section>
-
-              <Section title="Contract document">
-                {contract.documentUrl ? (
-                  <a
-                    href={contract.documentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-                  >
-                    <FileText className="h-4 w-4 text-neutral-400" />
-                    View PDF
-                    <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
-                  </a>
-                ) : (
-                  <p className="text-sm text-neutral-400">No contract document available</p>
-                )}
-                <p className="mt-1.5 text-xs text-neutral-400">
-                  Mock demo document — not a real contract file.
-                </p>
-              </Section>
-
-              <Section title="Contract-specific details">
-                <p className="text-sm text-neutral-400">
-                  Start/end dates, contract value, environmental requirements, documents, and an
-                  independent contract status aren't part of the current data model — this
-                  contract record is currently derived entirely from its linked supplier. These
-                  will populate once the backend models contracts as their own entity.
-                </p>
               </Section>
             </div>
           </>
@@ -159,7 +112,7 @@ export function ContractDetailsDrawer({ contract, onClose }: Props) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -167,9 +120,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
-      <span className="font-medium text-neutral-900">{value}</span>
+    <div className="flex items-start justify-between gap-4 py-1 text-sm">
+      <span className="text-neutral-500">{label}</span>
+      <span className="text-right font-medium text-neutral-900">{value}</span>
     </div>
   );
 }

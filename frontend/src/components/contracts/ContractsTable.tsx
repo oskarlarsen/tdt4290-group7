@@ -28,21 +28,21 @@ export function ContractsTable({
   const navigate = useNavigate();
 
   if (contracts.length === 0) {
-    return <div className="py-8 text-center text-sm text-neutral-400">No contracts to show.</div>;
+    return <div className="py-8 text-center text-sm text-neutral-500">No contracts to show.</div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
-            <th className="pb-2 pr-3 font-medium">Contract</th>
-            <th className="pb-2 pr-3 font-medium">Linked supplier</th>
-            <th className="pb-2 pr-3 font-medium">Contract status</th>
-            <th className="pb-2 pr-3 font-medium">Start date</th>
-            <th className="pb-2 pr-3 font-medium">End date</th>
-            <th className="pb-2 pr-3 font-medium">Environmental compliance</th>
-            <th className="pb-2 font-medium">Actions</th>
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Linked supplier</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract status</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Start date</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">End date</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Environmental compliance</th>
+            <th scope="col" className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -57,7 +57,7 @@ export function ContractsTable({
                 >
                   {c.supplierName}
                 </button>
-                <div className="font-mono text-xs text-neutral-400">{c.supplierOrgId}</div>
+                <div className="font-mono text-xs text-neutral-500">{c.supplierOrgId}</div>
               </td>
 
               <td className="py-3 pr-3">
@@ -82,7 +82,7 @@ export function ContractsTable({
                   onClick={() => onViewDetails(c)}
                   className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                 >
-                  View Details
+                  View details
                 </button>
               </td>
             </tr>

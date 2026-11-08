@@ -6,22 +6,31 @@ import type { CertificateContract } from "../../types/certificate";
 
 export function CertificateUploadDialog({
   contracts,
+  initialContractId,
+  onUploaded,
   onClose,
 }: {
   contracts: CertificateContract[];
+  /** Opens with this agreement already chosen, for a renewal. */
+  initialContractId?: string;
+  onUploaded?: () => void;
   onClose: () => void;
 }) {
-  const [contractId, setContractId] = useState("");
+  // The admin types to search supplier name, org number or saksnr; the text must match one agreement exactly.
+  const optionLabel = (contract: CertificateContract) =>
+    `${contract.supplierName} (${contract.supplierOrgId}) — ${contract.contractName}`;
+  const initial = contracts.find((contract) => contract.id === initialContractId);
+  const [typed, setTyped] = useState(initial ? optionLabel(initial) : "");
   const [file, setFile] = useState<File | null>(null);
   const upload = useUploadCertificate();
-  const selectedContract = contracts.find((contract) => contract.id === contractId);
+  const selectedContract = contracts.find((contract) => optionLabel(contract) === typed.trim());
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file || !selectedContract) return;
     upload.mutate(
       { file, supplierName: selectedContract.supplierName, contractId: selectedContract.id },
-      { onSuccess: onClose },
+      { onSuccess: () => { onUploaded?.(); onClose(); } },
     );
   }
 
@@ -51,7 +60,7 @@ export function CertificateUploadDialog({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+            className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
           </button>
@@ -59,19 +68,23 @@ export function CertificateUploadDialog({
 
         <label className="mt-5 block text-sm font-medium text-neutral-700">
           Supplier and contract
-          <select
+          <input
             required
-            value={contractId}
-            onChange={(event) => setContractId(event.target.value)}
+            list="certificate-agreements"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="Type a supplier, org number or saksnr"
+            autoComplete="off"
             className="mt-1.5 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-          >
-            <option value="">Select a supplier</option>
+          />
+          <datalist id="certificate-agreements">
             {contracts.map((contract) => (
-              <option key={contract.id} value={contract.id}>
-                {contract.supplierName} — {contract.contractName}
-              </option>
+              <option key={contract.id} value={optionLabel(contract)} />
             ))}
-          </select>
+          </datalist>
+          {typed.trim() && !selectedContract && (
+            <span className="mt-1 block text-xs font-normal text-neutral-500">Pick one of the suggestions to continue.</span>
+          )}
         </label>
 
         <label className="mt-4 block text-sm font-medium text-neutral-700">
@@ -87,7 +100,7 @@ export function CertificateUploadDialog({
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </span>
-          <span className="mt-1 block text-xs text-neutral-400">PDF only, up to 8 MB and 25 pages.</span>
+          <span className="mt-1 block text-xs text-neutral-500">PDF only, up to 8 MB and 25 pages.</span>
         </label>
 
         {upload.isError && (

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { ArrowUpRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -34,6 +35,7 @@ export function RiskDetailsDrawer({
 }) {
   const navigate = useNavigate();
   const isOpen = row !== null;
+  const drawerRef = useDrawerFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -61,6 +63,9 @@ export function RiskDetailsDrawer({
         }`}
       />
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={contract ? `${contract.supplierName} risk details` : undefined}
@@ -83,7 +88,7 @@ export function RiskDetailsDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -92,7 +97,7 @@ export function RiskDetailsDrawer({
             <div className="flex-1 space-y-5 p-4">
               <Section title={`Risk indicators (${row.indicators.length})`}>
                 {row.indicators.length === 0 ? (
-                  <p className="text-sm text-neutral-400">
+                  <p className="text-sm text-neutral-500">
                     No risk indicators on record for this contract.
                   </p>
                 ) : (
@@ -109,7 +114,7 @@ export function RiskDetailsDrawer({
               </Section>
 
               <Section title="Not calculated yet">
-                <p className="text-sm text-neutral-400">
+                <p className="text-sm text-neutral-500">
                   Trend-based predictions (energy consumption and fuel-distribution trends) need
                   several periods of historical statistics. Only one period of demo data exists, so
                   none are calculated. No probabilities or scores are shown for the same reason.
@@ -121,7 +126,7 @@ export function RiskDetailsDrawer({
                 <Field label="Supplier" value={contract.supplierName} />
                 <Field label="Org ID" value={contract.supplierOrgId} />
                 <Field label="Supplier risk badge (mock)" value={SUPPLIER_RISK_LABELS[contract.risk]} />
-                <p className="mt-1 text-xs text-neutral-400">
+                <p className="mt-1 text-xs text-neutral-500">
                   The supplier risk badge shown on other pages is a separate mock value. It is not
                   derived from the indicators above, so the two can differ.
                 </p>
@@ -162,10 +167,10 @@ function IndicatorCard({
     <div className="rounded-lg bg-neutral-50 p-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
-          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
+          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
           <div>
             <div className="text-sm font-medium text-neutral-900">{indicator.title}</div>
-            <div className="text-[11px] font-mono uppercase tracking-wide text-neutral-400">
+            <div className="text-[11px] font-mono uppercase tracking-wide text-neutral-500">
               {RISK_INDICATOR_KIND_LABELS[indicator.kind]}
             </div>
           </div>
@@ -193,7 +198,7 @@ function IndicatorCard({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -202,7 +207,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-500">{label}</span>
       <span className="text-right font-medium text-neutral-900">{value}</span>
     </div>
   );

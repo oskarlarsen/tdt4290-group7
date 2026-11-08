@@ -279,6 +279,17 @@ agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contr
 YOUR_ACTIVE_AGREEMENT_ID,GA11958,FALSE,SVV_FUEL_CODE,FALSE,TRUE,,,,
 YOUR_ACTIVE_AGREEMENT_ID,,TRUE,SVV_FUEL_CODE,FALSE,FALSE,2026-W30,2027-W52,,Planned vehicle
 ```
+**Fuel and hybrid status are filled in for you.** For a registered vehicle, `fuel_technology` and `is_hybrid` can be left blank (the template leaves `is_hybrid` out; files that include either column still work). At preview, the backend asks Statens vegvesen for the vehicle and fills both in, and the preview table shows which rows were filled in and which the supplier entered. A fuel the supplier enters is kept and not looked up. A row can end up with an error instead:
+
+| Situation | Result |
+|---|---|
+| Plate not found in Statens vegvesen | The row is blocked: "<plate> was not found in Statens vegvesen." |
+| Registry unavailable, over quota or lists no usable fuel | The row is blocked: "could not be checked. Fill in fuel_technology yourself, or try again later." |
+| Planned vehicle (no plate) | `fuel_technology` is required: there is nothing to look up. |
+| More than 50 vehicles needing a lookup in one preview | The rest are marked "could not be checked". A file that already has errors is not looked up at all. |
+
+A vehicle with both a combustion fuel and electricity (a plug-in hybrid) is stored as hybrid with the combustion fuel. When the registry knows the vehicle category, the category is stored so lists can show a weight range ("3,500 to 12,000 kg"); no other registry fields are kept.
+
 The values above are placeholders to illustrate the format only; replace them with the supplier's real data. `fuel_technology` must use the Statens vegvesen catalog code. Use `TRUE`/`FALSE` for flags; partial contract coverage requires both weeks in `YYYY-Www` format. The supplier dashboard includes a field guide for vehicle, energy, and product CSVs. Fuel technology, hybrid status, contract coverage, coverage weeks, attachment reference, and notes are retained with each imported vehicle and returned by `GET /api/supplier/vehicles`.
 
 Upload for dry-run verification:

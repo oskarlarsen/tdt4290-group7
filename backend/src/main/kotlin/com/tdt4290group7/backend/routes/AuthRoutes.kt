@@ -47,7 +47,7 @@ data class ForgotPasswordRequest(val email: String)
 data class ResetPasswordRequest(val token: String, val newPassword: String)
 
 @Serializable
-data class AcceptSupplierInvitationRequest(val token: String, val newPassword: String)
+data class AcceptSupplierInvitationRequest(val token: String, val newPassword: String, val name: String? = null)
 
 @Serializable
 data class ErrorResponse(val message: String)
@@ -106,6 +106,7 @@ fun Application.configureAuthRoutes(
                         return@post
                     }
                     LoginAttemptTracker.recordSuccess(email)
+                    UserRepository.recordActivity(user.id)
 
                     val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
                     // Without "remember me" the cookie lasts until the browser closes (the JWT
@@ -172,11 +173,17 @@ fun Application.configureAuthRoutes(
                         call.respond(HttpStatusCode.BadRequest, ErrorResponse(reason))
                         return@post
                     }
-                    val user = UserRepository.acceptSupplierInvitation(
-                        request.token.trim(),
-                        request.newPassword,
-                        supplierIsActive = supplierIsActive
-                    )
+                    val user = try {
+                        UserRepository.acceptSupplierInvitation(
+                            request.token.trim(),
+                            request.newPassword,
+                            supplierIsActive = supplierIsActive,
+                            name = request.name
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                        return@post
+                    }
                     if (user == null) {
                         call.respond(
                             HttpStatusCode.BadRequest,
@@ -200,6 +207,7 @@ fun Application.configureAuthRoutes(
                         return@get
                     }
 
+                    UserRepository.recordActivity(user.id)
                     call.respond(user.toAuthUser())
                 }
             }

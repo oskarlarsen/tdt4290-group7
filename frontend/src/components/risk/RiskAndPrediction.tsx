@@ -73,7 +73,7 @@ export default function RiskAndPrediction() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center text-neutral-400">
+      <div className="flex h-64 items-center justify-center text-neutral-500">
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
@@ -131,7 +131,7 @@ export default function RiskAndPrediction() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
               <Play className="h-3.5 w-3.5" />
-              Run Prediction Check
+              Run prediction check
             </button>
           </div>
         </div>
@@ -184,12 +184,12 @@ export default function RiskAndPrediction() {
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search supplier, contract, or risk driver…"
-              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
           <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">

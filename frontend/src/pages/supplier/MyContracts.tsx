@@ -2,11 +2,12 @@ import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
 import { Loader2, FileText } from "lucide-react";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { formatDate } from "../../utils/formatDate";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 export default function MyContracts() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
 
-  if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-400"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (isLoading) return <div className="flex h-64 items-center justify-center text-neutral-500"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (isError || !data) return <div className="p-8 text-center text-sm text-red-700">{error instanceof Error ? error.message : "Error loading data"}</div>;
 
   const { agreements } = data;
@@ -37,7 +38,7 @@ export default function MyContracts() {
                  <FileText className="h-5 w-5" />
                </div>
                <div>
-                  <h2 className="font-headline text-lg font-semibold text-neutral-900">{agreement.note || "Supplier agreement"}</h2>
+                  <h2 className="font-headline text-lg font-semibold text-neutral-900">{agreementLabel(agreement)}</h2>
                   <p className="text-sm text-neutral-500">Agreement ID: {agreement.id}</p>
                 </div>
               </div>

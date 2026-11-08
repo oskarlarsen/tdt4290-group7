@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil } from "lucide-react";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -15,30 +15,35 @@ export function CertificateTable({
   rows,
   onSelect,
   onEdit,
-  onDelete,
+  onArchive,
+  onRestore,
+  onRenew,
   emptyMessage = "No certificates to show.",
 }: {
   rows: CertificateRow[];
   onSelect: (row: CertificateRow) => void;
   onEdit: (certificate: Certificate) => void;
-  onDelete: (certificate: Certificate) => void;
+  onArchive: (certificate: Certificate) => void;
+  onRestore: (certificate: Certificate) => void;
+  /** Opens an upload for the certificate's agreement; shown for live certificates that are expiring or expired. */
+  onRenew?: (certificate: Certificate) => void;
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
-    return <div className="py-8 text-center text-sm text-neutral-400">{emptyMessage}</div>;
+    return <div className="py-8 text-center text-sm text-neutral-500">{emptyMessage}</div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-400">
-            <th className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
-            <th className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
-            <th className="pb-2 pr-3 font-medium">Contract</th>
-            <th className="pb-2 pr-3 font-medium">Valid until</th>
-            <th className="pb-2 pr-3 font-medium">Status</th>
-            <th className="pb-2 font-medium">Actions</th>
+          <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
+            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Valid until</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Status</th>
+            <th scope="col" className="pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -54,18 +59,18 @@ export function CertificateTable({
                         {contract?.supplierName ?? certificate.supplierName}
                       </div>
                       {contract?.supplierOrgId && (
-                        <div className="font-mono text-xs text-neutral-400">{contract.supplierOrgId}</div>
+                        <div className="font-mono text-xs text-neutral-500">{contract.supplierOrgId}</div>
                       )}
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-400">Contract not found</span>
+                    <span className="text-xs text-neutral-500">Contract not found</span>
                   )}
                 </td>
                 <td className="py-3 pr-3">
                   <div className="font-medium text-neutral-900">
                     {CERTIFICATE_STANDARD_LABELS[certificate.standard]}
                   </div>
-                  <div className="font-mono text-xs text-neutral-400">
+                  <div className="font-mono text-xs text-neutral-500">
                     {certificate.certificateNumber ?? "Not extracted"}
                   </div>
                 </td>
@@ -86,8 +91,18 @@ export function CertificateTable({
                       onClick={() => onSelect(row)}
                       className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                     >
-                      View Details
+                      View details
                     </button>
+                    {onRenew && certificate.contractId && !certificate.archivedAt && info.group !== "valid" && (
+                      <button
+                        type="button"
+                        onClick={() => onRenew(certificate)}
+                        aria-label={`Renew ${certificate.supplierName ?? "certificate"}`}
+                        className="rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                      >
+                        Renew
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onEdit(certificate)}
@@ -96,14 +111,25 @@ export function CertificateTable({
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(certificate)}
-                      aria-label={`Delete ${certificate.supplierName ?? "certificate"}`}
-                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {certificate.archivedAt ? (
+                      <button
+                        type="button"
+                        onClick={() => onRestore(certificate)}
+                        aria-label={`Restore ${certificate.supplierName ?? "certificate"}`}
+                        className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                      >
+                        <ArchiveRestore className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onArchive(certificate)}
+                        aria-label={`Archive ${certificate.supplierName ?? "certificate"}`}
+                        className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

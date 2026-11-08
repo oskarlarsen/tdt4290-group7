@@ -1,3 +1,3 @@
-import { getAlerts, createManualAlert, deleteAlert } from "./dashboard";
+import { getAlerts, createManualAlert, archiveAlert, restoreAlert } from "./dashboard";
 
-export { getAlerts, createManualAlert, deleteAlert };
+export { getAlerts, createManualAlert, archiveAlert, restoreAlert };

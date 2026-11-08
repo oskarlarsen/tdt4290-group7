@@ -46,6 +46,63 @@ Certificate routes require an administrator session.
 
 The original PDF is discarded. The dashboard upload form sends the selected supplier/contract ID so certificate indicators can appear in Risk & Breach Prediction. Contract data is currently demo data; the API does not verify the ID against a backend contract record, and certificates are not linked to external certification registries.
 
+### Shared access: colleagues and stand-ins
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/supplier/colleagues/invitations` | A supplier invites a colleague into its own organization (the organization comes from the login). Body: `email`, optional `accessEndDate` (`YYYY-MM-DD`). Returns the invitation `token` to pass on by hand. |
+| `POST` | `/api/admin/team/invitations` | An admin invites another admin, same body. |
+| `GET` | `/api/access` | Everyone with access: all accounts for an admin, the caller's own organization for a supplier. |
+| `POST` | `/api/access/{id}/renew` | Body `accessEndDate`. Only the person who gave the access, or an admin; only when 14 days or fewer are left (or it has ended); never your own. |
+| `POST` | `/api/access/{id}/revoke` | End access now. The granter or an admin; never your own, and never the seeded administrator. |
+| `POST` | `/api/admin/access/{id}/approve` | An admin approves a grant so it keeps working if the person who gave it later loses access. |
+
+`POST /api/auth/accept-invitation` takes an extra `name` (required for these invitations) so accounts can be told apart.
+
+Rules: an end date is at most 90 days away and cannot be later than the inviter's own access; with no end date, access ends with the inviter's (or has no end if theirs has none). Access ends at midnight Oslo time after the end date. Access is checked at login and on every request, so removing or expiring it takes effect at once. An unapproved grant also ends when the person who gave it loses access; an approved one keeps working until its own end date. A pending invitation from one organization cannot be cancelled or replaced by another.
+
+### Supplier alert feed and notifications
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/supplier/alerts` | A supplier's own alerts that are marked visible, newest first. Optional `?category=VEHICLE_COMPLIANCE` (or another alert category). |
+| `GET` | `/api/notifications` | The signed-in user's notifications, newest first (any role). |
+| `POST` | `/api/notifications/{id}/read` | Mark one of your notifications read. `404` for someone else's. |
+| `POST` | `/api/notifications/read-all` | Mark all of your notifications read. |
+
+A supplier sees `id`, `title`, `description`, `severity`, `category`, `dueDate`, `createdAt` and a `status` of only `OPEN` or `RESOLVED`. The admin's reason, affected item, in-progress and under-review steps and notes are never included, so alert titles and descriptions should be written for the supplier. Archived alerts are not shown.
+
+Alerts created before suppliers could see alerts are hidden from them (`visible_to_supplier` is 0). New manual alerts, and every automatic alert, are visible. Creating a manual alert for a supplier, or the system raising a new automatic alert (including a certificate reaching its next warning level), notifies every account at that supplier once; refreshing again does not repeat it.
+
+### Editing alerts
+
+`PATCH /api/admin/alerts/{id}` takes any of `status`, `title`, `description`, `severity` and `dueDate` (at least one). `title`, `description`, `severity` and `dueDate` can only be changed on manual alerts: an automatic alert is rebuilt from evidence on every refresh, so editing it returns `409`. For `dueDate`, leave it out to keep it, send `""` to clear it, or send `YYYY-MM-DD`. A body with only `status` works on every alert.
+
+### Archiving alerts and certificates
+
+Alerts and certificates are archived, not deleted. An archived item is hidden from lists and counts, raises no alerts, and can be restored.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/admin/alerts/{id}/archive` | Archive an alert. `404` if it is missing or already archived. |
+| `POST` | `/api/admin/alerts/{id}/restore` | Restore an archived alert. Alerts deleted before archiving existed cannot be restored. |
+| `GET` | `/api/admin/alerts?includeArchived=true` | List alerts including archived ones (they carry `archivedAt`). |
+| `POST` | `/api/certificates/{id}/archive` | Archive a certificate. Its alert is closed by the system. |
+| `POST` | `/api/certificates/{id}/restore` | Restore a certificate. An alert the system closed reopens; one an admin resolved stays resolved. |
+| `GET` | `/api/certificates?includeArchived=true` | List certificates including archived ones. |
+
+The supplier's own `GET /api/supplier/certificates` includes archived certificates with `archivedAt` set, so a supplier keeps their history. A certificate upload also counts as the supplier's `lastUpdatedAt` on the admin dashboard. The `DELETE` endpoints still exist for one release so a rollback keeps working, but the app no longer calls them.
+
+### Supplier certificate upload and renewals
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/supplier/certificates` | A supplier uploads a certificate PDF (multipart: `file`, `contractId`). The agreement must be one of the supplier's own active agreements, otherwise `403` or `400`. The supplier name comes from the agreement. Limited to 10 uploads per supplier per hour (`429`). |
+| `POST` | `/api/certificates/{id}/confirm-archive` | Admin: confirm a supplier's renewal, archiving the older certificate it replaces. |
+| `POST` | `/api/certificates/{id}/reject-archive` | Admin: keep both certificates and clear the pending mark. |
+
+A new certificate replaces an older one when it is on the same agreement, has the same normalised type, and expires later. An admin's upload archives the older certificate at once. A supplier's upload only sets `archivePendingFor` on the new certificate; both stay active until an admin confirms or rejects. Certificates with no agreement or no expiry date, and `Unknown` types, are never matched. Certificate responses include `uploadedByRole` and `archivePendingFor`.
+
 ## Fleet management
 
 An agreement belongs to a supplier and specifies dates and vehicle allowance. Vehicles are added to an agreement as registered vehicles or planned entries.
@@ -76,12 +133,15 @@ Use the returned supplier `id` to create an agreement:
 ```json
 {
   "supplierId": "returned-supplier-id",
+  "saksnr": "2024/1234",
   "startDate": "2026-01-01",
   "endDate": "2027-12-31",
   "allowedVehicles": 5,
   "note": "Example agreement"
 }
 ```
+
+`saksnr` is the municipal case number. It is required on every create and update, up to 50 characters, and several agreements may share one. Agreements created before this field existed return `saksnr: null` until they are next edited.
 
 Add an entry using either `{ "registrationNumber": "AB12345" }` or `{ "planned": true }`. The registration number is illustrative: a registered entry must exist in Statens vegvesen and pass a live lookup. Planned identifiers are generated by the server and require no registry request. Both entry types count toward the allowance.
 
@@ -180,7 +240,22 @@ Supplier onboarding and portal endpoints support both supplier sessions (strictl
 | `GET` | `/api/supplier/vehicles` | List vehicles linked to the supplier's agreements. |
 | `GET` | `/api/supplier/energy` | List facility energy consumption records. |
 | `GET` | `/api/supplier/products` | List catalog items and eco-labels. |
-| `GET` | `/api/supplier/certificates` | List environmental certificates for the supplier's contracts. |
+| `GET` | `/api/supplier/certificates` | List environmental certificates for all of the supplier's agreements, including ended ones, so older certificates stay as history. |
+
+### Supplier notes
+
+Notes are written by administrators about a supplier and are never shown to suppliers: no supplier route reads them.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/admin/suppliers/{supplierId}/notes` | List the caller's own `SELF` notes and every `INTERNAL` note, newest first. |
+| `POST` | `/api/admin/suppliers/{supplierId}/notes` | Add a note. The author comes from the login. |
+
+```json
+{ "text": "Call the contact on Monday", "visibility": "SELF", "alertId": "optional-alert-id" }
+```
+
+`visibility` is `SELF` (only the author sees it, the default) or `INTERNAL` (every administrator sees it). `text` is 1–2000 characters after trimming. An unknown supplier returns 404 and a supplier session returns 403.
 
 See [Supplier Onboarding Reference](supplier-onboarding.md) for full cURL examples, two-phase ingestion details, and SQLite schema DDLs.
 

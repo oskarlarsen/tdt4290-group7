@@ -21,7 +21,8 @@ import { CertificateEditDialog } from "../../components/certificates/Certificate
 import { CertificateDetailsDrawer } from "../../components/certificates/CertificateDetailsDrawer";
 import { CertificateAttentionCard } from "../../components/certificates/CertificateAttentionCard";
 import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
-import { useDeleteCertificate } from "../../hooks/useCertificates";
+import { useArchiveCertificate, useRestoreCertificate } from "../../hooks/useCertificates";
+import { PendingRenewalsCard } from "../../components/certificates/PendingRenewalsCard";
 import type { Certificate } from "../../types/certificate";
 import {
   CERTIFICATE_STANDARD_LABELS,
@@ -32,13 +33,14 @@ import { downloadCsv, toCsv } from "../../utils/csv";
 import { useSearchParams } from "react-router-dom";
 import { getActiveCertificateContracts } from "../../utils/certificateContracts";
 
-type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired";
+type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired" | "missing-documentation";
 
 const FILTERS: { value: CertificateFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "valid", label: "Valid" },
   { value: "expiring-soon", label: "Expiring soon" },
   { value: "expired", label: "Expired" },
+  { value: "missing-documentation", label: "Documentation missing" },
 ];
 
 const PAGE_SIZE = 6; // same as the reference; the logic doesn't assume how many rows exist
@@ -58,16 +60,21 @@ function compareBySeverity(a: CertificateRow, b: CertificateRow): number {
 
 export default function Certificates() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates();
+  const [showArchived, setShowArchived] = useState(false);
+  const { data: certificates, isLoading: certsLoading, isError: certsError } = useCertificates(showArchived);
   const { data: fleet, isLoading: contractsLoading, isError: contractsError } = useFleet();
-  const removeCertificate = useDeleteCertificate();
+  const archiveCertificate = useArchiveCertificate();
+  const restoreCertificate = useRestoreCertificate();
+  const archiveError = archiveCertificate.error ?? restoreCertificate.error;
 
+  const [uploadNotice, setUploadNotice] = useState("");
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null);
   const isUploadOpen = searchParams.get("upload") === "true";
+  const [renewContractId, setRenewContractId] = useState<string | undefined>(undefined);
 
   function setUploadOpen(open: boolean) {
     setSearchParams((current) => {
@@ -78,17 +85,21 @@ export default function Certificates() {
     });
   }
 
-  function handleDelete(certificate: Certificate) {
-    const supplier = certificate.supplierName ?? "this supplier";
-    if (!window.confirm(`Delete the ${certificate.certificateType ?? "certificate"} for ${supplier}? This cannot be undone.`)) {
-      return;
-    }
-    removeCertificate.reset();
-    removeCertificate.mutate(certificate.id, {
+  // Archive keeps the certificate and its document; it only takes it out of alerts, risk and the live counts.
+  function handleArchive(certificate: Certificate) {
+    archiveCertificate.reset();
+    restoreCertificate.reset();
+    archiveCertificate.mutate(certificate.id, {
       onSuccess: () => {
         if (selectedId === certificate.id) setSelectedId(null);
       },
     });
+  }
+
+  function handleRestore(certificate: Certificate) {
+    archiveCertificate.reset();
+    restoreCertificate.reset();
+    restoreCertificate.mutate(certificate.id);
   }
 
   const rows = useMemo<CertificateRow[]>(() => {
@@ -106,13 +117,16 @@ export default function Certificates() {
       valid: 0,
       "expiring-soon": 0,
       expired: 0,
+      "missing-documentation": 0,
       criticalExpired: 0,
     };
     for (const { certificate } of rows) {
+      if (certificate.archivedAt) continue;
       const status = getCertificateStatus(certificate).status;
       if (status === "valid") result.valid += 1;
       else if (status === "expiring" || status === "critical") result["expiring-soon"] += 1;
       else if (status === "expired") result.expired += 1;
+      else if (status === "missing-documentation") result["missing-documentation"] += 1;
       if (status === "critical" || status === "expired" || status === "missing-documentation") {
         result.criticalExpired += 1;
       }
@@ -130,7 +144,8 @@ export default function Certificates() {
             statusFilter === "all" ||
             (statusFilter === "valid" && status === "valid") ||
             (statusFilter === "expiring-soon" && (status === "expiring" || status === "critical")) ||
-            (statusFilter === "expired" && status === "expired");
+            (statusFilter === "expired" && status === "expired") ||
+            (statusFilter === "missing-documentation" && status === "missing-documentation");
           const matchesSearch =
             query.length === 0 ||
             CERTIFICATE_STANDARD_LABELS[certificate.standard].toLowerCase().includes(query) ||
@@ -160,7 +175,7 @@ export default function Certificates() {
 
   if (certsLoading || contractsLoading) {
     return (
-      <div className="flex h-64 items-center justify-center text-neutral-400">
+      <div className="flex h-64 items-center justify-center text-neutral-500">
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
@@ -258,17 +273,23 @@ export default function Certificates() {
         />
       </div>
 
+      <PendingRenewalsCard certificates={certificates ?? []} />
+
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search certificate no., supplier, standard, contract…"
-              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
+          <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
+            <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+            <span className="font-medium text-neutral-700">Show archived</span>
+          </label>
           <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
             <span className="font-medium text-neutral-700">Status:</span>
             <div className="relative">
@@ -293,18 +314,24 @@ export default function Certificates() {
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.certificate.id)}
           onEdit={setEditingCertificate}
-          onDelete={handleDelete}
+          onArchive={handleArchive}
+          onRestore={handleRestore}
+          onRenew={(certificate) => {
+            setRenewContractId(certificate.contractId);
+            setUploadOpen(true);
+          }}
           emptyMessage={
             certificates.length === 0
               ? "No certificate records available"
               : "No certificates match the current filters"
           }
         />
-        {removeCertificate.isError && (
+        {uploadNotice && (
+          <p role="status" className="mt-3 rounded-md bg-tertiary-50 px-3 py-2 text-sm text-tertiary-700">{uploadNotice}</p>
+        )}
+        {archiveError && (
           <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {removeCertificate.error instanceof Error
-              ? removeCertificate.error.message
-              : "Could not delete certificate."}
+            {archiveError instanceof Error ? archiveError.message : "Could not update the certificate."}
           </p>
         )}
 
@@ -324,7 +351,7 @@ export default function Certificates() {
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-            <span className="font-mono text-xs text-neutral-400">
+            <span className="font-mono text-xs text-neutral-500">
               Page {currentPage} of {totalPages}
             </span>
             <button
@@ -345,7 +372,17 @@ export default function Certificates() {
 
       <CertificateDetailsDrawer row={selectedRow} onClose={() => setSelectedId(null)} />
 
-      {isUploadOpen && <CertificateUploadDialog contracts={contracts} onClose={() => setUploadOpen(false)} />}
+      {isUploadOpen && (
+        <CertificateUploadDialog
+          contracts={contracts}
+          initialContractId={renewContractId}
+          onUploaded={() => setUploadNotice("Certificate uploaded.")}
+          onClose={() => {
+            setUploadOpen(false);
+            setRenewContractId(undefined);
+          }}
+        />
+      )}
       {editingCertificate && (
         <CertificateEditDialog
           certificate={editingCertificate}

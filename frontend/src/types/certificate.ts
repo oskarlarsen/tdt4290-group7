@@ -30,6 +30,12 @@ export type Certificate = {
   certificateType?: string;
   issueDate?: string | null;
   sourceFile?: string;
+  /** Set when the certificate was archived: kept as history, but it raises no alerts and counts in no risk. */
+  archivedAt?: string | null;
+  /** ADMIN or SUPPLIER; null for certificates uploaded before this was recorded. */
+  uploadedByRole?: string | null;
+  /** On a supplier's renewal: the older certificate it replaces once an admin confirms. */
+  archivePendingFor?: string | null;
 };
 
 export type CertificateContract = {
@@ -59,6 +65,10 @@ export const CERTIFICATE_THRESHOLDS = {
   yellowDays: 180,
 } as const;
 
+// Miljøfyrtårn and ISO 14001 take months to renew, so they are flagged a year ahead (backend: CertificateTypes).
+export const LONG_LEAD_WARNING_DAYS = 365;
+const LONG_LEAD_STANDARDS: readonly CertificateStandard[] = ["iso-14001", "miljofyrtarn"];
+
 export type CertificateStatusInfo = {
   status: CertificateStatus;
   group: CertificateStatusGroup;
@@ -77,7 +87,7 @@ function daysUntil(isoDate: string, now: Date): number {
 
 // Derived, never stored, so it can't drift from the date behind it.
 export function getCertificateStatus(
-  cert: Pick<Certificate, "validUntil">,
+  cert: Pick<Certificate, "validUntil"> & Partial<Pick<Certificate, "standard">>,
   now: Date = new Date()
 ): CertificateStatusInfo {
   if (cert.validUntil === null) {
@@ -107,6 +117,9 @@ export function getCertificateStatus(
   }
   if (days <= yellowDays) {
     return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "yellow", label: `Expiring (${days}d)`, rank: 2 };
+  }
+  if (cert.standard && LONG_LEAD_STANDARDS.includes(cert.standard) && days <= LONG_LEAD_WARNING_DAYS) {
+    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "yellow", label: `Renew soon (${days}d)`, rank: 2 };
   }
   return { status: "valid", group: "valid", daysRemaining: days, tone: "tertiary", label: "Valid", rank: 3 };
 }

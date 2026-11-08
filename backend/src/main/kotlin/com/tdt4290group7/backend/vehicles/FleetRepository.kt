@@ -81,6 +81,7 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         require(start <= end) { "End date must be on or after start date" }
         require(input.allowedVehicles in 0..10000) { "Vehicle allowance must be between 0 and 10000" }
         require(input.note.length <= 4000) { "Note must be at most 4000 characters" }
+        require(input.saksnr.trim().length in 1..50) { "Enter the saksnr (case number), up to 50 characters" }
         require(input.requiresVehicles || input.requiresEnergy || input.requiresProducts) {
             "Select at least one type of supplier information to collect"
         }
@@ -98,7 +99,8 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
                 "updated_at" to now.storageTimestamp(), "active" to 1,
                 "requires_vehicles" to if (input.requiresVehicles) 1 else 0,
                 "requires_energy" to if (input.requiresEnergy) 1 else 0,
-                "requires_products" to if (input.requiresProducts) 1 else 0)
+                "requires_products" to if (input.requiresProducts) 1 else 0,
+                "saksnr" to input.saksnr.trim())
             // Reducing an allowance is permitted even when more vehicles remain listed.
             writer.save("agreements", result)
             writer.agreementId = agreementId
@@ -275,7 +277,8 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         row["updated_at"] as String, row["active"] == 1,
         (row["requires_vehicles"] as Number).toInt() == 1,
         (row["requires_energy"] as Number).toInt() == 1,
-        (row["requires_products"] as Number).toInt() == 1)
+        (row["requires_products"] as Number).toInt() == 1,
+        row["saksnr"] as String?)
     private fun vehicle(row: Map<String, Any?>) = Vehicle(row["registration_number"] as String, row["created_at"] as String,
         row["agreement_id"] as String?, row["planned"] == 1, row["listed"] == 1, row["updated_at"] as String)
 }

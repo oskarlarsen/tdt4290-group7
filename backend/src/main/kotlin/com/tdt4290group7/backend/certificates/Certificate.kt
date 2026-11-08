@@ -11,7 +11,14 @@ data class Certificate(
     val expiryDate: LocalDate?,
     val sourceFile: String,
     val status: CertificateStatus,
-    val contractId: String? = null
+    val contractId: String? = null,
+    val archivedAt: String? = null,
+    /** Who uploaded it: ADMIN or SUPPLIER. Null for certificates uploaded before this was recorded. */
+    val uploadedByRole: String? = null,
+    /** Set on a supplier's renewal: the older certificate it would replace once an admin confirms. */
+    val archivePendingFor: String? = null,
+    /** When the file was uploaded; null for certificates uploaded before this was recorded. */
+    val uploadedAt: String? = null,
 )
 
 fun calculateStatus(expiryDate: LocalDate?, today: LocalDate = LocalDate.now()): CertificateStatus {

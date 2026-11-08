@@ -16,6 +16,8 @@ export type SupplierVehicle = {
   listed: boolean;
   fuelTechnology: string | null;
   isHybrid: boolean | null;
+  /** Registry category such as N2 (from the upload lookup), the source of the weight range. */
+  vehicleCategory?: string | null;
   fullContractCoverage: boolean | null;
   startYearWeek: string | null;
   endYearWeek: string | null;
@@ -66,6 +68,8 @@ type SupplierCertificateResponse = {
   expiryDate: string | null;
   sourceFile: string;
   contractId: string | null;
+  archivedAt?: string | null;
+  archivePendingFor?: string | null;
 };
 
 function certificateStandard(value: string): Certificate["standard"] {
@@ -124,6 +128,8 @@ export async function getSupplierCertificates(): Promise<Certificate[]> {
     validUntil: certificate.expiryDate,
     issueDate: certificate.issueDate,
     sourceFile: certificate.sourceFile,
+    archivedAt: certificate.archivedAt ?? null,
+    archivePendingFor: certificate.archivePendingFor ?? null,
   }));
 }
 

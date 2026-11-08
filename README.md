@@ -8,19 +8,19 @@ The application is a prototype: some areas have working workflows, while others 
 
 | Area | Purpose and current status |
 |---|---|
-| Dashboard | Demo overview of totals/metrics, compliance rates, supplier risks and alerts. Includes placeholder CSV export button. |
-| Suppliers | Demo directory with supplier details, notes and follow-up status. |
+| Dashboard | Backend-connected overview of totals, risk classification, issue categories and alerts, computed from stored vehicle checks and certificates. Includes placeholder CSV export button. |
+| Suppliers | Backend-connected directory with supplier details, notes and follow-up status, next to organization, agreement and invitation management. |
 | Contracts | Demo contract directory, compliance summaries and placeholder CSV export.  |
 | Vehicles | Backend-connected supplier and agreement management, registered/planned vehicles, statistics, registry checks and change history with undo. |
 | Environmental Certificates | Admins can upload PDF certificates for backend text/OCR extraction and review parsed metadata. Contract attachments, registry verification and automatic reminders are not connected. |
 | Energy & Fuel | Placeholder page for energy and fuel reporting. |
 | Risk & Prediction | Placeholder page for risk analysis. |
-| Alerts | Placeholder page for alerts. |
+| Alerts | Backend-connected alerts with manual alerts, status changes, archive and restore. |
 | Reports | Placeholder page. |
 | Supplier workspace | Backend-connected onboarding dashboard for contact details, checklist progress, CSV template/download, validation preview, imports and submission. Other supplier pages remain placeholders. |
 | Authentication | Admin/supplier sign-in, logout and session handling. Password-reset API exists; email delivery is not connected. |
 
-Dashboard, supplier and contract demo data are separate and not connected to the vehicle database, i.e suppliers under "Suppliers" and "Vehicles" are not linked.
+Contract and energy demo data are separate from the vehicle database.
 
 ## Run locally
 
@@ -73,7 +73,7 @@ Generate a signing secret with:
 node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
 ```
 
-Keep `VITE_USE_MOCKS=true` and `VITE_MOCK_AUTH=false` as supplied: this enables demo pages alongside real backend sign-in, vehicles and certificate uploads.
+Keep `VITE_USE_MOCKS=false` and `VITE_USE_MOCK_AUTH=false` as supplied. Set `VITE_USE_MOCKS=true` only to see demo data on the Contracts and Energy pages, which have no backend yet.
 
 `SVV_API_KEY` is optional for startup. Adding or replacing a registered vehicle requires a working "Statens-vegvesen-API-key". Without one, you can still manage suppliers, agreements and planned entries.
 

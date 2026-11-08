@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useUpdateCertificate } from "../../hooks/useCertificates";
 import type { Certificate, CertificateContract } from "../../types/certificate";
@@ -13,6 +13,14 @@ export function CertificateEditDialog({
   onClose: () => void;
 }) {
   const update = useUpdateCertificate();
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !update.isPending) onClose();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, update.isPending]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,6 +53,7 @@ export function CertificateEditDialog({
         aria-labelledby="edit-certificate-title"
         className="w-full max-w-lg rounded-xl border border-neutral-100 bg-white p-5 shadow-card"
         onSubmit={handleSubmit}
+        onChange={() => { if (update.isError) update.reset(); }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -61,7 +70,7 @@ export function CertificateEditDialog({
             onClick={onClose}
             disabled={update.isPending}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+            className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
           </button>

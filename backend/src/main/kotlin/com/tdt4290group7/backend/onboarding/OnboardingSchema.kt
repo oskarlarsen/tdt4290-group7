@@ -29,7 +29,8 @@ internal val onboardingSchemaStatements = listOf(
         error_rows INTEGER NOT NULL CHECK (error_rows >= 0),
         status TEXT NOT NULL CHECK (status IN ('PREVIEWED', 'COMMITTED', 'DISCARDED')),
         created_at TEXT NOT NULL CHECK (julianday(created_at) IS NOT NULL AND substr(created_at, -1) = 'Z'),
-        committed_at TEXT CHECK (committed_at IS NULL OR (julianday(committed_at) IS NOT NULL AND substr(committed_at, -1) = 'Z'))
+        committed_at TEXT CHECK (committed_at IS NULL OR (julianday(committed_at) IS NOT NULL AND substr(committed_at, -1) = 'Z')),
+        committed_by_role TEXT
     ) STRICT""",
     "CREATE INDEX IF NOT EXISTS idx_upload_batches_supplier ON upload_batches(supplier_id, created_at DESC)",
 
@@ -43,6 +44,7 @@ internal val onboardingSchemaStatements = listOf(
         attachment_reference TEXT,
         notes TEXT,
         updated_at TEXT NOT NULL CHECK (julianday(updated_at) IS NOT NULL AND substr(updated_at, -1) = 'Z'),
+        vehicle_category TEXT,
         CHECK (full_contract_coverage = 1 OR (start_year_week IS NOT NULL AND end_year_week IS NOT NULL))
     ) STRICT""",
 

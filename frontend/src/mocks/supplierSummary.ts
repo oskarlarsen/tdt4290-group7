@@ -32,6 +32,7 @@ export function buildSupplierPortfolioSummary(
     compliant: { count: compliantCount, percent: percent(compliantCount) },
     medium: { count: mediumCount, percent: percent(mediumCount) },
     high: { count: highCount, percent: percent(highCount) },
+    unassessed: { count: unassessedCount, percent: percent(unassessedCount) },
   };
 
   return {

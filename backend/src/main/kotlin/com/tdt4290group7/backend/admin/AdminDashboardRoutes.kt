@@ -2,8 +2,11 @@ package com.tdt4290group7.backend.admin
 
 import com.tdt4290group7.backend.certificates.Certificate
 import com.tdt4290group7.backend.certificates.CertificateRepository
+import com.tdt4290group7.backend.certificates.CertificateTypes
+import com.tdt4290group7.backend.onboarding.OnboardingRepository
 import com.tdt4290group7.backend.vehicles.DeviationPriority
 import com.tdt4290group7.backend.vehicles.FleetRepository
+import com.tdt4290group7.backend.vehicles.agreementLabel
 import com.tdt4290group7.backend.vehicles.VehicleRepository
 import com.tdt4290group7.backend.vehicles.adminActor
 import com.tdt4290group7.backend.onboarding.OnboardingStatus
@@ -14,6 +17,7 @@ import io.ktor.server.application.log
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.auth.principal
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -33,6 +37,7 @@ private val ALERT_CATEGORIES = setOf("ENVIRONMENTAL_COMPLIANCE", "ENERGY_FUEL", 
 private val ALERT_FINDING_TYPES = setOf("CONFIRMED_DEVIATION", "MISSING_DOCUMENTATION", "UPCOMING_EXPIRY")
 private val ALERT_STATUSES = setOf("OPEN", "IN_PROGRESS", "UNDER_REVIEW", "RESOLVED")
 private val SUPPLIER_REVIEW_STATUSES = setOf("to-review", "in-progress", "resolved")
+private val NOTE_VISIBILITIES = setOf("SELF", "INTERNAL")
 
 @Serializable
 data class DashboardKpis(
@@ -53,13 +58,13 @@ data class DashboardKpis(
 )
 
 @Serializable
-data class AlertSeverityCounts(val high: Int, val medium: Int)
+data class AlertSeverityCounts(val high: Int, val medium: Int, val low: Int)
 
 @Serializable
 data class RiskCount(val count: Int, val percent: Int)
 
 @Serializable
-data class RiskClassification(val compliant: RiskCount, val medium: RiskCount, val high: RiskCount)
+data class RiskClassification(val compliant: RiskCount, val medium: RiskCount, val high: RiskCount, val unassessed: RiskCount)
 
 @Serializable
 data class DashboardSupplier(
@@ -71,6 +76,8 @@ data class DashboardSupplier(
     val risk: String,
     val mainIssue: String,
     val issueCategory: String? = null,
+    /** Every category that applies, so a supplier with both a vehicle and a certificate problem is in both lists. */
+    val issueCategories: List<String> = emptyList(),
     val onboardingStatus: OnboardingStatus = OnboardingStatus.INVITED,
     val contactName: String? = null,
     val contactEmail: String? = null,
@@ -84,6 +91,11 @@ data class DashboardSupplier(
     val energyRecordCount: Int = 0,
     val productCount: Int = 0,
     val registeredAccountCount: Int = 0,
+    /** The most recent check-in (login or restored session) by any of the supplier's accounts. */
+    val lastActiveAt: String? = null,
+    val lastUpdatedAt: String? = null,
+    /** SUPPLIER or ADMIN (an admin acting for the supplier); null when it is not known who made the change. */
+    val lastUpdatedBy: String? = null,
 )
 
 @Serializable
@@ -109,6 +121,7 @@ data class RecentAlert(
     val category: String,
     val source: String,
     val dueDate: String? = null,
+    val archivedAt: String? = null,
     val findingType: String,
     val affectedItem: AffectedItem? = null,
     val reason: String? = null,
@@ -118,6 +131,8 @@ data class RecentAlert(
 @Serializable
 data class AdminDashboardSummary(
     val lastSyncedAt: String,
+    /** Suppliers with no check-in were last seen before this date, when activity tracking started. */
+    val activityTrackingSince: String,
     val kpis: DashboardKpis,
     val riskClassification: RiskClassification,
     val topRiskSuppliers: List<DashboardSupplier>,
@@ -137,11 +152,76 @@ data class ManualAlertInput(
     val dueDate: String? = null,
 )
 
+/** Every field is optional. dueDate: absent keeps it, an empty string clears it, a date sets it. */
+/** What a supplier sees of an alert: no reason, affected item, admin workflow status or internal notes. */
 @Serializable
-data class AlertStatusUpdate(val status: String)
+data class SupplierAlert(
+    val id: String,
+    val title: String,
+    val description: String,
+    val severity: String,
+    val category: String,
+    val dueDate: String? = null,
+    /** Only OPEN or RESOLVED: the admin's In progress and Under review steps are internal. */
+    val status: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class Notification(
+    val id: String,
+    val type: String,
+    val title: String,
+    val message: String,
+    val severity: String,
+    val alertId: String,
+    val timeAgo: String,
+    val read: Boolean,
+)
+
+/** Every alert-linked notification type the frontend already knows how to show. */
+private fun notificationType(category: String) = when (category) {
+    "VEHICLE_COMPLIANCE" -> "VEHICLE_DEVIATION"
+    "CERTIFICATES" -> "CERTIFICATE_EXPIRY"
+    "ENERGY_FUEL" -> "FUEL_DEVIATION"
+    else -> "SYSTEM"
+}
+
+private fun notifySupplierUsers(insights: AdminInsightsRepository, alert: AdminAlertRecord, now: Instant) {
+    val supplierId = alert.supplierId ?: return
+    val recipients = UserRepository.supplierUserIds(supplierId)
+    val message = alert.description.take(160)
+    runCatching { insights.addNotifications(recipients, alert, notificationType(alert.category), message, now) }
+}
+
+@Serializable
+data class AlertUpdate(
+    val status: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val severity: String? = null,
+    val dueDate: String? = null,
+)
 
 @Serializable
 data class SupplierReviewStatusUpdate(val status: String)
+
+@Serializable
+data class SupplierNoteInput(val text: String, val visibility: String = "SELF", val alertId: String? = null)
+
+@Serializable
+data class SupplierNote(
+    val id: String,
+    val supplierId: String,
+    val authorId: String,
+    val authorName: String,
+    val visibility: String,
+    val text: String,
+    val alertId: String? = null,
+    val createdAt: String,
+)
+
+private fun SupplierNoteRecord.toNote() = SupplierNote(id, supplierId, authorId, authorName, visibility, text, alertId, createdAt)
 
 private data class SupplierEvidence(
     var hasEvidence: Boolean = false,
@@ -187,7 +267,62 @@ fun Route.adminDashboardRoutes(
     get("/api/admin/alerts") {
         if (call.adminActor() == null) return@get
         refreshFindings(fleet, vehicles, certificates, insights)
-        call.respond(insights.allAlerts().map(::toRecentAlert))
+        val records = if (call.request.queryParameters["includeArchived"] == "true") insights.allAlerts() + insights.archivedAlerts() else insights.allAlerts()
+        call.respond(records.map(::toRecentAlert))
+    }
+
+    // ---- Supplier side: the supplier's own alerts, and in-app notifications for any signed-in user ----
+
+    get("/api/supplier/alerts") {
+        val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        val supplierId = user.supplierId?.takeIf { user.role == com.tdt4290group7.backend.model.Role.SUPPLIER }
+            ?: return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Supplier access required"))
+        refreshFindings(fleet, vehicles, certificates, insights)
+        val category = call.request.queryParameters["category"]
+        call.respond(
+            insights.supplierAlerts(supplierId)
+                .filter { category == null || it.category == category }
+                .map {
+                    SupplierAlert(
+                        id = it.id, title = it.title, description = it.description, severity = it.severity, category = it.category,
+                        dueDate = it.dueDate, status = if (it.status == "RESOLVED") "RESOLVED" else "OPEN", createdAt = it.createdAt,
+                    )
+                },
+        )
+    }
+
+    get("/api/notifications") {
+        val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        call.respond(insights.notificationsFor(user.id).map { it.toNotification() })
+    }
+
+    post("/api/notifications/{id}/read") {
+        val user = call.signedInUser() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (!insights.markNotificationRead(user.id, id, Instant.now())) return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Notification not found"))
+        call.respondText("", status = HttpStatusCode.NoContent)
+    }
+
+    post("/api/notifications/read-all") {
+        val user = call.signedInUser() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        insights.markAllNotificationsRead(user.id, Instant.now())
+        call.respondText("", status = HttpStatusCode.NoContent)
+    }
+
+    post("/api/admin/alerts/{id}/archive") {
+        val actor = call.adminActor() ?: return@post
+        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (!insights.archive(id, actor.id, Instant.now())) return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Alert not found"))
+        call.application.log.info("admin_alert_archived alertId={} actorId={}", id, actor.id)
+        call.respondText("", status = HttpStatusCode.NoContent)
+    }
+
+    post("/api/admin/alerts/{id}/restore") {
+        val actor = call.adminActor() ?: return@post
+        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (!insights.restore(id)) return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Archived alert not found"))
+        call.application.log.info("admin_alert_restored alertId={} actorId={}", id, actor.id)
+        call.respondText("", status = HttpStatusCode.NoContent)
     }
 
     post("/api/admin/alerts") {
@@ -204,18 +339,40 @@ fun Route.adminDashboardRoutes(
             dueDate = input.dueDate,
             now = Instant.now(),
         )
+        notifySupplierUsers(insights, alert, Instant.now())
         call.application.log.info("admin_alert_created alertId={} actorId={}", alert.id, actor.id)
         call.respond(HttpStatusCode.Created, toRecentAlert(alert))
     }
 
     patch("/api/admin/alerts/{id}") {
-        if (call.adminActor() == null) return@patch
+        val actor = call.adminActor() ?: return@patch
         val id = call.parameters["id"] ?: return@patch call.respond(HttpStatusCode.BadRequest)
-        val status = call.receive<AlertStatusUpdate>().status
-        require(status in ALERT_STATUSES) { "Select a valid alert status" }
-        val alert = insights.updateStatus(id, status)
+        val update = call.receive<AlertUpdate>()
+        val editsContent = update.title != null || update.description != null || update.severity != null || update.dueDate != null
+        require(update.status != null || editsContent) { "Nothing to update" }
+        update.status?.let { require(it in ALERT_STATUSES) { "Select a valid alert status" } }
+        var alert = insights.findAlert(id)
             ?: return@patch call.respond(HttpStatusCode.NotFound, mapOf("error" to "Alert not found"))
-        call.respond(toRecentAlert(alert))
+        if (editsContent) {
+            if (alert.source != "MANUAL") {
+                return@patch call.respond(
+                    HttpStatusCode.Conflict,
+                    mapOf("error" to "Automatic alerts are rebuilt from evidence and cannot be edited"),
+                )
+            }
+            val title = (update.title ?: alert.title).trim()
+            val description = (update.description ?: alert.description).trim()
+            val severity = update.severity ?: alert.severity
+            val dueDate = when (update.dueDate) { null -> alert.dueDate; "" -> null; else -> update.dueDate }
+            require(title.length in 1..200) { "Alert title must be between 1 and 200 characters" }
+            require(description.length in 1..4000) { "Alert description must be between 1 and 4000 characters" }
+            require(severity in ALERT_SEVERITIES) { "Select a valid alert severity" }
+            dueDate?.let { requireValidDueDate(it) }
+            insights.updateManualContent(id, title, description, severity, dueDate)
+        }
+        update.status?.let { alert = insights.updateStatus(id, it) ?: alert }
+        call.application.log.info("admin_alert_updated alertId={} actorId={} content={} status={}", id, actor.id, editsContent, update.status != null)
+        call.respond(toRecentAlert(insights.findAlert(id) ?: alert))
     }
 
     delete("/api/admin/alerts/{id}") {
@@ -229,6 +386,29 @@ fun Route.adminDashboardRoutes(
         if (call.adminActor() == null) return@get
         val activeSupplierIds = fleet.overview().suppliers.mapTo(mutableSetOf()) { it.id }
         call.respond(insights.supplierReviewStatuses().filterKeys(activeSupplierIds::contains))
+    }
+
+    // Notes are admin-only: no supplier route reads them. SELF notes are filtered by author on the server.
+    get("/api/admin/suppliers/{supplierId}/notes") {
+        val actor = call.adminActor() ?: return@get
+        val supplierId = call.parameters["supplierId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        call.respond(insights.notesFor(supplierId, actor.id).map { it.toNote() })
+    }
+
+    post("/api/admin/suppliers/{supplierId}/notes") {
+        val actor = call.adminActor() ?: return@post
+        val supplierId = call.parameters["supplierId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        if (fleet.overview().suppliers.none { it.id == supplierId }) {
+            return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Supplier not found"))
+        }
+        val input = call.receive<SupplierNoteInput>()
+        val text = input.text.trim()
+        require(text.length in 1..2000) { "Note must be between 1 and 2000 characters" }
+        require(input.visibility in NOTE_VISIBILITIES) { "Select who can see the note" }
+        require(input.alertId == null || input.alertId.length <= 100) { "Invalid alert reference" }
+        val note = insights.addNote(supplierId, actor.id, actor.name, input.visibility, text, input.alertId, Instant.now())
+        call.application.log.info("admin_note_created noteId={} actorId={} visibility={}", note.id, actor.id, note.visibility)
+        call.respond(HttpStatusCode.Created, note.toNote())
     }
 
     put("/api/admin/supplier-reviews/{supplierId}") {
@@ -248,15 +428,17 @@ private fun ManualAlertInput.validated(): ManualAlertInput {
     require(severity in ALERT_SEVERITIES) { "Select a valid alert severity" }
     require(category in ALERT_CATEGORIES) { "Select a valid alert category" }
     require(findingType in ALERT_FINDING_TYPES) { "Select a valid finding type" }
-    dueDate?.let { value ->
-        require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Due date must use YYYY-MM-DD" }
-        try {
-            LocalDate.parse(value)
-        } catch (_: Exception) {
-            throw IllegalArgumentException("Enter a valid due date")
-        }
-    }
+    dueDate?.let(::requireValidDueDate)
     return this
+}
+
+private fun requireValidDueDate(value: String) {
+    require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Due date must use YYYY-MM-DD" }
+    try {
+        LocalDate.parse(value)
+    } catch (_: Exception) {
+        throw IllegalArgumentException("Enter a valid due date")
+    }
 }
 
 private fun refreshFindings(
@@ -303,11 +485,18 @@ private fun refreshFindings(
     val certificateAgreementLinks = certificates.getAll().mapNotNull { certificate ->
         val expiry = certificate.expiryDate ?: return@mapNotNull null
         val daysRemaining = ChronoUnit.DAYS.between(today, expiry)
-        if (daysRemaining > 90) return@mapNotNull null
+        if (daysRemaining > CertificateTypes.warningDays(certificate.certificateType)) return@mapNotNull null
         val supplierId = certificate.contractId?.let(agreements::get)?.supplierId
             ?.takeIf(activeSuppliers::containsKey)
-        val findingKey = "certificate:${certificate.id}:$expiry"
-        val severity = if (daysRemaining < 0 || daysRemaining <= 30) "high" else "medium"
+        // Each warning level is its own alert, so resolving an early, low warning cannot hide a later one.
+        val level = when {
+            daysRemaining < 0 -> "expired"
+            daysRemaining <= 30 -> "30"
+            daysRemaining <= 90 -> "90"
+            else -> "365"
+        }
+        val findingKey = "certificate:${certificate.id}:$expiry:$level"
+        val severity = when (level) { "expired", "30" -> "high"; "90" -> "medium"; else -> "low" }
         val statusText = if (daysRemaining < 0) "has expired" else "expires in $daysRemaining days"
         AdminAlertRecord(
             id = UUID.nameUUIDFromBytes(findingKey.toByteArray()).toString(),
@@ -328,7 +517,11 @@ private fun refreshFindings(
         )
     }
     findings += certificateAgreementLinks
-    findings.forEach(insights::upsertFinding)
+    // A newly raised automatic alert (including a certificate reaching its next warning level) notifies the supplier.
+    findings.filter { it.supplierId != null }.forEach { finding ->
+        if (insights.upsertFinding(finding)) notifySupplierUsers(insights, finding, now)
+    }
+    findings.filter { it.supplierId == null }.forEach(insights::upsertFinding)
     insights.resolveInactiveFindings(findings.mapNotNull { it.findingKey }.toSet())
     val syncedAt = now.toString()
     insights.setLastSyncedAt(syncedAt)
@@ -396,14 +589,34 @@ private fun buildSummary(
     }
     val assessedCount = riskForSupplier.values.count { it != "unassessed" }
     fun percentage(count: Int) = if (assessedCount == 0) 0 else (count * 100.0 / assessedCount).toInt()
+    // The four risk rows share one denominator, all active suppliers, so their percentages add up to about 100.
+    // complianceRatePercent below keeps its own denominator (assessed suppliers only).
+    fun riskRow(level: String): RiskCount {
+        val count = riskForSupplier.values.count { it == level }
+        val total = riskForSupplier.size
+        return RiskCount(count, if (total == 0) 0 else (count * 100.0 / total).toInt())
+    }
     val riskClassification = RiskClassification(
-        compliant = RiskCount(riskForSupplier.values.count { it == "compliant" }, percentage(riskForSupplier.values.count { it == "compliant" })),
-        medium = RiskCount(riskForSupplier.values.count { it == "medium" }, percentage(riskForSupplier.values.count { it == "medium" })),
-        high = RiskCount(riskForSupplier.values.count { it == "high" }, percentage(riskForSupplier.values.count { it == "high" })),
+        compliant = riskRow("compliant"),
+        medium = riskRow("medium"),
+        high = riskRow("high"),
+        unassessed = riskRow("unassessed"),
     )
     val agreementsBySupplier = overview.agreements.groupBy { it.supplierId }
     val onboardingBySupplier = vehicles.onboarding.getAdminSupplierOnboardingSummaries().associateBy { it.supplierId }
     val registeredAccountsBySupplier = UserRepository.supplierAccountCounts()
+    val lastActiveBySupplier = UserRepository.lastActiveBySupplier()
+    val lastUpdatedBySupplier = vehicles.onboarding.lastUpdatedBySupplier().toMutableMap()
+    // A certificate upload counts as an update from the supplier it is linked to (through its agreement).
+    val supplierByAgreement = overview.agreements.associate { it.id to it.supplierId }
+    certificates.getAll().forEach { certificate ->
+        val at = certificate.uploadedAt?.let(java.time.Instant::parse) ?: return@forEach
+        val supplierId = certificate.contractId?.let(supplierByAgreement::get) ?: return@forEach
+        val current = lastUpdatedBySupplier[supplierId]
+        if (current == null || at.isAfter(current.at)) {
+            lastUpdatedBySupplier[supplierId] = OnboardingRepository.LastUpdate(at, certificate.uploadedByRole)
+        }
+    }
     val dashboardSuppliers = activeSuppliers.values.map { supplier ->
         val risk = riskForSupplier.getValue(supplier.id)
         val onboarding = onboardingBySupplier[supplier.id]
@@ -415,7 +628,7 @@ private fun buildSummary(
             id = supplier.id,
             displayName = supplier.name,
             orgId = supplier.orgNumber,
-            primaryContract = agreement?.note?.takeIf(String::isNotBlank) ?: agreement?.id ?: "No active agreement",
+            primaryContract = agreement?.let { agreementLabel(it.saksnr, it.note) } ?: "No active agreement",
             risk = risk,
             mainIssue = mainIssue,
             issueCategory = when {
@@ -423,6 +636,10 @@ private fun buildSummary(
                 evidence.getValue(supplier.id).hasCertificateFinding -> "CERTIFICATE_EXPIRY"
                 else -> null
             },
+            issueCategories = listOfNotNull(
+                "VEHICLE_DEVIATION".takeIf { evidence.getValue(supplier.id).hasVehicleFinding },
+                "CERTIFICATE_EXPIRY".takeIf { evidence.getValue(supplier.id).hasCertificateFinding },
+            ),
             onboardingStatus = onboarding?.status ?: OnboardingStatus.INVITED,
             contactName = onboarding?.contactName,
             contactEmail = onboarding?.contactEmail,
@@ -436,12 +653,16 @@ private fun buildSummary(
             energyRecordCount = onboarding?.energyRecordCount ?: 0,
             productCount = onboarding?.productCount ?: 0,
             registeredAccountCount = registeredAccountsBySupplier[supplier.id] ?: 0,
+            lastActiveAt = lastActiveBySupplier[supplier.id],
+            lastUpdatedAt = lastUpdatedBySupplier[supplier.id]?.at?.toString(),
+            lastUpdatedBy = lastUpdatedBySupplier[supplier.id]?.by,
         )
     }
     val alerts = insights.allAlerts()
     val unresolvedAlerts = alerts.filter { it.status != "RESOLVED" }
     val highCount = unresolvedAlerts.count { it.severity == "high" }
     val mediumCount = unresolvedAlerts.count { it.severity == "medium" }
+    val lowCount = unresolvedAlerts.count { it.severity == "low" }
     val noFlagCount = riskClassification.compliant.count
     val certificateRecords = certificates.getAll()
     val listedVehicleCount = overview.vehicles.count { it.listed }
@@ -453,13 +674,14 @@ private fun buildSummary(
     val lastSyncedAt = insights.lastSyncedAt() ?: Instant.now().toString()
     return AdminDashboardSummary(
         lastSyncedAt = lastSyncedAt,
+        activityTrackingSince = insights.activityTrackingSince(Instant.now()),
         kpis = DashboardKpis(
             totalSuppliers = activeSuppliers.size,
             totalSuppliersDeltaThisMonth = 0,
             highRiskSuppliers = riskClassification.high.count,
             monitoredSuppliers = assessedCount,
             activeAlerts = unresolvedAlerts.size,
-            alertsBySeverity = AlertSeverityCounts(highCount, mediumCount),
+            alertsBySeverity = AlertSeverityCounts(highCount, mediumCount, lowCount),
             complianceRatePercent = percentage(noFlagCount).toDouble(),
             complianceTargetPercent = 0,
             assessedSuppliers = assessedCount,
@@ -504,9 +726,25 @@ private fun toRecentAlert(record: AdminAlertRecord): RecentAlert {
         category = record.category,
         source = record.source,
         dueDate = record.dueDate,
+        archivedAt = record.archivedAt,
         findingType = record.findingType,
         affectedItem = record.affectedItemType?.let { AffectedItem(it, record.affectedItemName) },
         reason = record.reason,
         supplierId = record.supplierId,
     )
+}
+
+private fun io.ktor.server.application.ApplicationCall.signedInUser() =
+    principal<io.ktor.server.auth.jwt.JWTPrincipal>()?.payload?.let(com.tdt4290group7.backend.auth.JwtConfig::userId)?.let(UserRepository::findById)
+
+private fun NotificationRecord.toNotification(): Notification {
+    val seconds = ChronoUnit.SECONDS.between(Instant.parse(createdAt), Instant.now()).coerceAtLeast(0)
+    val age = when {
+        seconds < 60 -> "Just now"
+        seconds < 3600 -> "${seconds / 60}m ago"
+        seconds < 86400 -> "${seconds / 3600}h ago"
+        seconds < 604800 -> "${seconds / 86400}d ago"
+        else -> Instant.parse(createdAt).atZone(OSLO_ZONE).toLocalDate().toString()
+    }
+    return Notification(id, type, title, message, when (severity) { "high" -> "HIGH"; "medium" -> "MEDIUM"; else -> "INFO" }, alertId, age, read)
 }

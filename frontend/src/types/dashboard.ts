@@ -63,7 +63,7 @@ export type DashboardKpis = {
   highRiskSuppliers: number;
   monitoredSuppliers: number;
   activeAlerts: number;
-  alertsBySeverity: { high: number; medium: number };
+  alertsBySeverity: { high: number; medium: number; low: number };
   complianceRatePercent: number;
   complianceTargetPercent: number;
   assessedSuppliers: number;
@@ -78,6 +78,8 @@ export type RiskClassification = {
   compliant: { count: number; percent: number };
   medium: { count: number; percent: number };
   high: { count: number; percent: number };
+  // Suppliers with no stored vehicle check or dated certificate. Percentages are of all suppliers.
+  unassessed: { count: number; percent: number };
 };
 
 export type UnmodeledSupplierAggregate = {
@@ -103,6 +105,8 @@ export type TopRiskSupplier = {
   mainIssue: string;
   // Set the issue only for high/medium-risk suppliers
   issueCategory?: SupplierIssueCategory;
+  // Every category that applies; older responses only have issueCategory.
+  issueCategories?: SupplierIssueCategory[];
   onboardingStatus?: SupplierOnboardingStatus;
   contactName?: string | null;
   contactEmail?: string | null;
@@ -116,6 +120,10 @@ export type TopRiskSupplier = {
   energyRecordCount?: number;
   productCount?: number;
   registeredAccountCount?: number;
+  lastActiveAt?: string | null;
+  lastUpdatedAt?: string | null;
+  /** SUPPLIER, or ADMIN when an admin made the change for the supplier; null when unknown. */
+  lastUpdatedBy?: string | null;
 };
 
 export type RecentAlert = {
@@ -129,6 +137,8 @@ export type RecentAlert = {
   category?: AlertCategory;
   source?: AlertSource;
   dueDate?: string;
+  /** Set when an admin archived the alert; archived alerts are hidden unless asked for. */
+  archivedAt?: string | null;
   findingType?: AlertFindingType;
   affectedItem?: {
     type: "Vehicle" | "Document";
@@ -137,6 +147,14 @@ export type RecentAlert = {
   reason?: string;
   // Set only when the alert clearly matches a supplier issue in the mock data
   supplierId?: string;
+};
+
+/** Content of a manual alert an admin may change. dueDate: undefined keeps it, "" clears it. */
+export type AlertContentUpdate = {
+  title?: string;
+  description?: string;
+  severity?: AlertSeverity;
+  dueDate?: string;
 };
 
 export type NewManualAlertInput = {
@@ -157,16 +175,26 @@ export type IssueCategoryBreakdown = {
   modeledSupplierCount: number;
 };
 
+// SELF notes are seen only by their author; INTERNAL notes by every admin. Suppliers never see notes.
+export type NoteVisibility = "SELF" | "INTERNAL";
+
 export type SupplierNote = {
   id: string;
   supplierId: string;
+  authorId: string;
   authorName: string;
+  visibility: NoteVisibility;
   text: string;
+  alertId: string | null;
   createdAt: string;
 };
 
+export type NewSupplierNote = { text: string; visibility: NoteVisibility; alertId?: string };
+
 export type DashboardSummary = {
   lastSyncedAt: string;
+  /** When check-ins started being recorded: suppliers with none were last seen before this. */
+  activityTrackingSince?: string;
   kpis: DashboardKpis;
   riskClassification: RiskClassification;
   topRiskSuppliers: TopRiskSupplier[];

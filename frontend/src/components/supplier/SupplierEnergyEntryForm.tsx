@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
+import { CsvUploadPanel } from "./CsvUploadPanel";
 import type { SupplierOverview } from "../../types/onboarding";
 import { createEnergyFormRow, energyRowsToCsv, type EnergyFormRow } from "../../utils/energyFormCsv";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 const fieldClass =
   "mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50";
@@ -11,9 +13,11 @@ type Props = {
   working: boolean;
   onPreview: (file: File) => void;
   onChange: () => void;
+  /** Which way of entering data is showing: the form, or a CSV file. */
+  mode: "form" | "csv";
 };
 
-export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChange }: Props) {
+export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChange, mode }: Props) {
   const [rows, setRows] = useState<EnergyFormRow[]>([createEnergyFormRow()]);
 
   function updateRow(id: string, patch: Partial<EnergyFormRow>) {
@@ -66,6 +70,15 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
 
   return (
     <div className="space-y-4">
+      {mode === "csv" && (
+        <CsvUploadPanel entity="energy" disabled={working || agreements.length === 0} onPreview={onPreview} onChange={onChange} />
+      )}
+      {agreements.length === 0 && (
+        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
+      )}
+
+      {mode === "form" && (
+        <>
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
           <legend className="px-1 font-semibold text-neutral-800">Facility {index + 1}</legend>
@@ -97,7 +110,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
                 <option value="">Choose an agreement</option>
                 {agreements.map((agreement) => (
                   <option key={agreement.id} value={agreement.id}>
-                    {agreement.note || agreement.id}
+                    {agreementLabel(agreement)}
                   </option>
                 ))}
               </select>
@@ -181,7 +194,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Biogas (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Biogas (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -195,7 +208,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Fossil fuel (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Fossil fuel (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -209,7 +222,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Self-produced solar (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Self-produced solar (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -223,7 +236,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
               </label>
 
               <label className="block text-sm font-medium text-neutral-700">
-                Self-produced heat pump (kWh) <span className="font-normal text-neutral-400">(optional)</span>
+                Self-produced heat pump (kWh) <span className="font-normal text-neutral-500">(optional)</span>
                 <input
                   type="number"
                   min="0"
@@ -289,7 +302,7 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
 
           <div className="mt-4 border-t border-neutral-100 pt-3">
             <label className="block text-sm font-medium text-neutral-700">
-              Notes <span className="font-normal text-neutral-400">(optional)</span>
+              Notes <span className="font-normal text-neutral-500">(optional)</span>
               <textarea
                 value={row.notes}
                 onChange={(event) => updateRow(row.id, { notes: event.target.value })}
@@ -323,14 +336,12 @@ export function SupplierEnergyEntryForm({ agreements, working, onPreview, onChan
           {working ? "Validating…" : "Review energy details"}
         </button>
       </div>
-
-      {agreements.length === 0 && (
-        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
-      )}
       {!isReady && agreements.length > 0 && (
         <p className="text-xs text-neutral-500">
           Complete the required fields for each facility (Agreement, Location code, Address, Electricity, and District heating).
         </p>
+      )}
+        </>
       )}
     </div>
   );

@@ -78,7 +78,7 @@ export function CertificateAttentionCard({
               onClick={() => onViewDetails(row)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
-              View Details
+              View details
             </button>
           </div>
         </div>
@@ -97,7 +97,7 @@ export function CertificateAttentionCard({
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-            <span className="font-mono text-xs text-neutral-400">
+            <span className="font-mono text-xs text-neutral-500">
               Page {safeAttentionIndex + 1} of {attentionRows.length}
             </span>
             <button

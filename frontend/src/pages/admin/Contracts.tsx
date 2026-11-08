@@ -6,20 +6,24 @@ import { AgreementForm } from "../../components/vehicles/FleetForms";
 import { Field, inputClass, primaryClass, VehicleDialog } from "../../components/vehicles/VehicleDialog";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
-import type { FleetSupplier } from "../../types/vehicle";
-import { getAgreementStatus, type AgreementStatusFilter } from "../../utils/agreementStatus";
+import { ContractDetailsDrawer } from "../../components/contracts/ContractDetailsDrawer";
+import type { FleetAgreement, FleetSupplier } from "../../types/vehicle";
+import { agreementStatusText, getAgreementStatus, type AgreementStatusFilter } from "../../utils/agreementStatus";
+import { agreementLabel, hasSaksnr } from "../../utils/agreementLabel";
 
-const STATUS_FILTERS: AgreementStatusFilter[] = ["all", "Active", "Upcoming", "Expiring soon", "Expired"];
+type Filter = AgreementStatusFilter | "Missing saksnr";
+const STATUS_FILTERS: Filter[] = ["all", "Active", "Upcoming", "Expiring soon", "Expired", "Missing saksnr"];
 
 export default function Contracts() {
   const fleet = useFleet();
   const refresh = useRefreshVehicles();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AgreementStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<Filter>("all");
   const [isSupplierSelectionOpen, setIsSupplierSelectionOpen] = useState(false);
   const [isCreatingAgreement, setIsCreatingAgreement] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [openAgreement, setOpenAgreement] = useState<{ agreement: FleetAgreement; supplier: FleetSupplier } | null>(null);
   const query = search.trim().toLowerCase();
   const data = fleet.data;
 
@@ -30,8 +34,8 @@ export default function Contracts() {
       const supplier = suppliers.get(agreement.supplierId);
       if (!supplier) return [];
       const status = getAgreementStatus(agreement);
-      if (statusFilter !== "all" && status !== statusFilter) return [];
-      if (query && !`${agreement.note} ${agreement.id} ${supplier.name} ${supplier.orgNumber}`.toLowerCase().includes(query)) return [];
+      if (statusFilter === "Missing saksnr" ? hasSaksnr(agreement) : statusFilter !== "all" && status !== statusFilter) return [];
+      if (query && !`${agreement.saksnr ?? ""} ${agreement.note} ${agreement.id} ${supplier.name} ${supplier.orgNumber}`.toLowerCase().includes(query)) return [];
       return [{ agreement, supplier, status }];
     }).sort((a, b) => a.agreement.endDate.localeCompare(b.agreement.endDate));
   }, [data, query, statusFilter]);
@@ -55,10 +59,7 @@ export default function Contracts() {
     <div className="space-y-5 p-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-headline text-2xl font-semibold text-neutral-900">Supplier agreements</h1>
-          <p className="mt-1 max-w-2xl text-sm text-neutral-500">
-            Agreements are loaded from the fleet system and share its persisted supplier records. Environmental compliance is not assessed by this page.
-          </p>
+          <h1 className="font-headline text-2xl font-semibold text-neutral-900">Agreements</h1>
         </div>
         <button
           type="button"
@@ -80,12 +81,12 @@ export default function Contracts() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <label className="relative block w-full max-w-sm text-xs font-medium text-neutral-600">
             Search agreements or suppliers
-            <Search className="absolute left-3 top-9 h-4 w-4 text-neutral-400" />
-            <input className={`${inputClass} mt-2 pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, organization number or agreement ID" />
+            <Search className="absolute left-3 top-9 h-4 w-4 text-neutral-500" />
+            <input className={`${inputClass} mt-2 pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, organization number or saksnr" />
           </label>
           <label className="text-xs font-medium text-neutral-600">
             Agreement status
-            <select className={`${inputClass} mt-2`} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as AgreementStatusFilter)}>
+            <select className={`${inputClass} mt-2`} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as Filter)}>
               {STATUS_FILTERS.map((status) => <option key={status} value={status}>{status === "all" ? "All statuses" : status}</option>)}
             </select>
           </label>
@@ -98,7 +99,11 @@ export default function Contracts() {
           {agreements.map(({ agreement, supplier, status }) => (
             <article key={agreement.id}>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-medium text-neutral-800">{supplier.name} · {agreement.note.trim() || `Agreement ${agreement.id}`}</h2>
+                <h2 className="text-sm font-medium text-neutral-800">
+                  <button type="button" className="text-left hover:underline" onClick={() => setOpenAgreement({ agreement, supplier })}>
+                    {supplier.name} · {agreementLabel(agreement)}
+                  </button>
+                </h2>
                 <p className="mt-1 text-xs text-neutral-500">
                   Requested from supplier: {[
                     agreement.requiresVehicles && "vehicles",
@@ -106,7 +111,7 @@ export default function Contracts() {
                     agreement.requiresProducts && "products",
                   ].filter(Boolean).join(", ")}
                 </p>
-                <span className={`rounded px-2 py-0.5 text-xs font-medium ${status === "Expired" ? "bg-red-100 text-red-700" : status === "Expiring soon" ? "bg-amber-100 text-amber-800" : status === "Upcoming" ? "bg-blue-100 text-blue-700" : "bg-tertiary-100 text-tertiary-700"}`}>{status}</span>
+                <span className={`rounded px-2 py-0.5 text-xs font-medium ${status === "Expired" ? "bg-red-100 text-red-700" : status === "Expiring soon" ? "bg-amber-100 text-amber-800" : status === "Upcoming" ? "bg-blue-100 text-blue-700" : "bg-tertiary-100 text-tertiary-700"}`}>{agreementStatusText(agreement)}</span>
               </div>
               <AgreementCard
                 supplier={supplier}
@@ -129,6 +134,7 @@ export default function Contracts() {
         <div className="mt-4 flex justify-end"><button type="button" disabled={!selectedSupplierId} className={primaryClass} onClick={() => setIsCreatingAgreement(true)}>Continue</button></div>
       </VehicleDialog>}
       {isSupplierSelectionOpen && isCreatingAgreement && selectedSupplier && <AgreementForm supplier={selectedSupplier} onClose={() => { setIsSupplierSelectionOpen(false); setIsCreatingAgreement(false); setSelectedSupplierId(""); }} onSaved={saved} />}
+      <ContractDetailsDrawer agreement={openAgreement?.agreement ?? null} supplier={openAgreement?.supplier ?? null} onClose={() => setOpenAgreement(null)} />
     </div>
   );
 }
