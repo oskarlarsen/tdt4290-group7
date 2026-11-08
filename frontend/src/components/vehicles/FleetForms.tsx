@@ -93,7 +93,7 @@ export function InviteSupplierForm({ supplier, onClose, onInvited }: { supplier:
   </VehicleDialog>;
 }
 
-export function AgreementForm({ supplier, agreement, onClose, onSaved }: { supplier: FleetSupplier; agreement?: FleetAgreement; onClose: () => void; onSaved: () => void }) {
+export function AgreementForm({ supplier, agreement, vehicleCount = 0, onClose, onSaved }: { supplier: FleetSupplier; agreement?: FleetAgreement; vehicleCount?: number; onClose: () => void; onSaved: () => void }) {
   const [saksnr, setSaksnr] = useState(agreement?.saksnr ?? "");
   const [startDate, setStart] = useState(agreement?.startDate ?? "");
   const [endDate, setEnd] = useState(agreement?.endDate ?? "");
@@ -106,6 +106,7 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
     if (!saksnr.trim() || saksnr.trim().length > 50) throw new Error("Enter the saksnr (case number), up to 50 characters.");
     if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("Enter a valid agreement period.");
     if (!/^\d+$/.test(allowed) || Number(allowed) > 10000) throw new Error("Enter a vehicle allowance between 0 and 10000.");
+    if (Number(allowed) < vehicleCount) throw new Error(`The agreement already has ${vehicleCount} vehicles. Allow at least ${vehicleCount}, or remove vehicles first.`);
     if (requiresVehicles && Number(allowed) === 0) throw new Error("Allow at least one vehicle, or untick Vehicles under required information.");
     if (!requiresVehicles && !requiresEnergy && !requiresProducts) throw new Error("Select at least one type of supplier information to collect.");
     return api.saveAgreement({ supplierId: supplier.id, saksnr: saksnr.trim(), startDate, endDate, allowedVehicles: Number(allowed), note, requiresVehicles, requiresEnergy, requiresProducts }, agreement);
@@ -121,7 +122,7 @@ export function AgreementForm({ supplier, agreement, onClose, onSaved }: { suppl
         <Field label="End date"><input type="date" required min={startDate} aria-label="End date" className={inputClass} value={endDate} onChange={e => setEnd(e.target.value)} /></Field>
       </div>
       {agreementDuration(startDate, endDate) && <p className="text-sm text-neutral-500">{agreementDuration(startDate, endDate)}</p>}
-      <Field label="Maximum vehicles"><input type="number" required min={0} max={10000} step={1} aria-label="Maximum vehicles" className={inputClass} value={allowed} onChange={e => setAllowed(e.target.value)} /></Field>
+      <Field label="Maximum vehicles"><input type="number" required min={vehicleCount} max={10000} step={1} aria-label="Maximum vehicles" className={inputClass} value={allowed} onChange={e => setAllowed(e.target.value)} /></Field>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-neutral-700">Information required from supplier</legend>
         <label className="flex items-center gap-2 text-sm text-neutral-700">
