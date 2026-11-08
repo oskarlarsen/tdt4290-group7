@@ -48,7 +48,8 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
       const lastDay = pending.accessExpiresAt ? new Date(new Date(pending.accessExpiresAt).getTime() - 1).toISOString().slice(0, 10) : undefined;
       return inviteToAccess(pending.role === "ADMIN" ? "admin" : "supplier", pending.email, lastDay);
     },
-    onSuccess: async (created) => { setNewLink(created); await refresh(); },
+    // The earlier link for the same person no longer works, so stop showing it.
+    onSuccess: async (created) => { setNewLink(created); setInvitation(current => current?.email === created.email ? null : current); await refresh(); },
   });
   const canRegenerate = (pending: PendingInvitation) =>
     pending.contact ? mode === "admin" && !!pending.supplierId : mode === (pending.role === "ADMIN" ? "admin" : "supplier");
@@ -153,7 +154,7 @@ export function AccessPanel({ mode }: { mode: "supplier" | "admin" }) {
                 <span className="font-medium text-neutral-900">{invite.email}</span>
                 <span className="block text-xs text-neutral-500">
                   {mode === "admin" ? `${invite.role === "ADMIN" ? "Administrator" : "Supplier"}${invite.supplierName ? ` · ${invite.supplierName}` : ""} · ` : ""}
-                  Not yet activated · link expires {formatDate(invite.expiresAt)}
+                  Not yet activated · link expires {formatDate(invite.expiresAt)}{invite.accessExpiresAt ? ` · access until ${formatDate(new Date(new Date(invite.accessExpiresAt).getTime() - 1).toISOString())}` : ""}
                 </span>
                 {newLink?.email === invite.email ? (
                   <div className="mt-2"><CopyableValue label="New invitation link" value={`${window.location.origin}/accept-invitation#${newLink.token}`} /></div>
