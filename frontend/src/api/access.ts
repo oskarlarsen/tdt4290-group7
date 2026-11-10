@@ -28,11 +28,11 @@ export function getAccess(): Promise<AccessEntry[]> {
   return apiFetch<AccessEntry[]>("/access");
 }
 
-/** Suppliers invite into their own organization; admins invite admins. */
-export function inviteToAccess(kind: "supplier" | "admin", email: string, accessEndDate?: string): Promise<AccessInvitation> {
+/** Suppliers invite into their own organization; admins invite admins, or colleagues into a supplier organization (supplierId). */
+export function inviteToAccess(kind: "supplier" | "admin", email: string, accessEndDate?: string, supplierId?: string): Promise<AccessInvitation> {
   return apiFetch<AccessInvitation>(kind === "supplier" ? "/supplier/colleagues/invitations" : "/admin/team/invitations", {
     method: "POST",
-    body: JSON.stringify({ email, ...(accessEndDate ? { accessEndDate } : {}) }),
+    body: JSON.stringify({ email, ...(accessEndDate ? { accessEndDate } : {}), ...(supplierId ? { supplierId } : {}) }),
   });
 }
 

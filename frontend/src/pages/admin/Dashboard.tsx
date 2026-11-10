@@ -158,7 +158,7 @@ export default function Dashboard() {
           label="Active suppliers"
           value={data.kpis.totalSuppliers}
           sublabel="organizations"
-          note={`${data.kpis.activeAgreements} active agreements`}
+          note={`${data.kpis.activeAgreements} active ${data.kpis.activeAgreements === 1 ? "agreement" : "agreements"}`}
           icon={<Users className="h-4 w-4" />}
         />
         <KpiCard

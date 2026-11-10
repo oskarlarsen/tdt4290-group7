@@ -191,7 +191,7 @@ describe("alert creation date and age formatting", () => {
         })
       )
     );
-    expect(html).toContain("Not available in demo data");
+    expect(html).toContain("Not available");
   });
 
   it("shows all four fictional workflow statuses in the table", () => {

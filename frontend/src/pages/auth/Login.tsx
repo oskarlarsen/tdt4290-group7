@@ -35,9 +35,13 @@ export default function Login() {
   // Preserve the original destination when redirecting to login
   const from = safeRedirectPath((location.state as { from?: unknown } | null)?.from);
 
+  // The context keeps the last sign-in error; hide it once the user moves on to password reset.
+  const [authErrorHidden, setAuthErrorHidden] = useState(false);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
+    setAuthErrorHidden(false);
 
     if (!email.trim() || !password) {
       setFormError("Enter your email or username and password");
@@ -61,6 +65,7 @@ export default function Login() {
 
   async function handleForgotPassword() {
     const value = email.trim();
+    setAuthErrorHidden(true);
 
     if (!value) {
       setFormError("Enter your email address first, then select Forgot password");
@@ -113,7 +118,7 @@ export default function Login() {
     }
   }
 
-  const displayError = formError ?? authError;
+  const displayError = formError ?? (authErrorHidden ? null : authError);
 
   if (user) return <Navigate to={from ?? "/"} replace />;
 

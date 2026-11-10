@@ -484,7 +484,7 @@ internal class OnboardingRepository(
             batchId = batchId,
             entityType = cached.entityType,
             importedRows = cached.rows.size,
-            message = "Successfully committed ${cached.rows.size} ${cached.entityType.name.lowercase(Locale.ROOT)} record(s)."
+            message = "Successfully imported ${cached.rows.size} ${if (cached.rows.size == 1) "record" else "records"}."
         )
     }
 

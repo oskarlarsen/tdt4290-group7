@@ -163,7 +163,7 @@ export function RiskAttentionCard({
           aria-live="polite"
           className="fixed bottom-6 right-6 z-50 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
         >
-          Notice recorded successfully.
+          Notice recorded for demo only; no email was sent.
         </div>
       )}
     </>

@@ -10,17 +10,28 @@ The application is a prototype: some areas have working workflows, while others 
 |---|---|
 | Dashboard | Backend-connected overview of totals, risk classification, issue categories and alerts, computed from stored vehicle checks and certificates. Includes placeholder CSV export button. |
 | Suppliers | Backend-connected directory with supplier details, notes and follow-up status, next to organization, agreement and invitation management. |
-| Contracts | Demo contract directory, compliance summaries and placeholder CSV export.  |
+| Contracts | Active agreements as contracts, with each supplier's stored risk, compliance summaries and placeholder CSV export. |
 | Vehicles | Backend-connected supplier and agreement management, registered/planned vehicles, statistics, registry checks and change history with undo. |
 | Environmental Certificates | Admins can upload PDF certificates for backend text/OCR extraction and review parsed metadata. Contract attachments, registry verification and automatic reminders are not connected. |
-| Energy & Fuel | Placeholder page for energy and fuel reporting. |
+| Energy & Fuel | Shows no records until the backend has per-contract energy requirements; demo records are available with `VITE_USE_MOCKS=true`. |
 | Risk & Prediction | Placeholder page for risk analysis. |
 | Alerts | Backend-connected alerts with manual alerts, status changes, archive and restore. |
 | Reports | Placeholder page. |
 | Supplier workspace | Backend-connected onboarding dashboard for contact details, checklist progress, CSV template/download, validation preview, imports and submission. Other supplier pages remain placeholders. |
 | Authentication | Admin/supplier sign-in, logout and session handling. Password-reset API exists; email delivery is not connected. |
 
-Contract and energy demo data are separate from the vehicle database.
+### Real data or demo data
+
+The app runs in one of two ways. Nothing else changes between them.
+
+| | Real data (default) | Demo data |
+|---|---|---|
+| How | Start the app as described below. | After the backend is running, also run `SEED_ADMIN_PASSWORD=<your admin password> node scripts/seed-demo-data.mjs` and build the frontend with `VITE_USE_MOCKS=true`. |
+| Suppliers, agreements, vehicles, certificates, alerts, notes | Only what is entered in the app. | Eight demo suppliers with agreements, planned vehicles, certificates, alerts and notes, written to the database through the API. The script can be run twice safely. |
+| Contracts and Risk | Built from real agreements. | Same, built from the seeded agreements. |
+| Energy | Empty until energy reporting is connected. | Fictional consumption attached to the real contracts. |
+
+To go back to real data, remove the database (`docker compose down -v`) and start without the script and with `VITE_USE_MOCKS=false`.
 
 ## Run locally
 
@@ -73,7 +84,7 @@ Generate a signing secret with:
 node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
 ```
 
-Keep `VITE_USE_MOCKS=false` and `VITE_USE_MOCK_AUTH=false` as supplied. Set `VITE_USE_MOCKS=true` only to see demo data on the Contracts and Energy pages, which have no backend yet.
+Keep `VITE_USE_MOCKS=false` and `VITE_USE_MOCK_AUTH=false` as supplied. Set `VITE_USE_MOCKS=true` only together with the demo data script (see "Real data or demo data"); it adds fictional energy records.
 
 `SVV_API_KEY` is optional for startup. Adding or replacing a registered vehicle requires a working "Statens-vegvesen-API-key". Without one, you can still manage suppliers, agreements and planned entries.
 

@@ -193,6 +193,11 @@ export default function Onboarding() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // The banners render at the top of a long page; bring them into view after an action near the bottom.
+  useEffect(() => {
+    if (notice || error) document.querySelector('[data-onboarding-banner]')?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [notice, error]);
+
   const refresh = useCallback(async () => {
     const [nextStatus, nextOverview] = await Promise.all([
       getOnboardingStatus(),
@@ -285,8 +290,7 @@ export default function Onboarding() {
       const result = await submitOnboarding();
       setStatus(result);
       await refresh();
-      setNotice("Your onboarding information has been submitted for review.");
-      navigate("/supplier/dashboard", { replace: true });
+      navigate("/supplier/dashboard", { replace: true, state: { notice: "Your onboarding information has been submitted for review." } });
     });
   }
 
@@ -367,13 +371,13 @@ export default function Onboarding() {
       </section>
 
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div data-onboarding-banner role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div data-onboarding-banner role="status" className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {notice}
         </div>
@@ -611,7 +615,7 @@ export default function Onboarding() {
                   type="button"
                   disabled={working}
                   onClick={handleConfirm}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-50"
                 >
                   <Check className="h-4 w-4" aria-hidden="true" />
                   Confirm import

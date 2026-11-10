@@ -129,6 +129,18 @@ class SharedAccessTest {
     }
 
     @Test
+    fun anAdminCanReissueAColleagueLinkInsideTheSupplierOrganization() {
+        val owner = supplierOwner()
+        val email = "colleague-${UUID.randomUUID()}@example.no"
+        UserRepository.createAccessInvitation(owner, email, "S", null, now)
+        val reissued = UserRepository.createAccessInvitation(admin, email, "S", null, now, supplierId = owner.supplierId)
+        val pending = UserRepository.pendingInvitations(owner.supplierId, now).single { it.email == email }
+        assertEquals(owner.supplierId, pending.supplierId)
+        assertNotNull(UserRepository.acceptSupplierInvitation(reissued.token, "test-only-supplier-password", now, name = "Ola"))
+        assertFailsWith<IllegalArgumentException> { UserRepository.createAccessInvitation(owner, "x-${UUID.randomUUID()}@example.no", "S", null, now, supplierId = owner.supplierId) }
+    }
+
+    @Test
     fun anotherOrganizationsPendingInvitationCannotBeCancelledOrTaken() {
         val owner = supplierOwner(); val rival = supplierOwner()
         val email = "contested-${UUID.randomUUID()}@example.no"

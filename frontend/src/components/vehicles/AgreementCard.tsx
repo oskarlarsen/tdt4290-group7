@@ -59,7 +59,7 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
         <button className={dangerClass} disabled={removeAgreement.isPending} onClick={() => { removeAgreement.reset(); setRemoving("agreement"); }}>Remove agreement</button>
       </div>
     </details>
-    {editing && <AgreementForm supplier={supplier} agreement={agreement} onClose={() => setEditing(false)} onSaved={saved} />}
+    {editing && <AgreementForm supplier={supplier} agreement={agreement} vehicleCount={listed.length} onClose={() => setEditing(false)} onSaved={saved} />}
     {entry && <VehicleEntryForm agreementId={agreement.id} replacing={entry === "new" ? undefined : entry} onClose={() => setEntry(null)} onSaved={saved} />}
     {removing && <ConfirmAction title={removing === "agreement" ? `Remove agreement for ${supplier.name}?` : `Remove ${removing.registrationNumber}?`}
       label={removing === "agreement" ? "Remove agreement" : "Remove vehicle"} busy={remove.isPending || removeAgreement.isPending}
