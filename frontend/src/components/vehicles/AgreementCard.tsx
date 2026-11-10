@@ -14,7 +14,7 @@ export function VehicleAllowance({ count, allowed }: { count: number; allowed: n
   return <span className={`text-sm font-medium ${count > allowed ? "text-red-700" : "text-neutral-700"}`}>{count} of {allowed} vehicles</span>;
 }
 
-export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { supplier: FleetSupplier; agreement: FleetAgreement; vehicles: Vehicle[]; onOpen: (plate: string) => void }) {
+export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { supplier: FleetSupplier; agreement: FleetAgreement; vehicles: Vehicle[]; onOpen: (plate: string, agreementId: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [entry, setEntry] = useState<Vehicle | "new" | null>(null);
   const [removing, setRemoving] = useState<Vehicle | "agreement" | null>(null);
@@ -29,7 +29,7 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
     return <li key={vehicle.registrationNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 py-3">
       <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-medium">{vehicle.planned ? "Planned vehicle" : vehicle.registrationNumber}</span>{vehicle.planned && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">Registration pending</span>}</div>
       <div className="flex flex-wrap gap-2">
-        {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber)}>View details</button>}
+        {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber, agreement.id)}>View details</button>}
         {vehicle.listed && <><button className={buttonClass} onClick={() => setEntry(vehicle)}>{vehicle.planned ? "Register vehicle" : "Replace vehicle"}</button>
           <button className={buttonClass} disabled={remove.isPending} onClick={() => { remove.reset(); setRemoving(vehicle); }}>Remove</button></>}
       </div>
