@@ -31,7 +31,7 @@ The optional arguments set the sample count (1–60) and seed; reusing a seed re
 
 - Native startup from `backend/` creates `data/vehicles.db`; Docker uses a persistent volume. Suppliers, agreements, statistics, checks and change history survive restarts.
 - Certificate metadata is stored in its own SQLite database at `data/certificates.db` by default, independent of the vehicle database. Set `CERTIFICATE_DB_PATH` to choose another location. Uploads require an admin session; only extracted metadata is retained.
-- Authentication accounts are seeded in memory. Restarting restores the configured account passwords and requires signing in again.
+- Accounts are stored in SQLite at `data/users.db` by default (`USER_DB_PATH` overrides it). The administrator account is bootstrapped from `SEED_ADMIN_PASSWORD`; supplier accounts are created by accepting a one-time invitation generated from the supplier card.
 - The registry key enables live Statens vegvesen requests. Adding/replacing registered vehicles requires a successful live lookup; planned entries do not.
 - Dashboard, supplier-directory and contract demo data are frontend features. There are no backend APIs for the placeholder screens.
 

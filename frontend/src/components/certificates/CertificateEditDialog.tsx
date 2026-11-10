@@ -1,16 +1,26 @@
-import type { FormEvent } from "react";
+import { useEffect, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useUpdateCertificate } from "../../hooks/useCertificates";
-import type { Certificate } from "../../types/certificate";
+import type { Certificate, CertificateContract } from "../../types/certificate";
 
 export function CertificateEditDialog({
   certificate,
+  contracts,
   onClose,
 }: {
   certificate: Certificate;
+  contracts: CertificateContract[];
   onClose: () => void;
 }) {
   const update = useUpdateCertificate();
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !update.isPending) onClose();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, update.isPending]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,6 +53,7 @@ export function CertificateEditDialog({
         aria-labelledby="edit-certificate-title"
         className="w-full max-w-lg rounded-xl border border-neutral-100 bg-white p-5 shadow-card"
         onSubmit={handleSubmit}
+        onChange={() => { if (update.isError) update.reset(); }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -59,7 +70,7 @@ export function CertificateEditDialog({
             onClick={onClose}
             disabled={update.isPending}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+            className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
           </button>
@@ -105,13 +116,22 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700 sm:col-span-2">
-            Contract reference
-            <input
-              maxLength={200}
+            Agreement
+            <select
               name="contractId"
               defaultValue={certificate.contractId}
               className="mt-1 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm font-normal outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-            />
+            >
+              <option value="">Not linked</option>
+              {certificate.contractId && !contracts.some((contract) => contract.id === certificate.contractId) && (
+                <option value={certificate.contractId}>Existing agreement no longer active</option>
+              )}
+              {contracts.map((contract) => (
+                <option key={contract.id} value={contract.id}>
+                  {contract.supplierName} — {contract.contractName}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 

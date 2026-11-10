@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { User, Lock, Eye, EyeOff, Info, Loader2, KeyRound} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { requestPasswordReset, resetPassword } from "@/api/auth";
@@ -10,10 +10,10 @@ const MIN_PASSWORD_LENGTH = 12;
 const LOGIN_EMAIL_PLACEHOLDER =
   import.meta.env.VITE_USE_MOCK_AUTH === "true"
     ? "admin@kommune.no"
-    : "advisor.hansen@kommune.no";
+    : "name@example.com";
 
 export default function Login() {
-  const { login, status, error: authError } = useAuth();
+  const { user, login, status, error: authError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -115,8 +115,10 @@ export default function Login() {
 
   const displayError = formError ?? authError;
 
+  if (user) return <Navigate to={from ?? "/"} replace />;
+
   return (
-    <div className="min-h-screen bg-[#F8FAF9] flex items-center justify-center px-4 py-10">
+    <main className="min-h-screen bg-[#F8FAF9] flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-[420px] bg-white rounded-2xl border border-gray-100 shadow-card p-8">
         {/* Logo */}
         <div className="flex justify-center mb-5">
@@ -237,7 +239,7 @@ export default function Login() {
                   />
                 </div>
               </div>
-              <p className="text-xs font-normal text-gray-400 mb-5">
+              <p className="text-xs font-normal text-gray-500 mb-5">
                 Single sign-in for municipal advisors &amp; registered suppliers
               </p>
 
@@ -321,7 +323,7 @@ export default function Login() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 // Only allow redirects back into this app. Rejects protocol-relative ("//evil.com") and

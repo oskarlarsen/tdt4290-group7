@@ -8,7 +8,7 @@ export function DeviationFacts({ finding, check }: { finding: DeviationFinding; 
     <div className="space-y-3 px-3 pb-3">
       <p className="text-sm text-neutral-600">{analysis.explanation}</p>
       <div className="overflow-x-auto"><table className="w-full min-w-[30rem] table-fixed text-left text-sm">
-        <caption className="sr-only">Saved facts for {analysis.title}</caption>
+        <caption className="sr-only">Compared values: {analysis.title}</caption>
         <thead><tr className="border-b border-neutral-200"><th scope="col" className="w-1/4 py-2 pr-3 font-medium text-neutral-500">Fact</th><th scope="col" className="py-2 pr-3 font-medium">{analysis.comparison.leftLabel}</th><th scope="col" className="py-2 font-medium">{analysis.comparison.rightLabel}</th></tr></thead>
         <tbody>{analysis.comparison.rows.map((row, index) => <tr key={index} className="border-b border-neutral-100 last:border-0">
           <th scope="row" className="py-3 pr-3 align-top font-normal text-neutral-500">{row.label}</th>

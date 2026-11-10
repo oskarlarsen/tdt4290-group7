@@ -6,6 +6,7 @@ import {
   useMarkNotificationAsRead,
   useMarkAllNotificationsAsRead,
 } from "../../hooks/useNotifications";
+import { useAuth } from "../../hooks/useAuth";
 import type { Notification } from "../../types/notification";
 
 const SEVERITY_DOT: Record<Notification["severity"], string> = {
@@ -19,6 +20,7 @@ export function NotificationBell() {
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,8 +37,9 @@ export function NotificationBell() {
   function handleClick(n: Notification) {
     if (!n.read) markAsRead.mutate(n.id);
     setOpen(false);
-    // Navigate only for notifications that have a supplier destination
-    if (n.supplierId) navigate(`/admin/suppliers/${n.supplierId}`);
+    // A supplier's notification is about one of its alerts; an admin's goes to the supplier it concerns.
+    if (user?.role === "SUPPLIER") navigate("/supplier/alerts");
+    else if (n.supplierId) navigate(`/admin/suppliers/${n.supplierId}`);
   }
 
   return (
@@ -57,7 +60,7 @@ export function NotificationBell() {
       {open && (
         <div className="absolute right-0 z-10 mt-2 w-80 rounded-lg border border-neutral-100 bg-white shadow-card">
           <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
-            <span className="text-xs font-mono uppercase tracking-wide text-neutral-400">Notifications</span>
+            <span className="text-xs font-mono uppercase tracking-wide text-neutral-500">Notifications</span>
             {unreadCount > 0 && (
               <button
                 onClick={() => markAllAsRead.mutate()}
@@ -90,7 +93,7 @@ export function NotificationBell() {
                       {n.title}
                     </div>
                     <div className="text-xs text-neutral-500">{n.message}</div>
-                    <div className="mt-0.5 font-mono text-[11px] text-neutral-400">{n.timeAgo}</div>
+                    <div className="mt-0.5 font-mono text-[11px] text-neutral-500">{n.timeAgo}</div>
                   </div>
                 </div>
               </button>
@@ -100,7 +103,7 @@ export function NotificationBell() {
           {/* No notification-history page exists yet — shown disabled
               rather than wired to a fake route */}
           <div className="border-t border-neutral-100 px-3 py-2 text-center">
-            <span className="cursor-not-allowed text-xs text-neutral-300">View all notifications</span>
+            <span className="cursor-not-allowed text-xs text-neutral-500">View all notifications</span>
           </div>
         </div>
       )}

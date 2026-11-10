@@ -18,6 +18,15 @@ export type AlertFindingType =
   | "UPCOMING_EXPIRY";
 export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "FUEL_DEVIATION";
 export type SupplierRisk = RiskCategory | "unassessed";
+export type SupplierOnboardingStatus =
+  | "INVITED"
+  | "PROFILE_PENDING"
+  | "DATA_DRAFT"
+  | "VALIDATING"
+  | "SUBMITTED"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "REVISION_REQUIRED";
 export type NewSupplierInput = {
   displayName: string;
   orgId: string;
@@ -25,22 +34,52 @@ export type NewSupplierInput = {
   primaryContract?: string;
 };
 
-// TODO: Match this type with the backend response when the dashboard API is ready
+export type AdminDashboardAgreement = {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  supplierOrgNumber: string;
+  note: string;
+  startDate: string;
+  endDate: string;
+  allowedVehicles: number;
+  listedVehicles: number;
+};
+
+export type AdminDashboardSummary = {
+  generatedAt: string;
+  activeSuppliers: number;
+  activeAgreements: number;
+  listedVehicles: number;
+  certificatesTracked: number;
+  expiredCertificates: number;
+  certificatesExpiringWithin90Days: number;
+  agreements: AdminDashboardAgreement[];
+};
+
 export type DashboardKpis = {
   totalSuppliers: number;
   totalSuppliersDeltaThisMonth: number;
   highRiskSuppliers: number;
   monitoredSuppliers: number;
   activeAlerts: number;
-  alertsBySeverity: { high: number; medium: number };
+  alertsBySeverity: { high: number; medium: number; low: number };
   complianceRatePercent: number;
   complianceTargetPercent: number;
+  assessedSuppliers: number;
+  activeAgreements: number;
+  listedVehicles: number;
+  certificatesTracked: number;
+  expiredCertificates: number;
+  certificatesExpiringWithin90Days: number;
 };
 
 export type RiskClassification = {
   compliant: { count: number; percent: number };
   medium: { count: number; percent: number };
   high: { count: number; percent: number };
+  // Suppliers with no stored vehicle check or dated certificate. Percentages are of all suppliers.
+  unassessed: { count: number; percent: number };
 };
 
 export type UnmodeledSupplierAggregate = {
@@ -66,6 +105,25 @@ export type TopRiskSupplier = {
   mainIssue: string;
   // Set the issue only for high/medium-risk suppliers
   issueCategory?: SupplierIssueCategory;
+  // Every category that applies; older responses only have issueCategory.
+  issueCategories?: SupplierIssueCategory[];
+  onboardingStatus?: SupplierOnboardingStatus;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  reviewerNotes?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  agreementCount?: number;
+  vehicleCount?: number;
+  certificateCount?: number;
+  energyRecordCount?: number;
+  productCount?: number;
+  registeredAccountCount?: number;
+  lastActiveAt?: string | null;
+  lastUpdatedAt?: string | null;
+  /** SUPPLIER, or ADMIN when an admin made the change for the supplier; null when unknown. */
+  lastUpdatedBy?: string | null;
 };
 
 export type RecentAlert = {
@@ -79,6 +137,8 @@ export type RecentAlert = {
   category?: AlertCategory;
   source?: AlertSource;
   dueDate?: string;
+  /** Set when an admin archived the alert; archived alerts are hidden unless asked for. */
+  archivedAt?: string | null;
   findingType?: AlertFindingType;
   affectedItem?: {
     type: "Vehicle" | "Document";
@@ -87,6 +147,14 @@ export type RecentAlert = {
   reason?: string;
   // Set only when the alert clearly matches a supplier issue in the mock data
   supplierId?: string;
+};
+
+/** Content of a manual alert an admin may change. dueDate: undefined keeps it, "" clears it. */
+export type AlertContentUpdate = {
+  title?: string;
+  description?: string;
+  severity?: AlertSeverity;
+  dueDate?: string;
 };
 
 export type NewManualAlertInput = {
@@ -102,34 +170,35 @@ export type NewManualAlertInput = {
 export type IssueCategoryBreakdown = {
   vehicleDeviation: number;
   certificateExpiry: number;
-  fuelDeviation: number;
-  // All three counts are based on the same supplier total
+  fuelDeviation: number | null;
+  // Counts use suppliers with persisted assessment evidence.
   modeledSupplierCount: number;
 };
 
+// SELF notes are seen only by their author; INTERNAL notes by every admin. Suppliers never see notes.
+export type NoteVisibility = "SELF" | "INTERNAL";
+
+export type SupplierNote = {
+  id: string;
+  supplierId: string;
+  authorId: string;
+  authorName: string;
+  visibility: NoteVisibility;
+  text: string;
+  alertId: string | null;
+  createdAt: string;
+};
+
+export type NewSupplierNote = { text: string; visibility: NoteVisibility; alertId?: string };
+
 export type DashboardSummary = {
   lastSyncedAt: string;
+  /** When check-ins started being recorded: suppliers with none were last seen before this. */
+  activityTrackingSince?: string;
   kpis: DashboardKpis;
   riskClassification: RiskClassification;
   topRiskSuppliers: TopRiskSupplier[];
   suppliersRequiringAttention: TopRiskSupplier[];
   issueCategoryBreakdown: IssueCategoryBreakdown;
   recentAlerts: RecentAlert[];
-};
-
-export type SupplierNote = {
-  id: string;
-  supplierId: string;
-  authorName: string;
-  text: string;
-  createdAt: string;
-};
-
-export type SupplierNotice = {
-  id: string;
-  supplierId: string;
-  title: string;
-  message: string;
-  createdAt: string;
-  isRead: boolean;
 };

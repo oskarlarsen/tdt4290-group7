@@ -116,7 +116,7 @@ class VehicleInputRulesTest {
 
     @Test
     fun incompatibleSchemasRequireAnExplicitResetWithoutChangingRecords() {
-        for (version in listOf(2, 7)) {
+        for (version in listOf(2, 7, 11)) {
             val path = path()
             java.nio.file.Files.createDirectories(path.parent)
             DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
@@ -127,7 +127,7 @@ class VehicleInputRulesTest {
                 }
             }
             val error = assertFailsWith<IllegalStateException> { VehicleRepository(path) }
-            assertTrue(error.message!!.contains("reset-vehicle-data.ps1"))
+            assertTrue(error.message!!.contains("delete "))
             DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
                 db.createStatement().use { it.executeQuery("SELECT registration_number FROM vehicles").use { rows ->
                     assertTrue(rows.next()); assertEquals("TEST01", rows.getString(1)); assertFalse(rows.next())
@@ -136,6 +136,46 @@ class VehicleInputRulesTest {
                     rows.next(); assertEquals(version, rows.getInt(1))
                 } }
             }
+        }
+    }
+
+    @Test
+    fun versionTenDatabaseOpensAndKeepsItsVersion() {
+        val path = path()
+        VehicleRepository(path)
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.execute("PRAGMA user_version=10") }
+        }
+        VehicleRepository(path)
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
+                rows.next(); assertEquals(10, rows.getInt(1))
+            } }
+        }
+    }
+
+    @Test
+    fun versionNineDatabaseGetsSaksnrAndBecomesVersionTen() {
+        val path = path()
+        VehicleRepository(path)
+        // Rebuild the version-9 shape: same tables, no saksnr column.
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            db.createStatement().use {
+                it.execute("ALTER TABLE agreements DROP COLUMN saksnr")
+                it.execute("ALTER TABLE change_agreements DROP COLUMN saksnr")
+                it.execute("PRAGMA user_version=9")
+            }
+        }
+        VehicleRepository(path)
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
+            for (table in listOf("agreements", "change_agreements")) {
+                val columns = db.createStatement().use { s -> s.executeQuery("PRAGMA table_info($table)").use { rows ->
+                    buildList { while (rows.next()) add(rows.getString("name")) } } }
+                assertTrue("saksnr" in columns, "$table is missing saksnr")
+            }
+            db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
+                rows.next(); assertEquals(10, rows.getInt(1))
+            } }
         }
     }
 

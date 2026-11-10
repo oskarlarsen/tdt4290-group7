@@ -45,7 +45,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cors")
     implementation("io.ktor:ktor-server-call-logging")
     implementation("io.ktor:ktor-server-status-pages")
-    implementation("org.xerial:sqlite-jdbc:3.53.4.0")
+    implementation("org.xerial:sqlite-jdbc:3.54.1.0")
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("io.ktor:ktor-server-rate-limit")
@@ -65,8 +65,9 @@ tasks.test {
     // The app refuses to start without these; tests get throwaway values that never ship.
     environment("JWT_SECRET", "test-only-jwt-secret")
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
-    environment("SEED_SUPPLIER_PASSWORD", "test-only-supplier-password")
-    // Auth tests now initialize the vehicle store too; keep them away from local vehicle data.
+    // Auth tests use isolated SQLite stores and never touch local application data.
     environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles-v7.db").get().asFile.absolutePath)
     environment("CERTIFICATE_DB_PATH", layout.buildDirectory.file("test-data/default-certificates.db").get().asFile.absolutePath)
+    environment("ADMIN_INSIGHTS_DB_PATH", layout.buildDirectory.file("test-data/default-admin-insights.db").get().asFile.absolutePath)
+    environment("USER_DB_PATH", layout.buildDirectory.file("test-data/default-users.db").get().asFile.absolutePath)
 }

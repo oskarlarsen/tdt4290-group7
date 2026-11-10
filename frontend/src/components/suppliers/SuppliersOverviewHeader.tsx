@@ -1,9 +1,5 @@
-import { useState } from "react";
 import { Building2, ShieldAlert, Clock3, CheckCircle2, Download, Plus } from "lucide-react";
 import { KpiCard } from "../ui/KpiCard";
-import { AddSupplierDialog } from "./AddSupplierDialog";
-import type { DerivedContract } from "../../types/contract";
-import type { NewSupplierInput, TopRiskSupplier } from "../../types/dashboard";
 
 type Props = {
   monitoredSuppliers: number;
@@ -13,14 +9,10 @@ type Props = {
   compliantCount: number;
   compliantPercent: number;
   onExport: () => void;
-  existingSuppliers: TopRiskSupplier[];
-  contracts: DerivedContract[];
-  contractsLoading: boolean;
-  contractsError: boolean;
-  onAddSupplier: (supplier: NewSupplierInput) => Promise<void>;
+  onAddSupplier: () => void;
 };
 
-// Use the mockup as a visual reference, but show only metrics backed by the shared dashboard summary
+// Risk totals are based on suppliers with persisted vehicle or certificate evidence.
 export function SuppliersOverviewHeader({
   monitoredSuppliers,
   modeledSupplierCount,
@@ -29,14 +21,8 @@ export function SuppliersOverviewHeader({
   compliantCount,
   compliantPercent,
   onExport,
-  existingSuppliers,
-  contracts,
-  contractsLoading,
-  contractsError,
   onAddSupplier,
 }: Props) {
-  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
-
   const cards = [
     {
       label: "MONITORED SUPPLIERS",
@@ -50,7 +36,7 @@ export function SuppliersOverviewHeader({
       label: "HIGH RISK",
       value: highCount,
       valueClass: "text-black",
-      sublabel: "Portfolio-wide, needs immediate follow-up",
+      sublabel: "Assessed suppliers with high-priority findings",
       icon: ShieldAlert,
       iconStyle: "bg-red-100 text-red-700",
     },
@@ -58,15 +44,15 @@ export function SuppliersOverviewHeader({
       label: "MEDIUM RISK",
       value: mediumCount,
       valueClass: "text-black",
-      sublabel: "Portfolio-wide, needs follow-up",
+      sublabel: "Assessed suppliers with findings to review",
       icon: Clock3,
       iconStyle: "bg-amber-100 text-amber-700",
     },
     {
-      label: "COMPLIANT",
+      label: "NO FLAGGED EVIDENCE",
       value: compliantCount,
       valueClass: "text-black",
-      sublabel: `${compliantPercent}% of monitored suppliers`,
+      sublabel: `${compliantPercent}% of all suppliers`,
       icon: CheckCircle2,
       iconStyle: "bg-tertiary-100 text-tertiary-700",
     },
@@ -99,11 +85,11 @@ export function SuppliersOverviewHeader({
             </button>
             <button
               type="button"
-              onClick={() => setIsAddSupplierOpen(true)}
+              onClick={onAddSupplier}
               className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg bg-[#1f4d46] px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#173a34]"
             >
               <Plus className="h-4 w-4" />
-              Add Supplier
+              Add supplier
             </button>
           </div>
         </div>
@@ -123,15 +109,6 @@ export function SuppliersOverviewHeader({
         ))}
       </div>
 
-      <AddSupplierDialog
-        open={isAddSupplierOpen}
-        existingSuppliers={existingSuppliers}
-        contracts={contracts}
-        contractsLoading={contractsLoading}
-        contractsError={contractsError}
-        onClose={() => setIsAddSupplierOpen(false)}
-        onAddSupplier={onAddSupplier}
-      />
     </div>
   );
 }

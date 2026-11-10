@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supplier Onboarding Technical Specification — Trondheim kommune</title>
+  <style>
+    :root {
+      --primary: #00457C;
+      --primary-light: #EBF3FA;
+      --secondary: #1E7E34;
+      --secondary-light: #EAF7ED;
+      --dark: #24292F;
+      --muted: #57606A;
+      --border: #D0D7DE;
+      --bg-light: #F6F8FA;
+      --badge-mandatory: #CF222E;
+      --badge-conditional: #9A6700;
+      --badge-optional: #57606A;
+      --badge-system: #0969DA;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--dark);
+      background-color: #FFFFFF;
+      line-height: 1.55;
+      font-size: 10.5pt;
+      padding: 24px;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 15mm 12mm 15mm 12mm;
+      @bottom-right {
+        content: counter(page);
+        font-size: 9pt;
+        color: #57606A;
+      }
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        background: #FFFFFF;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      tr {
+        page-break-inside: avoid;
+      }
+      h1, h2, h3, h4 {
+        page-break-after: avoid;
+      }
+      pre, code {
+        font-size: 8.5pt !important;
+      }
+      table {
+        font-size: 8pt !important;
+      }
+    }
+
+    .container {
+      max-width: 1050px;
+      margin: 0 auto;
+    }
+
+    /* Cover / Header */
+    .header-card {
+      border: 1px solid var(--border);
+      border-top: 6px solid var(--primary);
+      border-radius: 6px;
+      padding: 28px;
+      background: #FFFFFF;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .header-card h1 {
+      color: var(--primary);
+      font-size: 22pt;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .header-card .subtitle {
+      font-size: 13pt;
+      color: var(--muted);
+      font-weight: 400;
+      margin-bottom: 16px;
+    }
+
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 9pt;
+    }
+
+    .metadata-item strong {
+      display: block;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 7.5pt;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }
+
+    /* Section Headings */
+    h2 {
+      color: var(--primary);
+      font-size: 14pt;
+      font-weight: 700;
+      border-bottom: 2px solid var(--primary-light);
+      padding-bottom: 6px;
+      margin-top: 28px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    h2 .section-num {
+      background: var(--primary);
+      color: white;
+      font-size: 9pt;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-right: 10px;
+      font-weight: 600;
+    }
+
+    h3 {
+      color: var(--dark);
+      font-size: 11.5pt;
+      font-weight: 600;
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+
+    h4 {
+      color: var(--muted);
+      font-size: 10pt;
+      font-weight: 600;
+      margin-top: 12px;
+      margin-bottom: 4px;
+    }
+
+    p {
+      margin-bottom: 10px;
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px 0;
+      font-size: 8.5pt;
+      background: #FFFFFF;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background-color: var(--bg-light);
+      color: var(--dark);
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+    }
+
+    tr:nth-child(even) td {
+      background-color: #FAFBFC;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 7.5pt;
+      font-weight: 600;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .badge-mandatory { background: #FFEBE9; color: var(--badge-mandatory); border: 1px solid rgba(207,34,46,0.2); }
+    .badge-conditional { background: #FFF8C5; color: var(--badge-conditional); border: 1px solid rgba(154,103,0,0.2); }
+    .badge-optional { background: #F6F8FA; color: var(--badge-optional); border: 1px solid var(--border); }
+    .badge-system { background: #DDF4FF; color: var(--badge-system); border: 1px solid rgba(9,105,218,0.2); }
+    .badge-high { background: #DCFFE4; color: var(--secondary); border: 1px solid rgba(30,126,52,0.2); }
+
+    /* Code blocks */
+    code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 8.5pt;
+      background: var(--bg-light);
+      padding: 1px 4px;
+      border-radius: 3px;
+      border: 1px solid rgba(175, 184, 193, 0.4);
+      color: #0969DA;
+    }
+
+    pre {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 8.5pt;
+      background: #1F2428;
+      color: #F0F6FC;
+      padding: 12px 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 12px 0 16px 0;
+      line-height: 1.45;
+    }
+
+    pre code {
+      background: transparent;
+      border: none;
+      color: inherit;
+      padding: 0;
+    }
+
+    .callout {
+      border-left: 4px solid var(--primary);
+      background: var(--primary-light);
+      padding: 10px 14px;
+      border-radius: 0 4px 4px 0;
+      margin: 14px 0;
+      font-size: 9.5pt;
+    }
+
+    .callout-success {
+      border-left-color: var(--secondary);
+      background: var(--secondary-light);
+    }
+
+    .callout-warning {
+      border-left-color: #9A6700;
+      background: #FFF8C5;
+    }
+
+    .footer {
+      margin-top: 36px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 8.5pt;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Document Header -->
+  <div class="header-card">
+    <h1>Supplier Onboarding Technical Specification</h1>
+    <div class="subtitle">Data Architecture, CSV Ingestion Protocols & Backend Schema Design</div>
+    <p>Comprehensive technical specification and empirical data evaluation for the municipal environmental monitoring system of Trondheim kommune (Innkjøpstjenesten).</p>
+
+    <div class="metadata-grid">
+      <div class="metadata-item">
+        <strong>Client Organization</strong>
+        Trondheim kommune (Innkjøpstjenesten)
+      </div>
+      <div class="metadata-item">
+        <strong>System Target</strong>
+        Environmental Monitoring & Compliance
+      </div>
+      <div class="metadata-item">
+        <strong>Document Version</strong>
+        Version 1.0 (Production Blueprint)
+      </div>
+      <div class="metadata-item">
+        <strong>Analysis Scope</strong>
+        Root Data Directory (All 42 Files)
+      </div>
+    </div>
+  </div>
+
+  <!-- Table of Contents -->
+  <div class="callout no-print">
+    <strong>Contents Overview:</strong>
+    1. Executive Summary &amp; Core Architecture &bull;
+    2. Comprehensive Inventory of All 42 Data Files &bull;
+    3. Project Requirements &amp; Code Traceability &bull;
+    4. Supplier Data Dictionary &bull;
+    5. Standardized CSV Ingestion Specifications &bull;
+    6. Relational Entity Architecture &bull;
+    7. Backend Architecture &amp; Lifecycle &bull;
+    8. Security, GDPR &amp; Risk Mitigation &bull;
+    9. Implementation Roadmap
+  </div>
+
+  <!-- SECTION 1 -->
+  <h2><span class="section-num">01</span> Executive Summary &amp; Core Architecture</h2>
+  <p>
+    This architectural document delivers the formal specification for onboarding suppliers onto the municipal Environmental Monitoring and Contract Compliance platform developed for <strong>Trondheim kommune (Innkjøpstjenesten)</strong>. The analysis synthesizes empirical evidence obtained from inspecting every single file (42 in total) within the project's root <code>data/</code> directory, cross-referenced with the existing full-stack codebase (Kotlin 2.x, Ktor, SQLite STRICT, React 19, TypeScript, Tailwind CSS).
+  </p>
+  <p>
+    Historically, municipal procurement follow-up relied on disparate Excel spreadsheets, scanned and redacted PDF certificates, manual warning emails (<em>purringer</em>), and ad-hoc communications. This platform replaces manual overhead with automated, strictly validated, and audit-proof ingestion pipelines.
+  </p>
+  <div class="callout callout-success">
+    <strong>Core Architectural Directive:</strong>
+    Avoid monolithic CSVs. Data must be segregated across three natural operational vectors:
+    <strong>(1) Contract Vehicle Fleet</strong>,
+    <strong>(2) Facility Energy &amp; Renewables</strong>, and
+    <strong>(3) Supply Catalog Eco-Labels</strong>.
+    Corporate profiles are handled via interactive web forms, while environmental management certificates are uploaded as original PDFs and extracted via native PDFBox and Tesseract OCR pipelines.
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">02</span> Comprehensive Inventory of All 42 Data Files</h2>
+  <p>All 42 files located in <code>data/</code> were systematically inventoried, inspected, and categorized. No files were omitted.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 4%;">#</th>
+        <th style="width: 25%;">Relative File Path</th>
+        <th style="width: 7%;">Type</th>
+        <th style="width: 10%;">Size / Extent</th>
+        <th style="width: 24%;">Observed Content &amp; Evidence</th>
+        <th style="width: 20%;">Quality &amp; Processing Notes</th>
+        <th style="width: 10%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><code>Backgound data\Konkurransegrunnlag kontormøbler (1).pdf</code></td>
+        <td>PDF</td>
+        <td>302 KB / 13 pp.</td>
+        <td>Tender specifications for office furniture; eco-labels (Möbelfakta, Svanen).</td>
+        <td>Native digital text; contains Mercell &amp; municipal URLs.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><code>Backgound data\kopi Dekk og dekkhotell kontrakt (1).pdf</code></td>
+        <td>PDF</td>
+        <td>211 KB / 10 pp.</td>
+        <td>Framework agreement for tire services, retreading, and tire hotel storage.</td>
+        <td>Digital PDF; signed public contract.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><code>Backgound data\Kopi konkurransegrunnlag dekk og dekkhotell (1).pdf</code></td>
+        <td>PDF</td>
+        <td>165 KB / 11 pp.</td>
+        <td>Tender basis for tire services; workshop energy reporting requirements.</td>
+        <td>Native text; award criteria and qualification requirements.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><code>Backgound data\kopi konkurransegrunnlag buss (1).pdf</code></td>
+        <td>PDF</td>
+        <td>1.58 MB / 13 pp.</td>
+        <td>Tender for school/passenger bus transport; Euro VI, biogas, and electric quotas.</td>
+        <td>Native digital PDF generated via EO.Pdf; clean links.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><code>Backgound data\kopi konkurransegrunnlag drosje (1).pdf</code></td>
+        <td>PDF</td>
+        <td>164 KB / 13 pp.</td>
+        <td>Tender for taxi services (rehabilitation &amp; day care centers). Fleet rules.</td>
+        <td>Digital PDF; specifies vehicle registration and inspection quotas.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><code>Backgound data\kopi Konkurransegrunnlag Frukt og grønt (1).pdf</code></td>
+        <td>PDF</td>
+        <td>214 KB / 15 pp.</td>
+        <td>Tender for fresh produce distribution; green delivery transport mandates.</td>
+        <td>Clean digital text; food waste reduction clauses.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><code>Backgound data\kopi kontormøbler kravspesifikasjon og tildelingskriterier (1).pdf</code></td>
+        <td>PDF</td>
+        <td>8.34 MB / 25 pp.</td>
+        <td>Comprehensive criteria for furniture: circular economy, 10-year spare parts.</td>
+        <td>Large document; native vector graphics and text.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><code>Backgound data\kopi kontrakt buss (1).pdf</code></td>
+        <td>PDF</td>
+        <td>1.28 MB / 11 pp.</td>
+        <td>Signed bus contract; vehicle allowance, service limits, penalty references.</td>
+        <td>Formal agreement; contact: innkjop.postmottak@trondheim.kommune.no.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td><code>Backgound data\kopi kontrakt drosje (1).pdf</code></td>
+        <td>PDF</td>
+        <td>164 KB / 11 pp.</td>
+        <td>Signed framework agreement for taxi services; service duration terms.</td>
+        <td>Digital contract with council resolution references.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><code>Backgound data\kopi kontrakt frukt og grønt (1).pdf</code></td>
+        <td>PDF</td>
+        <td>402 KB / 16 pp.</td>
+        <td>Produce supply contract; delivery frequency and emissions accounting.</td>
+        <td>Digital text; references e-commerce and SSB statistical links.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td><code>Backgound data\kopi kontrakt kontormøbler (1).pdf</code></td>
+        <td>PDF</td>
+        <td>392 KB / 16 pp.</td>
+        <td>Office furniture framework agreement; reporting cadence (biannual/annual).</td>
+        <td>Digital contract signed by municipal procurement director.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><code>Backgound data\Utklipp av miljøkrav fra kontrakter.docx</code></td>
+        <td>DOCX</td>
+        <td>1.01 MB / 8 paras.</td>
+        <td>Screenshots and clause excerpts illustrating recurring procurement problems.</td>
+        <td>OpenXML document; extracts user requirements for problems 1, 2, and 4.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>13</td>
+        <td><code>Co2 Data\samlet utslippstall fra resultater (1).xlsx</code></td>
+        <td>XLSX</td>
+        <td>61 KB / 4 sheets</td>
+        <td>Official CO2 emission benchmark factors (Miljødirektoratet, SSB, DFØ).</td>
+        <td>Standard factors for diesel, biogas, EV, waste, and furniture lifecycles.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>14</td>
+        <td><code>Environmental data\dashboard mock data example energy.xlsx</code></td>
+        <td>XLSX</td>
+        <td>73 KB / 1002 rows</td>
+        <td>Facility reporting template: building m², electricity, district heat, solar.</td>
+        <td>Contains explicit instruction: "Blå felter fylles ut av tilbyder".</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>15</td>
+        <td><code>Environmental data\Miljøkrav oversikt (Fra Gemini).xlsx</code></td>
+        <td>XLSX</td>
+        <td>67 KB / 1000 rows</td>
+        <td>Matrix of environmental criteria across 10 municipal purchase categories.</td>
+        <td>Classified into KK (Qualification), MK (Minimum), and TK (Award).</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>16</td>
+        <td><code>Environmental data\Miljøoppfølging sjekkliste for statistikk og metode (1).xlsx</code></td>
+        <td>XLSX</td>
+        <td>349 KB / 8 sheets</td>
+        <td>PDCA procurement cycle and supplier submission column specifications.</td>
+        <td>Defines required reporting fields: Case ID, Product, EcoLabel, Fuel, CO2.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>17</td>
+        <td><code>Environmental data\Miljøoppfølging tabelloppsett Gemini forslag med eksempler (1).xlsx</code></td>
+        <td>XLSX</td>
+        <td>77 KB / 996 rows</td>
+        <td>Operational dashboard tracker: deviations, reminder notices, license status.</td>
+        <td>Captures municipal advisor workflow and prioritization rules.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>18</td>
+        <td><code>Environmental data\Samlede utslippstall fra resultater (1).xlsx</code></td>
+        <td>XLSX</td>
+        <td>131 KB / 4 sheets</td>
+        <td>Enriched CO2 life-cycle calculation tables from DFØ and Sintef studies.</td>
+        <td>Internal calculation engine reference; validates backend CO2 logic.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>19</td>
+        <td><code>Extra Data examples\Kopi hel frukt og grønt juni-des Q3 Q4 2025, til varelinje 50, sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>1.36 MB / 1 p.</td>
+        <td>Redacted delivery invoice lines for produce supply contract.</td>
+        <td>Scanned/rasterized image with black redaction bars over pricing.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>20</td>
+        <td><code>Extra Data examples\Kopi kaffeavtalen, 2024 sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>1.34 MB / 1 p.</td>
+        <td>Sample coffee procurement report with Fairtrade / Organic certification.</td>
+        <td>Scanned, redacted delivery report.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>21</td>
+        <td><code>Extra Data examples\kopi kjøretøy frukt og grønt, ikke noe å sladde.pdf</code></td>
+        <td>PDF</td>
+        <td>352 KB / 1 p.</td>
+        <td>Clean, unredacted distribution fleet list for produce logistics.</td>
+        <td>Illustrates unformatted supplier submissions requiring normalization.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>22</td>
+        <td><code>Extra Data examples\Kopi kontormøbler 22-23, til varelinje 50, sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>1.08 MB / 1 p.</td>
+        <td>Furniture sales tracking sample showing certified vs non-certified items.</td>
+        <td>Scanned table; commercial figures redacted.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>23</td>
+        <td><code>Extra Data examples\kopi korttidsleie bil, 24-25 data sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>394 KB / 1 p.</td>
+        <td>Short-term vehicle rental log showing car categories and emissions.</td>
+        <td>Scanned table; vehicle license plates redacted.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>24</td>
+        <td><code>Extra Data examples\kopi liste over kjøretøy kontormøbler sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>3.85 MB / 1 p.</td>
+        <td>Heavy and light delivery fleet list for office furniture transport.</td>
+        <td>Scanned image; confirms delivery contracts mandate fleet registration.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>25</td>
+        <td><code>Extra Data examples\Kopi papir, plast og renholdsprodukter 2025, miljømerker, til varelinje 50, sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>849 KB / 1 p.</td>
+        <td>Cleaning and sanitary product supply log showing Nordic Swan credentials.</td>
+        <td>Scanned/rasterized table; reinforces product eco-label catalog need.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>26</td>
+        <td><code>Extra Data examples\kopi Tilslutningserklæring reduksjon av matsvinn, frukt avtale, sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>811 KB / 1 p.</td>
+        <td>Formal declaration of commitment to food waste reduction goals.</td>
+        <td>Signed legal declaration document; demonstrates document upload workflow.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>27</td>
+        <td><code>Problem 1, 3, 5, &amp; 6\kopi buss lev 1 liste over kjøretøy.xlsx</code></td>
+        <td>XLSX</td>
+        <td>85 KB / 1064 rows</td>
+        <td><strong>Primary Fleet Submission Template</strong> from bus transport contractor.</td>
+        <td>Standard 8-column layout: Plate, Tech, Hybrid, Coverage, Weeks, Attachment.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>28</td>
+        <td><code>Problem 1, 3, 5, &amp; 6\kopi drosje dagrehabilitering, dagsenter, lister over kjøretøy sladdet.pdf</code></td>
+        <td>PDF</td>
+        <td>3.80 MB / 1 p.</td>
+        <td>Taxi fleet declaration for rehabilitation center passenger transport.</td>
+        <td>Scanned/redacted list; validates unified fleet CSV schema across transport.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>29</td>
+        <td><code>Problem 1, 3, 5, &amp; 6\kopi eksempel buss lev 1 data mars 2024 dashbord - kopi.pdf</code></td>
+        <td>PDF</td>
+        <td>9.68 MB / 1 p.</td>
+        <td>Monthly aggregated operational telemetry: km, fuel liters, passenger trips.</td>
+        <td>Complex rasterized report; corresponds to ongoing <code>trip_rows</code> ingestion.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>30</td>
+        <td><code>Problem 1, 3, 5, &amp; 6\Kopi eksempel drosje dagsenter- dagrehabilitering data 2025, sladdet (1).pdf</code></td>
+        <td>PDF</td>
+        <td>6.57 MB / 1 p.</td>
+        <td>Aggregated periodic mileage and passenger journey tracking for taxis.</td>
+        <td>Scanned report; separates onboarding static fleet from periodic telemetry.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>31</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel egenerklæring miljø buss data dashbord, sladdet (2).pdf</code></td>
+        <td>PDF</td>
+        <td>677 KB / 2 pp.</td>
+        <td>Self-declaration of environmental management compliance for bus service.</td>
+        <td>Signed statement; uploaded via Certificate / Document subsystem.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>32</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel sladdet ISO 14001 buss data dashbord.pdf</code></td>
+        <td>PDF</td>
+        <td>446 KB / 1 p.</td>
+        <td>Accredited ISO 14001:2015 Environmental Management Certificate.</td>
+        <td>Scanned certificate; processed via Tesseract OCR in backend.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>33</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel sladdet ISO 9001 data dashbord (1).pdf</code></td>
+        <td>PDF</td>
+        <td>768 KB / 2 pp.</td>
+        <td>ISO 9001 Quality Management System Certificate.</td>
+        <td>Scanned certificate; companion document for supplier qualification.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>34</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel sladdet kurs i økonomisk kjøring data dashbord.pdf</code></td>
+        <td>PDF</td>
+        <td>555 KB / 1 p.</td>
+        <td>Driver training certification in eco-driving techniques (<em>økonomisk kjøring</em>).</td>
+        <td>Scanned certificate; matches parser standard <code>eco-driving-course</code>.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>35</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel sladdet miljøfyrtårn drosje data dashbord.pdf</code></td>
+        <td>PDF</td>
+        <td>426 KB / 1 p.</td>
+        <td>Eco-Lighthouse (<em>Miljøfyrtårn</em>) National Certificate for taxi enterprise.</td>
+        <td>Scanned document; recognized in backend as equivalent to ISO 14001.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>36</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel sladdet RENAS elektronikk data dashbord.pdf</code></td>
+        <td>PDF</td>
+        <td>477 KB / 1 p.</td>
+        <td>RENAS Producer Responsibility Scheme Membership (WEEE recycling).</td>
+        <td>Scanned document; mandatory for electronics and IT contracts.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>37</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel sladdet sep retura data dashbord .pdf</code></td>
+        <td>PDF</td>
+        <td>2.94 MB / 1 p.</td>
+        <td>Commercial waste handling and recycling certificate (Retura TRV).</td>
+        <td>Scanned certificate; recognized in parser as <code>retura</code>.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>38</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel Sladding Svanemerket data dashbord (1).pdf</code></td>
+        <td>PDF</td>
+        <td>1.29 MB / 1 p.</td>
+        <td>Official Nordic Swan Ecolabel license certificate with license ID.</td>
+        <td>Scanned certificate with license numbers; validates eco-label claims.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>39</td>
+        <td><code>Problem 2 &amp; 5\kopi eksempel Svensk møbelfakta data dashbord (2).pdf</code></td>
+        <td>PDF</td>
+        <td>706 KB / 1 p.</td>
+        <td>Möbelfakta sustainability certification for Scandinavian furniture.</td>
+        <td>Scanned certificate; evidence for office furniture contracts.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>40</td>
+        <td><code>Problem 2 &amp; 5\kopi sladdet sep eksempel EPD data dashbord.pdf</code></td>
+        <td>PDF</td>
+        <td>4.36 MB / 1 p.</td>
+        <td>Environmental Product Declaration (EPD) according to ISO 14025.</td>
+        <td>Technical life-cycle assessment dossier.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>41</td>
+        <td><code>Problem 2 &amp; 5\kopi sladdet sep eksempel grønt punkt data dashbord.pdf</code></td>
+        <td>PDF</td>
+        <td>361 KB / 1 p.</td>
+        <td>Grønt Punkt Norge membership certificate for packaging recycling.</td>
+        <td>Scanned membership confirmation; recognized by <code>CertificateParser.kt</code>.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+      <tr>
+        <td>42</td>
+        <td><code>Problem 4\kopi energiforbruk og produksjon, dekkavtale, sladdet sep26.pdf</code></td>
+        <td>PDF</td>
+        <td>4.70 MB / 1 p.</td>
+        <td>Annual energy consumption and renewable production breakdown for tire shop.</td>
+        <td>Scanned table; mirrors layout of <code>dashboard mock data example energy.xlsx</code>.</td>
+        <td><span class="badge badge-high">Complete</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">03</span> Project Requirements &amp; Codebase Traceability</h2>
+
+  <h3>3.1 Requirements Backed by Existing Repository Code</h3>
+  <ul>
+    <li>
+      <strong>Strict Fleet &amp; Agreement Modeling (<code>FleetSchema.kt</code>, <code>FleetModels.kt</code>):</strong>
+      The SQLite database enforces strict types (<code>STRICT</code> tables) and check constraints. The system manages suppliers (<code>suppliers</code>), framework agreements (<code>agreements</code>), authorized vehicles (<code>vehicles</code>), and an immutable audit log (<code>fleet_changes</code>) with undo capabilities.
+    </li>
+    <li>
+      <strong>Automated Statens vegvesen (SVV) Registry Verification (<code>VehicleCheckService.kt</code>):</strong>
+      Vehicles submitted with a Norwegian license plate (<code>[A-Z]{2}[1-9][0-9]{3,4}</code>) are automatically verified against SVV. The system identifies deviations including unregistered or deregistered status, statutory driving bans (<em>bruksforbud</em>), propulsion mismatches (e.g. declared electric but registered diesel), and category violations.
+    </li>
+    <li>
+      <strong>Certificate OCR &amp; Standard Identification (<code>CertificateParser.kt</code>, <code>CertificateRepository.kt</code>):</strong>
+      Ingests PDF certificates using native PDFBox text extraction with automatic fallback to Tesseract OCR (<code>eng+nor</code>). Identifies standards including <code>ISO 14001</code>, <code>Miljøfyrtårn</code>, <code>Grønt Punkt Norge</code>, <code>Retura</code>, and <code>Kurs i økonomisk kjøring</code>. Manages expiration dates and alerts.
+    </li>
+    <li>
+      <strong>Periodic Journey &amp; Telemetry Ingestion (<code>trip_rows</code> in <code>VehicleSchema.kt</code>):</strong>
+      Endpoint <code>POST /api/trip-rows</code> receives batched operational trip records (distance, fuel consumption, NOx, CO2) for post-onboarding performance tracking.
+    </li>
+  </ul>
+
+  <h3>3.2 Implementation Gaps Identified</h3>
+  <ul>
+    <li>
+      <strong>Supplier Workspace Tenant Scoping:</strong> In <code>frontend/src/pages/supplier/</code> (e.g. <code>MyVehicles.tsx</code>, <code>MyCertificates.tsx</code>), views are mock prototypes flagged with <code>{/* TODO: scope all data to the authenticated supplier's own organization only */}</code>.
+    </li>
+    <li>
+      <strong>Persistence for Facility Energy:</strong> The frontend prototypes an energy dashboard (<code>/admin/energy</code>), and sample submissions exist in <code>data/</code>, but there is no SQLite table to persist facility area and energy consumption.
+    </li>
+    <li>
+      <strong>Product Eco-Label Catalog:</strong> Procurement tenders mandate tracking eco-labeled goods (Svanemerket, Möbelfakta), but no relational schema exists for contract product lines.
+    </li>
+    <li>
+      <strong>Two-Phase CSV Upload Pipeline:</strong> The backend supports single-item JSON creation but lacks an atomic, batched CSV ingestion pipeline with dry-run preview and commit semantics.
+    </li>
+  </ul>
+
+  <!-- SECTION 4 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">04</span> Supplier Data Dictionary</h2>
+  <p>The following data fields must be collected during supplier onboarding, categorized by optimal ingestion channel.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 14%;">Technical Name</th>
+        <th style="width: 14%;">User Label</th>
+        <th style="width: 18%;">Purpose &amp; Justification</th>
+        <th style="width: 8%;">Req.</th>
+        <th style="width: 8%;">Source</th>
+        <th style="width: 12%;">Type / Format</th>
+        <th style="width: 12%;">Example</th>
+        <th style="width: 14%;">Ingestion Channel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>sustainability_contact_name</code></td>
+        <td>Sustainability Contact</td>
+        <td>Designated corporate environmental compliance officer.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>String (2-100)</td>
+        <td><code>Kari Nordmann</code></td>
+        <td>Web Form</td>
+      </tr>
+      <tr>
+        <td><code>sustainability_contact_email</code></td>
+        <td>Compliance Email</td>
+        <td>Direct contact for audit inquiries and reminder notices.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>RFC 5322 Email</td>
+        <td><code>miljo@firma.no</code></td>
+        <td>Web Form</td>
+      </tr>
+      <tr>
+        <td><code>sustainability_contact_phone</code></td>
+        <td>Contact Phone</td>
+        <td>Direct telephone for urgent operational deviations.</td>
+        <td><span class="badge badge-optional">Optional</span></td>
+        <td>Supplier</td>
+        <td>E.164 String</td>
+        <td><code>+47 912 34 567</code></td>
+        <td>Web Form</td>
+      </tr>
+      <tr>
+        <td><code>supplier_id</code></td>
+        <td>Supplier Identifier</td>
+        <td>Internal primary key linked to authenticated tenant session.</td>
+        <td><span class="badge badge-system">System</span></td>
+        <td>System</td>
+        <td>UUID / Slug</td>
+        <td><code>sup-trd-0042</code></td>
+        <td>Auto-Assigned</td>
+      </tr>
+      <tr>
+        <td><code>agreement_id</code></td>
+        <td>Agreement Reference</td>
+        <td>Target municipal framework contract identifier.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Admin / Supp.</td>
+        <td>Alphanumeric</td>
+        <td><code>AGR-2026-0042</code></td>
+        <td>Preloaded / CSV FK</td>
+      </tr>
+      <tr>
+        <td><code>registration_number</code></td>
+        <td>Vehicle Plate</td>
+        <td>Official vehicle license plate registered in Norway.</td>
+        <td><span class="badge badge-conditional">Conditional</span></td>
+        <td>Supplier</td>
+        <td><code>[A-Z]{2}[1-9][0-9]{3,4}</code></td>
+        <td><code>SV12345</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>is_planned</code></td>
+        <td>Planned Flag</td>
+        <td>Specifies if vehicle is scheduled for future delivery/procurement.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Boolean</td>
+        <td><code>FALSE</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>fuel_technology</code></td>
+        <td>Fuel Technology Code</td>
+        <td>Declared propulsion code matching Statens vegvesen catalog.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>SVV Code (1-21)</td>
+        <td><code>13</code> (Biogas)</td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>is_hybrid</code></td>
+        <td>Hybrid Flag</td>
+        <td>Identifies hybrid propulsion drivetrains.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Boolean</td>
+        <td><code>FALSE</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>full_contract_coverage</code></td>
+        <td>Whole Period Usage</td>
+        <td>Indicates whether vehicle serves for the entire contract term.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Boolean</td>
+        <td><code>TRUE</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>start_year_week</code></td>
+        <td>Operational Start</td>
+        <td>Calendar week vehicle enters active municipal service.</td>
+        <td><span class="badge badge-conditional">Conditional</span></td>
+        <td>Supplier</td>
+        <td>ISO Week (<code>YYYY-Www</code>)</td>
+        <td><code>2026-W01</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>end_year_week</code></td>
+        <td>Operational End</td>
+        <td>Calendar week vehicle is decommissioned or phased out.</td>
+        <td><span class="badge badge-conditional">Conditional</span></td>
+        <td>Supplier</td>
+        <td>ISO Week (<code>YYYY-Www</code>)</td>
+        <td><code>2026-W52</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>attachment_reference</code></td>
+        <td>Attachment Reference</td>
+        <td>Order confirmation or delivery note reference ID.</td>
+        <td><span class="badge badge-optional">Optional</span></td>
+        <td>Supplier</td>
+        <td>String (&le; 100)</td>
+        <td><code>ORD-2026-99</code></td>
+        <td>CSV Fleet</td>
+      </tr>
+      <tr>
+        <td><code>facility_location_code</code></td>
+        <td>Facility Code</td>
+        <td>Identifier for supplier depot, workshop, or warehouse.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Alphanumeric</td>
+        <td><code>DEPOT-HEIMDAL</code></td>
+        <td>CSV Energy</td>
+      </tr>
+      <tr>
+        <td><code>facility_address</code></td>
+        <td>Facility Address</td>
+        <td>Physical location of operational facilities.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>String (&le; 200)</td>
+        <td><code>Industriveien 12</code></td>
+        <td>CSV Energy</td>
+      </tr>
+      <tr>
+        <td><code>reporting_year</code></td>
+        <td>Reporting Year</td>
+        <td>Calendar year represented by energy balance submission.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Integer (2020-2030)</td>
+        <td><code>2025</code></td>
+        <td>CSV Energy</td>
+      </tr>
+      <tr>
+        <td><code>total_energy_consumption_kwh</code></td>
+        <td>Total Energy (kWh)</td>
+        <td>Aggregated gross energy consumed at operational site.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Decimal (&ge; 0)</td>
+        <td><code>457190.00</code></td>
+        <td>CSV Energy</td>
+      </tr>
+      <tr>
+        <td><code>renewable_self_produced_kwh</code></td>
+        <td>Self-Produced (kWh)</td>
+        <td>Locally produced solar or geothermal heat pump energy.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>Decimal (&ge; 0)</td>
+        <td><code>182561.00</code></td>
+        <td>CSV Energy</td>
+      </tr>
+      <tr>
+        <td><code>certificate_file</code></td>
+        <td>Certificate PDF</td>
+        <td>Original PDF of environmental management accreditation.</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supplier</td>
+        <td>PDF (&le; 8 MB)</td>
+        <td><code>iso14001_kiwa.pdf</code></td>
+        <td>Document Upload</td>
+      </tr>
+      <tr>
+        <td><code>certificate_standard</code></td>
+        <td>Standard Type</td>
+        <td>Standard classification (ISO 14001, Miljøfyrtårn, etc.).</td>
+        <td><span class="badge badge-mandatory">Mandatory</span></td>
+        <td>Supp. / Sys.</td>
+        <td>Enum String</td>
+        <td><code>iso-14001</code></td>
+        <td>OCR / Dropdown</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 5 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">05</span> Detailed CSV Ingestion Specifications</h2>
+
+  <div class="callout">
+    <strong>Global Ingestion Rules:</strong>
+    CSV uploads accept comma or semicolon delimiters; downloaded templates use semicolons for compatibility with Excel in comma-decimal locales. Use <strong>UTF-8 with BOM</strong> encoding, ISO 8601 dates and weeks, period decimal points (<code>.</code>), uppercase booleans (<code>TRUE</code> / <code>FALSE</code>), and empty fields for nulls. To prevent <strong>CSV Formula Injection (CWE-1236)</strong>, values starting with <code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>, <code>\t</code>, or <code>\r</code> are strictly rejected by the parser.
+  </div>
+
+  <h3>5.1 Template 1: Contract Vehicles (<code>contract_vehicles_template_v1.0.csv</code>)</h3>
+  <p><strong>Entity:</strong> Fleet Vehicles allocated to a municipal transport or distribution agreement.</p>
+  <p><strong>Primary Key:</strong> <code>registration_number</code> (or auto-assigned <code>PLAN*</code> ID). <strong>Foreign Key:</strong> <code>agreement_id</code>.</p>
+  <pre><code>agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes
+AGR-2026-0042,GA11958,FALSE,13,FALSE,TRUE,,,ORD-9912,Euro VI biogassbuss
+AGR-2026-0042,SV45892,FALSE,5,FALSE,FALSE,2026-W01,2026-W26,ORD-9913,Elektrisk reservebil H1
+AGR-2026-0042,,TRUE,5,FALSE,FALSE,2026-W27,2027-W52,ORD-9914,Planlagt el-buss leveranse juli</code></pre>
+
+  <h3>5.2 Template 2: Facility Energy Balance (<code>facility_energy_template_v1.0.csv</code>)</h3>
+  <p><strong>Entity:</strong> Physical operating locations, surface areas, and annual energy balances.</p>
+  <p><strong>Primary Key:</strong> Composite <code>(agreement_id, facility_location_code, reporting_year)</code>. <strong>Foreign Key:</strong> <code>agreement_id</code>.</p>
+  <pre><code>agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,notes
+AGR-2026-0042,LOC-HEIMDAL-01,Industriveien 12 7080 Heimdal,3142.00,1500.00,450.00,2025,175821.00,226804.00,0.00,0.00,4003.00,104397.00,Varmepumpe Q2
+AGR-2026-0042,LOC-TILLER-02,Ivar Lykkes vei 3 7075 Tiller,2757.00,800.00,300.00,2025,119322.00,68339.00,0.00,0.00,558.00,73603.00,Solceller takflate</code></pre>
+
+  <h3>5.3 Template 3: Contract Product Catalog (<code>contract_products_template_v1.0.csv</code>)</h3>
+  <p><strong>Entity:</strong> Goods, consumables, and furniture supplied under framework contracts.</p>
+  <p><strong>Primary Key:</strong> Composite <code>(agreement_id, product_code)</code>. <strong>Foreign Key:</strong> <code>agreement_id</code>.</p>
+  <pre><code>agreement_id,product_code,product_name,product_category,ecolabel_standard,license_number,unit_of_measure,is_repaired_or_reused,notes
+AGR-2026-0088,MOB-CHAIR-001,Ergonomisk kontorstol Modell A,FURNITURE,MOBELFAKTA,MF-2024-9182,PCS,FALSE,Reservedeler tilgjengelig 10 ar
+AGR-2026-0088,MOB-DESK-014,Hev-senk pult 160x80 resirkulert,FURNITURE,NORDIC_SWAN,3031-0021,PCS,TRUE,Gjenbrukt bordplate</code></pre>
+
+  <!-- SECTION 6 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">06</span> Relational Entity Architecture</h2>
+  <p>The entity model integrates cleanly with the existing database schemas, enforcing strict relational integrity.</p>
+
+  <pre><code>                     +---------------------------------------+
+                     |                 User                  |
+                     |  (id, email, role, supplier_id, ...)  |
+                     +-------------------+-------------------+
+                                         | 1:1 (Role=SUPPLIER)
+                                         v
+                     +---------------------------------------+
+                     |            FleetSupplier              |
+                     |  (id, name, org_number, active, ...)  |
+                     +-------------------+-------------------+
+                                         | 1:N
+                     +-------------------+-------------------+
+                     |           FleetAgreement              |
+                     |  (id, supplier_id, start_date,        |
+                     |   end_date, allowed_vehicles, ...)    |
+                     +---+---------------+---------------+---+
+                         | 1:N           | 1:N           | 1:N
+         +---------------+               |               +---------------+
+         |                               |                               |
+         v                               v                               v
++------------------+           +-------------------+           +-------------------+
+|  Vehicle / Fleet |           |  FacilityEnergy   |           |  ContractProduct  |
+|  (registration_  |           |  (agreement_id,   |           |  (agreement_id,   |
+|   number,        |           |   location_code,  |           |   product_code,   |
+|   agreement_id,  |           |   year, kwh, ...) |           |   ecolabel, ...)  |
+|   planned, ...)  |           +-------------------+           +-------------------+
++--------+---------+
+         | 1:N (Automated verification)
+         v
++------------------+           +-------------------+
+|  VehicleCheck    |           |    Certificate    |
+|  (check_id,      |           |  (id, contract_id,|
+|   svv_snapshot,  |           |   supplier_name,  |
+|   deviations)    |           |   type, dates)    |
++------------------+           +-------------------+</code></pre>
+
+  <!-- SECTION 7 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">07</span> Backend Architecture &amp; Ingestion Lifecycle</h2>
+
+  <h3>7.1 Onboarding State Machine</h3>
+  <pre><code>[INVITED] ──> [PROFILE_PENDING] ──> [DATA_DRAFT] ──> [VALIDATING] ──> [SUBMITTED]
+                                         ^                 │               │
+                                         │ (Correction)    │ (Errors)      │
+                                         └─────────────────┴───────────────┤
+                                                                           v
+                                                                   [UNDER_REVIEW]
+                                                                    │          │
+                                                    (Approved)      │          │ (Changes Req.)
+                                                                    v          v
+                                                               [APPROVED]  [REVISION_REQUIRED]</code></pre>
+
+  <h3>7.2 Ingestion Policy: Atomic All-or-Nothing vs. Partial Commits</h3>
+  <div class="callout callout-warning">
+    <strong>Architectural Decision: Strict All-or-Nothing Atomic Ingestion.</strong><br>
+    Partial row imports are rejected. Transport contracts have strict quotas (<code>allowed_vehicles</code>). If 8 out of 10 rows succeed, the supplier often re-uploads the whole spreadsheet, causing duplicate collisions or silent gaps in route coverage. Instead, the <strong>Two-Phase Preview &amp; Commit</strong> pattern is enforced:
+    <ul>
+      <li><code>POST /api/onboarding/upload/{entity}/preview</code> parses all rows, validates SVV checks, and returns a detailed diff showing every invalid cell without committing to the database.</li>
+      <li><code>POST /api/onboarding/upload/{entity}/confirm</code> commits the verified payload in a single atomic database transaction once 100% of rows are valid.</li>
+    </ul>
+  </div>
+
+  <h3>7.3 Production SQLite DDL Migrations</h3>
+  <pre><code>-- 1. Onboarding Status Tracking Table
+CREATE TABLE IF NOT EXISTS supplier_onboarding (
+    supplier_id TEXT PRIMARY KEY REFERENCES suppliers(id),
+    status TEXT NOT NULL CHECK (status IN (
+        'INVITED', 'PROFILE_PENDING', 'DATA_DRAFT',
+        'VALIDATING', 'SUBMITTED', 'UNDER_REVIEW',
+        'APPROVED', 'REVISION_REQUIRED'
+    )),
+    contact_name TEXT,
+    contact_email TEXT,
+    contact_phone TEXT,
+    submitted_at TEXT CHECK (submitted_at IS NULL OR (julianday(submitted_at) IS NOT NULL AND substr(submitted_at, -1) = 'Z')),
+    reviewed_at TEXT CHECK (reviewed_at IS NULL OR (julianday(reviewed_at) IS NOT NULL AND substr(reviewed_at, -1) = 'Z')),
+    reviewer_notes TEXT,
+    updated_at TEXT NOT NULL
+) STRICT;
+
+-- 2. Audit Trail for Batch Uploads
+CREATE TABLE IF NOT EXISTS upload_batches (
+    id TEXT PRIMARY KEY,
+    supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+    agreement_id TEXT REFERENCES agreements(id),
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('VEHICLES', 'ENERGY', 'PRODUCTS')),
+    file_name TEXT NOT NULL,
+    file_hash_sha256 TEXT NOT NULL,
+    total_rows INTEGER NOT NULL CHECK (total_rows >= 0),
+    valid_rows INTEGER NOT NULL CHECK (valid_rows >= 0),
+    error_rows INTEGER NOT NULL CHECK (error_rows >= 0),
+    status TEXT NOT NULL CHECK (status IN ('PREVIEWED', 'COMMITTED', 'DISCARDED')),
+    created_at TEXT NOT NULL,
+    committed_at TEXT
+) STRICT;
+
+-- 3. Facility Energy & Renewables Persistence
+CREATE TABLE IF NOT EXISTS facility_energy (
+    id TEXT PRIMARY KEY,
+    agreement_id TEXT NOT NULL REFERENCES agreements(id),
+    location_code TEXT NOT NULL,
+    address TEXT NOT NULL,
+    storage_area_sqm REAL CHECK (storage_area_sqm IS NULL OR storage_area_sqm >= 0),
+    workshop_area_sqm REAL CHECK (workshop_area_sqm IS NULL OR workshop_area_sqm >= 0),
+    other_area_sqm REAL CHECK (other_area_sqm IS NULL OR other_area_sqm >= 0),
+    reporting_year INTEGER NOT NULL CHECK (reporting_year BETWEEN 2020 AND 2030),
+    electricity_kwh REAL NOT NULL CHECK (electricity_kwh >= 0),
+    district_heating_kwh REAL NOT NULL CHECK (district_heating_kwh >= 0),
+    biogas_kwh REAL DEFAULT 0.0 CHECK (biogas_kwh >= 0),
+    fossil_fuel_kwh REAL DEFAULT 0.0 CHECK (fossil_fuel_kwh >= 0),
+    self_produced_solar_kwh REAL DEFAULT 0.0 CHECK (self_produced_solar_kwh >= 0),
+    self_produced_heatpump_kwh REAL DEFAULT 0.0 CHECK (self_produced_heatpump_kwh >= 0),
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (agreement_id, location_code, reporting_year)
+) STRICT;
+
+-- 4. Contract Product Catalog Persistence
+CREATE TABLE IF NOT EXISTS contract_products (
+    id TEXT PRIMARY KEY,
+    agreement_id TEXT NOT NULL REFERENCES agreements(id),
+    product_code TEXT NOT NULL,
+    product_name TEXT NOT NULL,
+    product_category TEXT NOT NULL CHECK (product_category IN (
+        'FURNITURE', 'IT_EQUIPMENT', 'FOOD_BEVERAGE', 'CLEANING_SUPPLIES', 'OTHER'
+    )),
+    ecolabel_standard TEXT NOT NULL CHECK (ecolabel_standard IN (
+        'NORDIC_SWAN', 'EU_ECOLABEL', 'MOBELFAKTA', 'BLUE_ANGEL', 'OEKO_TEX', 'EPD', 'NONE'
+    )),
+    license_number TEXT,
+    unit_of_measure TEXT NOT NULL CHECK (unit_of_measure IN ('PCS', 'KG', 'LITRE')),
+    is_repaired_or_reused INTEGER NOT NULL CHECK (is_repaired_or_reused IN (0, 1)),
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (agreement_id, product_code)
+) STRICT;</code></pre>
+
+  <!-- SECTION 8 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">08</span> Security, GDPR &amp; Risk Mitigation</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Risk Domain</th>
+        <th style="width: 25%;">Identified Threat / Vulnerability</th>
+        <th style="width: 15%;">Impact</th>
+        <th style="width: 40%;">Architectural Mitigation Strategy</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>GDPR &amp; Personal Data</strong></td>
+        <td>Driver names, phone numbers, or private license plates exposed in public audits.</td>
+        <td>Medium (GDPR / Norwegian Privacy Law)</td>
+        <td>Do not request driver identities in fleet CSVs. Treat vehicle plates strictly as operational contract assets. Mask sensitive contact data in administrative exports.</td>
+      </tr>
+      <tr>
+        <td><strong>SVV API Rate Limiting</strong></td>
+        <td>High-volume batch vehicle uploads exhausting the Statens vegvesen Enkeltoppslag quota.</td>
+        <td>High (System Outage)</td>
+        <td>Utilize the existing 14-day cached registry snapshot architecture (<code>svv_snapshots</code>). Run batch lookups through a rate-limited asynchronous worker queue.</td>
+      </tr>
+      <tr>
+        <td><strong>Tenant Isolation Breach</strong></td>
+        <td>Malicious supplier crafting CSV payloads referencing another supplier's <code>agreement_id</code>.</td>
+        <td>Critical (Data Tampering)</td>
+        <td>Derive <code>supplierId</code> strictly from the verified JWT session cookie. Enforce server-side ownership checks on all referenced agreements before parsing rows.</td>
+      </tr>
+      <tr>
+        <td><strong>CSV Formula Injection</strong></td>
+        <td>Spreadsheet cells containing <code>=CMD()</code>, <code>+DDE()</code>, or malicious macro triggers.</td>
+        <td>High (Client Compromise)</td>
+        <td>Sanitize all free-text fields. Reject or escape cells starting with <code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>, <code>\t</code>, or <code>\r</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 9 -->
+  <h2><span class="section-num">09</span> Prioritized Implementation Roadmap</h2>
+  <ol>
+    <li>
+      <strong>Sprint 1: Schema Migration &amp; Core Onboarding Service:</strong>
+      Execute DDL migrations for <code>supplier_onboarding</code>, <code>upload_batches</code>, <code>facility_energy</code>, and <code>contract_products</code>. Implement <code>OnboardingRoutes.kt</code> with strict JWT-scoped tenant verification.
+    </li>
+    <li>
+      <strong>Sprint 2: CSV Two-Phase Ingestion Engine:</strong>
+      Implement the streaming CSV parser with UTF-8 BOM detection, CWE-1236 sanitization, and the <code>/preview</code> and <code>/confirm</code> endpoints. Connect vehicle plate validation with <code>VehicleCheckService</code>.
+    </li>
+    <li>
+      <strong>Sprint 3: Supplier Certificate Flow:</strong>
+      Expose certificate upload endpoints for the <code>SUPPLIER</code> role, enforcing mandatory contract linking and triggering asynchronous OCR parsing.
+    </li>
+    <li>
+      <strong>Sprint 4: Frontend Supplier Portal:</strong>
+      Transform the placeholder views in <code>frontend/src/pages/supplier/</code> into a guided multi-step onboarding wizard featuring drag-and-drop CSV upload, live validation error tables, and template downloads.
+    </li>
+  </ol>
+
+  <!-- FORMAL ACCOUNTING -->
+  <div class="callout callout-success" style="margin-top: 24px;">
+    <strong>Formal Data Audit Accounting:</strong><br>
+    &bull; Total Files Discovered: <strong>42</strong><br>
+    &bull; Completely Analyzed: <strong>42 (100%)</strong><br>
+    &bull; Partially Analyzed: <strong>0 (0%)</strong><br>
+    &bull; Unreadable / Omitted: <strong>0 (0%)</strong>
+  </div>
+
+  <div class="footer">
+    Trondheim kommune &bull; Innkjøpstjenesten &bull; Environmental Monitoring &amp; Contract Compliance Platform<br>
+    Technical Specification Document &bull; Generated for NTNU Customer Driven Project (TDT4290)
+  </div>
+
+</div>
+
+</body>
+</html>

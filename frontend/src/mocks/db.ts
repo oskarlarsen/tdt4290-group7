@@ -130,25 +130,25 @@ const BULK_MEDIUM_ALERTS_UNLISTED = 7; // + 7 modeled medium = 14 total
 // Combined the unsupported "low" alerts into "medium" so the total stays consistent
 
 let alerts: RecentAlert[] = [
-  { id: "alert-1", severity: "high", title: "Vehicle deregistered according to Statens vegvesen", description: "Statens vegvesen data identifies a vehicle associated with this supplier as deregistered.", timeAgo: "20m ago", createdAt: demoAlertCreatedAt(0), status: "OPEN", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle is recorded as deregistered by Statens vegvesen.", supplierId: "sup-a" },
-  { id: "alert-2", severity: "medium", title: "Environmental certificate has expired", description: "The supplier's ISO 14001 certificate has passed its recorded expiry date.", timeAgo: "3h ago", createdAt: demoAlertCreatedAt(1), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "ISO 14001 certificate (DEMO-CERT-001)" }, reason: "The expiry date recorded for DEMO-CERT-001 has passed.", supplierId: "sup-b" },
-  { id: "alert-3", severity: "high", title: "Vehicle is not in the approved vehicle list", description: "A vehicle in the supplier's statistics does not appear in the approved vehicle list.", timeAgo: "5h ago", createdAt: demoAlertCreatedAt(3), status: "IN_PROGRESS", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle appears in supplier statistics but is absent from the approved vehicle list.", supplierId: "sup-a" },
-  { id: "alert-4", severity: "medium", title: "Required environmental certificate is missing", description: "The required Miljøfyrtårn certificate has not been submitted for this contract.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(7), status: "OPEN", findingType: "MISSING_DOCUMENTATION", affectedItem: { type: "Document", name: "Miljøfyrtårn certificate" }, reason: "The existing certificate record has no submitted expiry date or certificate number.", supplierId: "sup-c" },
-  { id: "alert-demo-1", severity: "high", title: "Vehicle is prohibited from use", description: "A vehicle associated with the supplier is recorded as prohibited from use.", timeAgo: "35m ago", createdAt: demoAlertCreatedAt(0), status: "OPEN", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The recorded vehicle status prohibits its use.", supplierId: "sup-d" },
-  { id: "alert-demo-2", severity: "high", title: "Supplier has not fulfilled an energy commitment", description: "The latest mock energy report is below the existing minimum renewable-energy commitment.", timeAgo: "2h ago", createdAt: demoAlertCreatedAt(1), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "Latest energy report" }, reason: "The report's renewable share is 62%, below the recorded 80% commitment.", supplierId: "sup-d" },
-  { id: "alert-demo-3", severity: "high", title: "Unauthorized fossil-fuel vehicle is being used", description: "An unauthorized fossil-fuel vehicle is reported as being used by the supplier.", timeAgo: "6h ago", createdAt: demoAlertCreatedAt(3), status: "IN_PROGRESS", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle is reported as in use despite not being authorized.", supplierId: "sup-d" },
+  { id: "alert-1", severity: "high", title: "Vehicle deregistered according to Statens vegvesen", description: "Statens vegvesen data identifies a vehicle associated with this supplier as deregistered.", timeAgo: "Today", createdAt: demoAlertCreatedAt(0), status: "OPEN", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle is recorded as deregistered by Statens vegvesen.", supplierId: "sup-a" },
+  { id: "alert-2", severity: "medium", title: "Environmental certificate has expired", description: "The supplier's ISO 14001 certificate has passed its recorded expiry date.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(1), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "ISO 14001 certificate (DEMO-CERT-001)" }, reason: "The expiry date recorded for DEMO-CERT-001 has passed.", supplierId: "sup-b" },
+  { id: "alert-3", severity: "high", title: "Vehicle is not in the approved vehicle list", description: "A vehicle in the supplier's statistics does not appear in the approved vehicle list.", timeAgo: "3 days ago", createdAt: demoAlertCreatedAt(3), status: "IN_PROGRESS", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle appears in supplier statistics but is absent from the approved vehicle list.", supplierId: "sup-a" },
+  { id: "alert-4", severity: "medium", title: "Required environmental certificate is missing", description: "The required Miljøfyrtårn certificate has not been submitted for this contract.", timeAgo: "7 days ago", createdAt: demoAlertCreatedAt(7), status: "OPEN", findingType: "MISSING_DOCUMENTATION", affectedItem: { type: "Document", name: "Miljøfyrtårn certificate" }, reason: "The existing certificate record has no submitted expiry date or certificate number.", supplierId: "sup-c" },
+  { id: "alert-demo-1", severity: "high", title: "Vehicle is prohibited from use", description: "A vehicle associated with the supplier is recorded as prohibited from use.", timeAgo: "Today", createdAt: demoAlertCreatedAt(0), status: "OPEN", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The recorded vehicle status prohibits its use.", supplierId: "sup-d" },
+  { id: "alert-demo-2", severity: "high", title: "Supplier has not fulfilled an energy commitment", description: "The latest mock energy report is below the existing minimum renewable-energy commitment.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(1), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "Latest energy report" }, reason: "The report's renewable share is 62%, below the recorded 80% commitment.", supplierId: "sup-d" },
+  { id: "alert-demo-3", severity: "high", title: "Unauthorized fossil-fuel vehicle is being used", description: "An unauthorized fossil-fuel vehicle is reported as being used by the supplier.", timeAgo: "3 days ago", createdAt: demoAlertCreatedAt(3), status: "IN_PROGRESS", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle is reported as in use despite not being authorized.", supplierId: "sup-d" },
   // Available near-expiry demo certificate is an Eco-driving course, not an environmental certificate; retain its existing Medium risk.
-  { id: "alert-demo-4", severity: "medium", title: "Certificate is approaching its expiry date", description: "The existing Eco-driving course certificate is within 30 days of its recorded expiry date.", timeAgo: "8h ago", createdAt: demoAlertCreatedAt(7), status: "IN_PROGRESS", findingType: "UPCOMING_EXPIRY", affectedItem: { type: "Document", name: "Eco-driving course certificate (DEMO-CERT-004)" }, reason: "The existing mock certificate record expires within 30 days.", supplierId: "sup-a" },
-  { id: "alert-demo-5", severity: "medium", title: "Required environmental certificate is missing", description: "The required Miljøfyrtårn certificate has not been submitted for this contract.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(14), status: "OPEN", findingType: "MISSING_DOCUMENTATION", affectedItem: { type: "Document", name: "Miljøfyrtårn certificate" }, reason: "The existing certificate record has no submitted expiry date or certificate number.", supplierId: "sup-c" },
-  { id: "alert-demo-6", severity: "high", title: "Vehicle is prohibited from use", description: "A vehicle associated with the supplier is recorded as prohibited from use.", timeAgo: "Yesterday", createdAt: demoAlertCreatedAt(5), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The recorded vehicle status prohibits its use.", supplierId: "sup-d" },
+  { id: "alert-demo-4", severity: "medium", title: "Certificate is approaching its expiry date", description: "The existing Eco-driving course certificate is within 30 days of its recorded expiry date.", timeAgo: "7 days ago", createdAt: demoAlertCreatedAt(7), status: "IN_PROGRESS", findingType: "UPCOMING_EXPIRY", affectedItem: { type: "Document", name: "Eco-driving course certificate (DEMO-CERT-004)" }, reason: "The existing mock certificate record expires within 30 days.", supplierId: "sup-a" },
+  { id: "alert-demo-5", severity: "medium", title: "Required environmental certificate is missing", description: "The required Miljøfyrtårn certificate has not been submitted for this contract.", timeAgo: "14 days ago", createdAt: demoAlertCreatedAt(14), status: "OPEN", findingType: "MISSING_DOCUMENTATION", affectedItem: { type: "Document", name: "Miljøfyrtårn certificate" }, reason: "The existing certificate record has no submitted expiry date or certificate number.", supplierId: "sup-c" },
+  { id: "alert-demo-6", severity: "high", title: "Vehicle is prohibited from use", description: "A vehicle associated with the supplier is recorded as prohibited from use.", timeAgo: "5 days ago", createdAt: demoAlertCreatedAt(5), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The recorded vehicle status prohibits its use.", supplierId: "sup-d" },
   { id: "alert-demo-7", severity: "high", title: "Vehicle is not in the approved vehicle list", description: "A vehicle in the supplier's statistics does not appear in the approved vehicle list.", timeAgo: "2 days ago", createdAt: demoAlertCreatedAt(2), status: "OPEN", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The vehicle appears in supplier statistics but is absent from the approved vehicle list.", supplierId: "sup-a" },
   { id: "alert-demo-8", severity: "medium", title: "Environmental certificate has expired", description: "The supplier's ISO 14001 certificate has passed its recorded expiry date.", timeAgo: "3 days ago", createdAt: demoAlertCreatedAt(3), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "ISO 14001 certificate (DEMO-CERT-001)" }, reason: "The expiry date recorded for DEMO-CERT-001 has passed.", supplierId: "sup-b" },
-  { id: "alert-demo-9", severity: "high", title: "Vehicle is prohibited from use", description: "A previously flagged vehicle was prohibited from use; the issue is marked addressed in the demo workflow.", timeAgo: "4 days ago", createdAt: demoAlertCreatedAt(7), status: "RESOLVED", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The recorded vehicle status prohibited its use; the alert is resolved in this mock workflow.", supplierId: "sup-d" },
-  { id: "alert-demo-10", severity: "high", title: "Supplier has not fulfilled an energy commitment", description: "The latest mock energy report is below the existing minimum renewable-energy commitment.", timeAgo: "5 days ago", createdAt: demoAlertCreatedAt(14), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "Latest energy report" }, reason: "The report's renewable share is 62%, below the recorded 80% commitment.", supplierId: "sup-d" },
+  { id: "alert-demo-9", severity: "high", title: "Vehicle is prohibited from use", description: "A previously flagged vehicle was prohibited from use; the issue is marked addressed in the demo workflow.", timeAgo: "7 days ago", createdAt: demoAlertCreatedAt(7), status: "RESOLVED", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Vehicle" }, reason: "The recorded vehicle status prohibited its use; the alert is resolved in this mock workflow.", supplierId: "sup-d" },
+  { id: "alert-demo-10", severity: "high", title: "Supplier has not fulfilled an energy commitment", description: "The latest mock energy report is below the existing minimum renewable-energy commitment.", timeAgo: "14 days ago", createdAt: demoAlertCreatedAt(14), status: "UNDER_REVIEW", findingType: "CONFIRMED_DEVIATION", affectedItem: { type: "Document", name: "Latest energy report" }, reason: "The report's renewable share is 62%, below the recorded 80% commitment.", supplierId: "sup-d" },
 ];
 
 export function getUnresolvedAlerts(): RecentAlert[] {
-  return alerts.filter((alert) => alert.status !== "RESOLVED");
+  return alerts.filter((alert) => alert.status !== "RESOLVED" && !alert.archivedAt);
 }
 
 export function updateAlertStatus(id: string, status: RecentAlert["status"]): void {
@@ -164,6 +164,34 @@ export function deleteAlert(id: string): void {
     throw new Error(`Alert "${id}" was not found.`);
   }
   alerts = alerts.filter((alert) => alert.id !== id);
+}
+
+export function updateManualAlert(id: string, changes: AlertContentUpdate): RecentAlert {
+  const existing = alerts.find((alert) => alert.id === id);
+  if (!existing) throw new Error(`Alert "${id}" was not found.`);
+  if (existing.source !== "MANUAL") throw new Error("Automatic alerts are rebuilt from evidence and cannot be edited");
+  const title = (changes.title ?? existing.title).trim();
+  const description = (changes.description ?? existing.description).trim();
+  if (!title || !description) throw new Error("Alert title and description are required.");
+  const updated: RecentAlert = {
+    ...existing,
+    title,
+    description,
+    severity: changes.severity ?? existing.severity,
+    dueDate: changes.dueDate === undefined ? existing.dueDate : changes.dueDate || undefined,
+  };
+  alerts = alerts.map((alert) => (alert.id === id ? updated : alert));
+  return updated;
+}
+
+export function archiveAlert(id: string): void {
+  if (!alerts.some((alert) => alert.id === id)) throw new Error(`Alert "${id}" was not found.`);
+  alerts = alerts.map((alert) => (alert.id === id ? { ...alert, archivedAt: new Date().toISOString() } : alert));
+}
+
+export function restoreAlert(id: string): void {
+  if (!alerts.some((alert) => alert.id === id && alert.archivedAt)) throw new Error(`Archived alert "${id}" was not found.`);
+  alerts = alerts.map((alert) => (alert.id === id ? { ...alert, archivedAt: null } : alert));
 }
 
 export function addManualAlert(input: NewManualAlertInput): RecentAlert {
@@ -193,19 +221,20 @@ export function addManualAlert(input: NewManualAlertInput): RecentAlert {
   return alert;
 }
 
-export function getAlertsBySeverity(): { high: number; medium: number } {
+export function getAlertsBySeverity(): { high: number; medium: number; low: number } {
   const unresolved = getUnresolvedAlerts();
   const modeledHigh = unresolved.filter((alert) => alert.severity === "high").length;
   const modeledMedium = unresolved.filter((alert) => alert.severity === "medium").length;
   return {
     high: modeledHigh + BULK_HIGH_ALERTS_UNLISTED,
     medium: modeledMedium + BULK_MEDIUM_ALERTS_UNLISTED,
+    low: unresolved.filter((alert) => alert.severity === "low").length,
   };
 }
 
 export function getUnresolvedAlertsCount(): number {
-  const { high, medium } = getAlertsBySeverity();
-  return high + medium;
+  const { high, medium, low } = getAlertsBySeverity();
+  return high + medium + low;
 }
 
 const SYNC_STORAGE_KEY = "last_synced_at";
@@ -295,7 +324,7 @@ export function getIssueCategoryBreakdown() {
   };
 }
 
-import type { SupplierNote } from "../types/dashboard";
+import type { AlertContentUpdate, NewSupplierNote, SupplierNote } from "../types/dashboard";
 
 const NOTES_STORAGE_KEY = "supplier_issue_notes";
 
@@ -318,79 +347,39 @@ function writeStoredNotes(notes: SupplierNote[]) {
   }
 }
 
-let supplierNotes: SupplierNote[] = readStoredNotes();
+// Notes saved before visibility existed are treated as INTERNAL notes with no known author.
+let supplierNotes: SupplierNote[] = readStoredNotes().map((note) => ({
+  ...note,
+  authorId: note.authorId ?? "",
+  visibility: note.visibility ?? "INTERNAL",
+  alertId: note.alertId ?? null,
+}));
 
-// TODO(backend): becomes real POST/GET /admin/suppliers/:id/notes
-// TODO: Resolve authorName from the authenticated session when the backend is available
-export function getNotesForSupplier(supplierId: string): SupplierNote[] {
+// Mirrors the server: SELF notes go to their author only, INTERNAL notes to every admin.
+export function getNotesForSupplier(supplierId: string, viewerId: string): SupplierNote[] {
   return supplierNotes
-    .filter((n) => n.supplierId === supplierId)
+    .filter((n) => n.supplierId === supplierId && (n.visibility === "INTERNAL" || n.authorId === viewerId))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export function addSupplierNote(supplierId: string, authorName: string, text: string): SupplierNote {
+export function addSupplierNote(
+  supplierId: string,
+  author: { id: string; name: string },
+  input: NewSupplierNote
+): SupplierNote {
   const note: SupplierNote = {
     id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     supplierId,
-    authorName,
-    text,
+    authorId: author.id,
+    authorName: author.name,
+    visibility: input.visibility,
+    text: input.text.trim(),
+    alertId: input.alertId ?? null,
     createdAt: new Date().toISOString(),
   };
   supplierNotes = [...supplierNotes, note];
   writeStoredNotes(supplierNotes);
   return note;
-}
-
-import type { SupplierNotice } from "../types/dashboard";
-
-const NOTICES_STORAGE_KEY = "supplier_notices";
-
-function readStoredNotices(): SupplierNotice[] {
-  try {
-    const stored = localStorage.getItem(NOTICES_STORAGE_KEY);
-    if (!stored) return [];
-    const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed) ? (parsed as SupplierNotice[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredNotices(notices: SupplierNotice[]) {
-  try {
-    localStorage.setItem(NOTICES_STORAGE_KEY, JSON.stringify(notices));
-  } catch {
-    // Keep the app usable if storage is unavailable.
-  }
-}
-
-let supplierNotices: SupplierNotice[] = readStoredNotices();
-
-export function getSupplierNotices(supplierId: string): SupplierNotice[] {
-  return supplierNotices
-    .filter((n) => n.supplierId === supplierId)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
-
-export function addSupplierNotice(supplierId: string, title: string, message: string): SupplierNotice {
-  const notice: SupplierNotice = {
-    id: `notice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    supplierId,
-    title,
-    message,
-    createdAt: new Date().toISOString(),
-    isRead: false,
-  };
-  supplierNotices = [notice, ...supplierNotices];
-  writeStoredNotices(supplierNotices);
-  return notice;
-}
-
-export function markSupplierNoticeAsRead(noticeId: string): void {
-  supplierNotices = supplierNotices.map(n =>
-    n.id === noticeId ? { ...n, isRead: true } : n
-  );
-  writeStoredNotices(supplierNotices);
 }
 
 // Fictional normalized demo points only; these are not real municipal measurements.
@@ -522,49 +511,6 @@ export function getEnergyData(): EnergyData {
   return { requirements: MOCK_ENERGY_REQUIREMENTS, records: MOCK_ENERGY_RECORDS };
 }
 
-export function getAllAlerts(): RecentAlert[] {
-  return alerts;
-}
-
-export type PendingReview = {
-  id: string;
-  title: string;
-  submittedAt: string;
-  type: string;
-  supplierId: string;
-  contractName?: string;
-  status?: string;
-  documentDetails?: string;
-  feedback?: string;
-};
-
-const MOCK_PENDING_REVIEWS: PendingReview[] = [
-  {
-    id: "rev-1",
-    supplierId: "sup-c",
-    title: "Miljøfyrtårn Certificate (Demo Mock)",
-    submittedAt: "Oct 12",
-    type: "Document",
-    contractName: "Skolebygg Rehabilitering",
-    status: "In Review",
-    documentDetails: "Certification valid until 2026. File attached: miljofyrtarn_2024.pdf",
-    feedback: "Awaiting final verification of issuer credentials from the environmental agency.",
-  }
-];
-
-export function getPendingReviews(supplierId: string): PendingReview[] {
-  return MOCK_PENDING_REVIEWS.filter(r => r.supplierId === supplierId);
-}
-
-export function addMockCertificate(cert: Certificate) {
-  // If replacing a missing cert, remove the placeholder first
-  const existingIndex = MOCK_CERTIFICATES.findIndex(c => c.contractId === cert.contractId && c.certificateNumber === null);
-  if (existingIndex >= 0) {
-    MOCK_CERTIFICATES.splice(existingIndex, 1);
-  }
-  MOCK_CERTIFICATES.push(cert);
-}
-
-export function addMockPendingReview(review: PendingReview) {
-  MOCK_PENDING_REVIEWS.push(review);
+export function getAllAlerts(includeArchived = false): RecentAlert[] {
+  return includeArchived ? alerts : alerts.filter((alert) => !alert.archivedAt);
 }

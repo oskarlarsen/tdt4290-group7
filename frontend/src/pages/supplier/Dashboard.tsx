@@ -1,426 +1,198 @@
-import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
-import { Loader2, AlertTriangle, CheckCircle2, Clock, FileText, ArrowRight, MessageSquare, ChevronDown, ChevronUp, Check, Mail, Hourglass, HelpCircle, Truck } from "lucide-react";
-import { Link } from "react-router-dom";
-import { PageHeader } from "../../components/ui/PageHeader";
-import { useAuth } from "../../hooks/useAuth";
-import { MOCK_SUPPLIER_MAPPING } from "../../utils/supplierOverview";
-import { useSupplierNotices, useMarkNoticeAsRead } from "../../hooks/useSupplierNotices";
-import { useState } from "react";
-import { StatCard, TaskCard, SectionHeading } from "../../components/supplier/DashboardCards";
-import { ReviewDetailsDialog } from "../../components/ui/ReviewDetailsDialog";
-import { CertificateUploadDialog } from "../../components/certificates/CertificateUploadDialog";
-import { VehicleLimitationDialog } from "../../components/vehicles/VehicleLimitationDialog";
-import { InformationOnFileModal } from "../../components/supplier/InformationOnFileModal";
-import type { PendingReview } from "../../mocks/db";
-import type { Vehicle } from "../../types/vehicle";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation } from "react-router-dom";
+import { BadgeCheck, Bell, Building2, CheckCircle2, ClipboardList, LoaderCircle, Package, Truck, Zap } from "lucide-react";
+import { getOnboardingStatus, getSupplierOverview } from "@/api/onboarding";
+import type { OnboardingStatusResponse, SupplierOverview } from "@/types/onboarding";
+import { agreementLabel } from "../../utils/agreementLabel";
+import { formatDate } from "../../utils/formatDate";
+import { useSupplierAlerts } from "../../hooks/useSupplierAlerts";
+import { ALERT_CATEGORIES } from "../../types/dashboard";
+import type { AlertCategory } from "../../types/dashboard";
 
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+const CATEGORY_LABELS: Record<AlertCategory, string> = {
+  ENVIRONMENTAL_COMPLIANCE: "Environmental compliance",
+  ENERGY_FUEL: "Energy & fuel",
+  VEHICLE_COMPLIANCE: "Vehicle compliance",
+  CERTIFICATES: "Certificates",
+};
+
+const DASHBOARD_STATUSES = new Set(["SUBMITTED", "UNDER_REVIEW", "APPROVED"]);
+
+const STATUS_LABELS: Record<OnboardingStatusResponse["status"], string> = {
+  INVITED: "Invited",
+  PROFILE_PENDING: "Profile pending",
+  DATA_DRAFT: "In progress",
+  VALIDATING: "Validating",
+  SUBMITTED: "Submitted",
+  UNDER_REVIEW: "Under review",
+  APPROVED: "Approved",
+  REVISION_REQUIRED: "Changes requested",
+};
+
+function Metric({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  icon: typeof Building2;
+}) {
+  return (
+    <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-card">
+      <div className="flex items-center justify-between text-sm text-neutral-500">
+        <span>{label}</span>
+        <Icon className="h-4 w-4 text-primary-700" aria-hidden="true" />
+      </div>
+      <p className="mt-2 text-2xl font-semibold text-neutral-900">{value}</p>
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const authSupplierId = user?.supplierId;
-  const supplierId = authSupplierId === "supplier-1" ? MOCK_SUPPLIER_MAPPING : authSupplierId;
+  // Set by the onboarding page when it sends the supplier here after submitting.
+  const notice = (useLocation().state as { notice?: string } | null)?.notice;
+  const [status, setStatus] = useState<OnboardingStatusResponse | null>(null);
+  const [overview, setOverview] = useState<SupplierOverview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const alerts = useSupplierAlerts();
+  const openAlerts = (alerts.data ?? []).filter((alert) => alert.status === "OPEN");
 
-  const { data, isLoading, isError, error } = useMySupplierOverview();
-  const { data: notices } = useSupplierNotices(supplierId ?? null);
-  const markAsRead = useMarkNoticeAsRead(supplierId ?? null);
+  useEffect(() => {
+    let active = true;
+    Promise.all([getOnboardingStatus(), getSupplierOverview()])
+      .then(([nextStatus, nextOverview]) => {
+        if (!active) return;
+        setStatus(nextStatus);
+        setOverview(nextOverview);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Couldn't load your supplier dashboard.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const [expandedNoticeId, setExpandedNoticeId] = useState<string | null>(null);
-  const [selectedReview, setSelectedReview] = useState<PendingReview | null>(null);
-  const [isCertUploadOpen, setCertUploadOpen] = useState(false);
-  const [uploadContractId, setUploadContractId] = useState<string | undefined>(undefined);
-  const [isVehicleLimitationOpen, setVehicleLimitationOpen] = useState(false);
-  const [infoModalState, setInfoModalState] = useState<{ isOpen: boolean; type: "certificates" | "vehicles" }>({ isOpen: false, type: "certificates" });
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-neutral-400">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div role="status" className="flex min-h-64 items-center justify-center text-neutral-500">
+        <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <span className="sr-only">Loading supplier dashboard…</span>
       </div>
     );
   }
 
-  if (isError || !data) {
+  if (status && !DASHBOARD_STATUSES.has(status.status)) {
+    return <Navigate to="/supplier/onboarding" replace />;
+  }
+
+  if (error || !status || !overview) {
     return (
-      <div className="p-8 text-center text-sm text-red-700">
-        {error instanceof Error ? error.message : "Couldn't load your supplier overview. Please try again!"}
-      </div>
+      <section role="alert" className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">
+        {error ?? "Couldn't load your supplier dashboard. Please try again."}
+      </section>
     );
   }
-
-  const { supplier, contract, contracts, requiredActions, summaries, raw } = data;
-
-  const pendingCount = data.pendingReviews ? data.pendingReviews.length : 0;
-  const activeContractsCount = contracts ? contracts.filter(c => c.status === "Active").length : (contract?.status === "Active" ? 1 : 0);
-  const unreadCount = notices ? notices.filter(n => !n.isRead).length : 0;
-
-  // Filter valid certificates for the Information On File modal
-  const validCertificates = raw.certificates ? raw.certificates.filter(c => {
-     if (!c.validUntil) return true; // Treat unknown expiry as valid for on file display
-     const daysUntilExpiry = Math.ceil((new Date(c.validUntil).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-     return daysUntilExpiry > 0;
-  }) : [];
-
-  // Filter vehicles for the Information On File modal
-  let validVehicles: Vehicle[] = [];
-  if (raw.vehicles && supplierId) {
-     const myAgreement = raw.vehicles.agreements.find(a => a.supplierId === supplierId || a.supplierId === "sup-c");
-     if (myAgreement) {
-         validVehicles = raw.vehicles.vehicles.filter(v => v.agreementId === myAgreement.id);
-     }
-  }
-
-  const getContractName = (id: string | null) => {
-    const matched = contracts.find(c => c.id === id);
-    return matched ? matched.contractName : "Municipal Contract";
-  };
 
   return (
-    <div className="space-y-4 p-4">
-      <PageHeader
-        title="Supplier Home"
-        tag="ACTIVE OPERATIONAL CYCLE"
-        description={`${supplier?.name || "Supplier"} • ${contract?.contractName || "Municipal Concession"}`}
-      >
-        <button className="bg-white border border-neutral-200 text-neutral-800 font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-neutral-50">
-          <HelpCircle className="w-4 h-4" />
-          Support
-        </button>
-      </PageHeader>
-
-      {/* KPI Row - 4 Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link to="/supplier/contracts" className="block h-full hover:opacity-90 transition-opacity">
-          <StatCard
-            title="My Contracts"
-            value={activeContractsCount}
-            description="Active agreements"
-            accentColor="dark-green"
-            icon={<FileText className="h-5 w-5" />}
-          />
-        </Link>
-        <a href="#action-required" className="block h-full hover:opacity-90 transition-opacity">
-          <StatCard
-            title="Action Required"
-            value={requiredActions.length}
-            description="Pending tasks"
-            bottomRightText={requiredActions.length > 0 ? "Urgent" : undefined}
-            bottomRightTextColor="text-red-600"
-            accentColor={requiredActions.length > 0 ? "red" : "green"}
-            icon={<AlertTriangle className="h-5 w-5" />}
-          />
-        </a>
-        <a href="#pending-review" className="block h-full hover:opacity-90 transition-opacity">
-          <StatCard
-            title="Pending Review"
-            value={pendingCount}
-            description="Awaiting sign-off"
-            bottomRightText={pendingCount > 0 ? "Pending" : undefined}
-            bottomRightTextColor="text-primary-900"
-            accentColor="dark-green"
-            icon={<Hourglass className="h-5 w-5" />}
-          />
-        </a>
-        <a href="#messages" className="block h-full hover:opacity-90 transition-opacity">
-          <StatCard
-            title="Unread Messages"
-            value={unreadCount}
-            description="New notifications"
-            bottomRightText={unreadCount > 0 ? "New" : undefined}
-            bottomRightTextColor="text-indigo-600"
-            accentColor="dark-green"
-            icon={<MessageSquare className="h-5 w-5" />}
-          />
-        </a>
-      </div>
-
-      {/* Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* Left Column */}
-        <div className="lg:col-span-2 space-y-8">
-
-          {/* Action Required */}
-          <div id="action-required">
-            <SectionHeading
-              title="Action Required"
-              dotColor="bg-red-600"
-              rightNode={requiredActions.length > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 uppercase tracking-wide">
-                  {requiredActions.length} Urgent Items
-                </span>
-              ) : undefined}
-            />
-            {requiredActions.length > 0 ? (
-              <div className="space-y-4">
-                {requiredActions.map((action, idx) => {
-                  const isCertificate = action.link === "/supplier/certificates";
-                  const isVehicle = action.link === "/supplier/vehicles";
-
-                  return (
-                  <TaskCard
-                    key={idx}
-                    title={action.title}
-                    description={action.reason}
-                    pill={
-                      <span className="inline-flex items-center rounded bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-red-600"></span>
-                        Action Required
-                      </span>
-                    }
-                    button={
-                      isCertificate ? (
-                        <button
-                           onClick={() => {
-                             setUploadContractId(action.contractId);
-                             setCertUploadOpen(true);
-                           }}
-                           className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-900 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-800 w-full sm:w-auto"
-                        >
-                          <FileText className="h-3.5 w-3.5" /> Upload Document
-                        </button>
-                      ) : isVehicle ? (
-                        <button
-                           onClick={() => setVehicleLimitationOpen(true)}
-                           className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-neutral-100 border border-neutral-200 px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-200 w-full sm:w-auto"
-                        >
-                          <Truck className="h-3.5 w-3.5" /> Update Vehicle Data
-                        </button>
-                      ) : (
-                        <Link to={action.link} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-900 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-800 w-full sm:w-auto">
-                          <FileText className="h-3.5 w-3.5" /> Resolve Issue
-                        </Link>
-                      )
-                    }
-                  />
-                )})}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-sm text-neutral-500 bg-white rounded-xl border border-neutral-100 shadow-sm flex flex-col items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-500 mb-2" />
-                <p>No immediate actions required.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Pending Municipal Review */}
-          <div id="pending-review">
-            <SectionHeading
-              title="Pending Municipal Review"
-              dotColor="bg-primary-900"
-              rightNode={
-                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-600 uppercase tracking-wide">
-                  Under Administrative Evaluation
-                </span>
-              }
-            />
-            {data.pendingReviews && data.pendingReviews.length > 0 ? (
-              <div className="space-y-4">
-                {data.pendingReviews.map(review => (
-                  <TaskCard
-                    key={review.id}
-                    title={review.title}
-                    description={`Review requested for submission. Pending action from administrative review officers.`}
-                    pill={
-                      <span className="inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-[10px] font-bold text-primary-900">
-                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-primary-800"></span>
-                        In Review
-                      </span>
-                    }
-                    subtitle={`Submitted ${review.submittedAt}`}
-                    button={
-                      <button
-                        onClick={() => setSelectedReview(review)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-900 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-800 w-full sm:w-auto"
-                      >
-                        View Details
-                      </button>
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-sm text-neutral-500 bg-white rounded-xl border border-neutral-100 shadow-sm flex flex-col items-center justify-center">
-                <Hourglass className="h-6 w-6 text-neutral-300 mb-2" />
-                <p>No pending reviews at this time.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Messages from Municipality */}
-          <div id="messages">
-            <SectionHeading
-              title="Messages from Municipality"
-              dotColor="bg-indigo-500"
-              rightNode={unreadCount > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 uppercase tracking-wide">
-                  {unreadCount} Unread
-                </span>
-              ) : undefined}
-            />
-            {notices && notices.length > 0 ? (
-              <div className="space-y-4">
-                {notices.map((notice) => {
-                  const isExpanded = expandedNoticeId === notice.id;
-                  return (
-                    <div key={notice.id} className={`bg-white rounded-xl shadow-sm border p-5 ${!notice.isRead ? 'border-indigo-200 shadow-indigo-100/50' : 'border-neutral-100'}`}>
-                      <button
-                        onClick={() => {
-                          if (!isExpanded) {
-                            setExpandedNoticeId(notice.id);
-                            if (!notice.isRead) markAsRead.mutate(notice.id);
-                          } else {
-                            setExpandedNoticeId(null);
-                          }
-                        }}
-                        className="w-full flex items-start justify-between text-left group"
-                      >
-                        <div className="flex-1 pr-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            {!notice.isRead && (
-                              <span className="h-2 w-2 rounded-full bg-indigo-600 shrink-0" />
-                            )}
-                            <h4 className={`font-semibold text-sm ${notice.isRead ? "text-neutral-700" : "text-neutral-900"}`}>
-                              {notice.title}
-                            </h4>
-                          </div>
-                          <p className="text-[11px] text-neutral-400 font-mono">
-                            {new Date(notice.createdAt).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                          {isExpanded && (
-                            <div className="mt-4 text-sm text-neutral-700 whitespace-pre-line border-t border-neutral-100 pt-4 leading-relaxed">
-                              {notice.message}
-                            </div>
-                          )}
-                        </div>
-                        <div className="shrink-0 mt-0.5 p-1 rounded-md text-neutral-400 group-hover:bg-neutral-50 group-hover:text-neutral-700 transition-colors">
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-sm text-neutral-500 bg-white rounded-xl border border-neutral-100 shadow-sm flex flex-col items-center justify-center">
-                <MessageSquare className="h-6 w-6 text-neutral-300 mb-2" />
-                <p>No messages at this time.</p>
-              </div>
-            )}
-          </div>
-
+    <div className="mx-auto max-w-6xl space-y-6">
+      {notice && (
+        <div role="status" className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          {notice}
         </div>
-
-        {/* Right Column */}
-        <div className="lg:col-span-1 space-y-8">
-          {/* Information on File */}
-          <div id="information-on-file">
-            <SectionHeading
-              title="Information on File"
-              dotColor="bg-teal-500"
-            />
-
-            <div className="space-y-4">
-              {summaries.certificates.valid > 0 ? (
-                <button onClick={() => setInfoModalState({ isOpen: true, type: "certificates" })} className="w-full text-left bg-white rounded-xl border border-neutral-100 p-4 shadow-sm flex items-center justify-between hover:border-teal-300 hover:shadow-md transition-all group block">
-                  <div>
-                    <h4 className="font-semibold text-neutral-900 text-sm group-hover:text-teal-800 transition-colors">Active Certificates</h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">Valid certificates on record</p>
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
-                    <Check className="w-3 h-3 mr-1" /> {summaries.certificates.valid} Verified
-                  </span>
-                </button>
-              ) : (
-                <button onClick={() => setInfoModalState({ isOpen: true, type: "certificates" })} className="w-full text-left bg-white rounded-xl border border-neutral-100 p-4 shadow-sm flex items-center justify-between hover:border-neutral-300 transition-all group block">
-                  <div>
-                    <h4 className="font-semibold text-neutral-900 text-sm">Active Certificates</h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">No active records found</p>
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-500">
-                    0 Verified
-                  </span>
-                </button>
-              )}
-
-              {summaries.vehicles.tracked > 0 ? (
-                <button onClick={() => setInfoModalState({ isOpen: true, type: "vehicles" })} className="w-full text-left bg-white rounded-xl border border-neutral-100 p-4 shadow-sm flex items-center justify-between hover:border-teal-300 hover:shadow-md transition-all group block">
-                  <div>
-                    <h4 className="font-semibold text-neutral-900 text-sm group-hover:text-teal-800 transition-colors">Registered Fleet</h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">Tracked vehicles on record</p>
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
-                    <Check className="w-3 h-3 mr-1" /> {summaries.vehicles.tracked} Active
-                  </span>
-                </button>
-              ) : (
-                <button onClick={() => setInfoModalState({ isOpen: true, type: "vehicles" })} className="w-full text-left bg-white rounded-xl border border-neutral-100 p-4 shadow-sm flex items-center justify-between hover:border-neutral-300 transition-all group block">
-                  <div>
-                    <h4 className="font-semibold text-neutral-900 text-sm">Registered Fleet</h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">No registered vehicles</p>
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-500">
-                    0 Active
-                  </span>
-                </button>
-              )}
-            </div>
+      )}
+      <section className="rounded-2xl bg-primary-900 px-6 py-7 text-white sm:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-primary-100">Supplier portal</p>
+            <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{overview.supplierName}</h1>
+            <p className="mt-1 text-sm text-primary-100">Organization number {overview.orgNumber}</p>
           </div>
+          <span className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium">
+            {STATUS_LABELS[status.status]}
+          </span>
+        </div>
+        {status.reviewerNotes && (
+          <p className="mt-5 rounded-lg bg-white/10 px-4 py-3 text-sm">
+            <span className="font-semibold">Reviewer feedback: </span>{status.reviewerNotes}
+          </p>
+        )}
+      </section>
 
-          {/* Assistance Banner */}
-          <div className="bg-primary-900 rounded-xl p-5 text-white shadow-sm relative overflow-hidden">
-            <div className="relative z-10">
-              <h4 className="text-[10px] font-bold tracking-wider text-green-300 uppercase mb-2">Municipal Governance</h4>
-              <h3 className="font-headline text-lg font-bold mb-2">Need assistance with requirements?</h3>
-              <p className="text-xs text-green-50 mb-4 leading-relaxed">
-                Municipal liaison officers are available to assist concessionaires with documentation and mass-balance certificate submissions.
-              </p>
-              <button className="text-xs font-bold text-white hover:text-green-200 flex items-center gap-1 group transition-colors">
-                Review Compliance Handbook <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-            {/* Decorative element to simulate the image background */}
-            <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none transform translate-x-1/4 translate-y-1/4">
-               <HelpCircle className="w-32 h-32" />
-            </div>
+      <section aria-label="Supplier overview" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Metric icon={Building2} label="Agreements" value={overview.agreements.length} />
+        <Metric icon={Truck} label="Vehicles" value={overview.totalVehicles} />
+        <Metric icon={BadgeCheck} label="Certificates" value={overview.totalCertificates} />
+        <Metric icon={Zap} label="Energy reports" value={overview.totalEnergyRecords} />
+        <Metric icon={Package} label="Products" value={overview.totalProducts} />
+      </section>
+
+      <section aria-label="Open issues" className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Bell className="h-5 w-5 text-primary-700" aria-hidden="true" />
+          <h2 className="text-lg font-semibold text-neutral-900">Open issues</h2>
+        </div>
+        {alerts.isError ? (
+          <p className="text-sm text-neutral-500">Couldn't load your issues. Open My Alerts to try again.</p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {ALERT_CATEGORIES.map((category) => {
+              const count = openAlerts.filter((alert) => alert.category === category).length;
+              return (
+                <li key={category}>
+                  <Link
+                    to={`/supplier/alerts?category=${category}`}
+                    className="block rounded-lg border border-neutral-100 p-3 hover:bg-neutral-50"
+                  >
+                    <span className="block text-sm text-neutral-600">{CATEGORY_LABELS[category]}</span>
+                    <span className="mt-1 block text-2xl font-semibold text-neutral-900">{alerts.isLoading ? "…" : count}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-primary-700" aria-hidden="true" />
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900">My agreements</h2>
+            <p className="text-sm text-neutral-500">Agreements and reporting data linked to your organization.</p>
           </div>
         </div>
-
-      </div>
-
-      {selectedReview && (
-        <ReviewDetailsDialog
-          review={selectedReview}
-          onClose={() => setSelectedReview(null)}
-        />
-      )}
-
-      {isCertUploadOpen && (
-        <CertificateUploadDialog
-          contracts={contracts}
-          onClose={() => setCertUploadOpen(false)}
-          initialContractId={uploadContractId}
-        />
-      )}
-
-      {isVehicleLimitationOpen && (
-        <VehicleLimitationDialog onClose={() => setVehicleLimitationOpen(false)} />
-      )}
-
-      <InformationOnFileModal
-        type={infoModalState.type}
-        isOpen={infoModalState.isOpen}
-        onClose={() => setInfoModalState({ ...infoModalState, isOpen: false })}
-        certificates={validCertificates}
-        vehicles={validVehicles}
-        getContractName={getContractName}
-      />
+        {overview.agreements.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-neutral-200 p-5 text-center text-sm text-neutral-500">
+            No agreements have been added to your organization yet. Contact your municipal administrator if you expect one here.
+          </p>
+        ) : (
+          <ul className="divide-y divide-neutral-100">
+            {overview.agreements.map((agreement) => (
+              <li key={agreement.id} className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                <div>
+                  <p className="font-medium text-neutral-900">{agreementLabel(agreement)}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    {formatDate(agreement.startDate)} – {formatDate(agreement.endDate)}
+                  </p>
+                </div>
+                <div className="text-right text-sm text-neutral-600">
+                  <p>{agreement.active ? "Active" : "Inactive"}</p>
+                  <p className="text-xs text-neutral-500">
+                    {agreement.activeVehiclesCount} / {agreement.allowedVehicles} vehicles
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

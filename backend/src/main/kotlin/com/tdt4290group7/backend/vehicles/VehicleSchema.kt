@@ -105,7 +105,7 @@ internal val vehicleSchemaStatements = fleetSchemaStatements + listOf(
         usage_prohibition_state TEXT NOT NULL CHECK (usage_prohibition_state = 'UNKNOWN'),
         supplier_id TEXT, supplier_name TEXT, supplier_org_number TEXT, supplier_updated_at TEXT,
         agreement_id TEXT, agreement_start TEXT, agreement_end TEXT, agreement_allowed INTEGER,
-        agreement_note TEXT, agreement_updated_at TEXT, agreement_active INTEGER,
+        agreement_note TEXT, agreement_updated_at TEXT, agreement_active INTEGER, agreement_saksnr TEXT,
         CHECK ((registry_data_source = 'UNAVAILABLE') = (snapshot_id IS NULL)),
         UNIQUE (id, registration_number), UNIQUE(id, snapshot_id)
     ) STRICT""",

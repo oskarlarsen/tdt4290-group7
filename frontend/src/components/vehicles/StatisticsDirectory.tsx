@@ -32,12 +32,12 @@ export function StatisticsDirectory({ onOpenVehicle }: { onOpenVehicle: (plate: 
   useEffect(() => { const timer = window.setTimeout(() => { setQuery(normalizePlate(search)); setPage(1); }, 300); return () => window.clearTimeout(timer); }, [search]);
   return <>
     <section className="space-y-3">
-      <label className="mb-4 block w-full max-w-xs text-xs text-neutral-600"><span className="mb-1.5 block font-medium">Statistics registration number search</span><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input className={`${inputClass} pl-9`} placeholder="Search a plate…" value={search} onChange={event => setSearch(event.target.value)} /></div></label>
+      <label className="mb-4 block w-full max-w-xs text-xs text-neutral-600"><span className="mb-1.5 block font-medium">Statistics registration number search</span><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" /><input className={`${inputClass} pl-9`} placeholder="Search a plate…" value={search} onChange={event => setSearch(event.target.value)} /></div></label>
       {statistics.isLoading && <p role="status" className="py-8 text-center text-neutral-500">Loading statistics…</p>}
       <ErrorNotice error={statistics.error} />
       {statistics.isError && <button className={`${buttonClass} mt-3`} onClick={() => void statistics.refetch()}>Retry loading statistics</button>}
       {statistics.data && <>
-        {statistics.data.items.length ? <StatisticsTable rows={statistics.data.items} onSelect={setSelected} /> : <p className="py-10 text-center text-sm text-neutral-500">No matching statistics rows. Add statistics or clear the search.</p>}
+        {statistics.data.items.length ? <StatisticsTable rows={statistics.data.items} onSelect={setSelected} /> : <p className="py-10 text-center text-sm text-neutral-500">No matching statistics rows. Add reported data or clear the search.</p>}
         <div className="pb-1"><Paging page={page} total={statistics.data.total} pageSize={25} onChange={setPage} /></div>
       </>}
     </section>

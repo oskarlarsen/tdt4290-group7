@@ -26,9 +26,9 @@ describe("manual alert creation", () => {
     );
 
     expect(html).toContain("Create Manual Alert");
-    expect(html).toContain("Alert Title *");
+    expect(html).toContain("Alert title *");
     expect(html).toContain("Supplier *");
-    expect(html).toContain("Risk Category *");
+    expect(html).toContain("Risk category *");
     expect(html).toContain("Risk *");
     expect(html).toContain("Alert Type *");
     expect(html).toContain("Description *");
@@ -36,7 +36,7 @@ describe("manual alert creation", () => {
     expect(html).toContain("DD/MM/YYYY");
     expect(html).toContain('type="date"');
     expect(html).toContain("Cancel");
-    expect(html).toContain("Create Alert");
+    expect(html).toContain("Create alert");
     for (const category of [
       "Environmental Compliance",
       "Energy &amp; Fuel",

@@ -62,12 +62,13 @@ describe("alert creation date and age formatting", () => {
       createElement(AlertsTable, {
         rows: [{ alert: rowAlert }],
         onSelect: () => {},
-        onDelete: () => {},
+        onArchive: () => {},
+        onRestore: () => {},
       })
     );
     const headers = Array.from(html.matchAll(/<th(?:\s[^>]*)?>(.*?)<\/th>/g), ([, label]) => label);
     expect(headers).toEqual(["Description", "Supplier", "Contract", "Risk", "Status", "Created On", "Action"]);
-    expect(html).toMatch(/<th class="whitespace-nowrap pb-2 pr-3 font-medium">Created On<\/th>/);
+    expect(html).toMatch(/<th scope="col" class="whitespace-nowrap pb-2 pr-3 font-medium">Created On<\/th>/);
     expect(html).not.toContain("Risk / Priority");
     expect(html).toContain(">Low</span>");
     expect(html).toContain("Alert Type:");
@@ -75,7 +76,7 @@ describe("alert creation date and age formatting", () => {
     expect(html).toContain("aria-label=\"View details for Test alert\"");
     expect(html.indexOf(">Action</th>")).toBeLessThan(html.indexOf("aria-label=\"View details for Test alert\""));
     expect(html.indexOf("aria-label=\"View details for Test alert\""))
-      .toBeLessThan(html.indexOf("aria-label=\"Delete Test alert\""));
+      .toBeLessThan(html.indexOf("aria-label=\"Archive Test alert\""));
     expect(html).toContain(">Low</span>");
     expect(html).toContain(formatAlertCreatedDate(rowAlert.createdAt));
     expect(html).not.toContain(">Age</th>");
@@ -166,7 +167,7 @@ describe("alert creation date and age formatting", () => {
     expect(html).toContain("Miljøfyrtårn certificate");
     expect(html).toContain("The existing certificate record has no submitted expiry date or certificate number.");
     expect(
-      html.match(/<div class="py-1 text-sm"><span class="block text-left text-neutral-400">/g)
+      html.match(/<div class="py-1 text-sm"><span class="block text-left text-neutral-500">/g)
     ).toHaveLength(9);
   });
 

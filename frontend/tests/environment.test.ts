@@ -20,14 +20,13 @@ describe("shared environment configuration", () => {
       "VITE_USE_MOCK_AUTH=false",
       "JWT_SECRET=synthetic-jwt-secret",
       "SEED_ADMIN_PASSWORD=synthetic-admin-password",
-      "SEED_SUPPLIER_PASSWORD=synthetic-supplier-password",
       "SVV_API_KEY=synthetic-registry-key",
     ].join("\n"));
     const browserSettings = loadEnv("development", directory, "VITE_");
     expect(browserSettings).toHaveProperty("VITE_API_BASE_URL");
     expect(browserSettings).toHaveProperty("VITE_USE_MOCKS");
     expect(browserSettings).toHaveProperty("VITE_USE_MOCK_AUTH");
-    for (const key of ["JWT_SECRET", "SEED_ADMIN_PASSWORD", "SEED_SUPPLIER_PASSWORD", "SVV_API_KEY"]) {
+    for (const key of ["JWT_SECRET", "SEED_ADMIN_PASSWORD", "SVV_API_KEY"]) {
       expect(browserSettings).not.toHaveProperty(key);
     }
   });

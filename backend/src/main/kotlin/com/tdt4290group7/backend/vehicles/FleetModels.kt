@@ -11,15 +11,33 @@ data class FleetSupplier(val id: String, val name: String, val orgNumber: String
 data class SupplierInput(val name: String, val orgNumber: String)
 
 @Serializable
+data class SupplierInvitationRequest(val email: String)
+
+@Serializable
+data class SupplierInvitationResponse(val email: String, val token: String, val expiresAt: String)
+
+@Serializable
 data class SupplierUpdate(val supplier: SupplierInput, val expectedUpdatedAt: String)
 
 @Serializable
 data class AgreementInput(val supplierId: String, val startDate: String, val endDate: String,
-    val allowedVehicles: Int, val note: String = "")
+    val allowedVehicles: Int, val note: String = "", val requiresVehicles: Boolean = true,
+    val requiresEnergy: Boolean = false, val requiresProducts: Boolean = false,
+    /** Required case number; the empty default only exists so a missing field reaches the validation message. */
+    val saksnr: String = "")
 
 @Serializable
 data class FleetAgreement(val id: String, val supplierId: String, val startDate: String, val endDate: String,
-    val allowedVehicles: Int, val note: String, val updatedAt: String, val active: Boolean = true)
+    val allowedVehicles: Int, val note: String, val updatedAt: String, val active: Boolean = true,
+    val requiresVehicles: Boolean = true, val requiresEnergy: Boolean = false, val requiresProducts: Boolean = false,
+    val saksnr: String? = null)
+
+/** Display name for an agreement: "saksnr — note", falling back to "Saksnr missing" for agreements created before saksnr existed. */
+fun agreementLabel(saksnr: String?, note: String): String {
+    val number = saksnr?.trim()?.takeIf(String::isNotEmpty) ?: "Saksnr missing"
+    val text = note.trim()
+    return if (text.isEmpty()) number else "$number — $text"
+}
 
 @Serializable
 data class AgreementUpdate(val agreement: AgreementInput, val expectedUpdatedAt: String)

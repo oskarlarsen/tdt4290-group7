@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Bell, CheckCircle2, ChevronDown, Clock3, Download, Loader2, Plus, Search } from "lucide-react";
 import { useAlerts } from "../../hooks/useAlerts";
-import { useContracts } from "../../hooks/useContracts";
-import { useDashboardSummary, useUpdateAlertStatus } from "../../hooks/useDashboardSummary";
-import { createManualAlert, deleteAlert } from "../../api/alerts";
+import { useFleet } from "../../hooks/useVehicles";
+import { useSearchParams } from "react-router-dom";
+import { useDashboardSummary, useUpdateAlertStatus, useUpdateManualAlert } from "../../hooks/useDashboardSummary";
+import { createManualAlert, archiveAlert, restoreAlert } from "../../api/alerts";
+import { addSupplierNote } from "../../api/notes";
+import { useAuth } from "../../hooks/useAuth";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { TablePagination } from "../../components/ui/TablePagination";
 import { AlertsTable } from "../../components/alerts/AlertsTable";
@@ -15,11 +18,14 @@ import { AlertsAttentionCard } from "../../components/alerts/AlertsAttentionCard
 import { ALERT_SEVERITY_LABELS, ALERT_STATUS_LABELS } from "../../components/alerts/AlertBadges";
 import { ALERT_STATUSES } from "../../types/dashboard";
 import type { AlertSeverity, AlertStatus, NewManualAlertInput, RecentAlert } from "../../types/dashboard";
-import type { DerivedContract } from "../../types/contract";
+import { getActiveCertificateContracts } from "../../utils/certificateContracts";
+import type { AlertContract } from "../../components/alerts/AlertsTable";
 import { formatAlertCreatedDate } from "../../utils/alertAge";
 import { downloadCsv, toCsv } from "../../utils/csv";
 
 type AlertView = "all" | AlertSeverity;
+// "UNRESOLVED" is every status except RESOLVED, the same set the dashboard card counts.
+type StatusFilter = "ALL" | "UNRESOLVED" | AlertStatus;
 
 const FILTERS: { value: AlertView; label: string }[] = [
   { value: "all", label: "All" },
@@ -34,26 +40,50 @@ type PendingAlertDelete = { deadline: number; isDeleting: boolean };
 
 export default function Alerts() {
   const queryClient = useQueryClient();
-  const { data: alerts, isLoading: alertsLoading, isError: alertsError } = useAlerts();
-  const { data: contracts, isLoading: contractsLoading, isError: contractsError } = useContracts();
+  const { user } = useAuth();
+  const [showArchived, setShowArchived] = useState(false);
+  const { data: alerts, isLoading: alertsLoading, isError: alertsError } = useAlerts(showArchived);
+  // Agreement names are a convenience column: if the fleet data is unavailable the page still works without them.
+  const fleet = useFleet();
+  const contracts = useMemo(() => (fleet.data ? getActiveCertificateContracts(fleet.data) : []), [fleet.data]);
   // Only used for the portfolio-wide count shown next to the record-based KPIs.
   const { data: dashboard } = useDashboardSummary();
   const updateAlertStatus = useUpdateAlertStatus();
+  const updateManualAlert = useUpdateManualAlert();
   const createAlert = useMutation({
     mutationFn: (input: NewManualAlertInput) => createManualAlert(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
+  // Archive keeps the alert (it can be restored); there is no permanent delete here.
   const permanentDelete = useMutation({
-    mutationFn: (id: string) => deleteAlert(id),
+    mutationFn: (id: string) => archiveAlert(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    },
+  });
+  const restore = useMutation({
+    mutationFn: (id: string) => restoreAlert(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
 
   const [view, setView] = useState<AlertView>("all");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | AlertStatus>("ALL");
+  // The status filter lives in the URL so dashboard links such as ?status=unresolved can set it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusParam = searchParams.get("status")?.toUpperCase();
+  const statusFilter: StatusFilter =
+    statusParam === "UNRESOLVED" ? "UNRESOLVED" : ALERT_STATUSES.find((candidate) => candidate === statusParam) ?? "ALL";
+  const setStatusFilter = useCallback((next: StatusFilter) => {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (next === "ALL") params.delete("status");
+      else params.set("status", next.toLowerCase());
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [createdAlertIdToReveal, setCreatedAlertIdToReveal] = useState<string | null>(null);
@@ -88,7 +118,7 @@ export default function Alerts() {
       });
       setDeleteErrors((current) => ({
         ...current,
-        [id]: error instanceof Error ? error.message : "Could not delete the alert.",
+        [id]: error instanceof Error ? error.message : "Could not archive the alert.",
       }));
     } finally {
       finalizingDeleteIds.current.delete(id);
@@ -97,8 +127,8 @@ export default function Alerts() {
 
   // Most severe first; within a severity, the original order (most recent first) is kept.
   const rows = useMemo<AlertRow[]>(() => {
-    if (!alerts || !contracts) return [];
-    const contractBySupplier = new Map<string, DerivedContract>();
+    if (!alerts) return [];
+    const contractBySupplier = new Map<string, AlertContract>();
     const supplierById = new Map((dashboard?.topRiskSuppliers ?? []).map((supplier) => [supplier.id, supplier]));
     for (const c of contracts) {
       if (!contractBySupplier.has(c.supplierId)) contractBySupplier.set(c.supplierId, c);
@@ -127,6 +157,7 @@ export default function Alerts() {
       resolved: 0,
     };
     for (const { alert } of rows) {
+      if (alert.archivedAt) continue;
       if (alert.status === "RESOLVED") {
         result.resolved += 1;
       } else {
@@ -141,7 +172,8 @@ export default function Alerts() {
     const query = search.trim().toLowerCase();
     return rows
       .filter(({ alert }) => {
-        const matchesStatus = statusFilter === "ALL" || alert.status === statusFilter;
+        const matchesStatus =
+          statusFilter === "ALL" || (statusFilter === "UNRESOLVED" ? alert.status !== "RESOLVED" : alert.status === statusFilter);
         const matchesSeverity = view === "all" || alert.severity === view;
         return matchesStatus && matchesSeverity;
       })
@@ -184,15 +216,15 @@ export default function Alerts() {
     ? "No alert records available"
     : "No alerts match the current filters";
 
-  if (alertsLoading || contractsLoading) {
+  if (alertsLoading) {
     return (
-      <div className="flex h-64 items-center justify-center text-neutral-400">
+      <div className="flex h-64 items-center justify-center text-neutral-500">
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
   }
 
-  if (alertsError || contractsError || !alerts || !contracts) {
+  if (alertsError || !alerts) {
     return <div className="text-sm text-red-700">Couldn't load alerts. Try again.</div>;
   }
 
@@ -248,14 +280,30 @@ export default function Alerts() {
     });
   }
 
-  async function handleCreateAlert(input: NewManualAlertInput) {
+  async function handleCreateAlert(input: NewManualAlertInput, noteToSelf?: string) {
     const createdAlert: RecentAlert = await createAlert.mutateAsync(input);
+    // The alert is already saved: a failed note must not make the dialog report the whole thing as failed.
+    let noteSaved = true;
+    if (noteToSelf) {
+      try {
+        await addSupplierNote(input.supplierId, { id: user?.id ?? "", name: user?.name ?? "Unknown admin" }, {
+          text: noteToSelf,
+          visibility: "SELF",
+          alertId: createdAlert.id,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["supplier-notes", input.supplierId] });
+      } catch {
+        noteSaved = false;
+      }
+    }
     setView("all");
     setStatusFilter("ALL");
     setSearch("");
     setPage(1);
     setCreatedAlertIdToReveal(createdAlert.id);
-    setCreateSuccessMessage("Manual alert created successfully");
+    setCreateSuccessMessage(
+      noteSaved ? "Manual alert created successfully" : "Alert saved, note not saved. Add the note from the supplier's page."
+    );
   }
 
   function handleExport() {
@@ -311,7 +359,7 @@ export default function Alerts() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
               <Plus className="h-3.5 w-3.5" />
-              Create Manual Alert
+              Create manual alert
             </button>
           </div>
         </div>
@@ -362,23 +410,27 @@ export default function Alerts() {
       <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search alert, supplier, or contract…"
-              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
+              className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-neutral-600">
+              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+              <span className="font-medium text-neutral-700">Show archived</span>
+            </label>
             <label className="flex items-center gap-2 text-xs text-neutral-600">
               <span className="font-medium text-neutral-700">Status:</span>
               <select
                 value={statusFilter}
                 onChange={(event) => {
                   const value = event.target.value;
-                  if (value === "ALL") {
-                    setStatusFilter("ALL");
+                  if (value === "ALL" || value === "UNRESOLVED") {
+                    setStatusFilter(value);
                   } else {
                     const status = ALERT_STATUSES.find((candidate) => candidate === value);
                     if (status) setStatusFilter(status);
@@ -388,6 +440,7 @@ export default function Alerts() {
                 aria-label="Filter alerts by status"
               >
                 <option value="ALL">All statuses</option>
+                <option value="UNRESOLVED">Unresolved</option>
                 {ALERT_STATUSES.map((status) => (
                   <option key={status} value={status}>{ALERT_STATUS_LABELS[status]}</option>
                 ))}
@@ -420,7 +473,8 @@ export default function Alerts() {
         <AlertsTable
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.alert.id)}
-          onDelete={handleDeleteAlert}
+          onArchive={handleDeleteAlert}
+          onRestore={(row) => restore.mutate(row.alert.id)}
           emptyMessage={emptyMessage}
         />
 
@@ -441,6 +495,7 @@ export default function Alerts() {
         row={selectedRow}
         onClose={() => setSelectedId(null)}
         onStatusChange={handleStatusChange}
+        onEdit={async (id, changes) => { await updateManualAlert.mutateAsync({ id, changes }); }}
         isBusy={updateAlertStatus.isPending}
         statusMessage={statusFeedbackForSelected?.message}
         statusError={statusFeedbackForSelected?.isError}
@@ -548,10 +603,10 @@ function AlertDeleteUndoNotice({
       className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
     >
       <span className="min-w-0 truncate">
-        {isDeleting ? "Deleting alert…" : `Alert deleted: ${title}`}
+        {isDeleting ? "Archiving alert…" : `Alert archived: ${title}`}
       </span>
       {isDeleting ? (
-        <span className="shrink-0 text-neutral-300">Please wait</span>
+        <span className="shrink-0 text-neutral-500">Please wait</span>
       ) : (
         <button
           type="button"

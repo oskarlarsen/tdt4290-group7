@@ -7,6 +7,8 @@ import { useRefreshVehicles } from "../../hooks/useVehicles";
 import { AgreementForm, VehicleEntryForm } from "./FleetForms";
 import { ConfirmAction } from "./ConfirmAction";
 import { ErrorNotice, buttonClass, dangerClass, primaryClass } from "./VehicleDialog";
+import { CopyableValue } from "../ui/CopyableValue";
+import { hasSaksnr } from "../../utils/agreementLabel";
 
 export function VehicleAllowance({ count, allowed }: { count: number; allowed: number }) {
   return <span className={`text-sm font-medium ${count > allowed ? "text-red-700" : "text-neutral-700"}`}>{count} of {allowed} vehicles</span>;
@@ -25,7 +27,7 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
   function saved() { setEditing(false); setEntry(null); void refresh(); }
   function vehicleRow(vehicle: Vehicle) {
     return <li key={vehicle.registrationNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 py-3">
-      <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-medium">{vehicle.registrationNumber}</span>{vehicle.planned && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">Registration pending</span>}</div>
+      <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-medium">{vehicle.planned ? "Planned vehicle" : vehicle.registrationNumber}</span>{vehicle.planned && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">Registration pending</span>}</div>
       <div className="flex flex-wrap gap-2">
         {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber)}>View details</button>}
         {vehicle.listed && <><button className={buttonClass} onClick={() => setEntry(vehicle)}>{vehicle.planned ? "Register vehicle" : "Replace vehicle"}</button>
@@ -35,7 +37,14 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
   }
   return <article className="rounded-xl border border-neutral-200 bg-white p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h3 className="font-medium text-neutral-900">{vehicleDate(agreement.startDate)} – {vehicleDate(agreement.endDate)}</h3><p className="mt-1 text-xs text-neutral-500">{agreementDuration(agreement.startDate, agreement.endDate)}</p></div>
+      <div className="space-y-1">
+        <h3 className="font-medium text-neutral-900">{vehicleDate(agreement.startDate)} – {vehicleDate(agreement.endDate)}</h3>
+        <p className="text-xs text-neutral-500">{agreementDuration(agreement.startDate, agreement.endDate)}</p>
+        {hasSaksnr(agreement)
+          ? <p className="text-xs text-neutral-500">Saksnr {agreement.saksnr}</p>
+          : <p className="flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-red-100 px-2 py-0.5 font-medium text-red-700">Saksnr missing</span><button className="font-medium text-secondary-700 underline" onClick={() => setEditing(true)}>Add saksnr</button></p>}
+        <CopyableValue label="Agreement ID (for supplier CSV)" value={agreement.id} />
+      </div>
       <VehicleAllowance count={listed.length} allowed={agreement.allowedVehicles} />
     </div>
     <div className="my-4 flex flex-wrap gap-2">

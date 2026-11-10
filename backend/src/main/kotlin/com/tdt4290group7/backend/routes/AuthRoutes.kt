@@ -47,13 +47,19 @@ data class ForgotPasswordRequest(val email: String)
 data class ResetPasswordRequest(val token: String, val newPassword: String)
 
 @Serializable
+data class AcceptSupplierInvitationRequest(val token: String, val newPassword: String, val name: String? = null)
+
+@Serializable
 data class ErrorResponse(val message: String)
 
 /**
  * [logResetTokens]: there is no email delivery yet, so the only way to get a reset token is to log
  * it. See [com.tdt4290group7.backend.config.resetTokenLoggingEnabled] for when that's allowed.
  */
-fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
+fun Application.configureAuthRoutes(
+    logResetTokens: Boolean = false,
+    supplierIsActive: (String) -> Boolean = { true }
+) {
     if (logResetTokens) {
         logger.warn(
             "ALLOW_DEV_PASSWORD_RESET_LOG=true: password reset tokens will be written to the log. " +
@@ -63,7 +69,7 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
 
     routing {
         route("/api/auth") {
-            // Applies to login and forgot-password: blunt brute-force / enumeration protection.
+            // Applies to sign-in, recovery and invitation acceptance to constrain repeated attempts.
             rateLimit(LOGIN_RATE_LIMIT) {
                 post("/login") {
                     val request = call.receive<LoginRequest>()
@@ -93,12 +99,14 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     // Same generic error, and the same response time, whether the account doesn't
                     // exist or the password is wrong, so the endpoint can't enumerate accounts.
                     val user = UserRepository.authenticate(email, request.password)
-                    if (user == null) {
+                    if (user == null || (user.role == com.tdt4290group7.backend.model.Role.SUPPLIER &&
+                            !supplierIsActive(user.supplierId.orEmpty()))) {
                         LoginAttemptTracker.recordFailure(email)
                         call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
                         return@post
                     }
                     LoginAttemptTracker.recordSuccess(email)
+                    UserRepository.recordActivity(user.id)
 
                     val (token, expiresAt) = JwtConfig.generateToken(user, request.rememberMe)
                     // Without "remember me" the cookie lasts until the browser closes (the JWT
@@ -158,6 +166,33 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     logger.info("Password reset completed for user ${user.id}")
                     call.respond(HttpStatusCode.OK)
                 }
+
+                post("/accept-invitation") {
+                    val request = call.receive<AcceptSupplierInvitationRequest>()
+                    PasswordPolicy.violation(request.newPassword)?.let { reason ->
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(reason))
+                        return@post
+                    }
+                    val user = try {
+                        UserRepository.acceptSupplierInvitation(
+                            request.token.trim(),
+                            request.newPassword,
+                            supplierIsActive = supplierIsActive,
+                            name = request.name
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                        return@post
+                    }
+                    if (user == null) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ErrorResponse("This supplier invitation is invalid, expired, or already used.")
+                        )
+                        return@post
+                    }
+                    call.respond(HttpStatusCode.OK)
+                }
             }
 
             authenticate(AUTH_JWT) {
@@ -166,11 +201,13 @@ fun Application.configureAuthRoutes(logResetTokens: Boolean = false) {
                     val userId = principal?.payload?.let { JwtConfig.userId(it) }
                     val user = userId?.let { UserRepository.findById(it) }
 
-                    if (user == null) {
+                    if (user == null || (user.role == com.tdt4290group7.backend.model.Role.SUPPLIER &&
+                            !supplierIsActive(user.supplierId.orEmpty()))) {
                         call.respond(HttpStatusCode.Unauthorized)
                         return@get
                     }
 
+                    UserRepository.recordActivity(user.id)
                     call.respond(user.toAuthUser())
                 }
             }

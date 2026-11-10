@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import * as api from "../src/api/vehicles";
 import { ApiError } from "../src/api/client";
-import { AgreementForm, SupplierForm, VehicleEntryForm } from "../src/components/vehicles/FleetForms";
+import { AgreementForm, RemoveSupplierAction, SupplierForm, VehicleEntryForm } from "../src/components/vehicles/FleetForms";
 import { StatisticsForm } from "../src/components/vehicles/VehicleForms";
 import { AgreementCard } from "../src/components/vehicles/AgreementCard";
 import { VehicleDetails } from "../src/components/vehicles/VehicleDetails";
@@ -14,7 +14,7 @@ import type { FleetAgreement, FleetSupplier, Snapshot, TripRow, Vehicle } from "
 
 const vehicle: Vehicle = { registrationNumber: "AB12345", agreementId: "agreement", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", planned: false, listed: true };
 const supplier: FleetSupplier = { id: "supplier", name: "Test supplier", orgNumber: "123456789", active: true, updatedAt: vehicle.updatedAt };
-const agreement: FleetAgreement = { id: "agreement", supplierId: supplier.id, startDate: "2026-01-01", endDate: "2027-12-31", allowedVehicles: 3, note: "", updatedAt: vehicle.updatedAt, active: true };
+const agreement: FleetAgreement = { id: "agreement", supplierId: supplier.id, startDate: "2026-01-01", endDate: "2027-12-31", allowedVehicles: 3, note: "", saksnr: "2024/1234", updatedAt: vehicle.updatedAt, active: true, requiresVehicles: true, requiresEnergy: false, requiresProducts: false };
 const row: TripRow = { id: "period", registrationNumber: vehicle.registrationNumber, createdAt: vehicle.createdAt, estimatedCo2Kg: "120", data: {
   registrationNumber: vehicle.registrationNumber, periodStart: "2026-01-01", periodEnd: "2026-01-31", fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Test", model: "Model",
   co2Registered: true, co2GramsPerKm: "120", totalTripKm: "1000", totalKmCo2Registered: "1000", totalKmCo2NotRegistered: "0", kmFuelNotRegistered: "0", totalKmFuelRegistered: "1000", totalKmNoxRegistered: "500", totalNoxRegisteredGrams: "12.5", averageFuelConsumptionLitresPer100Km: "8", fuelConsumedLitres: "80",
@@ -50,6 +50,28 @@ describe("vehicle registration and consequential actions", () => {
     expect(saved).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalledTimes(1);
     expect(save.mock.calls[0]).toEqual([{ name: "My edit", orgNumber: supplier.orgNumber }, supplier]);
+  });
+  it("confirms supplier removal and reports the affected agreements and vehicles", async () => {
+    const remove = vi.spyOn(api, "removeSupplier").mockResolvedValue(undefined);
+    const removed = vi.fn();
+    mount(<RemoveSupplierAction supplier={supplier} agreementCount={2} vehicleCount={3} onRemoved={removed} />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    const confirmation = screen.getByRole("dialog", { name: "Remove supplier Test supplier?" });
+    expect(confirmation.textContent).toContain("2 active agreements and 3 listed vehicles");
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Remove supplier Test supplier?" })).getByRole("button", { name: "Remove supplier" }));
+    await waitFor(() => expect(removed).toHaveBeenCalledTimes(1));
+    expect(remove).toHaveBeenCalledWith(supplier);
+  });
+  it("refuses to save an agreement without a saksnr", async () => {
+    const save = vi.spyOn(api, "saveAgreement").mockResolvedValue(agreement);
+    mount(<AgreementForm supplier={supplier} agreement={{ ...agreement, saksnr: null }} onClose={() => {}} onSaved={() => {}} />);
+    fireEvent.change(screen.getByLabelText(/Saksnr/), { target: { value: "   " } });
+    fireEvent.submit(screen.getByRole("button", { name: "Save agreement" }).closest("form")!);
+    expect(await screen.findByText(/Enter the saksnr/)).toBeTruthy();
+    expect(save).not.toHaveBeenCalled();
   });
   it("saves an ordinary agreement edit without extra confirmation", async () => {
     const save = vi.spyOn(api, "saveAgreement").mockResolvedValue({ ...agreement, allowedVehicles: 1 });

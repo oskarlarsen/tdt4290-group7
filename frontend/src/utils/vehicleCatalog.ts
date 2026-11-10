@@ -31,6 +31,25 @@ export const VEHICLE_CATEGORIES = {
   "O4": "Trailer, over 10,000 kg",
 } as const;
 
+// Maximum permitted weight by registry category. Passenger cars (M1) have no weight class.
+export const VEHICLE_WEIGHT_RANGES: Record<VehicleCategory, string | null> = {
+  M1: null,
+  M2: "up to 5,000 kg",
+  M3: "over 5,000 kg",
+  N1: "up to 3,500 kg",
+  N2: "3,500 to 12,000 kg",
+  N3: "over 12,000 kg",
+  O1: "up to 750 kg",
+  O2: "750 to 3,500 kg",
+  O3: "3,500 to 10,000 kg",
+  O4: "over 10,000 kg",
+};
+
+/** The weight range for a registry category code such as N2, or null when it has none or is unknown. */
+export function vehicleWeightRange(category: string | null | undefined): string | null {
+  return category && category in VEHICLE_WEIGHT_RANGES ? VEHICLE_WEIGHT_RANGES[category as VehicleCategory] : null;
+}
+
 export const BODY_TYPES = {
   "AA": "Sedan",
   "AB": "Hatchback",

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { X, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -35,6 +36,7 @@ export function CertificateDetailsDrawer({
 }) {
   const navigate = useNavigate();
   const isOpen = row !== null;
+  const drawerRef = useDrawerFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,6 +65,9 @@ export function CertificateDetailsDrawer({
         }`}
       />
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={certificate ? `${CERTIFICATE_STANDARD_LABELS[certificate.standard]} details` : undefined}
@@ -84,7 +89,7 @@ export function CertificateDetailsDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -106,7 +111,7 @@ export function CertificateDetailsDrawer({
 
               <Section title="Status">
                 <p className="text-sm text-neutral-700">{describeStatus(info)}</p>
-                <p className="mt-1 text-xs text-neutral-400">
+                <p className="mt-1 text-xs text-neutral-500">
                   Calculated from the valid-until date. Provisional thresholds: critical within{" "}
                   {CERTIFICATE_THRESHOLDS.criticalDays} days, expiring within{" "}
                   {CERTIFICATE_THRESHOLDS.yellowDays} days.
@@ -133,8 +138,7 @@ export function CertificateDetailsDrawer({
               </Section>
 
               <p className="rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-500">
-                Extracted details should be reviewed before being used as compliance evidence. The
-                original PDF is not retained, and certificates are not yet linked to live contract records.
+                Review extracted details before relying on them as compliance evidence. The original PDF is not retained.
               </p>
             </div>
           </>
@@ -147,7 +151,7 @@ export function CertificateDetailsDrawer({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -156,7 +160,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1 text-sm">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-500">{label}</span>
       <span className="text-right font-medium text-neutral-900">{value}</span>
     </div>
   );

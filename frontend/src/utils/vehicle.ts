@@ -121,7 +121,7 @@ export function statisticsSaveMessage(result: StatisticsSave, plate: string): st
   return `Statistics saved and automatic check recorded: ${checkLabel(checked)}. ${registry}`;
 }
 export function humanize(value: string): string { return value.toLowerCase().replace(/_/g, " "); }
-export function timestamp(value?: string | null): string { return value ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : "Not available"; }
+export function timestamp(value?: string | null): string { return value ? new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : "Not available"; }
 export function codeLabel(value?: RegistryCode | null): string { return value ? `${value.name ?? value.code}${value.name ? ` (${value.code})` : ""}` : "Not provided"; }
 
 export function vehicleDate(value: string): string { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split("-").reverse().join(".") : value; }

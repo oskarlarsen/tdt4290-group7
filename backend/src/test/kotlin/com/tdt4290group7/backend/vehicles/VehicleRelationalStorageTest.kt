@@ -25,12 +25,21 @@ class VehicleRelationalStorageTest {
         connection(path).use { db ->
             db.createStatement().use { statement ->
                 statement.executeQuery("PRAGMA table_list").use { rows ->
-                    var count = 0
-                    while (rows.next()) if (!rows.getString("name").startsWith("sqlite_")) {
-                        assertEquals(1, rows.getInt("strict"))
-                        count++
+                    var vehicleTableCount = 0
+                    while (rows.next()) {
+                        val name = rows.getString("name")
+                        if (!name.startsWith("sqlite_")) assertEquals(1, rows.getInt("strict"))
+                        if (!name.startsWith("sqlite_") && name !in setOf(
+                                "supplier_onboarding",
+                                "upload_batches",
+                                "facility_energy",
+                                "contract_products",
+                                "vehicle_contract_details"
+                            )) {
+                            vehicleTableCount++
+                        }
                     }
-                    assertEquals(14, count)
+                    assertEquals(14, vehicleTableCount)
                 }
                 statement.executeQuery("PRAGMA table_info(vehicles)").use { rows ->
                     val names = mutableListOf<String>()

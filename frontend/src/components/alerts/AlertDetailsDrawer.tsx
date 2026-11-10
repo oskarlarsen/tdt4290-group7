@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useDrawerFocus } from "../../hooks/useDrawerFocus";
 import { ArrowUpRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AlertFindingBadge, AlertStatusBadge, SeverityBadge, ALERT_SEVERITY_LABELS, ALERT_STATUS_LABELS } from "./AlertBadges";
 import type { AlertRow } from "./AlertsTable";
 import { formatAlertCreatedDate } from "../../utils/alertAge";
 import { ALERT_CATEGORIES, ALERT_STATUSES } from "../../types/dashboard";
-import type { AlertCategory, AlertStatus } from "../../types/dashboard";
+import type { AlertCategory, AlertContentUpdate, AlertSeverity, AlertStatus } from "../../types/dashboard";
 
 const CATEGORY_LABELS: Record<AlertCategory, string> = {
   ENVIRONMENTAL_COMPLIANCE: "Environmental Compliance",
@@ -18,6 +19,7 @@ export function AlertDetailsDrawer({
   row,
   onClose,
   onStatusChange,
+  onEdit,
   isBusy,
   statusMessage,
   statusError,
@@ -25,12 +27,56 @@ export function AlertDetailsDrawer({
   row: AlertRow | null;
   onClose: () => void;
   onStatusChange: (alertId: string, status: AlertStatus) => void;
+  /** Saves changes to a manual alert; rejects with a message the drawer shows. */
+  onEdit?: (alertId: string, changes: AlertContentUpdate) => Promise<void>;
   isBusy: boolean;
   statusMessage?: string;
   statusError?: boolean;
 }) {
   const navigate = useNavigate();
   const isOpen = row !== null;
+  const drawerRef = useDrawerFocus(isOpen);
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({ title: "", description: "", severity: "medium" as AlertSeverity, dueDate: "" });
+
+  // A different alert, or closing the drawer, ends any edit in progress.
+  useEffect(() => {
+    setEditing(false);
+    setEditError("");
+  }, [row?.alert.id]);
+
+  function startEditing() {
+    if (!row) return;
+    const { title, description, severity, dueDate } = row.alert;
+    setDraft({ title, description, severity, dueDate: dueDate ?? "" });
+    setEditError("");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!row || !onEdit) return;
+    if (!draft.title.trim() || !draft.description.trim()) {
+      setEditError("Title and description are required.");
+      return;
+    }
+    setSaving(true);
+    setEditError("");
+    try {
+      await onEdit(row.alert.id, {
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        severity: draft.severity,
+        dueDate: draft.dueDate,
+      });
+      setEditing(false);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Could not save the alert.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,6 +111,9 @@ export function AlertDetailsDrawer({
         }`}
       />
       <div
+        ref={drawerRef}
+        tabIndex={-1}
+        inert={!isOpen}
         role="dialog"
         aria-modal="true"
         aria-label={alert ? `${alert.title} details` : undefined}
@@ -85,7 +134,7 @@ export function AlertDetailsDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700"
+                className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -97,7 +146,7 @@ export function AlertDetailsDrawer({
                 <Field label="Created On" value={formatAlertCreatedDate(alert.createdAt)} />
                 <Field label="Status" value={ALERT_STATUS_LABELS[alert.status]} />
                 <Field label="Source" value={alert.source === "MANUAL" ? "Manual" : "Automatic"} />
-                {alert.category && <Field label="Risk Category" value={CATEGORY_LABELS[alert.category]} />}
+                {alert.category && <Field label="Risk category" value={CATEGORY_LABELS[alert.category]} />}
                 {alert.dueDate && <Field label="Due Date" value={formatAlertCreatedDate(alert.dueDate)} />}
               </Section>
 
@@ -108,7 +157,82 @@ export function AlertDetailsDrawer({
                     <AlertFindingBadge findingType={alert.findingType} />
                   </div>
                 )}
-                <p className="text-sm text-neutral-700">{alert.description}</p>
+                {editing ? (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-neutral-700">
+                      Title
+                      <input
+                        value={draft.title}
+                        maxLength={200}
+                        onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                        className="mt-1 w-full rounded-md border border-neutral-200 px-2.5 py-2 text-sm text-neutral-700"
+                      />
+                    </label>
+                    <label className="block text-xs font-medium text-neutral-700">
+                      Description
+                      <textarea
+                        value={draft.description}
+                        rows={4}
+                        maxLength={4000}
+                        onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                        className="mt-1 w-full rounded-md border border-neutral-200 px-2.5 py-2 text-sm text-neutral-700"
+                      />
+                    </label>
+                    <label className="block text-xs font-medium text-neutral-700">
+                      Risk
+                      <select
+                        value={draft.severity}
+                        onChange={(event) => setDraft({ ...draft, severity: event.target.value as AlertSeverity })}
+                        className="mt-1 w-full rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-sm text-neutral-700"
+                      >
+                        {(Object.keys(ALERT_SEVERITY_LABELS) as AlertSeverity[]).map((severity) => (
+                          <option key={severity} value={severity}>{ALERT_SEVERITY_LABELS[severity]}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-xs font-medium text-neutral-700">
+                      Due date (optional)
+                      <input
+                        type="date"
+                        value={draft.dueDate}
+                        onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })}
+                        className="mt-1 w-full rounded-md border border-neutral-200 px-2.5 py-2 text-sm text-neutral-700"
+                      />
+                    </label>
+                    {editError && <p role="alert" className="text-xs text-red-700">{editError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveEdit()}
+                        disabled={saving}
+                        className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {saving ? "Saving…" : "Save changes"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(false)}
+                        disabled={saving}
+                        className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-neutral-700">{alert.description}</p>
+                    {alert.source === "MANUAL" && onEdit && (
+                      <button
+                        type="button"
+                        onClick={startEditing}
+                        className="mt-2 text-xs font-medium text-secondary-700 hover:text-secondary-800"
+                      >
+                        Edit alert
+                      </button>
+                    )}
+                  </>
+                )}
                 {alert.findingType === "MISSING_DOCUMENTATION" && (
                   <p className="mt-2 text-xs leading-5 text-neutral-500">
                     Required evidence has not been submitted. Missing documentation alone does not
@@ -201,7 +325,7 @@ export function AlertDetailsDrawer({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-400">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wide text-neutral-500">{title}</h3>
       <div className="mt-1.5">{children}</div>
     </div>
   );
@@ -210,7 +334,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="py-1 text-sm">
-      <span className="block text-left text-neutral-400">{label}</span>
+      <span className="block text-left text-neutral-500">{label}</span>
       <span className="block text-left font-medium text-neutral-900">{value}</span>
     </div>
   );

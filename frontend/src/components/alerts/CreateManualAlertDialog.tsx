@@ -60,7 +60,8 @@ type Props = {
   open: boolean;
   suppliers: TopRiskSupplier[];
   onClose: () => void;
-  onCreate: (input: NewManualAlertInput) => Promise<void>;
+  /** noteToSelf is set when the admin ticked "Save a note to self". */
+  onCreate: (input: NewManualAlertInput, noteToSelf?: string) => Promise<void>;
 };
 
 export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: Props) {
@@ -72,6 +73,8 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
   const [findingType, setFindingType] = useState<AlertFindingType | "">("");
   const [description, setDescription] = useState("");
   const [dueDateInput, setDueDateInput] = useState("");
+  const [saveNote, setSaveNote] = useState(false);
+  const [noteText, setNoteText] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -90,6 +93,8 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
     setFindingType("");
     setDescription("");
     setDueDateInput("");
+    setSaveNote(false);
+    setNoteText("");
     setError("");
   }
 
@@ -114,6 +119,10 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
       setError("Enter a valid due date in DD/MM/YYYY format.");
       return;
     }
+    if (saveNote && !noteText.trim()) {
+      setError("Write the note, or untick \"Save a note to self\".");
+      return;
+    }
 
     setError("");
     setIsSaving(true);
@@ -126,7 +135,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         findingType,
         description: trimmedDescription,
         dueDate: dueDate || undefined,
-      });
+      }, saveNote ? noteText.trim() : undefined);
       resetForm();
       onClose();
     } catch (submitError) {
@@ -160,10 +169,10 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
       <header className="flex items-start justify-between gap-4 border-b border-neutral-100 px-5 py-4">
         <div>
           <h2 id="create-manual-alert-title" className="font-headline text-lg font-semibold text-neutral-900">
-            Create Manual Alert
+            Create manual alert
           </h2>
           <p className="mt-1 text-sm leading-5 text-neutral-500">
-            Record a follow-up alert for a supplier.
+            Record a follow-up alert for a supplier. The title and description are shown to the supplier, so write them for them.
           </p>
         </div>
         <button
@@ -171,7 +180,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
           onClick={close}
           disabled={isSaving}
           aria-label="Close Create Manual Alert"
-          className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 disabled:opacity-50"
+          className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 disabled:opacity-50"
         >
           <X className="h-4 w-4" />
         </button>
@@ -185,7 +194,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         )}
 
         <label className={labelClassName}>
-          Alert Title *
+          Alert title *
           <input
             required
             value={title}
@@ -214,7 +223,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={labelClassName}>
-            Risk Category *
+            Risk category *
             <select
               required
               value={category}
@@ -305,6 +314,26 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
           <span className="sr-only">Enter date as day/month/year.</span>
         </label>
 
+        <div>
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
+            <input type="checkbox" checked={saveNote} onChange={(event) => setSaveNote(event.target.checked)} />
+            Save a note to self
+          </label>
+          {saveNote && (
+            <label className={`${labelClassName} mt-2`}>
+              Note to self
+              <textarea
+                value={noteText}
+                onChange={(event) => setNoteText(event.target.value)}
+                maxLength={2000}
+                rows={3}
+                className={fieldClassName}
+              />
+              <span className="mt-1 block font-normal text-neutral-500">Only you see this note. It is never shown to the supplier.</span>
+            </label>
+          )}
+        </div>
+
         <div className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
           <button
             type="button"
@@ -319,7 +348,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
             disabled={isSaving || suppliers.length === 0}
             className="rounded-lg bg-primary-900 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSaving ? "Creating…" : "Create Alert"}
+            {isSaving ? "Creating…" : "Create alert"}
           </button>
         </div>
       </form>

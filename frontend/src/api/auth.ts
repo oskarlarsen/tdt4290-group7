@@ -45,3 +45,11 @@ export function resetPassword(payload: {
     body: JSON.stringify(payload)
   });
 }
+
+export function acceptSupplierInvitation(payload: { token: string; newPassword: string; name?: string }): Promise<void> {
+  return apiFetch<void>(
+    "/auth/accept-invitation",
+    { method: "POST", body: JSON.stringify(payload) },
+    { notifySessionExpired: false }
+  );
+}

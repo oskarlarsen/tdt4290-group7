@@ -98,13 +98,13 @@ export function EnergyAttentionCard({
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
             >
               <Mail className="h-3.5 w-3.5" />
-              Send Notice
+              Send notice
             </button>
             <button
               onClick={() => onViewDetails(row)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
-              View Details
+              View details
             </button>
           </div>
         </div>
@@ -123,7 +123,7 @@ export function EnergyAttentionCard({
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
             </button>
-            <span className="font-mono text-xs text-neutral-400">
+            <span className="font-mono text-xs text-neutral-500">
               Page {currentPage} of {totalPages}
             </span>
             <button

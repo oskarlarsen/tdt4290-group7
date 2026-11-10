@@ -10,6 +10,10 @@ React, TypeScript and Vite application with admin and supplier workspaces. See t
 - Administrators can edit supplier, certificate type, issue/expiry dates, and contract reference, or delete a certificate after confirmation. Editing metadata does not reprocess the PDF; upload the document again if its extracted details need to be refreshed.
 - Certificate routes require a real administrator login. They are not served by mock data or mock authentication.
 
+## Supplier onboarding
+
+The supplier dashboard is connected to the onboarding API. It supports saving the sustainability contact, viewing onboarding progress and agreements, downloading a CSV template, previewing backend validation errors, confirming valid imports, and submitting the dossier. CSV uploads are limited by the backend to 4 MiB. The authenticated supplier account must already be linked to an organization with an active agreement before agreement-specific CSV imports can pass validation.
+
 ## Development
 
 Configure the root `.env` and start the backend first. Then, from `frontend/`:
