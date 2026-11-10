@@ -244,19 +244,19 @@ export function AlertDetailsDrawer({
               <Section title="Supplier & contract">
                 <Field
                   label="Supplier"
-                  value={contract?.supplierName ?? supplier?.displayName ?? "Not available in demo data"}
+                  value={contract?.supplierName ?? supplier?.displayName ?? "Not available"}
                 />
                 <Field
                   label="Contract"
                   value={
                     contract?.contractName ??
                     (supplier?.primaryContract !== "Not assigned" ? supplier?.primaryContract : undefined) ??
-                    "Not available in demo data"
+                    "Not available"
                   }
                 />
                 {(contract || supplier) && (
                   <>
-                    <Field label="Org ID" value={contract?.supplierOrgId ?? supplier?.orgId ?? "Not available in demo data"} />
+                    <Field label="Org ID" value={contract?.supplierOrgId ?? supplier?.orgId ?? "Not available"} />
                     <button
                       onClick={() => navigate(`/admin/suppliers?supplierId=${contract?.supplierId ?? supplier?.id}`)}
                       className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-secondary-700 hover:text-secondary-800"
@@ -271,11 +271,11 @@ export function AlertDetailsDrawer({
               <Section title="Affected item & reason">
                 <Field
                   label={alert.affectedItem?.type ?? "Affected item"}
-                  value={alert.affectedItem?.name ?? "Not available in demo data"}
+                  value={alert.affectedItem?.name ?? "Not available"}
                 />
                 <Field
                   label="Reason"
-                  value={alert.reason ?? "No reason recorded in demo data"}
+                  value={alert.reason ?? "No reason recorded"}
                 />
               </Section>
 

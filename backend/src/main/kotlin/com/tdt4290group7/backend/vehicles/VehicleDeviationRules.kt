@@ -42,7 +42,7 @@ internal fun evaluateDeviationRules(agreement: AgreementEvidence?, vehicle: Vehi
     }
     if (registry.dataSource in setOf(RegistryDataSource.UNAVAILABLE, RegistryDataSource.STALE_CACHE))
         finding(VehicleDeviation.UNABLE_TO_VERIFY,
-            "Unable to verify current registry facts: ${registry.refreshFailure ?: registry.lookupOutcome}. ${if (registry.data != null) "Comparisons use older information fetched at ${registry.fetchedAt}." else "No registry information is available."}",
+            "Unable to verify current registry facts (${(registry.refreshFailure ?: registry.lookupOutcome).toString().lowercase().replace('_', ' ')}). ${if (registry.data != null) "Comparisons use older information fetched at ${registry.fetchedAt}." else "No registry information is available."}",
             DeviationOrigin.REGISTRY)
     val data = registry.data
     if (data != null) {

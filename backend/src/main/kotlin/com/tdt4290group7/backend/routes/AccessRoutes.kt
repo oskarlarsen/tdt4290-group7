@@ -27,7 +27,7 @@ import java.time.format.DateTimeParseException
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class AccessInvitationRequest(val email: String, val accessEndDate: String? = null)
+data class AccessInvitationRequest(val email: String, val accessEndDate: String? = null, val supplierId: String? = null)
 
 @Serializable
 data class AccessInvitationResponse(val email: String, val token: String, val expiresAt: String, val accessExpiresAt: String? = null)
@@ -79,7 +79,7 @@ fun Application.configureAccessRoutes(fleet: FleetRepository) {
             post("/api/admin/team/invitations") {
                 val user = call.signedIn()
                 if (user == null || user.role != Role.ADMIN) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Administrator access required"))
-                call.invite(user, null)
+                call.invite(user, null) { id -> fleet.overview().suppliers.firstOrNull { it.id == id }?.name }
             }
 
             get("/api/access") {
@@ -115,10 +115,13 @@ fun Application.configureAccessRoutes(fleet: FleetRepository) {
     }
 }
 
-private suspend fun ApplicationCall.invite(inviter: User, supplierName: String?) {
+private suspend fun ApplicationCall.invite(inviter: User, supplierName: String?, supplierNameFor: (String) -> String? = { null }) {
     val request = try { receive<AccessInvitationRequest>() } catch (_: Exception) { return respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request")) }
     try {
-        val invitation = UserRepository.createAccessInvitation(inviter, request.email, supplierName, request.accessEndDate?.takeIf { it.isNotBlank() }.toDate())
+        // Only the admin route passes a supplierId; it must name an active supplier organization.
+        val targetId = request.supplierId?.takeIf { inviter.role == Role.ADMIN }
+        val targetName = targetId?.let { supplierNameFor(it) ?: return respond(HttpStatusCode.NotFound, ApiError("Active supplier organization not found")) }
+        val invitation = UserRepository.createAccessInvitation(inviter, request.email, targetName ?: supplierName, request.accessEndDate?.takeIf { it.isNotBlank() }.toDate(), supplierId = targetId)
         application.log.info("access_invitation_created inviterId={} role={} standIn={}", inviter.id, inviter.role, invitation.accessExpiresAt != null)
         respond(HttpStatusCode.Created, AccessInvitationResponse(request.email.trim(), invitation.token, invitation.expiresAt, invitation.accessExpiresAt))
     } catch (e: AccountConflictException) {

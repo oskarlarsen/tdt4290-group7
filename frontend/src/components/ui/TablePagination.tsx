@@ -18,7 +18,7 @@ export function TablePagination({
   const pageStart = (currentPage - 1) * pageSize;
   const summary =
     totalItems === 0
-      ? `No ${itemLabel}s match the current filters.`
+      ? `No ${itemLabel}s match the current filters`
       : `Showing ${pageStart + 1}–${Math.min(pageStart + pageSize, totalItems)} of ${totalItems} ${itemLabel}${totalItems === 1 ? "" : "s"}`;
 
   return (

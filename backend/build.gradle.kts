@@ -45,7 +45,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cors")
     implementation("io.ktor:ktor-server-call-logging")
     implementation("io.ktor:ktor-server-status-pages")
-    implementation("org.xerial:sqlite-jdbc:3.54.1.0")
+    implementation("org.xerial:sqlite-jdbc:3.53.4.0")
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("io.ktor:ktor-server-rate-limit")

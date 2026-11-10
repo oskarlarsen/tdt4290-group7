@@ -23,12 +23,12 @@ export function RiskClassificationBar({ data }: { data: RiskClassification }) {
             <li key={level}>
               <Link
                 to={`/admin/suppliers?risk=${level}`}
-                aria-label={`${count} suppliers, ${label}: open list`}
+                aria-label={`${count} ${count === 1 ? "supplier" : "suppliers"}, ${label}: open list`}
                 className="block rounded-lg px-2 py-1.5 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/40"
               >
                 <span className="flex flex-wrap items-center gap-1.5 text-sm">
                   <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-                  <span className="font-medium text-neutral-800">{count} suppliers</span>
+                  <span className="font-medium text-neutral-800">{count} {count === 1 ? "supplier" : "suppliers"}</span>
                   <span className="font-mono text-xs text-neutral-500">({percent}%) {label}</span>
                 </span>
                 <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-neutral-100">

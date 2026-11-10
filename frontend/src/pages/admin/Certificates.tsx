@@ -186,9 +186,10 @@ export default function Certificates() {
   }
 
   // Every KPI is a direct count over the certificate records.
-  const total = certificates.length;
+  const active = certificates.filter((c) => !c.archivedAt);
+  const total = active.length;
   const contracts = getActiveCertificateContracts(fleet);
-  const contractCount = new Set(certificates.map((c) => c.contractId).filter(Boolean)).size;
+  const contractCount = new Set(active.map((c) => c.contractId).filter(Boolean)).size;
   const validPercent = total > 0 ? Math.round((counts.valid / total) * 100) : null;
   const selectedRow = rows.find((r) => r.certificate.id === selectedId) ?? null;
 

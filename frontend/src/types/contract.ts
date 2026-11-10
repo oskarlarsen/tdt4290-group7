@@ -1,4 +1,4 @@
-import type { RiskCategory } from "./risk";
+import type { SupplierRisk } from "./dashboard";
 
 export type ContractStatus = "Active" | "Expiring Soon" | "Expired";
 
@@ -10,7 +10,7 @@ export type DerivedContract = {
   supplierId: string;
   supplierName: string;
   supplierOrgId: string;
-  risk: RiskCategory;
+  risk: SupplierRisk;
   mainIssue: string;
   environmentalGoal?: number | null;
   environmentalActual?: number | null;
@@ -23,7 +23,8 @@ export type DerivedContract = {
   documentUrl: string | null; // path to a mock PDF, or null if unavailable
 };
 
-const COMPLIANCE_LABELS: Record<RiskCategory, string> = {
+const COMPLIANCE_LABELS: Record<SupplierRisk, string> = {
+  unassessed: "Not yet assessed",
   compliant: "Compliant",
   medium: "Under review",
   high: "Non-compliant",
@@ -31,6 +32,6 @@ const COMPLIANCE_LABELS: Record<RiskCategory, string> = {
 
 // Pure relabeling of the real `risk` field for contract-facing
 // language — never an independently stored/assessed value.
-export function getEnvironmentalComplianceLabel(risk: RiskCategory): string {
+export function getEnvironmentalComplianceLabel(risk: SupplierRisk): string {
   return COMPLIANCE_LABELS[risk];
 }

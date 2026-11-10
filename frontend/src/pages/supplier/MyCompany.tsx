@@ -1,6 +1,5 @@
 import { useMySupplierOverview } from "../../hooks/useMySupplierOverview";
 import { Loader2 } from "lucide-react";
-import { PageHeader } from "../../components/ui/PageHeader";
 
 export default function MyCompany() {
   const { data, isLoading, isError, error } = useMySupplierOverview();
@@ -11,11 +10,8 @@ export default function MyCompany() {
   const { overview, agreements } = data;
 
   return (
-    <div className="space-y-4 p-4">
-      <PageHeader
-        title="My Company"
-        description="View your organization and contract profile"
-      />
+    <div className="space-y-4 max-w-3xl">
+      <h1 className="font-headline text-2xl font-semibold text-neutral-900">My Company</h1>
       <section className="rounded-xl border border-neutral-100 bg-white p-6">
         <div className="space-y-4">
           <div>

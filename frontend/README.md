@@ -33,7 +33,7 @@ Open `http://localhost:5173`.
 
 ## Data and workflows
 
-The default setup combines demo data (`VITE_USE_MOCKS=true`) with backend sign-in (`VITE_MOCK_AUTH=false`). Vehicles always uses the backend. Setting `VITE_USE_MOCKS=false` prevents Dashboard, Suppliers and Contracts from loading data because their backend endpoints are not implemented.
+Every page reads the backend, and sign-in uses it too (`VITE_USE_MOCK_AUTH=false`). `VITE_USE_MOCKS=true` only adds fictional energy records for the real contracts. To see a lot of demo data, seed the backend with `scripts/seed-demo-data.mjs`; see the root README, "Real data or demo data".
 
 In Vehicles, the structure is:
 

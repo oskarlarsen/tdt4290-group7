@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
-import { useSendSupplierNotice } from "../../hooks/useSupplierNotices";
 import type { DerivedContract } from "../../types/contract";
 
-const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2 };
+const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2, unassessed: 3 };
 
 export function ContractComplianceSummary({
   contracts,
@@ -18,15 +17,6 @@ export function ContractComplianceSummary({
   const [noticeMessageDraft, setNoticeMessageDraft] = useState("");
   const [activeAttentionIndex, setActiveAttentionIndex] = useState(0);
 
-  const sortedContracts = [...contracts].sort(
-    (a, b) => RISK_PRIORITY[a.risk] - RISK_PRIORITY[b.risk]
-  );
-  const attentionContracts = sortedContracts.filter((contract) => contract.risk !== "compliant");
-  const safeAttentionIndex = Math.max(0, Math.min(activeAttentionIndex, attentionContracts.length - 1));
-  const current = attentionContracts[safeAttentionIndex] ?? sortedContracts[0];
-
-  const sendNotice = useSendSupplierNotice(current?.supplierId ?? null);
-
   useEffect(() => {
     if (!isNoticeRecorded) return;
 
@@ -34,9 +24,16 @@ export function ContractComplianceSummary({
     return () => window.clearTimeout(timeout);
   }, [isNoticeRecorded]);
 
+  const sortedContracts = [...contracts].sort(
+    (a, b) => RISK_PRIORITY[a.risk] - RISK_PRIORITY[b.risk]
+  );
+  const attentionContracts = sortedContracts.filter((contract) => contract.risk === "high" || contract.risk === "medium");
+  const safeAttentionIndex = Math.min(activeAttentionIndex, attentionContracts.length - 1);
+  const current = attentionContracts[safeAttentionIndex] ?? sortedContracts[0];
+
   if (!current) return null;
 
-  const needsAttention = current.risk !== "compliant";
+  const needsAttention = current.risk === "high" || current.risk === "medium";
   const noticeReason =
     current.status === "Expired"
       ? "The contract has expired."
@@ -102,7 +99,7 @@ export function ContractComplianceSummary({
         {needsAttention && (
           <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
             <p className="text-xs text-neutral-500">
-              Showing {safeAttentionIndex + 1} of {attentionContracts.length} contracts requiring attention
+              Showing {safeAttentionIndex + 1} of {attentionContracts.length} {attentionContracts.length === 1 ? "contract" : "contracts"} requiring attention
             </p>
             <div className="flex items-center gap-1.5">
               <button
@@ -140,15 +137,8 @@ export function ContractComplianceSummary({
           onMessageChange={setNoticeMessageDraft}
           onCancel={() => setIsSendNoticeInfoOpen(false)}
           onConfirm={() => {
-            sendNotice.mutate({
-              title: "Contract Compliance Follow-up",
-              message: noticeMessageDraft
-            }, {
-              onSuccess: () => {
-                setIsSendNoticeInfoOpen(false);
-                setIsNoticeRecorded(true);
-              }
-            });
+            setIsSendNoticeInfoOpen(false);
+            setIsNoticeRecorded(true);
           }}
         />
       )}
@@ -159,7 +149,7 @@ export function ContractComplianceSummary({
           aria-live="polite"
           className="fixed bottom-6 right-6 z-50 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
         >
-          Notice recorded successfully.
+          Notice recorded for demo only; no email was sent.
         </div>
       )}
     </div>

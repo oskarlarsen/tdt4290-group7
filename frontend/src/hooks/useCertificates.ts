@@ -24,10 +24,7 @@ export function useUploadCertificate() {
   return useMutation({
     mutationFn: ({ file, supplierName, contractId }: { file: File; supplierName: string; contractId: string }) =>
       uploadCertificate(file, supplierName, contractId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      queryClient.invalidateQueries({ queryKey: ["supplier-overview"] });
-    }
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["certificates"] }),
   });
 }
 

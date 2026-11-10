@@ -84,7 +84,7 @@ export function SupplierDetailsDialog({ supplier, alerts, trackingSince, onClose
           </Section>
 
           <Section title="Supplier onboarding">
-            <Field label="Status" value={(supplier.onboardingStatus ?? "INVITED").replace(/_/g, " ")} />
+            <Field label="Status" value={supplier.onboardingStatus === "INVITED" && !supplier.registeredAccountCount ? "NO ACCOUNT" : (supplier.onboardingStatus ?? "INVITED").replace(/_/g, " ")} />
             <Field label="Registered accounts" value={String(supplier.registeredAccountCount ?? 0)} />
             {supplier.submittedAt && <Field label="Submitted" value={new Date(supplier.submittedAt).toLocaleString("en-GB")} />}
             <div className="pt-2">

@@ -99,12 +99,6 @@ export function NotificationBell() {
               </button>
             ))}
           </div>
-
-          {/* No notification-history page exists yet — shown disabled
-              rather than wired to a fake route */}
-          <div className="border-t border-neutral-100 px-3 py-2 text-center">
-            <span className="cursor-not-allowed text-xs text-neutral-500">View all notifications</span>
-          </div>
         </div>
       )}
     </div>

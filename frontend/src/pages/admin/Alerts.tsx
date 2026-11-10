@@ -92,6 +92,11 @@ export default function Alerts() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createSuccessMessage, setCreateSuccessMessage] = useState("");
+  useEffect(() => {
+    if (!createSuccessMessage) return;
+    const timer = window.setTimeout(() => setCreateSuccessMessage(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [createSuccessMessage]);
   const [statusFeedback, setStatusFeedback] = useState<{
     alertId: string;
     message: string;
@@ -365,7 +370,7 @@ export default function Alerts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard
           label="Unresolved alerts"
           value={counts.unresolved}
@@ -396,6 +401,14 @@ export default function Alerts() {
           note={counts.medium > 0 ? "Needs follow-up soon" : "None currently"}
           icon={<Clock3 className="h-4 w-4" />}
           iconClassName="bg-amber-100 text-amber-700"
+        />
+        <KpiCard
+          label="Low Risk"
+          value={counts.low}
+          sublabel="unresolved follow-up"
+          note={counts.low > 0 ? "Review when convenient" : "None currently"}
+          icon={<Clock3 className="h-4 w-4" />}
+          iconClassName="bg-neutral-100 text-neutral-600"
         />
         <KpiCard
           label="Resolved"

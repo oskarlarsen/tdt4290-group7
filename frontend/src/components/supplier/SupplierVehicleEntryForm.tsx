@@ -113,7 +113,6 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
             {row.isPlanned !== true && (
               <label className="block text-sm font-medium text-neutral-700">
                 Registration plate
-                <span className="block text-xs font-normal text-neutral-500">We look up the vehicle with Statens vegvesen, so you do not need to fill in fuel.</span>
                 <input
                   value={row.registrationNumber}
                   onChange={(event) => updateRow(row.id, { registrationNumber: event.target.value.toUpperCase() })}
@@ -123,6 +122,7 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
                   className={fieldClass}
                   required={row.isPlanned === false}
                 />
+                <span className="mt-1 block text-xs font-normal text-neutral-500">We look up the vehicle with Statens vegvesen, so you do not need to fill in fuel.</span>
               </label>
             )}
 

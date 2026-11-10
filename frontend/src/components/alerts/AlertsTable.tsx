@@ -70,7 +70,7 @@ export function AlertsTable({
                       </div>
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-500">Not available in demo data</span>
+                    <span className="text-xs text-neutral-500">Not available</span>
                   )}
                 </td>
                 <td className="py-3 pr-3">
@@ -79,7 +79,7 @@ export function AlertsTable({
                       {contract?.contractName ?? supplier?.primaryContract}
                     </span>
                   ) : (
-                    <span className="text-xs text-neutral-500">Not available in demo data</span>
+                    <span className="text-xs text-neutral-500">Not available</span>
                   )}
                 </td>
                 <td className="whitespace-nowrap py-3 pr-3">
