@@ -75,7 +75,7 @@ export function TopRiskSuppliersTable({
               <td className="py-3 pr-3 text-neutral-700">{s.mainIssue}</td>
               {showOnboardingStatus && (
                 <td className="py-3 pr-3 whitespace-nowrap text-xs font-medium text-neutral-700">
-                  {(s.onboardingStatus ?? "INVITED").replace(/_/g, " ")}
+                  {s.onboardingStatus === "INVITED" && !s.registeredAccountCount ? "NO ACCOUNT" : (s.onboardingStatus ?? "INVITED").replace(/_/g, " ")}
                 </td>
               )}
               {getReviewStatus && (

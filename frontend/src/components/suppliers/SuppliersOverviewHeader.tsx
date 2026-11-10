@@ -28,7 +28,7 @@ export function SuppliersOverviewHeader({
       label: "MONITORED SUPPLIERS",
       value: monitoredSuppliers,
       valueClass: "text-black",
-      sublabel: `${modeledSupplierCount} with full records shown`,
+      sublabel: `of ${modeledSupplierCount} suppliers; the rest have no checks or certificates yet`,
       icon: Building2,
       iconStyle: "bg-primary-100 text-primary-900",
     },
