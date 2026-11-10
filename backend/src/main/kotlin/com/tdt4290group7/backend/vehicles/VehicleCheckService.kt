@@ -18,7 +18,8 @@ class VehicleCheckService(
         val now = Instant.now(clock)
         repository.findOrCreateVehicle(request.registrationNumber, now)
         // Read the vehicle, agreement, statistics and cache in one SQLite snapshot.
-        val state = requireNotNull(repository.vehicleDetails(request.registrationNumber))
+        val state = repository.vehicleDetails(request.registrationNumber, request.agreementId)
+            ?: throw IllegalArgumentException("This vehicle is not listed under that agreement")
         val vehicle = state.vehicle
         val agreement = state.agreement
         val tripRows = state.tripRows

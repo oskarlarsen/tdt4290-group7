@@ -296,7 +296,7 @@ class OnboardingWorkflowTest {
     }
 
     @Test
-    fun refusesToReassignAnotherSuppliersVehicleDuringImport() = testApplication {
+    fun importsATruckAnotherSupplierAlreadyUsesAsAListingOfItsOwn() = testApplication {
         val repo = testRepository()
         application { module(repo, null) }
         val ownAgreementId = setupSupplierAndAgreement(repo)
@@ -316,10 +316,12 @@ class OnboardingWorkflowTest {
             now
         )
         repo.database.write { db ->
+            repo.fleet.ensureTruck(db, "AB12345", false, now)
             repo.database.insert(
                 db,
-                "vehicles",
+                "vehicle_usages",
                 mapOf(
+                    "id" to "AB12345|${otherAgreement.id}",
                     "registration_number" to "AB12345",
                     "agreement_id" to otherAgreement.id,
                     "planned" to 0,
@@ -333,7 +335,7 @@ class OnboardingWorkflowTest {
         val supplier = supplierClient("nordvik-transport")
         val csv = """
             agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes
-            $ownAgreementId,AB12345,FALSE,13,FALSE,TRUE,,,ORD-001,Attempted reassignment
+            $ownAgreementId,AB12345,FALSE,13,FALSE,TRUE,,,ORD-001,Shared truck
         """.trimIndent()
         val preview = supplier.submitFormWithBinaryData(
             url = "/api/onboarding/upload/vehicles/preview",
@@ -350,8 +352,14 @@ class OnboardingWorkflowTest {
             contentType(ContentType.Application.Json)
             setBody("""{"batchId":"$batchId"}""")
         }
-        assertEquals(HttpStatusCode.BadRequest, confirmed.status)
-        assertEquals(otherAgreement.id, repo.fleet.overview().vehicles.single().agreementId)
+        assertEquals(HttpStatusCode.OK, confirmed.status, confirmed.bodyAsText())
+        // Both suppliers list the same truck, each under its own agreement; the first one's listing is untouched.
+        val listings = repo.fleet.overview().vehicles.filter { it.registrationNumber == "AB12345" }
+        assertEquals(setOf(ownAgreementId, otherAgreement.id), listings.map { it.agreementId }.toSet())
+        assertTrue(listings.all { it.listed })
+        // Contract details belong to the supplier's own listing only.
+        val detailRows = repo.database.read { db -> repo.database.query(db, "SELECT usage_id, notes FROM vehicle_usage_details") { it.getString(1) to it.getString(2) } }
+        assertEquals(listOf("AB12345|$ownAgreementId" to "Shared truck"), detailRows)
     }
 
     @Test

@@ -70,15 +70,54 @@ class FleetRepositoryTest {
         assertEquals(planned.registrationNumber, repo.fleet.overview().vehicles.single { it.listed }.registrationNumber)
     }
 
-    @Test fun oneAgreementPerVehicleAndInvalidReplacementNeverRemovesOriginal() {
+    @Test fun aTruckIsListedOncePerAgreementAndInvalidReplacementNeverRemovesOriginal() {
         val repo = repository(); val first = agreement(repo)
         val second = repo.fleet.saveAgreement(null, AgreementInput(first.supplierId, first.startDate, first.endDate, 2, saksnr = "2024/1234"), null, actor, now)
         val old = repo.fleet.addVehicle(first.id, VehicleEntryInput("AB12345"), actor, now)
-        assertFailsWith<FleetConflictException> { repo.fleet.addVehicle(second.id, VehicleEntryInput("AB12345"), actor, now) }
+        assertFailsWith<FleetConflictException> { repo.fleet.addVehicle(first.id, VehicleEntryInput("AB12345"), actor, now) }
         assertFailsWith<IllegalArgumentException> { repo.fleet.replaceVehicle(old.registrationNumber, ReplacementRequest(VehicleEntryInput("invalid"), old.updatedAt), actor, now.plusSeconds(1)) }
         assertTrue(repo.fleet.overview().vehicles.single().listed)
         repo.fleet.removeVehicle(old.registrationNumber, old.updatedAt, actor, now.plusSeconds(2))
-        assertFailsWith<FleetConflictException> { repo.fleet.addVehicle(second.id, VehicleEntryInput("AB12345"), actor, now.plusSeconds(3)) }
+        // Removed from the first agreement, the truck can be listed under the second, and back under the first.
+        repo.fleet.addVehicle(second.id, VehicleEntryInput("AB12345"), actor, now.plusSeconds(3))
+        repo.fleet.addVehicle(first.id, VehicleEntryInput("AB12345"), actor, now.plusSeconds(4))
+        assertEquals(setOf(first.id, second.id), repo.fleet.overview().vehicles.filter { it.listed }.map { it.agreementId }.toSet())
+    }
+
+    @Test fun theSameTruckCanBeListedUnderSeveralAgreementsAndEachListingIsHandledOnItsOwn() {
+        val repo = repository(); val first = agreement(repo, 1)
+        val otherSupplier = repo.fleet.saveSupplier(null, SupplierInput("Second Supplier AS", "987654321"), actor, now)
+        val second = repo.fleet.saveAgreement(null, AgreementInput(otherSupplier.id, first.startDate, first.endDate, 1, saksnr = "2024/9999"), null, actor, now)
+
+        val a = repo.fleet.addVehicle(first.id, VehicleEntryInput("AB12345"), actor, now)
+        val b = repo.fleet.addVehicle(second.id, VehicleEntryInput("AB12345"), actor, now.plusSeconds(1))
+        assertEquals(listOf(first.id, second.id), repo.fleet.overview().vehicles.filter { it.registrationNumber == "AB12345" && it.listed }.map { it.agreementId }.sortedBy { if (it == first.id) 0 else 1 })
+        // Each agreement counts the truck against its own allowance.
+        val full = assertFailsWith<FleetConflictException> { repo.fleet.addVehicle(first.id, VehicleEntryInput("CD12345"), actor, now.plusSeconds(2)) }
+        assertEquals("Vehicle allowance reached", full.message)
+
+        // Several listings: the caller must say which one.
+        assertFailsWith<IllegalArgumentException> { repo.fleet.removeVehicle("AB12345", a.updatedAt, actor, now.plusSeconds(3)) }
+        repo.fleet.removeVehicle("AB12345", a.updatedAt, actor, now.plusSeconds(3), first.id)
+        val remaining = repo.fleet.overview().vehicles.filter { it.listed }
+        assertEquals(listOf(second.id), remaining.map { it.agreementId }, "the other supplier's listing is untouched")
+        assertEquals(b.updatedAt, remaining.single().updatedAt)
+
+        // Without a say, a single remaining listing is found by itself.
+        repo.fleet.removeVehicle("AB12345", b.updatedAt, actor, now.plusSeconds(4))
+        assertTrue(repo.fleet.overview().vehicles.none { it.listed })
+    }
+
+    @Test fun theBestFittingListingIsUsedUnlessTheCallerNamesAnAgreement() {
+        val repo = repository()
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Fit AS", "246813579"), actor, now)
+        val past = repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2020-01-01", "2020-12-31", 2, saksnr = "2020/1"), null, actor, now)
+        val current = repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2020-01-01", "2099-12-31", 2, saksnr = "2025/1"), null, actor, now)
+        repo.fleet.addVehicle(past.id, VehicleEntryInput("AB12345"), actor, now)
+        repo.fleet.addVehicle(current.id, VehicleEntryInput("AB12345"), actor, now)
+        assertEquals(current.id, repo.vehicleDetails("AB12345")!!.agreement!!.agreement.id)
+        assertEquals(past.id, repo.vehicleDetails("AB12345", past.id)!!.agreement!!.agreement.id)
+        assertNull(repo.vehicleDetails("AB12345", "no-such-agreement"))
     }
 
     @Test fun concurrentAdditionsCannotExceedCapacityAcrossConnections() {
