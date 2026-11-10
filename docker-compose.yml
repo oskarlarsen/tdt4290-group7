@@ -10,8 +10,7 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-tdt4290-backend}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-tdt4290-frontend}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in your .env file (see .env.example)}
-      CERTIFICATE_DB_PATH: ${CERTIFICATE_DB_PATH:-/app/data/certificates.db}
-      USER_DB_PATH: ${USER_DB_PATH:-/app/data/users.db}
+      DATABASE_PATH: /app/data/app.db
       SVV_API_KEY: ${SVV_API_KEY:-}
       SVV_CACHE_TTL_DAYS: ${SVV_CACHE_TTL_DAYS:-14}
       APP_ENV: ${APP_ENV:-prod}

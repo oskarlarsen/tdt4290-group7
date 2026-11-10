@@ -2,7 +2,7 @@ import sqlite3
 import sys
 
 def inspect_db():
-    db_path = "backend/data/vehicles.db"
+    db_path = "backend/data/app.db"
     print(f"Inspecting {db_path} in read-only mode...")
     try:
         # Open in read-only mode using URI
