@@ -59,16 +59,16 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
       <button className={buttonClass} disabled={listed.length >= agreement.allowedVehicles} onClick={() => setBulk(true)}>Legg til flere</button>
       <button className={buttonClass} onClick={() => setEditing(true)}>Rediger avtale</button>
     </div>
-    {reported.length > agreement.allowedVehicles && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">The supplier has reported {reported.length} vehicles, over the maximum of {agreement.allowedVehicles}.</p>}
-    {unchecked.length > 0 && <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Statens vegvesen has not been checked for {unchecked.length === 1 ? "1 vehicle" : `${unchecked.length} vehicles`}, for example because the service was unavailable. Run a check from View details.</p>}
+    {reported.length > agreement.allowedVehicles && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Leverandøren har rapportert {reported.length} kjøretøy, over maksimum {agreement.allowedVehicles}.</p>}
+    {unchecked.length > 0 && <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Statens vegvesen er ikke kontrollert for {unchecked.length === 1 ? "1 kjøretøy" : `${unchecked.length} kjøretøy`}, for eksempel fordi tjenesten var utilgjengelig. Kjør en sjekk fra Vis detaljer.</p>}
     {unapproved.length > 0 && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-      <h4 className="text-sm font-medium text-amber-900">Reported by the supplier, not on the approved list ({unapproved.length})</h4>
+      <h4 className="text-sm font-medium text-amber-900">Rapportert av leverandøren, ikke på den godkjente listen ({unapproved.length})</h4>
       <ul>{unapproved.map(vehicle => <li key={vehicle.registrationNumber} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
         <span className="font-mono">{vehicle.registrationNumber}</span>
-        {vehicle.exceptionApproved ? <span className="text-xs text-green-700"><span className="font-medium">Approved as an exception</span>{vehicle.exceptionNote && <> · Note to supplier: {vehicle.exceptionNote}</>}</span>
+        {vehicle.exceptionApproved ? <span className="text-xs text-green-700"><span className="font-medium">Godkjent som unntak</span>{vehicle.exceptionNote && <> · Notat til leverandør: {vehicle.exceptionNote}</>}</span>
           : <span className="flex flex-wrap items-center gap-2">
-            <input aria-label={`Note to the supplier for ${vehicle.registrationNumber}`} placeholder="Note to supplier (optional)" maxLength={500} className={inputClass} value={notes[vehicle.registrationNumber] ?? ""} onChange={e => setNotes({ ...notes, [vehicle.registrationNumber]: e.target.value })} />
-            <button className={buttonClass} disabled={approveException.isPending} onClick={() => approveException.mutate(vehicle)}>Approve exception</button>
+            <input aria-label={`Notat til leverandøren for ${vehicle.registrationNumber}`} placeholder="Notat til leverandør (valgfritt)" maxLength={500} className={inputClass} value={notes[vehicle.registrationNumber] ?? ""} onChange={e => setNotes({ ...notes, [vehicle.registrationNumber]: e.target.value })} />
+            <button className={buttonClass} disabled={approveException.isPending} onClick={() => approveException.mutate(vehicle)}>Godkjenn unntak</button>
           </span>}
       </li>)}</ul>
       <ErrorNotice error={approveException.error} />

@@ -43,7 +43,7 @@ export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetS
         <p className="text-xs text-neutral-500">Reaktivering beholder organisasjonsnummeret {match.supplier.orgNumber}; rediger leverandøren etterpå hvis nummeret du skrev inn er det riktige.</p>
         <ErrorNotice error={reactivate.error} />
       </div> : match ? <div role="alert" className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-800">
-        <p>Dette organisasjonsnummeret tilhørte <strong>{match.supplier.name}</strong>, arkivert{match.archivedAt ? ` ${new Date(match.archivedAt).toLocaleDateString()}` : ""} after {match.agreementCount} agreement{match.agreementCount === 1 ? "" : "s"}. Is this the same supplier?</p>
+        <p>Dette organisasjonsnummeret tilhørte <strong>{match.supplier.name}</strong>, arkivert{match.archivedAt ? ` ${new Date(match.archivedAt).toLocaleDateString()}` : ""} etter {match.agreementCount} {match.agreementCount === 1 ? "avtale" : "avtaler"}. Er dette den samme leverandøren?</p>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={primaryClass} disabled={busy} onClick={() => reactivate.mutate()}>{reactivate.isPending ? "Reaktiverer…" : `Ja, reaktiver ${match.supplier.name}`}</button>
           <button type="button" className={buttonClass} disabled={busy} onClick={() => save.reset()}>Nei, sjekk nummeret</button>
@@ -218,20 +218,20 @@ export function BulkVehicleForm({ agreementId, onClose, onSaved }: { agreementId
   const plates = [...new Set(text.toUpperCase().replace(/\s/g, "").match(/[A-Z]{2}[1-9][0-9]{3,4}/g) ?? [])];
   const save = useMutation({ mutationFn: () => api.addVehiclesBulk(agreementId, plates), onSuccess: result => { if (!result.failed.length) onSaved(); }, retry: false });
   const failed = save.data?.failed ?? [];
-  return <VehicleDialog title="Add several vehicles" onClose={onClose} busy={save.isPending}>
+  return <VehicleDialog title="Legg til flere kjøretøy" onClose={onClose} busy={save.isPending}>
     <form className="space-y-4" onSubmit={(e: FormEvent) => { e.preventDefault(); if (plates.length && !save.isPending) save.mutate(); }}>
-      <Field label="Registration numbers (paste, or load a .csv/.txt file)">
+      <Field label="Registreringsnumre (lim inn, eller last inn en .csv/.txt-fil)">
         <textarea rows={6} className={`${inputClass} font-mono`} value={text} disabled={save.isPending} onChange={e => { setText(e.target.value); save.reset(); }} />
       </Field>
       <input type="file" accept=".csv,.txt" disabled={save.isPending} className="block w-full text-sm text-neutral-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-neutral-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-800 hover:file:bg-neutral-50" onChange={async e => { const file = e.target.files?.[0]; if (file) { setText(await file.text()); save.reset(); } }} />
-      <p className="text-sm text-neutral-500">{plates.length} registration number{plates.length === 1 ? "" : "s"} found{plates.length > 200 ? " (max 200 at a time)" : ""}.</p>
-      {save.isPending && <p role="status" className="text-sm text-neutral-500">Checking with Statens vegvesen…</p>}
-      {save.data && <p role="status" className="text-sm">Added {save.data.added.length}.</p>}
+      <p className="text-sm text-neutral-500">{plates.length} registreringsnummer funnet{plates.length > 200 ? " (maks 200 om gangen)" : ""}.</p>
+      {save.isPending && <p role="status" className="text-sm text-neutral-500">Sjekker hos Statens vegvesen…</p>}
+      {save.data && <p role="status" className="text-sm">La til {save.data.added.length}.</p>}
       {failed.length > 0 && <ul className="space-y-1 text-sm text-red-700">{failed.map(f => <li key={f.registrationNumber}><span className="font-mono">{f.registrationNumber}</span>: {f.reason}</li>)}</ul>}
       <ErrorNotice error={save.error} />
       <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
-        <button type="button" className={buttonClass} disabled={save.isPending} onClick={failed.length ? onSaved : onClose}>{failed.length ? "Done" : "Cancel"}</button>
-        {!save.data && <button className={primaryClass} disabled={save.isPending || !plates.length || plates.length > 200}>{save.isPending ? "Adding…" : "Add vehicles"}</button>}
+        <button type="button" className={buttonClass} disabled={save.isPending} onClick={failed.length ? onSaved : onClose}>{failed.length ? "Ferdig" : "Avbryt"}</button>
+        {!save.data && <button className={primaryClass} disabled={save.isPending || !plates.length || plates.length > 200}>{save.isPending ? "Legger til…" : "Legg til kjøretøy"}</button>}
       </footer>
     </form>
   </VehicleDialog>;

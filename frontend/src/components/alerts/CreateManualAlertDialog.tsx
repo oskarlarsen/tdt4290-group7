@@ -60,7 +60,7 @@ type Props = {
   open: boolean;
   suppliers: TopRiskSupplier[];
   onClose: () => void;
-  /** noteToSelf is set when the admin ticked "Save a note to self". */
+  /** noteToSelf is set when the admin ticked "Lagre et notat til meg selv". */
   onCreate: (input: NewManualAlertInput, noteToSelf?: string) => Promise<void>;
 };
 
