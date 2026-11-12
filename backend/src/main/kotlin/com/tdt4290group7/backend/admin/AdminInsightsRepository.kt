@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.admin
 
+import com.tdt4290group7.backend.jdbcUrl
+import com.tdt4290group7.backend.link
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.DriverManager
@@ -54,7 +56,7 @@ class AdminInsightsRepository(databasePath: Path) {
     init {
         val path = databasePath.toAbsolutePath().normalize()
         Files.createDirectories(path.parent)
-        databaseUrl = "jdbc:sqlite:$path"
+        databaseUrl = jdbcUrl(path)
         DriverManager.getConnection(databaseUrl).use { database ->
             database.createStatement().use { statement ->
                 statement.execute(
@@ -64,7 +66,7 @@ class AdminInsightsRepository(databasePath: Path) {
                         description TEXT NOT NULL,
                         severity TEXT NOT NULL,
                         status TEXT NOT NULL,
-                        supplier_id TEXT,
+                        supplier_id TEXT${database.link("suppliers")},
                         category TEXT NOT NULL,
                         finding_type TEXT NOT NULL,
                         source TEXT NOT NULL,
@@ -89,8 +91,8 @@ class AdminInsightsRepository(databasePath: Path) {
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS notifications (
                         id TEXT PRIMARY KEY,
-                        recipient_user_id TEXT NOT NULL,
-                        alert_id TEXT NOT NULL,
+                        recipient_user_id TEXT NOT NULL${database.link("users")},
+                        alert_id TEXT NOT NULL${database.link("admin_alerts")},
                         type TEXT NOT NULL,
                         title TEXT NOT NULL,
                         message TEXT NOT NULL,
@@ -107,26 +109,46 @@ class AdminInsightsRepository(databasePath: Path) {
                         value TEXT NOT NULL
                     )""".trimIndent(),
                 )
-                // Admin-only notes. SELF notes are returned to their author only, INTERNAL notes to every admin.
+                // Admin-only notes. SELF notes are returned to their author only, INTERNAL notes to every admin, SUPPLIER notes to every admin and the supplier.
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_notes (
                         id TEXT PRIMARY KEY,
-                        supplier_id TEXT NOT NULL,
-                        author_id TEXT NOT NULL,
+                        supplier_id TEXT NOT NULL${database.link("suppliers")},
+                        author_id TEXT NOT NULL${database.link("users")},
                         author_name TEXT NOT NULL,
-                        visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL')),
+                        visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL','SUPPLIER')),
                         text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
-                        alert_id TEXT,
+                        alert_id TEXT${database.link("admin_alerts")},
                         created_at TEXT NOT NULL
                     )""".trimIndent(),
                 )
+                // Databases made before SUPPLIER notes have the old CHECK; SQLite cannot alter it, so rebuild the table.
+                val oldCheck = statement.executeQuery("SELECT sql FROM sqlite_master WHERE name = 'supplier_notes'").use { it.next() && !it.getString(1).contains("'SUPPLIER'") }
+                if (oldCheck) {
+                    statement.execute("ALTER TABLE supplier_notes RENAME TO supplier_notes_old")
+                    statement.execute("DROP INDEX IF EXISTS idx_supplier_notes_supplier")
+                    statement.execute(
+                        """CREATE TABLE supplier_notes (
+                            id TEXT PRIMARY KEY,
+                            supplier_id TEXT NOT NULL,
+                            author_id TEXT NOT NULL,
+                            author_name TEXT NOT NULL,
+                            visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL','SUPPLIER')),
+                            text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
+                            alert_id TEXT,
+                            created_at TEXT NOT NULL
+                        )""".trimIndent(),
+                    )
+                    statement.execute("INSERT INTO supplier_notes SELECT id, supplier_id, author_id, author_name, visibility, text, alert_id, created_at FROM supplier_notes_old")
+                    statement.execute("DROP TABLE supplier_notes_old")
+                }
                 statement.execute("CREATE INDEX IF NOT EXISTS idx_supplier_notes_supplier ON supplier_notes(supplier_id, created_at)")
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_review_statuses (
-                        supplier_id TEXT PRIMARY KEY,
+                        supplier_id TEXT PRIMARY KEY${database.link("suppliers")},
                         status TEXT NOT NULL,
                         updated_at TEXT NOT NULL,
-                        updated_by TEXT NOT NULL
+                        updated_by TEXT NOT NULL${database.link("users")}
                     )""".trimIndent(),
                 )
             }
@@ -273,6 +295,15 @@ class AdminInsightsRepository(databasePath: Path) {
             database.prepareStatement("SELECT * FROM admin_alerts WHERE id = ?").use { statement ->
                 statement.setString(1, id)
                 statement.executeQuery().use { rows -> if (rows.next()) rows.toAlert() else null }
+            }
+        }
+
+    /** Includes archived alerts, which findAlert hides. */
+    fun alertExists(id: String): Boolean =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("SELECT 1 FROM admin_alerts WHERE id = ?").use { statement ->
+                statement.setString(1, id)
+                statement.executeQuery().use { it.next() }
             }
         }
 
@@ -437,7 +468,7 @@ class AdminInsightsRepository(databasePath: Path) {
             database.prepareStatement(
                 """SELECT id, supplier_id, author_id, author_name, visibility, text, alert_id, created_at
                     FROM supplier_notes
-                    WHERE supplier_id = ? AND (visibility = 'INTERNAL' OR author_id = ?)
+                    WHERE supplier_id = ? AND (visibility IN ('INTERNAL','SUPPLIER') OR author_id = ?)
                     ORDER BY created_at DESC, rowid DESC""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, supplierId)
@@ -460,6 +491,9 @@ class AdminInsightsRepository(databasePath: Path) {
                 }
             }
         }
+
+    fun supplierVisibleNotes(supplierId: String): List<SupplierNoteRecord> =
+        notesFor(supplierId, "").filter { it.visibility == "SUPPLIER" }
 
     fun addNote(
         supplierId: String,

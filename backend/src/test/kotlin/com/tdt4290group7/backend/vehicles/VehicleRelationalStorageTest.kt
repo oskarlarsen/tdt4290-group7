@@ -36,12 +36,13 @@ class VehicleRelationalStorageTest {
                                 "contract_products",
                                 "vehicle_contract_details",
                                 "agreement_energy_commitments",
-                                "energy_evidence"
+                                "energy_evidence",
+                                "vehicle_usage_details"
                             )) {
                             vehicleTableCount++
                         }
                     }
-                    assertEquals(14, vehicleTableCount)
+                    assertEquals(16, vehicleTableCount)
                 }
                 statement.executeQuery("PRAGMA table_info(vehicles)").use { rows ->
                     val names = mutableListOf<String>()
@@ -49,7 +50,7 @@ class VehicleRelationalStorageTest {
                         names += rows.getString("name")
                         if (rows.getString("name") == "registration_number") assertEquals(1, rows.getInt("pk"))
                     }
-                    assertEquals(listOf("registration_number", "agreement_id", "planned", "listed", "created_at", "updated_at"), names)
+                    assertEquals(listOf("registration_number", "agreement_id", "planned", "listed", "exception_approved", "registry_problem", "exception_note", "created_at", "updated_at"), names)
                 }
                 statement.executeQuery("SELECT sql FROM sqlite_schema WHERE type = 'table'").use { rows ->
                     while (rows.next()) {

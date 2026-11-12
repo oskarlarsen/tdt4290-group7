@@ -17,6 +17,7 @@ const summary = {
 vi.mock("../../src/hooks/useDashboardSummary", () => ({ useDashboardSummary: () => ({ data: summary, isLoading: false, isError: false }) }));
 vi.mock("../../src/hooks/useVehicles", () => ({
   useFleet: () => ({ data: { suppliers: [], agreements: [], vehicles: [], changes: [] }, isLoading: false, isError: false, refetch: vi.fn() }),
+  useArchive: () => ({ data: { suppliers: [] }, isError: false }),
   useRefreshVehicles: () => vi.fn(),
 }));
 vi.mock("../../src/hooks/useSupplierReviewStatus", () => ({

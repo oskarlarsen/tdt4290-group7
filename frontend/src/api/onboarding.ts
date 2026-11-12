@@ -13,7 +13,14 @@ export type SupplierVehicle = {
   registrationNumber: string;
   agreementId: string | null;
   planned: boolean;
+  /** On the admin's approved list. */
   listed: boolean;
+  /** The supplier has reported this vehicle as used. */
+  uploaded: boolean;
+  /** Not on the list, but the admin approved it as a one-off exception. */
+  exceptionApproved?: boolean;
+  exceptionNote?: string | null;
+  registryProblem?: string | null;
   fuelTechnology: string | null;
   isHybrid: boolean | null;
   /** Registry category such as N2 (from the upload lookup), the source of the weight range. */

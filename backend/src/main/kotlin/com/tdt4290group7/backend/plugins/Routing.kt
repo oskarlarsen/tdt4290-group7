@@ -65,7 +65,7 @@ fun Application.configureRouting(
         authenticate(AUTH_JWT) {
             if (repository is VehicleRepository) {
                 repository.onboarding.attachCertificateRepository(certificateRepository)
-                fleetRoutes(repository.fleet, registryLookup)
+                fleetRoutes(repository.fleet, registryLookup, checks)
                 onboardingRoutes(repository.onboarding, certificateRepository, registryLookup)
                 adminEnergyRoutes(repository.onboarding)
                 supplierEnergyEvidenceRoutes(repository.onboarding)
@@ -76,7 +76,7 @@ fun Application.configureRouting(
             get("/api/vehicles/{registrationNumber}") {
                 if (call.adminActor() == null) return@get
                 val result = try {
-                    repository.vehicleDetails(call.parameters["registrationNumber"]!!)
+                    repository.vehicleDetails(call.parameters["registrationNumber"]!!, call.request.queryParameters["agreementId"])
                 } catch (cause: IllegalArgumentException) {
                     call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldig registreringsnummer"))
                     return@get

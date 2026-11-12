@@ -152,8 +152,13 @@ class CertificateRoutesTest {
         }
         assertEquals(HttpStatusCode.BadRequest, invalidEdit.status)
 
+        // DELETE no longer destroys anything: the certificate is archived and stays in the database.
         assertEquals(HttpStatusCode.NoContent, adminClient.delete("/api/certificates/$certificateId").status)
         assertEquals(0, CertificateRepository(certificateDatabase).getAll().size)
+        val archived = CertificateRepository(certificateDatabase).getAllIncludingArchived().single()
+        assertEquals(certificateId, archived.id)
+        assertNotNull(archived.archivedAt)
+        assertEquals(HttpStatusCode.NotFound, adminClient.delete("/api/certificates/$certificateId").status, "already archived")
     }
 
     private suspend fun HttpClient.uploadPdf(path: String, contractId: String?, pdf: ByteArray) = post(path) {

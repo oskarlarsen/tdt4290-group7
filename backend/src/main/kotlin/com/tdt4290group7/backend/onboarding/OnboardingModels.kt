@@ -133,6 +133,8 @@ data class CsvPreviewResponse(
     val errorRows: Int,
     val canCommit: Boolean,
     val errors: List<CsvCellError>,
+    /** Things the supplier should know that do not stop the import, e.g. Statens vegvesen being unavailable. */
+    val warnings: List<String> = emptyList(),
     val previewRows: List<Map<String, String>>,
     /** Things worth a second look that do not block the import, e.g. an existing quarter report being replaced. */
     val notices: List<String> = emptyList()
@@ -210,7 +212,16 @@ data class SupplierVehicleSummary(
     val registrationNumber: String,
     val agreementId: String?,
     val planned: Boolean,
+    /** On the admin's approved list. */
     val listed: Boolean,
+    /** The supplier has reported this vehicle as used (has uploaded details). */
+    val uploaded: Boolean = false,
+    /** Not on the list, but the admin approved it as a one-off exception. */
+    val exceptionApproved: Boolean = false,
+    /** Admin's note to the supplier when the exception was approved. */
+    val exceptionNote: String? = null,
+    /** NOT_FOUND when Statens vegvesen does not know the plate: the reported data is wrong. */
+    val registryProblem: String? = null,
     val fuelTechnology: String? = null,
     val isHybrid: Boolean? = null,
     /** Registry vehicle category such as N2, from the upload lookup or the latest registry snapshot. */

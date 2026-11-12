@@ -66,8 +66,5 @@ tasks.test {
     environment("JWT_SECRET", "test-only-jwt-secret")
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
     // Auth tests use isolated SQLite stores and never touch local application data.
-    environment("VEHICLE_DB_PATH", layout.buildDirectory.file("test-data/default-vehicles-v7.db").get().asFile.absolutePath)
-    environment("CERTIFICATE_DB_PATH", layout.buildDirectory.file("test-data/default-certificates.db").get().asFile.absolutePath)
-    environment("ADMIN_INSIGHTS_DB_PATH", layout.buildDirectory.file("test-data/default-admin-insights.db").get().asFile.absolutePath)
-    environment("USER_DB_PATH", layout.buildDirectory.file("test-data/default-users.db").get().asFile.absolutePath)
+    environment("DATABASE_PATH", layout.buildDirectory.file("test-data/default-app.db").get().asFile.absolutePath)
 }

@@ -24,36 +24,46 @@ object VehicleRegistryFill {
     private const val ELECTRIC_CODE = "5"
 
     /** Null when the registry lists no fuel, or only fuels this app has no code for. */
-    fun fuelFrom(data: RegistryVehicleData): FilledFuel? {
-        val codes = data.fuels.mapNotNull { it.fuelTechnology?.code }
+    fun fuelFrom(data: RegistryVehicleData): FilledFuel? =
+        fuelFromCodes(data.fuels.mapNotNull { it.fuelTechnology?.code }, data.vehicleCategory?.code)
+
+    fun fuelFromCodes(allCodes: List<String>, categoryCode: String?): FilledFuel? {
+        val codes = allCodes
             .filter { code -> FuelTechnology.entries.any { it.code == code } }
             .distinct()
         if (codes.isEmpty()) return null
         // A plug-in hybrid is listed with both a combustion fuel and electricity.
         val hybrid = codes.any { it in HYBRID_CODES } || (codes.size > 1 && ELECTRIC_CODE in codes)
         val chosen = codes.firstOrNull { it in HYBRID_CODES } ?: if (codes.size > 1) codes.first { it != ELECTRIC_CODE } else codes.single()
-        val category = data.vehicleCategory?.code?.takeIf { code -> VehicleCategory.entries.any { it.name == code } }
+        val category = categoryCode?.takeIf { code -> VehicleCategory.entries.any { it.name == code } }
         return FilledFuel(chosen, hybrid, category)
     }
 
     /** A hybrid flag from the supplier's own fuel choice, for rows where only the fuel was given. */
     fun hybridFor(fuelTechnologyCode: String): Boolean = fuelTechnologyCode in HYBRID_CODES
 
-    data class Result(val rows: List<Map<String, String>>, val errors: List<CsvCellError>)
+    data class Result(val rows: List<Map<String, String>>, val errors: List<CsvCellError>, val warnings: List<String> = emptyList())
 
     /** Rows without a fuel and no registry to ask: a plain error telling the supplier what to do. */
     fun withoutRegistry(rows: List<Map<String, String>>): Result = fill(rows, null)
 
     private fun fill(rows: List<Map<String, String>>, lookups: Map<String, LookupResult>?): Result {
         val errors = mutableListOf<CsvCellError>()
+        val warnings = mutableListOf<String>()
         val filled = rows.mapIndexed { index, row ->
             val csvRow = index + 2
             val fuel = row["fuel_technology"]?.trim().orEmpty()
             val plate = row["registration_number"]?.trim()?.uppercase(Locale.ROOT).orEmpty()
             when {
+                // The supplier gave the fuel, so a registry outage is fine, but an unknown plate means the report is wrong.
+                fuel.isNotEmpty() && lookups?.get(plate) is LookupResult.NotFound -> {
+                    errors += CsvCellError(csvRow, "registration_number", "$plate was not found in Statens vegvesen. Check the registration number.", plate)
+                    row + ("registry_status" to "NOT_FOUND")
+                }
                 fuel.isNotEmpty() -> row + mapOf(
                     "is_hybrid" to (row["is_hybrid"]?.trim()?.takeIf { it.isNotEmpty() } ?: hybridFor(fuel).toString().uppercase(Locale.ROOT)),
-                    "registry_status" to "PROVIDED",
+                    // Not asked yet (over the preview limit, or the service was down): checked after the import is confirmed.
+                    "registry_status" to if (plate.isNotEmpty() && (lookups == null || lookups[plate] is LookupResult.NotChecked || lookups[plate] is LookupResult.NoRegistry)) "NOT_CHECKED" else "PROVIDED",
                 )
                 plate.isEmpty() -> row + ("registry_status" to "NOT_CHECKED") // planned: the parser already asked for a fuel
                 else -> when (val result = lookups?.get(plate)) {
@@ -66,32 +76,41 @@ object VehicleRegistryFill {
                         errors += CsvCellError(csvRow, "registration_number", "$plate ble ikke funnet hos Statens vegvesen. Kontroller registreringsnummeret.", plate)
                         row + ("registry_status" to "NOT_FOUND")
                     }
-                    is LookupResult.NotChecked, null -> {
-                        errors += CsvCellError(
-                            csvRow, "fuel_technology",
-                            "Kunne ikke sjekke $plate hos Statens vegvesen. Fyll ut fuel_technology selv, eller prøv igjen senere.", plate,
-                        )
-                        row + ("registry_status" to "NOT_CHECKED")
+                    is LookupResult.NotChecked, is LookupResult.NoRegistry, null -> {
+                        if (lookups == null || lookups[plate] is LookupResult.NoRegistry) {
+                            errors += CsvCellError(csvRow, "fuel_technology", "Kunne ikke sjekke $plate hos Statens vegvesen. Fyll ut fuel_technology selv, eller prøv igjen senere.", plate)
+                            row + ("registry_status" to "NOT_CHECKED")
+                        } else {
+                            // The registry could not be asked (e.g. it is down): import anyway and fill the fuel in when it is checked afterwards.
+                            if (warnings.isEmpty()) warnings += "Vi kunne ikke hente drivstofftype automatisk for noen kjøretøy. Fyll den ut selv, eller importer uten, så sjekker vi dem etterpå."
+                            row + mapOf("fuel_technology" to "", "is_hybrid" to "FALSE", "registry_status" to "NOT_CHECKED")
+                        }
                     }
                 }
             }
         }
-        return Result(filled, errors)
+        return Result(filled, errors, warnings)
     }
 
     sealed interface LookupResult {
         data class Filled(val fuel: FilledFuel) : LookupResult
         data object NotFound : LookupResult
         data object NotChecked : LookupResult
+        /** No registry is configured at all, so nothing can be checked afterwards either. */
+        data object NoRegistry : LookupResult
     }
 
-    suspend fun fillFromRegistry(rows: List<Map<String, String>>, registry: VehicleRegistryLookup?, now: Instant): Result {
-        val needed = rows.filter { it["fuel_technology"].isNullOrBlank() && !it["registration_number"].isNullOrBlank() }
+    /** [approved] holds plates on the supplier's approved list: they are matched against the list first and only the rest reach Statens vegvesen. */
+    suspend fun fillFromRegistry(rows: List<Map<String, String>>, registry: VehicleRegistryLookup?, now: Instant, approved: Map<String, FilledFuel?> = emptyMap()): Result {
+        // Every plate that is not on the approved list is checked, also when the fuel is given, so a wrong plate is caught.
+        val needed = rows.filter { !it["registration_number"].isNullOrBlank() && (it["fuel_technology"].isNullOrBlank() || it["registration_number"]!!.trim().uppercase(Locale.ROOT) !in approved) }
             .map { it["registration_number"]!!.trim().uppercase(Locale.ROOT) }.distinct()
         val results = mutableMapOf<String, LookupResult>()
         for ((position, plate) in needed.withIndex()) {
             results[plate] = when {
-                registry == null || position >= MAX_LOOKUPS_PER_PREVIEW -> LookupResult.NotChecked
+                plate in approved -> approved[plate]?.let { LookupResult.Filled(it) } ?: LookupResult.NotChecked
+                registry == null -> LookupResult.NoRegistry
+                position >= MAX_LOOKUPS_PER_PREVIEW -> LookupResult.NotChecked
                 else -> lookup(registry, plate, now)
             }
         }

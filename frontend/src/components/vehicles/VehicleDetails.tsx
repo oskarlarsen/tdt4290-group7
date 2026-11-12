@@ -11,8 +11,8 @@ import { VehicleDialog, ErrorNotice, Paging, buttonClass, primaryClass } from ".
 
 const TAB_LABELS: Record<string, string> = { Statistics: "Statistikk", Deviations: "Avvik", History: "Historikk" };
 
-export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () => void }) {
-  const detail = useVehicle(plate);
+export function VehicleDetails({ plate, agreementId, onClose }: { plate: string; agreementId?: string | null; onClose: () => void }) {
+  const detail = useVehicle(plate, agreementId);
   const [tab, setTab] = useState("Statistics");
   const [addingStatistics, setAddingStatistics] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
@@ -22,7 +22,7 @@ export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () 
   const history = useVehicleHistory(plate, historyPage);
   const check = useVehicleCheck(selectedCheck ?? detail.data?.latestCheck?.id);
   const refresh = useRefreshVehicles();
-  const run = useMutation({ mutationFn: (forceRefresh: boolean) => api.runCheck(plate, forceRefresh), retry: false, onSuccess: (result, forceRefresh) => {
+  const run = useMutation({ mutationFn: (forceRefresh: boolean) => api.runCheck(plate, forceRefresh, agreementId), retry: false, onSuccess: (result, forceRefresh) => {
     setSelectedCheck(result.id); if (!forceRefresh) setTab("Deviations"); void refresh();
   } });
   const data = detail.data;
@@ -35,7 +35,7 @@ export function VehicleDetails({ plate, onClose }: { plate: string; onClose: () 
       {data && <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm"><p className="font-medium">{data.agreement?.supplier.name ?? "Ingen avtale tilknyttet"}</p>
-            {data.agreement && <p className="mt-1 text-xs text-neutral-500">{vehicleDate(data.agreement.agreement.startDate)} – {vehicleDate(data.agreement.agreement.endDate)}</p>}
+            {data.agreement && <p className="mt-1 text-xs text-neutral-500">{data.agreement.agreement.saksnr ? `${data.agreement.agreement.saksnr} · ` : ""}{vehicleDate(data.agreement.agreement.startDate)} – {vehicleDate(data.agreement.agreement.endDate)}</p>}
             {!data.vehicle.listed && <p className="mt-1 text-xs text-red-700">Ikke på avtalens gjeldende kjøretøyliste</p>}
           </div>
           <div className="flex gap-2"><button className={buttonClass} onClick={() => setAddingStatistics(true)}>Legg til rapporterte data</button><button className={primaryClass} disabled={run.isPending} onClick={() => run.mutate(false)}>{run.isPending ? "Sjekker…" : "Sjekk for avvik"}</button></div>

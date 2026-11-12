@@ -180,8 +180,8 @@ export type IssueCategoryBreakdown = {
   modeledSupplierCount: number;
 };
 
-// SELF notes are seen only by their author; INTERNAL notes by every admin. Suppliers never see notes.
-export type NoteVisibility = "SELF" | "INTERNAL";
+// SELF notes are seen only by their author; INTERNAL notes by every admin; SUPPLIER notes by every admin and the supplier.
+export type NoteVisibility = "SELF" | "INTERNAL" | "SUPPLIER";
 
 export type SupplierNote = {
   id: string;

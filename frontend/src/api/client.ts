@@ -19,7 +19,9 @@ try {
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    /** The parsed error body, for answers that carry more than a message (for example an archived-supplier match). */
+    readonly body?: unknown
   ) {
     super(message);
   }
@@ -77,7 +79,7 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: unknown; error?: unknown } | null;
     const message = typeof body?.message === "string" ? body.message : typeof body?.error === "string" ? body.error : `API-feil ${res.status}`;
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, body);
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();

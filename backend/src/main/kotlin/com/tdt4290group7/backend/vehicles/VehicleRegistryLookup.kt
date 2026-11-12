@@ -25,6 +25,10 @@ class VehicleRegistryLookup(
         return snapshot
     }
 
+    /** Being on the approved list is what approves a vehicle, so a failed or negative registry lookup must not block adding it; vehicle checks report the mismatch as a deviation. */
+    suspend fun checkForList(input: VehicleEntryInput): Pair<RegistrySnapshot?, String?> =
+        try { verifyEntry(input) to null } catch (_: IllegalArgumentException) { null to "NOT_FOUND" } catch (_: RegistryUnavailableException) { null to "UNAVAILABLE" }
+
     suspend fun resolve(
         registrationNumber: String,
         cached: RegistrySnapshot?,

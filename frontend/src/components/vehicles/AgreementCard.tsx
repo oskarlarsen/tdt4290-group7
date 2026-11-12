@@ -4,9 +4,9 @@ import * as api from "../../api/vehicles";
 import type { FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
 import { agreementDuration, vehicleDate } from "../../utils/vehicle";
 import { useRefreshVehicles } from "../../hooks/useVehicles";
-import { AgreementForm, VehicleEntryForm } from "./FleetForms";
+import { AgreementForm, BulkVehicleForm, VehicleEntryForm } from "./FleetForms";
 import { ConfirmAction } from "./ConfirmAction";
-import { ErrorNotice, buttonClass, dangerClass, primaryClass } from "./VehicleDialog";
+import { ErrorNotice, buttonClass, dangerClass, primaryClass, inputClass } from "./VehicleDialog";
 import { CopyableValue } from "../ui/CopyableValue";
 import { hasSaksnr } from "../../utils/agreementLabel";
 
@@ -14,22 +14,29 @@ export function VehicleAllowance({ count, allowed }: { count: number; allowed: n
   return <span className={`text-sm font-medium ${count > allowed ? "text-red-700" : "text-neutral-700"}`}>{count} av {allowed} kjøretøy</span>;
 }
 
-export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { supplier: FleetSupplier; agreement: FleetAgreement; vehicles: Vehicle[]; onOpen: (plate: string) => void }) {
+export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { supplier: FleetSupplier; agreement: FleetAgreement; vehicles: Vehicle[]; onOpen: (plate: string, agreementId: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [entry, setEntry] = useState<Vehicle | "new" | null>(null);
   const [removing, setRemoving] = useState<Vehicle | "agreement" | null>(null);
+  const [bulk, setBulk] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const refresh = useRefreshVehicles();
   const listed = vehicles.filter(vehicle => vehicle.listed);
-  const removed = vehicles.filter(vehicle => !vehicle.listed);
+  const removed = vehicles.filter(vehicle => !vehicle.listed && !vehicle.reported);
+  const reported = vehicles.filter(vehicle => vehicle.reported); // distinct plates, so re-uploading a vehicle never counts twice
+  const unchecked = vehicles.filter(vehicle => vehicle.listed && !vehicle.planned && vehicle.registryChecked === false && vehicle.registryProblem !== "NOT_FOUND");
+  const unapproved = reported.filter(vehicle => !vehicle.listed);
+  const approveException = useMutation({ mutationFn: (vehicle: Vehicle) => api.approveException(vehicle, notes[vehicle.registrationNumber] ?? ""), onSuccess: () => void refresh(), retry: false });
   function removalSaved() { setRemoving(null); void refresh(); }
   const remove = useMutation({ mutationFn: api.removeVehicle, onSuccess: removalSaved, retry: false });
   const removeAgreement = useMutation({ mutationFn: () => api.removeAgreement(agreement), onSuccess: removalSaved, retry: false });
   function saved() { setEditing(false); setEntry(null); void refresh(); }
   function vehicleRow(vehicle: Vehicle) {
     return <li key={vehicle.registrationNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 py-3">
-      <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-medium">{vehicle.planned ? "Planlagt kjøretøy" : vehicle.registrationNumber}</span>{vehicle.planned && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">Registrering venter</span>}</div>
+      <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-medium">{vehicle.planned ? "Planlagt kjøretøy" : vehicle.registrationNumber}</span>{vehicle.planned && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">Registration pending</span>}
+        {vehicle.registryProblem === "NOT_FOUND" && <span role="alert" className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">Skiltet finnes ikke hos Statens vegvesen. Kontroller at registreringsnummeret er riktig.</span>}</div>
       <div className="flex flex-wrap gap-2">
-        {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber)}>Vis detaljer</button>}
+        {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber, agreement.id)}>Vis detaljer</button>}
         {vehicle.listed && <><button className={buttonClass} onClick={() => setEntry(vehicle)}>{vehicle.planned ? "Registrer kjøretøy" : "Erstatt kjøretøy"}</button>
           <button className={buttonClass} disabled={remove.isPending} onClick={() => { remove.reset(); setRemoving(vehicle); }}>Fjern</button></>}
       </div>
@@ -49,8 +56,23 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
     </div>
     <div className="my-4 flex flex-wrap gap-2">
       <button className={primaryClass} disabled={listed.length >= agreement.allowedVehicles} onClick={() => setEntry("new")}>Legg til kjøretøy</button>
+      <button className={buttonClass} disabled={listed.length >= agreement.allowedVehicles} onClick={() => setBulk(true)}>Legg til flere</button>
       <button className={buttonClass} onClick={() => setEditing(true)}>Rediger avtale</button>
     </div>
+    {reported.length > agreement.allowedVehicles && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">The supplier has reported {reported.length} vehicles, over the maximum of {agreement.allowedVehicles}.</p>}
+    {unchecked.length > 0 && <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Statens vegvesen has not been checked for {unchecked.length === 1 ? "1 vehicle" : `${unchecked.length} vehicles`}, for example because the service was unavailable. Run a check from View details.</p>}
+    {unapproved.length > 0 && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <h4 className="text-sm font-medium text-amber-900">Reported by the supplier, not on the approved list ({unapproved.length})</h4>
+      <ul>{unapproved.map(vehicle => <li key={vehicle.registrationNumber} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+        <span className="font-mono">{vehicle.registrationNumber}</span>
+        {vehicle.exceptionApproved ? <span className="text-xs text-green-700"><span className="font-medium">Approved as an exception</span>{vehicle.exceptionNote && <> · Note to supplier: {vehicle.exceptionNote}</>}</span>
+          : <span className="flex flex-wrap items-center gap-2">
+            <input aria-label={`Note to the supplier for ${vehicle.registrationNumber}`} placeholder="Note to supplier (optional)" maxLength={500} className={inputClass} value={notes[vehicle.registrationNumber] ?? ""} onChange={e => setNotes({ ...notes, [vehicle.registrationNumber]: e.target.value })} />
+            <button className={buttonClass} disabled={approveException.isPending} onClick={() => approveException.mutate(vehicle)}>Approve exception</button>
+          </span>}
+      </li>)}</ul>
+      <ErrorNotice error={approveException.error} />
+    </div>}
     <ErrorNotice error={remove.error ?? removeAgreement.error} />
     {listed.length ? <ul>{listed.map(vehicleRow)}</ul> : <p className="py-3 text-sm text-neutral-500">Ingen kjøretøy lagt til.</p>}
     <details className="mt-3 border-t border-neutral-100 pt-3"><summary className="cursor-pointer text-xs font-medium text-neutral-500">Avtaledetaljer</summary>
@@ -60,6 +82,7 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
       </div>
     </details>
     {editing && <AgreementForm supplier={supplier} agreement={agreement} vehicleCount={listed.length} onClose={() => setEditing(false)} onSaved={saved} />}
+    {bulk && <BulkVehicleForm agreementId={agreement.id} onClose={() => setBulk(false)} onSaved={() => { setBulk(false); void refresh(); }} />}
     {entry && <VehicleEntryForm agreementId={agreement.id} replacing={entry === "new" ? undefined : entry} onClose={() => setEntry(null)} onSaved={saved} />}
     {removing && <ConfirmAction title={removing === "agreement" ? `Fjerne avtalen for ${supplier.name}?` : `Fjerne ${removing.registrationNumber}?`}
       label={removing === "agreement" ? "Fjern avtale" : "Fjern kjøretøy"} busy={remove.isPending || removeAgreement.isPending}

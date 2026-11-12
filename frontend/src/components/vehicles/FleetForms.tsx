@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
-import type { FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
+import { ApiError } from "../../api/client";
+import type { ArchivedSupplierMatch, FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
 import { agreementDuration, validDate, validPlate } from "../../utils/vehicle";
 import { VehicleDialog, Field, ErrorNotice, buttonClass, dangerClass, primaryClass, inputClass } from "./VehicleDialog";
 import { RegistrationNumberInput } from "./VehicleInputs";
@@ -15,15 +16,42 @@ function FormFooter({ busy, label, onClose }: { busy: boolean; label: string; on
   </footer>;
 }
 
+/** The backend answers 409 with this body when the organization number, or just the name, belonged to an archived supplier. */
+function archivedMatch(error: unknown): ArchivedSupplierMatch | null {
+  const body = error instanceof ApiError ? (error.body as Partial<ArchivedSupplierMatch> | null) : null;
+  return (body?.code === "ARCHIVED_SUPPLIER_MATCH" || body?.code === "ARCHIVED_SUPPLIER_NAME_MATCH") && body.supplier ? (body as ArchivedSupplierMatch) : null;
+}
+
 export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: (savedSupplier: FleetSupplier) => void }) {
   const [name, setName] = useState(supplier?.name ?? "");
   const [orgNumber, setOrgNumber] = useState(supplier?.orgNumber ?? "");
-  const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier), onSuccess: onSaved, retry: false });
-  return <VehicleDialog title={supplier ? "Rediger leverandør" : "Legg til leverandør"} onClose={onClose} busy={save.isPending}>
+  // confirmNew is true after the admin answered "no, this is a new supplier" to the archived-name warning.
+  const save = useMutation({ mutationFn: (confirmNew?: boolean) => api.saveSupplier({ name, orgNumber, ...(confirmNew ? { confirmNewSupplier: true } : {}) }, supplier), onSuccess: onSaved, retry: false });
+  const match = archivedMatch(save.error);
+  const reactivate = useMutation({ mutationFn: () => api.reactivateSupplier(match!.supplier), onSuccess: onSaved, retry: false });
+  const busy = save.isPending || reactivate.isPending;
+  return <VehicleDialog title={supplier ? "Rediger leverandør" : "Legg til leverandør"} onClose={onClose} busy={busy}>
     <form className="space-y-4" onChange={() => { if (save.isError) save.reset(); }} onSubmit={event => { event.preventDefault(); save.mutate(); }}>
       <Field label="Leverandørnavn"><input autoFocus required maxLength={200} className={inputClass} value={name} onChange={e => setName(e.target.value)} /></Field>
       <Field label="Organisasjonsnummer"><input required inputMode="numeric" pattern="[0-9]{9}" title="Oppgi organisasjonsnummer med 9 sifre" maxLength={9} className={inputClass} value={orgNumber} onChange={e => setOrgNumber(e.target.value.replace(/\s/g, ""))} /></Field>
-      <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Lagre leverandør" onClose={onClose} />
+      {match?.code === "ARCHIVED_SUPPLIER_NAME_MATCH" ? <div role="alert" className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-800">
+        <p>En arkivert leverandør har samme navn: <strong>{match.supplier.name}</strong>, organisasjonsnummer <span className="font-mono">{match.supplier.orgNumber}</span>, arkivert{match.archivedAt ? ` ${new Date(match.archivedAt).toLocaleDateString()}` : ""} after {match.agreementCount} agreement{match.agreementCount === 1 ? "" : "s"}. You entered <span className="font-mono">{orgNumber}</span>. Is this the same supplier?</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={primaryClass} disabled={busy} onClick={() => reactivate.mutate()}>{reactivate.isPending ? "Reaktiverer…" : `Ja, reaktiver ${match.supplier.name}`}</button>
+          <button type="button" className={buttonClass} disabled={busy} onClick={() => save.mutate(true)}>Nei, opprett en ny leverandør</button>
+        </div>
+        <p className="text-xs text-neutral-500">Reaktivering beholder organisasjonsnummeret {match.supplier.orgNumber}; rediger leverandøren etterpå hvis nummeret du skrev inn er det riktige.</p>
+        <ErrorNotice error={reactivate.error} />
+      </div> : match ? <div role="alert" className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-800">
+        <p>Dette organisasjonsnummeret tilhørte <strong>{match.supplier.name}</strong>, arkivert{match.archivedAt ? ` ${new Date(match.archivedAt).toLocaleDateString()}` : ""} after {match.agreementCount} agreement{match.agreementCount === 1 ? "" : "s"}. Is this the same supplier?</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={primaryClass} disabled={busy} onClick={() => reactivate.mutate()}>{reactivate.isPending ? "Reaktiverer…" : `Ja, reaktiver ${match.supplier.name}`}</button>
+          <button type="button" className={buttonClass} disabled={busy} onClick={() => save.reset()}>Nei, sjekk nummeret</button>
+        </div>
+        <p className="text-xs text-neutral-500">De gamle avtalene og kjøretøyene forblir arkivert, og brukerkontoene forblir sperret til du inviterer en kontaktperson på nytt.</p>
+        <ErrorNotice error={reactivate.error} />
+      </div> : <ErrorNotice error={save.error} />}
+      <FormFooter busy={busy} label="Lagre leverandør" onClose={onClose} />
     </form>
   </VehicleDialog>;
 }
@@ -48,7 +76,7 @@ export function RemoveSupplierAction({ supplier, agreementCount, vehicleCount, o
       onConfirm={() => remove.mutate()}
     >
       <p>Dette fjerner organisasjonen og deaktiverer {agreementCount} aktive {agreementCount === 1 ? "avtale" : "avtaler"} og {vehicleCount} kjøretøy på listen.</p>
-      <p className="mt-2">Historiske opplysninger beholdes. Du kan angre dette fra endringshistorikken.</p>
+      <p className="mt-2">Historiske opplysninger beholdes, og organisasjonen blir liggende i arkivet så den kan komme tilbake senere. Brukerkontoene blir sperret og åpne invitasjoner kansellert. Du kan angre fjerningen fra endringshistorikken, men kontoene forblir sperret.</p>
     </ConfirmAction>}
   </>;
 }
@@ -181,4 +209,30 @@ export function VehicleEntryForm({ agreementId, replacing, onClose, onSaved }: {
       <p className="mt-2">Du kan angre dette fra endringshistorikken.</p>
     </ConfirmAction>}
   </>;
+}
+
+/** Admin pastes or loads the supplier's approved-vehicle list; every plate is checked with Statens vegvesen as it is added. */
+export function BulkVehicleForm({ agreementId, onClose, onSaved }: { agreementId: string; onClose: () => void; onSaved: () => void }) {
+  const [text, setText] = useState("");
+  // shortcut: reads plain text/CSV only, so an Excel file must be saved as CSV first; add xlsx parsing if admins ask.
+  const plates = [...new Set(text.toUpperCase().replace(/\s/g, "").match(/[A-Z]{2}[1-9][0-9]{3,4}/g) ?? [])];
+  const save = useMutation({ mutationFn: () => api.addVehiclesBulk(agreementId, plates), onSuccess: result => { if (!result.failed.length) onSaved(); }, retry: false });
+  const failed = save.data?.failed ?? [];
+  return <VehicleDialog title="Add several vehicles" onClose={onClose} busy={save.isPending}>
+    <form className="space-y-4" onSubmit={(e: FormEvent) => { e.preventDefault(); if (plates.length && !save.isPending) save.mutate(); }}>
+      <Field label="Registration numbers (paste, or load a .csv/.txt file)">
+        <textarea rows={6} className={`${inputClass} font-mono`} value={text} disabled={save.isPending} onChange={e => { setText(e.target.value); save.reset(); }} />
+      </Field>
+      <input type="file" accept=".csv,.txt" disabled={save.isPending} className="block w-full text-sm text-neutral-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-neutral-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-800 hover:file:bg-neutral-50" onChange={async e => { const file = e.target.files?.[0]; if (file) { setText(await file.text()); save.reset(); } }} />
+      <p className="text-sm text-neutral-500">{plates.length} registration number{plates.length === 1 ? "" : "s"} found{plates.length > 200 ? " (max 200 at a time)" : ""}.</p>
+      {save.isPending && <p role="status" className="text-sm text-neutral-500">Checking with Statens vegvesen…</p>}
+      {save.data && <p role="status" className="text-sm">Added {save.data.added.length}.</p>}
+      {failed.length > 0 && <ul className="space-y-1 text-sm text-red-700">{failed.map(f => <li key={f.registrationNumber}><span className="font-mono">{f.registrationNumber}</span>: {f.reason}</li>)}</ul>}
+      <ErrorNotice error={save.error} />
+      <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
+        <button type="button" className={buttonClass} disabled={save.isPending} onClick={failed.length ? onSaved : onClose}>{failed.length ? "Done" : "Cancel"}</button>
+        {!save.data && <button className={primaryClass} disabled={save.isPending || !plates.length || plates.length > 200}>{save.isPending ? "Adding…" : "Add vehicles"}</button>}
+      </footer>
+    </form>
+  </VehicleDialog>;
 }

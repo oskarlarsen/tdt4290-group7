@@ -116,7 +116,7 @@ class VehicleInputRulesTest {
 
     @Test
     fun incompatibleSchemasRequireAnExplicitResetWithoutChangingRecords() {
-        for (version in listOf(2, 7, 11)) {
+        for (version in listOf(2, 7, 12)) {
             val path = path()
             java.nio.file.Files.createDirectories(path.parent)
             DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
@@ -140,7 +140,7 @@ class VehicleInputRulesTest {
     }
 
     @Test
-    fun versionTenDatabaseOpensAndKeepsItsVersion() {
+    fun versionTenDatabaseOpensAndBecomesVersionEleven() {
         val path = path()
         VehicleRepository(path)
         DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
@@ -149,13 +149,36 @@ class VehicleInputRulesTest {
         VehicleRepository(path)
         DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}").use { db ->
             db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
-                rows.next(); assertEquals(10, rows.getInt(1))
+                rows.next(); assertEquals(11, rows.getInt(1))
             } }
         }
     }
 
     @Test
-    fun versionNineDatabaseGetsSaksnrAndBecomesVersionTen() {
+    fun versionTenListingsAreCopiedToTheirAgreementsAndLaterChangesSurviveRestarts() {
+        val path = path()
+        val repo = VehicleRepository(path)
+        val actor = ChangeActor("a", "Admin")
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Old AS", "112233445"), actor, java.time.Instant.now())
+        val agreement = repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2026-12-31", 5, saksnr = "2026/1"), null, actor, java.time.Instant.now())
+        // Rebuild the version-10 shape: the truck row itself carries its one agreement, and there are no per-agreement rows.
+        DriverManager.getConnection("jdbc:sqlite:${path.toAbsolutePath()}?foreign_keys=true").use { db ->
+            db.createStatement().use {
+                it.executeUpdate("INSERT INTO vehicles (registration_number, agreement_id, planned, listed, created_at, updated_at) VALUES ('AB12345', '${agreement.id}', 0, 1, '2026-01-01T00:00:00.000000000Z', '2026-01-01T00:00:00.000000000Z')")
+                it.execute("PRAGMA user_version=10")
+            }
+        }
+        val upgraded = VehicleRepository(path)
+        val listed = upgraded.fleet.overview().vehicles.single()
+        assertEquals("AB12345", listed.registrationNumber); assertEquals(agreement.id, listed.agreementId); assertTrue(listed.listed)
+
+        // A change made after the upgrade is not undone by the copy running again on the next start.
+        upgraded.fleet.removeVehicle("AB12345", listed.updatedAt, actor, java.time.Instant.now())
+        assertFalse(VehicleRepository(path).fleet.overview().vehicles.single().listed)
+    }
+
+    @Test
+    fun versionNineDatabaseGetsSaksnrAndBecomesVersionEleven() {
         val path = path()
         VehicleRepository(path)
         // Rebuild the version-9 shape: same tables, no saksnr column.
@@ -174,7 +197,7 @@ class VehicleInputRulesTest {
                 assertTrue("saksnr" in columns, "$table is missing saksnr")
             }
             db.createStatement().use { it.executeQuery("PRAGMA user_version").use { rows ->
-                rows.next(); assertEquals(10, rows.getInt(1))
+                rows.next(); assertEquals(11, rows.getInt(1))
             } }
         }
     }

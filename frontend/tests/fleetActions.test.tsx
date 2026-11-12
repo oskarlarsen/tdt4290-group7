@@ -31,6 +31,19 @@ describe("agreement vehicle actions", () => {
     await undoChange("change-id");
     expect(fetch.mock.calls[2][0]).toContain("/history/change-id/undo");
   });
+  it("names the agreement when a truck is listed under several: details, checks, remove and replace", async () => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}"))); vi.stubGlobal("fetch", fetch);
+    const { getVehicle, runCheck } = await import("../src/api/vehicles");
+    await getVehicle("AB12345", "agreement 2"); await getVehicle("AB12345");
+    expect(fetch.mock.calls[0][0]).toContain("/vehicles/AB12345?agreementId=agreement%202");
+    expect(fetch.mock.calls[1][0]).not.toContain("agreementId");
+    await runCheck("AB12345", false, "agreement-2"); await runCheck("AB12345", true);
+    expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual({ registrationNumber: "AB12345", forceRefresh: false, agreementId: "agreement-2" });
+    expect(JSON.parse(fetch.mock.calls[3][1].body)).toEqual({ registrationNumber: "AB12345", forceRefresh: true });
+    await removeVehicle(vehicle); await replaceVehicle(vehicle, { planned: true });
+    expect(fetch.mock.calls[4][0]).toContain("/vehicle-fleet/vehicles/AB12345?agreementId=agreement");
+    expect(fetch.mock.calls[5][0]).toContain("/vehicle-fleet/vehicles/AB12345/replace?agreementId=agreement");
+  });
   it("offers a registration-pending switch without requiring technical vehicle details", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><VehicleEntryForm agreementId="agreement" onClose={() => {}} onSaved={() => {}} /></QueryClientProvider>);
     expect(html).toContain('role="switch"'); expect(html).toContain('aria-checked="false"');

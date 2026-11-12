@@ -197,11 +197,12 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     call.respond(HttpStatusCode.NoContent)
                 }
 
+                // Kept for existing clients, but nothing is destroyed any more: this archives, like POST /{id}/archive.
                 delete("/{id}") {
-                    if (call.adminActor() == null) return@delete
+                    val actor = call.adminActor() ?: return@delete
                     val id = call.parameters["id"]
-                    if (id == null || !repository.delete(id)) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet"))
+                    if (id == null || !repository.archive(id, actor.id, java.time.Instant.now())) {
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet, eller det er allerede arkivert"))
                         return@delete
                     }
                     call.respond(HttpStatusCode.NoContent)

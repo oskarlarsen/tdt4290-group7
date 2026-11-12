@@ -55,7 +55,7 @@ export function SupplierReportingDataDialog({ supplier, onClose }: Props) {
                           ? "Hele avtaleperioden"
                           : `${vehicle.startYearWeek ?? "?"} til ${vehicle.endYearWeek ?? "?"}`;
                       return (
-                        <li key={vehicle.registrationNumber}>
+                        <li key={`${vehicle.registrationNumber}|${vehicle.agreementId}`}>
                           <span className="font-medium text-neutral-800">
                             {vehicle.planned ? "Planlagt kjøretøy" : vehicle.registrationNumber}
                           </span>

@@ -3,6 +3,8 @@ package com.tdt4290group7.backend.onboarding
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.vehicles.FleetRepository
 import com.tdt4290group7.backend.vehicles.VehicleDatabase
+import com.tdt4290group7.backend.vehicles.VehicleEntryInput
+import com.tdt4290group7.backend.vehicles.insertRegistrySnapshot
 import java.security.MessageDigest
 import java.sql.Connection
 import java.sql.ResultSet
@@ -57,6 +59,15 @@ internal class OnboardingRepository(
                 onboardingSchemaStatements.forEach { sql ->
                     statement.executeUpdate(sql)
                 }
+                // Details used to be kept per truck; copy them to the truck-and-agreement table. Repeating this changes nothing.
+                statement.executeUpdate(
+                    """INSERT OR IGNORE INTO vehicle_usage_details (usage_id, fuel_technology, is_hybrid, full_contract_coverage, start_year_week,
+                           end_year_week, attachment_reference, notes, updated_at, vehicle_category)
+                       SELECT v.registration_number || '|' || v.agreement_id, d.fuel_technology, d.is_hybrid, d.full_contract_coverage, d.start_year_week,
+                           d.end_year_week, d.attachment_reference, d.notes, d.updated_at, d.vehicle_category
+                       FROM vehicle_contract_details d JOIN vehicles v ON v.registration_number = d.registration_number
+                       WHERE v.agreement_id IS NOT NULL"""
+                )
             }
             migrateFacilityEnergyToQuarterly(db)
         }
@@ -130,7 +141,7 @@ internal class OnboardingRepository(
             if (agreements.any { it.requiresEnergy }) add(BatchEntityType.ENERGY)
             if (agreements.any { it.requiresProducts }) add(BatchEntityType.PRODUCTS)
         }.toList()
-        val missingVehicleAgreements = agreements.count { it.requiresVehicles && countAgreementRecords(db, "vehicles", it.id) == 0 }
+        val missingVehicleAgreements = agreements.count { it.requiresVehicles && countAgreementRecords(db, "vehicle_usages", it.id) == 0 }
         val missingEnergyAgreements = agreements.count { it.requiresEnergy && countAgreementRecords(db, "facility_energy", it.id) == 0 }
         val missingProductAgreements = agreements.count { it.requiresProducts && countAgreementRecords(db, "contract_products", it.id) == 0 }
         val requiredDataComplete = requiredEntities.isNotEmpty() &&
@@ -387,8 +398,8 @@ internal class OnboardingRepository(
         val prepared = prepareBatch(supplierId, entityType, fileName, fileBytes, now)
         val parse = prepared.parse
         if (entityType != BatchEntityType.VEHICLES || parse.errors.isNotEmpty()) return finishBatch(prepared, parse)
-        val filled = VehicleRegistryFill.fillFromRegistry(parse.rows, registry, now)
-        return finishBatch(prepared, parse.copy(rows = filled.rows, errors = filled.errors))
+        val filled = VehicleRegistryFill.fillFromRegistry(parse.rows, registry, now, approvedFuel(supplierId))
+        return finishBatch(prepared, parse.copy(rows = filled.rows, errors = filled.errors), filled.warnings)
     }
 
     /** Energy rows overwrite a stored report for the same location and quarter, so say which ones before the import. */
@@ -417,7 +428,18 @@ internal class OnboardingRepository(
         }
     }
 
-    private fun finishBatch(prepared: PreparedBatch, parseResult: CsvStreamParser.ParsedCsvResult): CsvPreviewResponse {
+    /** Fuel already stored for the supplier's approved vehicles (verified when the admin added them), so uploads of these never need a registry call. */
+    private fun approvedFuel(supplierId: String): Map<String, FilledFuel?> = database.read { db ->
+        database.query(db, """SELECT v.registration_number,
+                (SELECT group_concat(f.fuel_technology) FROM svv_snapshot_fuels f WHERE f.snapshot_id = s.id) AS codes, s.vehicle_category
+            FROM vehicle_usages v JOIN agreements a ON a.id = v.agreement_id
+            LEFT JOIN svv_snapshots s ON s.id = (SELECT id FROM svv_snapshots WHERE registration_number = v.registration_number ORDER BY fetched_at DESC, id DESC LIMIT 1)
+            WHERE a.supplier_id = ? AND v.listed = 1 AND v.planned = 0""", listOf(supplierId)) { row ->
+            row.getString("registration_number") to VehicleRegistryFill.fuelFromCodes(row.getString("codes")?.split(',').orEmpty(), row.getString("vehicle_category"))
+        }.toMap()
+    }
+
+    private fun finishBatch(prepared: PreparedBatch, parseResult: CsvStreamParser.ParsedCsvResult, warnings: List<String> = emptyList()): CsvPreviewResponse {
         val supplierId = prepared.supplierId
         val entityType = prepared.entityType
         val fileName = prepared.fileName
@@ -476,9 +498,34 @@ internal class OnboardingRepository(
             errorRows = errorRowsCount,
             canCommit = canCommit,
             errors = parseResult.errors,
+            warnings = warnings,
             previewRows = parseResult.rows.take(10),
             notices = if (entityType == BatchEntityType.ENERGY) energyNotices(parseResult.rows) else emptyList()
         )
+    }
+
+    /** Plates of a previewed batch that Statens vegvesen could not be asked about (over the preview limit, or the service was down). */
+    fun unverifiedPlates(batchId: String): List<String> = batchCache[batchId]?.rows.orEmpty()
+        .filter { it["registry_status"] == "NOT_CHECKED" && !it["registration_number"].isNullOrBlank() }
+        .map { it["registration_number"]!!.trim().uppercase(Locale.ROOT) }.distinct()
+
+    /** Runs after the import is confirmed: stores the registry data, or why there is none (e.g. NOT_FOUND), per plate. */
+    suspend fun verifyAfterUpload(plates: List<String>, registry: VehicleRegistryLookup) {
+        for (plate in plates) {
+            val (snapshot, problem) = registry.checkForList(VehicleEntryInput(plate))
+            database.write { db ->
+                if (snapshot != null) {
+                    database.insertRegistrySnapshot(db, snapshot)
+                    // Rows imported while the registry was unreachable have no fuel yet: fill it in from what the registry lists.
+                    VehicleRegistryFill.fuelFrom(snapshot.data)?.let { fuel ->
+                        database.update(db, "vehicle_usage_details",
+                            mapOf("fuel_technology" to fuel.fuelTechnologyCode, "is_hybrid" to if (fuel.isHybrid) 1 else 0, "vehicle_category" to fuel.vehicleCategory),
+                            "fuel_technology = '' AND usage_id IN (SELECT id FROM vehicle_usages WHERE registration_number = ?)", listOf(plate))
+                    }
+                }
+                database.update(db, "vehicle_usages", mapOf("registry_problem" to problem), "registration_number = ?", listOf(plate))
+            }
+        }
     }
 
     fun confirmBatch(batchId: String, supplierId: String, now: Instant, byRole: String? = null): CsvConfirmResponse {
@@ -546,49 +593,28 @@ internal class OnboardingRepository(
                 r["registration_number"]!!.trim().uppercase(Locale.ROOT)
             }
 
-            val existingOwner = database.query(
-                db,
-                """SELECT a.supplier_id FROM vehicles v
-                   LEFT JOIN agreements a ON a.id = v.agreement_id
-                   WHERE v.registration_number = ?""",
-                listOf(regNumber)
-            ) { it.getString(1) }.firstOrNull()
-
-            require(existingOwner == null || existingOwner == supplierId) {
-                "Kjøretøyet $regNumber er allerede tilordnet en annen leverandør"
-            }
-
-            if (existingOwner == null) {
-                val exists = database.query(
-                    db,
-                    "SELECT 1 FROM vehicles WHERE registration_number = ?",
-                    listOf(regNumber)
-                ) { it.getInt(1) }.isNotEmpty()
-                require(!exists) { "Kjøretøyet $regNumber er ikke knyttet til en avtale som tilhører organisasjonen din" }
+            // The same truck may already be listed under another agreement, also another supplier's: it is the truck's own
+            // row that is shared, and this agreement gets its own listing and its own contract details.
+            val usageId = "$regNumber|$agreementId"
+            val existingUsage = database.query(db, "SELECT created_at FROM vehicle_usages WHERE id = ?", listOf(usageId)) { it.getString(1) }.firstOrNull()
+            fleet.ensureTruck(db, regNumber, isPlanned, java.time.Instant.parse(timestamp))
+            if (existingUsage == null) {
                 database.insert(
                     db,
-                    "vehicles",
+                    "vehicle_usages",
                     mapOf(
+                        "id" to usageId,
                         "registration_number" to regNumber,
                         "agreement_id" to agreementId,
                         "planned" to if (isPlanned) 1 else 0,
-                        "listed" to 1,
+                        "listed" to 0, // only the admin's approved list sets listed
                         "created_at" to timestamp,
                         "updated_at" to timestamp
                     )
                 )
             } else {
-                database.update(
-                    db,
-                    "vehicles",
-                    mapOf(
-                        "agreement_id" to agreementId,
-                        "listed" to 1,
-                        "updated_at" to timestamp
-                    ),
-                    "registration_number = ?",
-                    listOf(regNumber)
-                )
+                // Re-reporting a truck never changes the approved list: only the admin sets listed.
+                database.update(db, "vehicle_usages", mapOf("updated_at" to timestamp), "id = ?", listOf(usageId))
             }
 
             val coverage = r["full_contract_coverage"]!!.trim().equals("TRUE", ignoreCase = true) ||
@@ -605,16 +631,18 @@ internal class OnboardingRepository(
             ) + (r["vehicle_category"]?.trim()?.takeIf { it.isNotEmpty() }?.let { mapOf("vehicle_category" to it) } ?: emptyMap())
             val hasDetails = database.query(
                 db,
-                "SELECT 1 FROM vehicle_contract_details WHERE registration_number = ?",
-                listOf(regNumber)
+                "SELECT 1 FROM vehicle_usage_details WHERE usage_id = ?",
+                listOf(usageId)
             ) { it.getInt(1) }.isNotEmpty()
             if (hasDetails) {
-                database.update(db, "vehicle_contract_details", detailValues, "registration_number = ?", listOf(regNumber))
+                // A row without a fuel (registry unavailable) must not wipe the fuel stored from an earlier report.
+                val values = if (detailValues["fuel_technology"] == "") detailValues - "fuel_technology" - "is_hybrid" - "vehicle_category" else detailValues
+                database.update(db, "vehicle_usage_details", values, "usage_id = ?", listOf(usageId))
             } else {
                 database.insert(
                     db,
-                    "vehicle_contract_details",
-                    detailValues + ("registration_number" to regNumber)
+                    "vehicle_usage_details",
+                    detailValues + ("usage_id" to usageId)
                 )
             }
         }
@@ -749,17 +777,18 @@ internal class OnboardingRepository(
     fun getSupplierVehicles(supplierId: String): List<SupplierVehicleSummary> {
         return database.read { db ->
             val sql = """
-                SELECT v.registration_number, v.agreement_id, v.planned, v.listed,
+                SELECT v.registration_number, v.agreement_id, v.planned, v.listed, d.updated_at AS details_at, v.exception_approved, v.exception_note,
+                       CASE WHEN EXISTS (SELECT 1 FROM svv_snapshots s WHERE s.registration_number = v.registration_number) THEN NULL ELSE v.registry_problem END AS registry_problem,
                        d.fuel_technology, d.is_hybrid, d.full_contract_coverage,
                        d.start_year_week, d.end_year_week, d.attachment_reference, d.notes,
                        COALESCE(d.vehicle_category, (SELECT s.vehicle_category FROM svv_snapshots s
                            WHERE s.registration_number = v.registration_number ORDER BY s.fetched_at DESC, s.id DESC LIMIT 1)) AS vehicle_category,
                        v.created_at, v.updated_at
-                FROM vehicles v
+                FROM vehicle_usages v
                 JOIN agreements a ON v.agreement_id = a.id
-                LEFT JOIN vehicle_contract_details d ON d.registration_number = v.registration_number
+                LEFT JOIN vehicle_usage_details d ON d.usage_id = v.id
                 WHERE a.supplier_id = ? AND a.active = 1
-                ORDER BY v.registration_number
+                ORDER BY v.registration_number, v.agreement_id
             """.trimIndent()
             database.query(db, sql, listOf(supplierId)) { row ->
                 SupplierVehicleSummary(
@@ -767,6 +796,10 @@ internal class OnboardingRepository(
                     agreementId = row.getString("agreement_id"),
                     planned = row.getInt("planned") == 1,
                     listed = row.getInt("listed") == 1,
+                    uploaded = row.getObject("details_at") != null,
+                    exceptionApproved = row.getInt("exception_approved") == 1,
+                    exceptionNote = row.getString("exception_note"),
+                    registryProblem = row.getString("registry_problem"),
                     fuelTechnology = row.getString("fuel_technology"),
                     isHybrid = row.getObject("is_hybrid")?.let { row.getInt("is_hybrid") == 1 },
                     vehicleCategory = row.getString("vehicle_category"),
@@ -1102,7 +1135,7 @@ internal class OnboardingRepository(
         val sql = """
             SELECT a.id, a.note, a.saksnr, a.start_date, a.end_date, a.allowed_vehicles, a.active,
                    a.requires_vehicles, a.requires_energy, a.requires_products,
-                   (SELECT COUNT(*) FROM vehicles v WHERE v.agreement_id = a.id AND v.listed = 1) AS vehicle_count
+                   (SELECT COUNT(*) FROM vehicle_usages v WHERE v.agreement_id = a.id AND v.listed = 1) AS vehicle_count
             FROM agreements a
             WHERE a.supplier_id = ? AND a.active = 1
             ORDER BY a.start_date DESC
@@ -1142,27 +1175,29 @@ internal class OnboardingRepository(
     }
 
     private fun countAgreementRecords(db: Connection, table: String, agreementId: String): Int {
-        require(table in setOf("vehicles", "facility_energy", "contract_products"))
-        val listedClause = if (table == "vehicles") " AND listed = 1" else ""
+        require(table in setOf("vehicle_usages", "facility_energy", "contract_products"))
+        // Vehicles count once the supplier has uploaded details; the admin's approved list alone does not.
+        val uploadedClause = if (table == "vehicle_usages") " AND id IN (SELECT usage_id FROM vehicle_usage_details)" else ""
         return database.query(
             db,
-            "SELECT COUNT(*) FROM $table WHERE agreement_id = ?$listedClause",
+            "SELECT COUNT(*) FROM $table WHERE agreement_id = ?$uploadedClause",
             listOf(agreementId)
         ) { it.getInt(1) }.single()
     }
 
     private fun countAgreementRecords(db: Connection, entityType: BatchEntityType, agreementId: String): Int =
         countAgreementRecords(db, when (entityType) {
-            BatchEntityType.VEHICLES -> "vehicles"
+            BatchEntityType.VEHICLES -> "vehicle_usages"
             BatchEntityType.ENERGY -> "facility_energy"
             BatchEntityType.PRODUCTS -> "contract_products"
         }, agreementId)
 
     private fun querySupplierVehicleCount(db: Connection, supplierId: String): Int {
         val sql = """
-            SELECT COUNT(*) FROM vehicles v
+            SELECT COUNT(*) FROM vehicle_usages v
             JOIN agreements a ON v.agreement_id = a.id
-            WHERE a.supplier_id = ? AND v.listed = 1
+            JOIN vehicle_usage_details d ON d.usage_id = v.id
+            WHERE a.supplier_id = ?
         """.trimIndent()
         return database.query(db, sql, listOf(supplierId)) { it.getInt(1) }.firstOrNull() ?: 0
     }

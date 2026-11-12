@@ -29,7 +29,11 @@ internal suspend fun ApplicationCall.adminActor(): ChangeActor? {
     return ChangeActor(user.id, user.name)
 }
 
-fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
+fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup, checks: VehicleCheckService? = null) {
+    // Deviations are checked automatically when the admin adds a vehicle; a failed check never undoes the add.
+    suspend fun autoCheck(vehicle: Vehicle) {
+        if (!vehicle.planned) runCatching { checks?.check(VehicleCheckRequest(vehicle.registrationNumber)) }
+    }
     get("/api/vehicle-fleet") { if (call.adminActor() != null) call.respond(fleet.overview()) }
     get("/api/vehicle-fleet/history") {
         if (call.adminActor() == null) return@get
@@ -37,9 +41,21 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
         val page = if (rawPage == null) 1 else rawPage.toIntOrNull() ?: throw IllegalArgumentException("Ugyldig historikkside")
         call.respond(fleet.history(page))
     }
+    get("/api/vehicle-fleet/archive") { if (call.adminActor() != null) call.respond(fleet.archive()) }
     post("/api/vehicle-fleet/suppliers") {
         val actor = call.adminActor() ?: return@post
-        call.respond(HttpStatusCode.Created, fleet.saveSupplier(null, decodeFleetRequest(call.receiveText(), SupplierInput.serializer()), actor, Instant.now()))
+        val input = decodeFleetRequest(call.receiveText(), SupplierInput.serializer())
+        try {
+            call.respond(HttpStatusCode.Created, fleet.saveSupplier(null, input, actor, Instant.now()))
+        } catch (match: ArchivedSupplierMatchException) {
+            call.respond(HttpStatusCode.Conflict, match.match)
+        }
+    }
+    post("/api/vehicle-fleet/suppliers/{id}/reactivate") {
+        val actor = call.adminActor() ?: return@post
+        val id = call.parameters["id"] ?: throw IllegalArgumentException("Supplier ID is required")
+        val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
+        call.respond(fleet.reactivateSupplier(id, request.expectedUpdatedAt, actor, Instant.now()))
     }
     post("/api/vehicle-fleet/suppliers/{id}/invitations") {
         val actor = call.adminActor() ?: return@post
@@ -105,20 +121,46 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
         val actor = call.adminActor() ?: return@post
         val input = decodeFleetRequest(call.receiveText(), VehicleEntryInput.serializer())
         // Never hold a SQLite write lock during a remote lookup. Capacity is checked at commit time.
-        val snapshot = registry.verifyEntry(input)
-        call.respond(HttpStatusCode.Created, fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot))
+        val (snapshot, problem) = registry.checkForList(input)
+        val added = fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot, problem)
+        autoCheck(added)
+        call.respond(HttpStatusCode.Created, added)
+    }
+    post("/api/vehicle-fleet/agreements/{id}/vehicles/bulk") {
+        val actor = call.adminActor() ?: return@post
+        val plates = decodeFleetRequest(call.receiveText(), BulkVehicleRequest.serializer()).registrationNumbers.distinct()
+        require(plates.size in 1..200) { "Send between 1 and 200 registration numbers" }
+        val added = mutableListOf<String>()
+        val failed = mutableListOf<BulkVehicleFailure>()
+        // One by one: a bad plate must not block the rest, and each add keeps its own history entry.
+        for (plate in plates) try {
+            val input = VehicleEntryInput(plate)
+            val (snapshot, problem) = registry.checkForList(input)
+            val vehicle = fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot, problem)
+            autoCheck(vehicle)
+            added += vehicle.registrationNumber
+        } catch (e: Exception) {
+            failed += BulkVehicleFailure(plate, e.message ?: "Could not be added")
+        }
+        call.respond(HttpStatusCode.Created, BulkVehicleResult(added, failed))
     }
     delete("/api/vehicle-fleet/vehicles/{plate}") {
         val actor = call.adminActor() ?: return@delete
         val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
-        fleet.removeVehicle(call.parameters["plate"]!!, request.expectedUpdatedAt, actor, Instant.now())
+        fleet.removeVehicle(call.parameters["plate"]!!, request.expectedUpdatedAt, actor, Instant.now(), call.request.queryParameters["agreementId"])
         call.respond(HttpStatusCode.NoContent)
     }
     post("/api/vehicle-fleet/vehicles/{plate}/replace") {
         val actor = call.adminActor() ?: return@post
         val request = decodeFleetRequest(call.receiveText(), ReplacementRequest.serializer())
-        val snapshot = registry.verifyEntry(request.replacement)
-        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot))
+        val (snapshot, problem) = registry.checkForList(request.replacement)
+        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot, problem, call.request.queryParameters["agreementId"]))
+    }
+    post("/api/vehicle-fleet/vehicles/{plate}/exception") {
+        val actor = call.adminActor() ?: return@post
+        val request = decodeFleetRequest(call.receiveText(), ExceptionRequest.serializer())
+        fleet.approveException(normalizeRegistrationNumber(call.parameters["plate"]!!), request.note, actor, Instant.now(), call.request.queryParameters["agreementId"])
+        call.respond(HttpStatusCode.NoContent)
     }
     post("/api/vehicle-fleet/history/{id}/undo") {
         val actor = call.adminActor() ?: return@post

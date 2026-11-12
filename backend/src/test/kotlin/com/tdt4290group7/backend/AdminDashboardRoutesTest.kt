@@ -420,16 +420,22 @@ class AdminDashboardRoutesTest {
         assertEquals("SELF", selfNote.getValue("visibility").jsonPrimitive.content)
         assertEquals("Remember to call", selfNote.getValue("text").jsonPrimitive.content)
         assertEquals("Advisor Hansen", selfNote.getValue("authorName").jsonPrimitive.content)
-        assertEquals(HttpStatusCode.Created, post("""{"text":"Shared with admins","visibility":"INTERNAL","alertId":"alert-1"}""").status)
+        val alertId = Json.parseToJsonElement(admin.post("/api/admin/alerts") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"title":"Linked alert","supplierId":"${supplier.id}","category":"VEHICLE_COMPLIANCE","severity":"medium","findingType":"CONFIRMED_DEVIATION","description":"d"}""")
+        }.bodyAsText()).jsonObject.getValue("id").jsonPrimitive.content
+        // A note can only point at an alert that exists.
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"Dangling","visibility":"INTERNAL","alertId":"no-such-alert"}""").status)
+        assertEquals(HttpStatusCode.Created, post("""{"text":"Shared with admins","visibility":"INTERNAL","alertId":"$alertId"}""").status)
 
         val listed = Json.parseToJsonElement(admin.get("/api/admin/suppliers/${supplier.id}/notes").bodyAsText()).jsonArray
         assertEquals(listOf("Shared with admins", "Remember to call"), listed.map { it.jsonObject.getValue("text").jsonPrimitive.content })
-        assertEquals("alert-1", listed.first().jsonObject.getValue("alertId").jsonPrimitive.content)
+        assertEquals(alertId, listed.first().jsonObject.getValue("alertId").jsonPrimitive.content)
 
         // Validation and unknown suppliers.
         assertEquals(HttpStatusCode.BadRequest, post("""{"text":"   "}""").status)
         assertEquals(HttpStatusCode.BadRequest, post("""{"text":"${"x".repeat(2001)}"}""").status)
-        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"SUPPLIER"}""").status)
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"PUBLIC"}""").status)
         assertEquals(HttpStatusCode.NotFound, admin.post("/api/admin/suppliers/unknown/notes") {
             contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""")
         }.status)

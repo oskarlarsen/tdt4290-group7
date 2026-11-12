@@ -88,11 +88,6 @@ export async function updateCertificate(id: string, updates: CertificateUpdate):
   return toCertificate(response);
 }
 
-export function deleteCertificate(id: string): Promise<void> {
-  return apiFetch<void>(`/certificates/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
-
 export function archiveCertificate(id: string): Promise<void> {
   return apiFetch<void>(`/certificates/${encodeURIComponent(id)}/archive`, { method: "POST" });
 }

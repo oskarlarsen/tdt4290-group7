@@ -516,6 +516,11 @@ export default function Onboarding() {
             <p className="mt-1 text-sm text-neutral-500">
               Fyll ut de nødvendige opplysningene i skjemaet. Systemet validerer og behandler innsendingen automatisk.
             </p>
+            {entity === "vehicles" && (
+              <p className="mt-1 text-sm text-neutral-500">
+                Only add vehicles you have actually used. Your approved list is already registered; vehicles that are not on it are checked with Statens vegvesen.
+              </p>
+            )}
           </div>
           <Boxes className="hidden h-5 w-5 text-primary-700 sm:block" aria-hidden="true" />
         </div>
@@ -584,6 +589,7 @@ export default function Onboarding() {
                 working={working}
                 onPreview={handlePreview}
                 onChange={handleFormChange}
+                unchecked={(previews.form?.previewRows ?? []).filter((row) => row.registry_status === "NOT_CHECKED").map((row) => row.registration_number)}
               />
             )}
 
@@ -641,6 +647,7 @@ export default function Onboarding() {
               )}
             </div>
 
+            {preview.warnings?.map((warning) => <p key={warning} role="status" className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{warning}</p>)}
             {preview.notices && preview.notices.length > 0 && (
               <ul role="status" className="mt-4 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {preview.notices.map((notice) => (

@@ -36,6 +36,8 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.core.readBytes
+import io.ktor.server.application.application
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.Locale
 
@@ -186,8 +188,11 @@ internal fun Route.onboardingRoutes(
                 return@post
             }
 
+            val unverified = if (registry != null) repository.unverifiedPlates(request.batchId) else emptyList()
             try {
                 val response = repository.confirmBatch(request.batchId, supplierId, Instant.now(), byRole = user.role.name)
+                // Plates the registry could not be asked about during the preview are checked afterwards, in the background.
+                if (registry != null && unverified.isNotEmpty()) call.application.launch { runCatching { repository.verifyAfterUpload(unverified, registry) } }
                 call.respond(response)
             } catch (e: IllegalArgumentException) {
                 call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Kunne ikke bekrefte importen"))

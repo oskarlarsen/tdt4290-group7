@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { VEHICLE_CATEGORIES, vehicleWeightRange } from "../src/utils/vehicleCatalog";
 
 const workspace = vi.hoisted(() => ({ data: undefined as unknown }));
 vi.mock("../src/hooks/useMySupplierOverview", () => ({
   useMySupplierOverview: () => ({ data: workspace.data, isLoading: false, isError: false, error: null }),
 }));
-import { MemoryRouter } from "react-router-dom";
 import MyVehicles from "../src/pages/supplier/MyVehicles";
 
 afterEach(cleanup);
@@ -35,14 +35,16 @@ describe("vehicleWeightRange", () => {
 describe("My Vehicles", () => {
   it("shows each vehicle's fuel and weight range, with a dash where they are unknown", () => {
     workspace.data = {
+      agreements: [],
       vehicles: [
-        { registrationNumber: "AB12345", planned: false, listed: true, fuelTechnology: "2", vehicleCategory: "N2" },
-        { registrationNumber: "CD12346", planned: false, listed: true, fuelTechnology: null, vehicleCategory: null },
+        { registrationNumber: "AB12345", agreementId: "a1", planned: false, listed: true, uploaded: true, fuelTechnology: "2", vehicleCategory: "N2" },
+        { registrationNumber: "CD12346", agreementId: "a1", planned: false, listed: true, uploaded: true, fuelTechnology: null, vehicleCategory: null },
       ],
     };
     render(<MemoryRouter><MyVehicles /></MemoryRouter>);
-    expect(screen.getByText("Diesel")).toBeTruthy();
-    expect(screen.getByText(/3.500 til 12.000 kg/)).toBeTruthy();
-    expect(screen.getAllByText("—")).toHaveLength(2);
+    // Listed vehicles that were reported show in both the approved and the reported table.
+    expect(screen.getAllByText("Diesel")).toHaveLength(2);
+    expect(screen.getAllByText(/3.500 til 12.000 kg/)).toHaveLength(2);
+    expect(screen.getAllByText("—")).toHaveLength(4);
   });
 });

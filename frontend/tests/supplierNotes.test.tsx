@@ -38,10 +38,10 @@ describe("supplier notes in the drawer", () => {
     vi.spyOn(notesApi, "getSupplierNotes").mockResolvedValue([note("n1", "INTERNAL", "Shared"), note("n2", "SELF", "Mine")]);
     mountDrawer();
     expect(await screen.findByText("Shared")).toBeTruthy();
-    // Each label appears once as a choice and once as a tag on a note.
-    expect(screen.getAllByText("Internt notat")).toHaveLength(2);
-    expect(screen.getAllByText("Notat til meg selv")).toHaveLength(2);
-    expect(screen.getByText("Notater vises aldri for leverandøren.")).toBeTruthy();
+    // The choices carry a hint ("Internt notat (alle administratorer)"); the exact label appears only as the tag on a note.
+    expect(screen.getAllByText("Internt notat")).toHaveLength(1);
+    expect(screen.getAllByText("Notat til meg selv")).toHaveLength(1);
+    expect(screen.getByText("Leverandøren ser ikke dette notatet.")).toBeTruthy();
   });
 
   it("saves a note to self by default and an internal note when chosen first", async () => {
@@ -55,7 +55,7 @@ describe("supplier notes in the drawer", () => {
     await waitFor(() => expect(add).toHaveBeenCalledTimes(1));
     expect(add.mock.calls[0][2]).toEqual({ text: "First", visibility: "SELF" });
 
-    fireEvent.click(screen.getByRole("radio", { name: "Internt notat" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Internt notat (alle administratorer)" }));
     fireEvent.change(box, { target: { value: "Second" } });
     fireEvent.click(screen.getByRole("button", { name: "Legg til notat" }));
     await waitFor(() => expect(add).toHaveBeenCalledTimes(2));

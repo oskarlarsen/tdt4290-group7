@@ -26,6 +26,8 @@ type Props = {
   onClose: () => void;
 };
 
+const NOTE_LABELS: Record<NoteVisibility, string> = { SELF: "Notat til meg selv", INTERNAL: "Internt notat", SUPPLIER: "Notat til leverandør" };
+
 export function SupplierDetailsDrawer({
   supplier,
   alerts,
@@ -178,7 +180,7 @@ export function SupplierDetailsDrawer({
                         <span className="text-xs font-medium text-neutral-700">
                           {note.authorName}
                           <span className="ml-2 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-normal text-neutral-600">
-                            {note.visibility === "SELF" ? "Notat til meg selv" : "Internt notat"}
+                            {NOTE_LABELS[note.visibility]}
                           </span>
                         </span>
                         <span className="font-mono text-[11px] text-neutral-500">
@@ -200,14 +202,18 @@ export function SupplierDetailsDrawer({
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-700">
                     <label className="flex items-center gap-1.5">
                       <input type="radio" name="note-visibility" checked={visibility === "SELF"} onChange={() => setVisibility("SELF")} />
-                      Notat til meg selv
+                      Notat til meg selv (bare du)
                     </label>
                     <label className="flex items-center gap-1.5">
                       <input type="radio" name="note-visibility" checked={visibility === "INTERNAL"} onChange={() => setVisibility("INTERNAL")} />
-                      Internt notat
+                      Internt notat (alle administratorer)
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "SUPPLIER"} onChange={() => setVisibility("SUPPLIER")} />
+                      Notat til leverandør
                     </label>
                   </div>
-                  <p className="mt-1 text-xs text-neutral-500">Notater vises aldri for leverandøren.</p>
+                  <p className="mt-1 text-xs text-neutral-500">{visibility === "SUPPLIER" ? "Leverandøren ser dette notatet." : "Leverandøren ser ikke dette notatet."}</p>
                 </fieldset>
                 <div className="mt-2 flex gap-2">
                   <textarea

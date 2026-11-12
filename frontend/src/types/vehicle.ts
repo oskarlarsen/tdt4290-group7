@@ -2,7 +2,7 @@
 import type { BodyType, FuelTechnology, VehicleCategory } from "../utils/vehicleCatalog";
 export type Decimal = string;
 export type DataSource = "LIVE" | "CACHE" | "STALE_CACHE" | "UNAVAILABLE";
-export type Vehicle = { registrationNumber: string; createdAt: string; agreementId: string | null; planned: boolean; listed: boolean; updatedAt: string };
+export type Vehicle = { registrationNumber: string; createdAt: string; agreementId: string | null; planned: boolean; listed: boolean; updatedAt: string; reported?: boolean; registryChecked?: boolean; registryProblem?: "NOT_FOUND" | "UNAVAILABLE" | null; exceptionApproved?: boolean; exceptionNote?: string | null };
 export type FleetSupplier = { id: string; name: string; orgNumber: string; active: boolean; updatedAt: string | null };
 export type AgreementInput = {
   supplierId: string;
@@ -19,6 +19,10 @@ export type AgreementInput = {
 export type FleetAgreement = Omit<AgreementInput, "saksnr"> & { id: string; saksnr: string | null; updatedAt: string; active: boolean };
 export type AgreementEvidence = { agreement: FleetAgreement; supplier: FleetSupplier };
 export type FleetChange = { id: string; occurredAt: string; actorName: string; description: string; agreementId: string | null; reversedBy: string | null; undoOf: string | null; canUndo: boolean };
+export type ArchivedSupplier = { supplier: FleetSupplier; archivedAt: string | null; agreements: FleetAgreement[]; vehicles: Vehicle[] };
+export type FleetArchive = { suppliers: ArchivedSupplier[] };
+/** Answer to adding a supplier whose organization number belonged to an archived one. */
+export type ArchivedSupplierMatch = { code: "ARCHIVED_SUPPLIER_MATCH" | "ARCHIVED_SUPPLIER_NAME_MATCH"; supplier: FleetSupplier; archivedAt: string | null; agreementCount: number };
 export type FleetOverview = { suppliers: FleetSupplier[]; agreements: FleetAgreement[]; vehicles: Vehicle[]; changes: FleetChange[] };
 export type VehicleEntryInput = { planned: boolean; registrationNumber?: string };
 export type TripData = {

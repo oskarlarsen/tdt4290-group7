@@ -43,7 +43,7 @@ export function KpiCard({
 }: Props) {
   const card = (
     <div className={`h-full rounded-xl border border-neutral-100 bg-white p-4 ${href || onClick ? "hover:border-neutral-300" : ""} ${pressed ? "border-primary-700 ring-2 ring-primary-700/20" : ""}`}>
-      <div className="flex items-start justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-mono text-neutral-500">{label}</div>
         {icon && (
           <div className={`rounded-lg p-1.5 ${iconClassName ?? "bg-neutral-50 text-neutral-500"}`}>{icon}</div>

@@ -1,6 +1,8 @@
 import { Bell, Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useSupplierAlerts } from "../../hooks/useSupplierAlerts";
+import { getSupplierNotes } from "../../api/supplierAlerts";
 import { ALERT_CATEGORIES } from "../../types/dashboard";
 import type { AlertCategory } from "../../types/dashboard";
 import { ALERT_SEVERITY_LABELS } from "../../components/alerts/AlertBadges";
@@ -25,6 +27,7 @@ export default function MyAlerts() {
   const categoryParam = params.get("category");
   const category = ALERT_CATEGORIES.find((candidate) => candidate === categoryParam);
   const { data: alerts, isLoading, isError, error } = useSupplierAlerts(category);
+  const { data: notes } = useQuery({ queryKey: ["supplier-notes"], queryFn: getSupplierNotes, retry: false });
 
   function setCategory(next: string) {
     const nextParams = new URLSearchParams(params);
@@ -50,6 +53,20 @@ export default function MyAlerts() {
           </select>
         </label>
       </div>
+
+      {notes && notes.length > 0 && (
+        <section className="rounded-xl border border-primary-100 bg-white p-4">
+          <h2 className="text-sm font-semibold text-neutral-900">Messages from your contact</h2>
+          <ul className="mt-2 space-y-2">
+            {notes.map((note) => (
+              <li key={note.id} className="rounded-lg bg-neutral-50 p-2.5">
+                <p className="whitespace-pre-wrap text-sm text-neutral-700">{note.text}</p>
+                <p className="mt-1 text-xs text-neutral-500">{formatDate(note.createdAt)}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {isLoading && <div className="flex h-40 items-center justify-center text-neutral-500"><Loader2 className="h-5 w-5 animate-spin" /></div>}
       {isError && (

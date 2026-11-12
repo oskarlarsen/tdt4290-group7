@@ -39,7 +39,7 @@ private val ALERT_CATEGORIES = setOf("ENVIRONMENTAL_COMPLIANCE", "ENERGY_FUEL", 
 private val ALERT_FINDING_TYPES = setOf("CONFIRMED_DEVIATION", "MISSING_DOCUMENTATION", "UPCOMING_EXPIRY", "PREDICTED_DEVIATION")
 private val ALERT_STATUSES = setOf("OPEN", "IN_PROGRESS", "UNDER_REVIEW", "RESOLVED")
 private val SUPPLIER_REVIEW_STATUSES = setOf("to-review", "in-progress", "resolved")
-private val NOTE_VISIBILITIES = setOf("SELF", "INTERNAL")
+private val NOTE_VISIBILITIES = setOf("SELF", "INTERNAL", "SUPPLIER")
 
 @Serializable
 data class DashboardKpis(
@@ -172,6 +172,10 @@ data class SupplierAlert(
     val status: String,
     val createdAt: String,
 )
+
+/** What a supplier sees of a note addressed to them: no author or alert link. */
+@Serializable
+data class SupplierNoteView(val id: String, val text: String, val createdAt: String)
 
 @Serializable
 data class Notification(
@@ -308,6 +312,13 @@ fun Route.adminDashboardRoutes(
         )
     }
 
+    get("/api/supplier/notes") {
+        val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        val supplierId = user.supplierId?.takeIf { user.role == com.tdt4290group7.backend.model.Role.SUPPLIER }
+            ?: return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Supplier access required"))
+        call.respond(insights.supplierVisibleNotes(supplierId).map { SupplierNoteView(it.id, it.text, it.createdAt) })
+    }
+
     get("/api/notifications") {
         val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
         call.respond(insights.notificationsFor(user.id).map { it.toNotification() })
@@ -422,7 +433,7 @@ fun Route.adminDashboardRoutes(
         val text = input.text.trim()
         require(text.length in 1..2000) { "Notatet må være mellom 1 og 2000 tegn" }
         require(input.visibility in NOTE_VISIBILITIES) { "Velg hvem som kan se notatet" }
-        require(input.alertId == null || input.alertId.length <= 100) { "Ugyldig varselreferanse" }
+        require(input.alertId == null || insights.alertExists(input.alertId)) { "Ugyldig varselreferanse" }
         val note = insights.addNote(supplierId, actor.id, actor.name, input.visibility, text, input.alertId, Instant.now())
         call.application.log.info("admin_note_created noteId={} actorId={} visibility={}", note.id, actor.id, note.visibility)
         call.respond(HttpStatusCode.Created, note.toNote())
@@ -498,7 +509,7 @@ private fun refreshFindings(
     overview.vehicles.filter { it.listed && !it.planned }.forEach { vehicle ->
         val supplierId = vehicle.agreementId?.let(agreements::get)?.supplierId ?: return@forEach
         if (supplierId !in activeSuppliers) return@forEach
-        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber)?.latestCheck?.id ?: return@forEach
+        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber, vehicle.agreementId)?.latestCheck?.id ?: return@forEach
         val check = vehicles.findCheck(latestCheckId) ?: return@forEach
         check.findings.forEach { finding ->
             val findingKey = "vehicle:${check.id}:${finding.code}:${finding.tripRowId.orEmpty()}"
@@ -648,7 +659,7 @@ private fun buildSummary(
     overview.vehicles.filter { it.listed && !it.planned }.forEach { vehicle ->
         val supplierId = vehicle.agreementId?.let(agreementsById::get)?.supplierId
             ?.takeIf(activeSuppliers::containsKey) ?: return@forEach
-        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber)?.latestCheck?.id ?: return@forEach
+        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber, vehicle.agreementId)?.latestCheck?.id ?: return@forEach
         val check = vehicles.findCheck(latestCheckId) ?: return@forEach
         val supplierEvidence = evidence.getValue(supplierId)
         supplierEvidence.hasEvidence = true

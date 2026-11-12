@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.certificates
 
+import com.tdt4290group7.backend.jdbcUrl
+import com.tdt4290group7.backend.link
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.DriverManager
@@ -12,7 +14,7 @@ class CertificateRepository(databasePath: Path) {
     init {
         val path = databasePath.toAbsolutePath().normalize()
         Files.createDirectories(path.parent)
-        databaseUrl = "jdbc:sqlite:$path"
+        databaseUrl = jdbcUrl(path)
         DriverManager.getConnection(databaseUrl).use { db ->
             db.createStatement().use { statement ->
                 statement.execute(
@@ -23,7 +25,7 @@ class CertificateRepository(databasePath: Path) {
                         issue_date TEXT,
                         expiry_date TEXT,
                         source_file TEXT NOT NULL CHECK (length(source_file) BETWEEN 1 AND 255),
-                        contract_id TEXT
+                        contract_id TEXT${db.link("agreements")}
                     )""".trimIndent(),
                 )
                 // Added after first release: nullable ADD COLUMN only, so an older release can still read the file.
@@ -72,14 +74,6 @@ class CertificateRepository(databasePath: Path) {
                 statement.setString(4, certificate.expiryDate?.toString())
                 statement.setString(5, certificate.contractId)
                 statement.setString(6, certificate.id)
-                statement.executeUpdate() == 1
-            }
-        }
-
-    fun delete(id: String): Boolean =
-        DriverManager.getConnection(databaseUrl).use { db ->
-            db.prepareStatement("DELETE FROM certificates WHERE id = ?").use { statement ->
-                statement.setString(1, id)
                 statement.executeUpdate() == 1
             }
         }

@@ -77,7 +77,8 @@ class BodyLimitTest {
     private fun statusFor(body: String, chunked: Boolean = false): HttpStatusCode {
         var status = HttpStatusCode.OK
         testApplication {
-            application { module() }
+            // Own vehicle file, so the shared default test file never gets a suppliers table (which would add foreign keys to it).
+            application { module(VehicleRepository(Path.of("build", "test-data", "${UUID.randomUUID()}.db"))) }
             status = client.post("/api/auth/forgot-password") {
                 contentType(ContentType.Application.Json)
                 if (chunked) {
