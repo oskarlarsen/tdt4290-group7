@@ -47,6 +47,14 @@ fun Application.module(
     val logResetTokens = resetTokenLoggingEnabled(environment, backendSetting("ALLOW_DEV_PASSWORD_RESET_LOG"))
     log.info("Starting in ${environment.name.lowercase()} mode")
 
+    // One database file. The merge of the four old files and WAL only apply to the real file, never to injected test repositories.
+    val databasePath = databasePath()
+    if (repository == null) {
+        LegacyDatabaseMerge.run(databasePath)
+        enableWal(databasePath)
+    }
+    // The vehicle schema goes first, so the account, certificate and alert tables can link to it.
+    val vehicleRepository = repository ?: VehicleRepository(databasePath)
     // Kotlin objects initialize lazily, so touch the repository here and fail before serving requests.
     require(UserRepository.count > 0) { "User repository failed to seed" }
 
@@ -58,12 +66,8 @@ fun Application.module(
     configureRequireJsonBody()
     configureSecurity()
     configureRateLimiting()
-    val vehicleDatabasePath = Path.of(backendSetting("VEHICLE_DB_PATH") ?: "data/vehicles.db")
-    val vehicleRepository = repository ?: VehicleRepository(vehicleDatabasePath)
-    val certificateDatabasePath = Path.of(backendSetting("CERTIFICATE_DB_PATH") ?: "data/certificates.db")
-    val resolvedCertificateRepository = certificateRepository ?: CertificateRepository(certificateDatabasePath)
-    val insightsDatabasePath = Path.of(backendSetting("ADMIN_INSIGHTS_DB_PATH") ?: "data/admin-insights.db")
-    val resolvedAdminInsightsRepository = adminInsightsRepository ?: AdminInsightsRepository(insightsDatabasePath)
+    val resolvedCertificateRepository = certificateRepository ?: CertificateRepository(databasePath)
+    val resolvedAdminInsightsRepository = adminInsightsRepository ?: AdminInsightsRepository(databasePath)
     configureRouting(vehicleRepository, registry, cacheTtl, resolvedCertificateRepository, resolvedAdminInsightsRepository)
     configureCertificateRoutes(resolvedCertificateRepository, (vehicleRepository as? VehicleRepository)?.fleet)
     (vehicleRepository as? VehicleRepository)?.fleet?.let(::configureAccessRoutes)

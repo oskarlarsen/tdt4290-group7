@@ -36,7 +36,7 @@ export default function MyVehicles() {
               </thead>
               <tbody className="divide-y divide-neutral-100">
                  {myVehicles.map((vehicle) => (
-                   <tr key={vehicle.registrationNumber} className="hover:bg-neutral-50/50">
+                   <tr key={`${vehicle.registrationNumber}|${vehicle.agreementId}`} className="hover:bg-neutral-50/50">
                     <td className="px-4 py-3 font-mono font-medium text-neutral-900">
                         {vehicle.planned ? "Registration pending" : vehicle.registrationNumber}
                     </td>

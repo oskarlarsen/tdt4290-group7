@@ -95,7 +95,7 @@ describe("certificate API", () => {
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetch);
-    const { deleteCertificate, updateCertificate } = await import("../src/api/certificates");
+    const { archiveCertificate, updateCertificate } = await import("../src/api/certificates");
 
     const updated = await updateCertificate("certificate-1", {
       supplierName: "Updated Transport AS",
@@ -104,7 +104,7 @@ describe("certificate API", () => {
       expiryDate: "2028-12-31",
       contractId: "CONTRACT-42",
     });
-    await deleteCertificate("certificate-1");
+    await archiveCertificate("certificate-1");
 
     expect(fetch.mock.calls[0][0]).toContain("/certificates/certificate-1");
     expect(fetch.mock.calls[0][1].method).toBe("PUT");
@@ -113,6 +113,7 @@ describe("certificate API", () => {
       contractId: "CONTRACT-42",
     });
     expect(updated).toMatchObject({ supplierName: "Updated Transport AS", validUntil: "2028-12-31" });
-    expect(fetch.mock.calls[1][1].method).toBe("DELETE");
+    expect(fetch.mock.calls[1][0]).toContain("/certificates/certificate-1/archive");
+    expect(fetch.mock.calls[1][1].method).toBe("POST");
   });
 });

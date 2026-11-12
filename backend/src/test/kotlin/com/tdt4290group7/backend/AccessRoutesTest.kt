@@ -69,4 +69,40 @@ class AccessRoutesTest {
         assertEquals(HttpStatusCode.Unauthorized, standInClient.get("/api/auth/me").status)
         assertEquals(HttpStatusCode.Forbidden, owner.post("/api/admin/access/$id/approve").status)
     }
+
+    @Test
+    fun aColleagueWhoseAccessWasRemovedCanBeInvitedAgainAndKeepsTheSameAccount() = testApplication {
+        val vehicles = VehicleRepository(Path.of("build", "test-data", "access-${UUID.randomUUID()}.db"))
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Again AS", "223344556"), ChangeActor("a", "Admin"), Instant.now())
+        val other = vehicles.fleet.saveSupplier(null, SupplierInput("Elsewhere AS", "667788990"), ChangeActor("a", "Admin"), Instant.now())
+        application { module(vehicles, null) }
+        val owner = supplierClient(supplier.id)
+        val admin = adminClient()
+        val email = "again-${UUID.randomUUID()}@example.no"
+        suspend fun invite(who: io.ktor.client.HttpClient = owner, address: String = email) =
+            who.post("/api/supplier/colleagues/invitations") { contentType(ContentType.Application.Json); setBody("""{"email":"$address"}""") }
+        suspend fun accept(response: io.ktor.client.statement.HttpResponse, password: String) = client.post("/api/auth/accept-invitation") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"token":"${Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("token").jsonPrimitive.content}","newPassword":"$password","name":"Kari Kollega"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, accept(invite(), "first-password-1234").status)
+        val first = UserRepository.findByEmail(email)!!
+        // Still active: no second invitation.
+        assertEquals(HttpStatusCode.Conflict, invite().status)
+
+        val id = Json.parseToJsonElement(owner.get("/api/access").bodyAsText()).jsonArray.map { it.jsonObject }.single { it.getValue("email").jsonPrimitive.content == email }.getValue("id").jsonPrimitive.content
+        assertEquals(HttpStatusCode.NoContent, owner.post("/api/access/$id/revoke").status)
+        // Removed: another organization still cannot invite the address, the same one can.
+        assertEquals(HttpStatusCode.Conflict, supplierClient(other.id).post("/api/supplier/colleagues/invitations") { contentType(ContentType.Application.Json); setBody("""{"email":"$email"}""") }.status)
+        val again = invite()
+        assertEquals(HttpStatusCode.Created, again.status, again.bodyAsText())
+        assertEquals(HttpStatusCode.OK, accept(again, "second-password-1234").status)
+
+        val back = UserRepository.findByEmail(email)!!
+        assertEquals(first.id, back.id)
+        assertEquals(null, back.accessExpiresAt)
+        assertEquals(true, UserRepository.isAccessActive(back))
+        assertEquals(true, back.tokenVersion > first.tokenVersion)
+    }
 }

@@ -72,7 +72,7 @@ fun Application.configureRouting(
             get("/api/vehicles/{registrationNumber}") {
                 if (call.adminActor() == null) return@get
                 val result = try {
-                    repository.vehicleDetails(call.parameters["registrationNumber"]!!)
+                    repository.vehicleDetails(call.parameters["registrationNumber"]!!, call.request.queryParameters["agreementId"])
                 } catch (cause: IllegalArgumentException) {
                     call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid registration number"))
                     return@get

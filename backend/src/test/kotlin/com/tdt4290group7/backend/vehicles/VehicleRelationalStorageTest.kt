@@ -34,12 +34,13 @@ class VehicleRelationalStorageTest {
                                 "upload_batches",
                                 "facility_energy",
                                 "contract_products",
-                                "vehicle_contract_details"
+                                "vehicle_contract_details",
+                                "vehicle_usage_details"
                             )) {
                             vehicleTableCount++
                         }
                     }
-                    assertEquals(14, vehicleTableCount)
+                    assertEquals(16, vehicleTableCount)
                 }
                 statement.executeQuery("PRAGMA table_info(vehicles)").use { rows ->
                     val names = mutableListOf<String>()

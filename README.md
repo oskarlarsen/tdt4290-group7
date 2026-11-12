@@ -110,7 +110,7 @@ macOS:
 ./gradlew run
 ```
 
-The API runs at `http://localhost:8080`. Open `http://localhost:8080/health` to check that it returns `{"status":"UP"}`. SQLite is created automatically; no database installation is needed.
+The API runs at `http://localhost:8080`. Open `http://localhost:8080/health` to check that it returns `{"status":"UP"}`. SQLite is created automatically as one file, `backend/data/app.db`; no database installation is needed.
 
 ### 4. Start the frontend
 
@@ -140,13 +140,13 @@ Install and start Docker with Compose support. From the repository root, complet
 docker compose up --build
 ```
 
-Open **http://localhost:3000** and sign in with the same accounts. The backend uses port `8080`, so stop the local backend before starting Docker. Both startup paths use the same configuration file, but keep separate vehicle databases.
+Open **http://localhost:3000** and sign in with the same accounts. The backend uses port `8080`, so stop the local backend before starting Docker. Both startup paths use the same configuration file, but keep separate databases.
 
 ```sh
 docker compose down
 ```
 
-This stops the stack and retains its vehicle database in the named volume. After source or frontend configuration changes, run `docker compose up --build` again. The optional OCR tool is not included in the container setup.
+This stops the stack and retains its database in the named volume. After source or frontend configuration changes, run `docker compose up --build` again. The optional OCR tool is not included in the container setup.
 
 ## Development and troubleshooting
 

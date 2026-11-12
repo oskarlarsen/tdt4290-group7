@@ -34,6 +34,21 @@ internal val onboardingSchemaStatements = listOf(
     ) STRICT""",
     "CREATE INDEX IF NOT EXISTS idx_upload_batches_supplier ON upload_batches(supplier_id, created_at DESC)",
 
+    // Contract details are per truck and agreement (two suppliers can use the same truck on different terms). Replaces
+    // vehicle_contract_details, which is kept as it was and copied from on startup.
+    """CREATE TABLE IF NOT EXISTS vehicle_usage_details (
+        usage_id TEXT PRIMARY KEY REFERENCES vehicle_usages(id),
+        fuel_technology TEXT NOT NULL,
+        is_hybrid INTEGER NOT NULL CHECK (is_hybrid IN (0, 1)),
+        full_contract_coverage INTEGER NOT NULL CHECK (full_contract_coverage IN (0, 1)),
+        start_year_week TEXT,
+        end_year_week TEXT,
+        attachment_reference TEXT,
+        notes TEXT,
+        updated_at TEXT NOT NULL CHECK (julianday(updated_at) IS NOT NULL AND substr(updated_at, -1) = 'Z'),
+        vehicle_category TEXT,
+        CHECK (full_contract_coverage = 1 OR (start_year_week IS NOT NULL AND end_year_week IS NOT NULL))
+    ) STRICT""",
     """CREATE TABLE IF NOT EXISTS vehicle_contract_details (
         registration_number TEXT PRIMARY KEY REFERENCES vehicles(registration_number),
         fuel_technology TEXT NOT NULL,

@@ -1,5 +1,7 @@
 package com.tdt4290group7.backend.admin
 
+import com.tdt4290group7.backend.jdbcUrl
+import com.tdt4290group7.backend.link
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.DriverManager
@@ -54,7 +56,7 @@ class AdminInsightsRepository(databasePath: Path) {
     init {
         val path = databasePath.toAbsolutePath().normalize()
         Files.createDirectories(path.parent)
-        databaseUrl = "jdbc:sqlite:$path"
+        databaseUrl = jdbcUrl(path)
         DriverManager.getConnection(databaseUrl).use { database ->
             database.createStatement().use { statement ->
                 statement.execute(
@@ -64,7 +66,7 @@ class AdminInsightsRepository(databasePath: Path) {
                         description TEXT NOT NULL,
                         severity TEXT NOT NULL,
                         status TEXT NOT NULL,
-                        supplier_id TEXT,
+                        supplier_id TEXT${database.link("suppliers")},
                         category TEXT NOT NULL,
                         finding_type TEXT NOT NULL,
                         source TEXT NOT NULL,
@@ -89,8 +91,8 @@ class AdminInsightsRepository(databasePath: Path) {
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS notifications (
                         id TEXT PRIMARY KEY,
-                        recipient_user_id TEXT NOT NULL,
-                        alert_id TEXT NOT NULL,
+                        recipient_user_id TEXT NOT NULL${database.link("users")},
+                        alert_id TEXT NOT NULL${database.link("admin_alerts")},
                         type TEXT NOT NULL,
                         title TEXT NOT NULL,
                         message TEXT NOT NULL,
@@ -111,22 +113,22 @@ class AdminInsightsRepository(databasePath: Path) {
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_notes (
                         id TEXT PRIMARY KEY,
-                        supplier_id TEXT NOT NULL,
-                        author_id TEXT NOT NULL,
+                        supplier_id TEXT NOT NULL${database.link("suppliers")},
+                        author_id TEXT NOT NULL${database.link("users")},
                         author_name TEXT NOT NULL,
                         visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL')),
                         text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
-                        alert_id TEXT,
+                        alert_id TEXT${database.link("admin_alerts")},
                         created_at TEXT NOT NULL
                     )""".trimIndent(),
                 )
                 statement.execute("CREATE INDEX IF NOT EXISTS idx_supplier_notes_supplier ON supplier_notes(supplier_id, created_at)")
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_review_statuses (
-                        supplier_id TEXT PRIMARY KEY,
+                        supplier_id TEXT PRIMARY KEY${database.link("suppliers")},
                         status TEXT NOT NULL,
                         updated_at TEXT NOT NULL,
-                        updated_by TEXT NOT NULL
+                        updated_by TEXT NOT NULL${database.link("users")}
                     )""".trimIndent(),
                 )
             }
@@ -273,6 +275,15 @@ class AdminInsightsRepository(databasePath: Path) {
             database.prepareStatement("SELECT * FROM admin_alerts WHERE id = ?").use { statement ->
                 statement.setString(1, id)
                 statement.executeQuery().use { rows -> if (rows.next()) rows.toAlert() else null }
+            }
+        }
+
+    /** Includes archived alerts, which findAlert hides. */
+    fun alertExists(id: String): Boolean =
+        DriverManager.getConnection(databaseUrl).use { database ->
+            database.prepareStatement("SELECT 1 FROM admin_alerts WHERE id = ?").use { statement ->
+                statement.setString(1, id)
+                statement.executeQuery().use { it.next() }
             }
         }
 

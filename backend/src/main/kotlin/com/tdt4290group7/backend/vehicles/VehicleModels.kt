@@ -85,7 +85,9 @@ data class TripRowsListResponse(
 )
 
 @Serializable
-data class VehicleCheckRequest(val registrationNumber: String, val forceRefresh: Boolean = false)
+data class VehicleCheckRequest(val registrationNumber: String, val forceRefresh: Boolean = false,
+    /** Which agreement to check a truck against when it is listed under several. */
+    val agreementId: String? = null)
 
 @Serializable
 data class RegistryCode(val code: String, val name: String? = null)
