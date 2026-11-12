@@ -405,7 +405,7 @@ class AdminDashboardRoutesTest {
         // Validation and unknown suppliers.
         assertEquals(HttpStatusCode.BadRequest, post("""{"text":"   "}""").status)
         assertEquals(HttpStatusCode.BadRequest, post("""{"text":"${"x".repeat(2001)}"}""").status)
-        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"SUPPLIER"}""").status)
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"PUBLIC"}""").status)
         assertEquals(HttpStatusCode.NotFound, admin.post("/api/admin/suppliers/unknown/notes") {
             contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""")
         }.status)

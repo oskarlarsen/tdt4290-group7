@@ -37,8 +37,8 @@ export function KpiCard({
   href,
 }: Props) {
   const card = (
-    <div className={`rounded-xl border border-neutral-100 bg-white p-4 ${href ? "hover:border-neutral-300" : ""}`}>
-      <div className="flex items-start justify-between">
+    <div className={`h-full rounded-xl border border-neutral-100 bg-white p-4 ${href ? "hover:border-neutral-300" : ""}`}>
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-mono text-neutral-500">{label}</div>
         {icon && (
           <div className={`rounded-lg p-1.5 ${iconClassName ?? "bg-neutral-50 text-neutral-500"}`}>{icon}</div>
@@ -67,7 +67,7 @@ export function KpiCard({
     <Link
       to={href}
       aria-label={`${label}: ${value}${sublabel ? ` ${sublabel}` : ""}, open list`}
-      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/40"
+      className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/40"
     >
       {card}
     </Link>

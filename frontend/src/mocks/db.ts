@@ -355,10 +355,10 @@ let supplierNotes: SupplierNote[] = readStoredNotes().map((note) => ({
   alertId: note.alertId ?? null,
 }));
 
-// Mirrors the server: SELF notes go to their author only, INTERNAL notes to every admin.
+// Mirrors the server: SELF notes go to their author only, INTERNAL and SUPPLIER notes to every admin.
 export function getNotesForSupplier(supplierId: string, viewerId: string): SupplierNote[] {
   return supplierNotes
-    .filter((n) => n.supplierId === supplierId && (n.visibility === "INTERNAL" || n.authorId === viewerId))
+    .filter((n) => n.supplierId === supplierId && (n.visibility !== "SELF" || n.authorId === viewerId))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 

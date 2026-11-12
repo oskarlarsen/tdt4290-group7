@@ -79,6 +79,7 @@ export type CsvPreview = {
     message: string;
     value: string | null;
   }>;
+  warnings?: string[];
   previewRows: Array<Record<string, string>>;
 };
 

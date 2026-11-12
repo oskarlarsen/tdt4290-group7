@@ -49,6 +49,9 @@ internal class VehicleDatabase(path: Path) {
             "vehicle_checks" to listOf("agreement_saksnr TEXT"),
             // The category (and so the weight class) Statens vegvesen gave when the fuel was filled in at upload.
             "vehicle_contract_details" to listOf("vehicle_category TEXT"),
+            // An admin accepted this unlisted vehicle as a one-off exception; kept on vehicles so Change history can undo it.
+            "vehicles" to listOf("exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1))", "exception_note TEXT", "registry_problem TEXT"),
+            "change_vehicles" to listOf("exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1))", "exception_note TEXT", "registry_problem TEXT"),
             // Who confirmed an upload (SUPPLIER, or ADMIN acting for the supplier), for "last updated".
             "upload_batches" to listOf("committed_by_role TEXT")
         )

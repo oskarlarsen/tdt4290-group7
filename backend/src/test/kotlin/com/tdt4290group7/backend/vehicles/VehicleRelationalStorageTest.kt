@@ -47,7 +47,7 @@ class VehicleRelationalStorageTest {
                         names += rows.getString("name")
                         if (rows.getString("name") == "registration_number") assertEquals(1, rows.getInt("pk"))
                     }
-                    assertEquals(listOf("registration_number", "agreement_id", "planned", "listed", "created_at", "updated_at"), names)
+                    assertEquals(listOf("registration_number", "agreement_id", "planned", "listed", "exception_approved", "registry_problem", "exception_note", "created_at", "updated_at"), names)
                 }
                 statement.executeQuery("SELECT sql FROM sqlite_schema WHERE type = 'table'").use { rows ->
                     while (rows.next()) {

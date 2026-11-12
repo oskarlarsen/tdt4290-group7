@@ -32,6 +32,22 @@ class FleetRepositoryTest {
         assertFailsWith<IllegalArgumentException> { repo.appendTripRows(AppendTripRowsRequest(rows = listOf(syntheticTrip(planned.registrationNumber))), now) }
     }
 
+    @Test fun exceptionForAReportedUnlistedVehicleIsInHistoryAndCanBeUndone() {
+        val repo = repository(); val agreement = agreement(repo)
+        val vehicle = repo.fleet.addVehicle(agreement.id, VehicleEntryInput("AB12345"), actor, now)
+        repo.fleet.removeVehicle(vehicle.registrationNumber, vehicle.updatedAt, actor, now.plusSeconds(1)) // now unlisted
+        assertFailsWith<FleetConflictException> { repo.fleet.approveException("AB12345", null, actor, now.plusSeconds(2)) } // not reported yet
+        repo.database.write { db -> repo.database.insert(db, "vehicle_contract_details", mapOf("registration_number" to "AB12345",
+            "fuel_technology" to "2", "is_hybrid" to 0, "full_contract_coverage" to 1, "updated_at" to "2026-01-01T10:00:00Z")) }
+        repo.fleet.approveException("AB12345", "Fine for the winter period", actor, now.plusSeconds(3))
+        assertTrue(repo.fleet.overview().vehicles.single { it.registrationNumber == "AB12345" }.exceptionApproved)
+        assertEquals("Fine for the winter period", repo.fleet.overview().vehicles.single { it.registrationNumber == "AB12345" }.exceptionNote)
+        val change = repo.fleet.history(1).first()
+        assertEquals("Approved exception for AB12345", change.description)
+        repo.fleet.undo(change.id, actor, now.plusSeconds(4))
+        assertFalse(repo.fleet.overview().vehicles.single { it.registrationNumber == "AB12345" }.exceptionApproved)
+    }
+
     @Test fun lowerAllowanceKeepsVehiclesAndAllowsReplacementButBlocksNewPlaces() {
         val repo = repository(); val agreement = agreement(repo, 1)
         val old = repo.fleet.addVehicle(agreement.id, VehicleEntryInput("AB12345"), actor, now)
@@ -158,6 +174,16 @@ class FleetRepositoryTest {
             repo.fleet.removeSupplier(supplier.id, supplier.updatedAt!!, actor, now.plusSeconds(2))
         }
         assertEquals(before, repo.fleet.overview())
+    }
+
+    @Test fun aRemovedSupplierCanBeAddedBackWithTheSameOrganizationNumber() {
+        val repo = repository()
+        val supplier = repo.fleet.saveSupplier(null, SupplierInput("Old name", "123456789"), actor, now)
+        repo.fleet.removeSupplier(supplier.id, supplier.updatedAt!!, actor, now.plusSeconds(1))
+        val back = repo.fleet.saveSupplier(null, SupplierInput("New name", "123 456 789"), actor, now.plusSeconds(2))
+        assertEquals(supplier.id, back.id)
+        assertEquals("New name", repo.fleet.overview().suppliers.single().name)
+        assertFailsWith<FleetConflictException> { repo.fleet.saveSupplier(null, SupplierInput("Duplicate", "123456789"), actor, now.plusSeconds(3)) }
     }
 
     @Test fun supplierEditsCanBeUndoneUnlessTheirPreviousOrganizationNumberWasReused() {

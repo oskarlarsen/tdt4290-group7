@@ -182,3 +182,29 @@ export function VehicleEntryForm({ agreementId, replacing, onClose, onSaved }: {
     </ConfirmAction>}
   </>;
 }
+
+/** Admin pastes or loads the supplier's approved-vehicle list; every plate is checked with Statens vegvesen as it is added. */
+export function BulkVehicleForm({ agreementId, onClose, onSaved }: { agreementId: string; onClose: () => void; onSaved: () => void }) {
+  const [text, setText] = useState("");
+  // shortcut: reads plain text/CSV only, so an Excel file must be saved as CSV first; add xlsx parsing if admins ask.
+  const plates = [...new Set(text.toUpperCase().replace(/\s/g, "").match(/[A-Z]{2}[1-9][0-9]{3,4}/g) ?? [])];
+  const save = useMutation({ mutationFn: () => api.addVehiclesBulk(agreementId, plates), onSuccess: result => { if (!result.failed.length) onSaved(); }, retry: false });
+  const failed = save.data?.failed ?? [];
+  return <VehicleDialog title="Add several vehicles" onClose={onClose} busy={save.isPending}>
+    <form className="space-y-4" onSubmit={(e: FormEvent) => { e.preventDefault(); if (plates.length && !save.isPending) save.mutate(); }}>
+      <Field label="Registration numbers (paste, or load a .csv/.txt file)">
+        <textarea rows={6} className={`${inputClass} font-mono`} value={text} disabled={save.isPending} onChange={e => { setText(e.target.value); save.reset(); }} />
+      </Field>
+      <input type="file" accept=".csv,.txt" disabled={save.isPending} className="block w-full text-sm text-neutral-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-neutral-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-800 hover:file:bg-neutral-50" onChange={async e => { const file = e.target.files?.[0]; if (file) { setText(await file.text()); save.reset(); } }} />
+      <p className="text-sm text-neutral-500">{plates.length} registration number{plates.length === 1 ? "" : "s"} found{plates.length > 200 ? " (max 200 at a time)" : ""}.</p>
+      {save.isPending && <p role="status" className="text-sm text-neutral-500">Checking with Statens vegvesen…</p>}
+      {save.data && <p role="status" className="text-sm">Added {save.data.added.length}.</p>}
+      {failed.length > 0 && <ul className="space-y-1 text-sm text-red-700">{failed.map(f => <li key={f.registrationNumber}><span className="font-mono">{f.registrationNumber}</span>: {f.reason}</li>)}</ul>}
+      <ErrorNotice error={save.error} />
+      <footer className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
+        <button type="button" className={buttonClass} disabled={save.isPending} onClick={failed.length ? onSaved : onClose}>{failed.length ? "Done" : "Cancel"}</button>
+        {!save.data && <button className={primaryClass} disabled={save.isPending || !plates.length || plates.length > 200}>{save.isPending ? "Adding…" : "Add vehicles"}</button>}
+      </footer>
+    </form>
+  </VehicleDialog>;
+}

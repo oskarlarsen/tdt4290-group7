@@ -63,7 +63,7 @@ fun Application.configureRouting(
         authenticate(AUTH_JWT) {
             if (repository is VehicleRepository) {
                 repository.onboarding.attachCertificateRepository(certificateRepository)
-                fleetRoutes(repository.fleet, registryLookup)
+                fleetRoutes(repository.fleet, registryLookup, checks)
                 onboardingRoutes(repository.onboarding, certificateRepository, registryLookup)
                 if (certificateRepository != null && adminInsightsRepository != null) {
                     adminDashboardRoutes(repository.fleet, repository, certificateRepository, adminInsightsRepository)

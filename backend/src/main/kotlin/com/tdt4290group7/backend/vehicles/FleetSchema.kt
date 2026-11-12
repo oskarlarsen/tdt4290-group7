@@ -17,6 +17,9 @@ private fun vehicleColumns(references: Boolean) = """
     agreement_id TEXT ${if (references) "REFERENCES agreements(id)" else ""},
     planned INTEGER NOT NULL DEFAULT 0 CHECK(planned IN (0,1)),
     listed INTEGER NOT NULL DEFAULT 0 CHECK(listed IN (0,1)),
+    exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1)),
+    registry_problem TEXT CHECK(registry_problem IS NULL OR registry_problem IN ('NOT_FOUND','UNAVAILABLE')),
+    exception_note TEXT CHECK(exception_note IS NULL OR length(exception_note) <= 500),
     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
     CHECK(listed = 0 OR agreement_id IS NOT NULL),
     CHECK((planned = 1 AND registration_number GLOB 'PLAN*') OR

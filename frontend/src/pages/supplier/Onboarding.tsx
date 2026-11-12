@@ -505,6 +505,11 @@ export default function Onboarding() {
             <p className="mt-1 text-sm text-neutral-500">
               Complete the required details in the form. The system will validate and process your submission automatically.
             </p>
+            {entity === "vehicles" && (
+              <p className="mt-1 text-sm text-neutral-500">
+                Only add vehicles you have actually used. Your approved list is already registered; vehicles that are not on it are checked with Statens vegvesen.
+              </p>
+            )}
           </div>
           <Boxes className="hidden h-5 w-5 text-primary-700 sm:block" aria-hidden="true" />
         </div>
@@ -568,6 +573,7 @@ export default function Onboarding() {
                 working={working}
                 onPreview={handlePreview}
                 onChange={handleFormChange}
+                unchecked={(previews.form?.previewRows ?? []).filter((row) => row.registry_status === "NOT_CHECKED").map((row) => row.registration_number)}
               />
             )}
 
@@ -624,6 +630,8 @@ export default function Onboarding() {
                 <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">Fix errors to import</span>
               )}
             </div>
+
+            {preview.warnings?.map((warning) => <p key={warning} role="status" className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{warning}</p>)}
 
             {preview.errors.length > 0 && (
               <div className="mt-4 overflow-x-auto rounded-lg border border-red-100">

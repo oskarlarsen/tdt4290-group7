@@ -16,3 +16,9 @@ export type SupplierAlert = {
 export function getSupplierAlerts(category?: AlertCategory): Promise<SupplierAlert[]> {
   return apiFetch<SupplierAlert[]>(category ? `/supplier/alerts?category=${encodeURIComponent(category)}` : "/supplier/alerts");
 }
+
+export type SupplierNoteView = { id: string; text: string; createdAt: string };
+
+export function getSupplierNotes(): Promise<SupplierNoteView[]> {
+  return apiFetch<SupplierNoteView[]>("/supplier/notes");
+}

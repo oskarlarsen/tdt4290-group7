@@ -26,6 +26,8 @@ type Props = {
   onClose: () => void;
 };
 
+const NOTE_LABELS: Record<NoteVisibility, string> = { SELF: "Note to self", INTERNAL: "Internal note", SUPPLIER: "Note to supplier" };
+
 export function SupplierDetailsDrawer({
   supplier,
   alerts,
@@ -178,7 +180,7 @@ export function SupplierDetailsDrawer({
                         <span className="text-xs font-medium text-neutral-700">
                           {note.authorName}
                           <span className="ml-2 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-normal text-neutral-600">
-                            {note.visibility === "SELF" ? "Note to self" : "Internal note"}
+                            {NOTE_LABELS[note.visibility]}
                           </span>
                         </span>
                         <span className="font-mono text-[11px] text-neutral-500">
@@ -199,14 +201,18 @@ export function SupplierDetailsDrawer({
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-700">
                     <label className="flex items-center gap-1.5">
                       <input type="radio" name="note-visibility" checked={visibility === "SELF"} onChange={() => setVisibility("SELF")} />
-                      Note to self
+                      Note to self (only you)
                     </label>
                     <label className="flex items-center gap-1.5">
                       <input type="radio" name="note-visibility" checked={visibility === "INTERNAL"} onChange={() => setVisibility("INTERNAL")} />
-                      Internal note
+                      Internal note (all admins)
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "SUPPLIER"} onChange={() => setVisibility("SUPPLIER")} />
+                      Note to supplier
                     </label>
                   </div>
-                  <p className="mt-1 text-xs text-neutral-500">Notes are never shown to the supplier.</p>
+                  <p className="mt-1 text-xs text-neutral-500">{visibility === "SUPPLIER" ? "The supplier will see this note." : "The supplier will not see this note."}</p>
                 </fieldset>
                 <div className="mt-2 flex gap-2">
                   <textarea

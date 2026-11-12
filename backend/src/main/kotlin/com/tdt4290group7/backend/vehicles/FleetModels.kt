@@ -56,6 +56,18 @@ internal fun VehicleEntryInput.validatedRegistrationNumber(): String? {
 }
 
 @Serializable
+data class ExceptionRequest(val note: String? = null)
+
+@Serializable
+data class BulkVehicleRequest(val registrationNumbers: List<String>)
+
+@Serializable
+data class BulkVehicleFailure(val registrationNumber: String, val reason: String)
+
+@Serializable
+data class BulkVehicleResult(val added: List<String>, val failed: List<BulkVehicleFailure>)
+
+@Serializable
 data class VehicleChangeRequest(val expectedUpdatedAt: String)
 
 @Serializable

@@ -31,7 +31,7 @@ const day = (offset) => new Date(Date.now() + offset * 86_400_000).toISOString()
 // start/end are days from today; the mix covers active, expiring soon and expired agreements.
 const SUPPLIERS = [
   { name: "Nordic Transport AS", org: "912345671", start: -300, end: 700, vehicles: 6, planned: 2, flags: [true, false, false] },
-  { name: "Trondheim Renovasjon AS", org: "912345672", start: -200, end: 60, vehicles: 4, planned: 1, flags: [true, true, false] },
+  { name: "Trondheim Renovasjon AS", org: "912345672", start: -200, end: 60, vehicles: 4, planned: 0, flags: [true, true, false] },
   { name: "Fjord Buss og Taxi AS", org: "912345673", start: -400, end: 20, vehicles: 8, planned: 0, flags: [true, false, false] },
   { name: "Midtnorsk Bygg AS", org: "912345674", start: -90, end: 900, vehicles: 5, planned: 3, flags: [true, true, true] },
   { name: "Grønn Logistikk AS", org: "912345675", start: -500, end: -10, vehicles: 3, planned: 0, flags: [true, false, false] },
@@ -54,6 +54,15 @@ const ALERTS = [
   [5, "Renewable share below requirement", "ENERGY_FUEL", "medium", "CONFIRMED_DEVIATION", "Reported energy use is below the agreed renewable share."],
 ];
 
+// The admin's approved list: being on it is what approves a vehicle. Registry details are fetched when a key is
+// configured; without one the plates are still added. Reg.nrs are made up.
+const APPROVED = [[0, ["AB12345", "AB12346", "AB12347"]], [1, ["CD23451", "CD23452", "CD23453", "CD23454"]]];
+// Vehicles the supplier reports as used. Plates on the list are approved; the others are deviations.
+// The second supplier reports 5 vehicles against a maximum of 4.
+const REPORTED = [[0, ["AB12345", "AB12346", "AB12399"]], [1, ["CD23451", "CD23452", "CD23453", "CD23454", "CD23455"]]];
+// Reported vehicles not on the list that the admin has approved as one-off exceptions, with a note for the supplier.
+const EXCEPTIONS = [["CD23455", "Approved for the winter period while the new vehicles are delivered."]];
+
 await api("/auth/login", { json: { email: "advisor.hansen@kommune.no", password } });
 const fleet = await api("/vehicle-fleet");
 const ids = [];
@@ -70,6 +79,22 @@ for (const [index, s] of SUPPLIERS.entries()) {
   console.log(`+ ${s.name}`);
 }
 
+for (const [index, plates] of APPROVED) {
+  if (ids[index].existed) continue;
+  for (const registrationNumber of plates) await api(`/vehicle-fleet/agreements/${ids[index].agreement}/vehicles`, { json: { registrationNumber } });
+}
+for (const [index, plates] of REPORTED) {
+  const target = ids[index];
+  if (target.existed || !target.agreement) continue;
+  const csv = ["agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes",
+    ...plates.map((plate) => `${target.agreement},${plate},FALSE,2,FALSE,TRUE,,,,Demo`)].join("\n");
+  const form = new FormData();
+  form.append("file", new Blob([csv], { type: "text/csv" }), "vehicles.csv");
+  const preview = await api(`/onboarding/upload/vehicles/preview?supplierId=${target.supplier}`, { form }).catch((e) => console.warn(`  reported vehicles: ${e.message}`));
+  if (preview?.canCommit) await api(`/onboarding/upload/vehicles/confirm?supplierId=${target.supplier}`, { json: { batchId: preview.batchId } });
+  else if (preview) console.warn(`  reported vehicles not imported: ${JSON.stringify(preview.errors.slice(0, 2))}`);
+}
+for (const [plate, note] of EXCEPTIONS) await api(`/vehicle-fleet/vehicles/${plate}/exception`, { json: { note } }).catch((e) => console.warn(`  exception ${plate}: ${e.message}`));
 for (const [index, file] of CERTIFICATES) {
   const target = ids[index];
   if (target.existed || !target.agreement) continue;

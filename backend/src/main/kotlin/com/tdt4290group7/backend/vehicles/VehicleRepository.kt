@@ -21,6 +21,8 @@ interface VehicleStore {
     fun findCheck(id: String): VehicleCheckResponse?
     fun vehicleDetails(registrationNumber: String): VehicleDetailsResponse?
     fun checkHistory(registrationNumber: String, page: Int, pageSize: Int): VehicleHistoryResponse?
+    /** True when an admin approved this unlisted vehicle as a one-off exception. */
+    fun exceptionApproved(registrationNumber: String): Boolean = false
 }
 private val timestampFormat = DateTimeFormatterBuilder().appendInstant(9).toFormatter()
 internal fun Instant.storageTimestamp(): String = timestampFormat.format(this)
@@ -46,6 +48,10 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
                 parameters + listOf(pageSize, (page.toLong() - 1) * pageSize), ::tripFrom)
             TripRowsListResponse(items, total, page, pageSize)
         }
+    }
+
+    override fun exceptionApproved(registrationNumber: String) = readTransaction { db ->
+        query(db, "SELECT 1 FROM vehicles WHERE registration_number = ? AND exception_approved = 1", listOf(registrationNumber)) { it.getInt(1) }.isNotEmpty()
     }
 
     override fun vehicleDetails(registrationNumber: String): VehicleDetailsResponse? = readTransaction { db ->

@@ -107,19 +107,39 @@ class AdminInsightsRepository(databasePath: Path) {
                         value TEXT NOT NULL
                     )""".trimIndent(),
                 )
-                // Admin-only notes. SELF notes are returned to their author only, INTERNAL notes to every admin.
+                // Admin-only notes. SELF notes are returned to their author only, INTERNAL notes to every admin, SUPPLIER notes to every admin and the supplier.
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_notes (
                         id TEXT PRIMARY KEY,
                         supplier_id TEXT NOT NULL,
                         author_id TEXT NOT NULL,
                         author_name TEXT NOT NULL,
-                        visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL')),
+                        visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL','SUPPLIER')),
                         text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
                         alert_id TEXT,
                         created_at TEXT NOT NULL
                     )""".trimIndent(),
                 )
+                // Databases made before SUPPLIER notes have the old CHECK; SQLite cannot alter it, so rebuild the table.
+                val oldCheck = statement.executeQuery("SELECT sql FROM sqlite_master WHERE name = 'supplier_notes'").use { it.next() && !it.getString(1).contains("'SUPPLIER'") }
+                if (oldCheck) {
+                    statement.execute("ALTER TABLE supplier_notes RENAME TO supplier_notes_old")
+                    statement.execute("DROP INDEX IF EXISTS idx_supplier_notes_supplier")
+                    statement.execute(
+                        """CREATE TABLE supplier_notes (
+                            id TEXT PRIMARY KEY,
+                            supplier_id TEXT NOT NULL,
+                            author_id TEXT NOT NULL,
+                            author_name TEXT NOT NULL,
+                            visibility TEXT NOT NULL CHECK(visibility IN ('SELF','INTERNAL','SUPPLIER')),
+                            text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 2000),
+                            alert_id TEXT,
+                            created_at TEXT NOT NULL
+                        )""".trimIndent(),
+                    )
+                    statement.execute("INSERT INTO supplier_notes SELECT id, supplier_id, author_id, author_name, visibility, text, alert_id, created_at FROM supplier_notes_old")
+                    statement.execute("DROP TABLE supplier_notes_old")
+                }
                 statement.execute("CREATE INDEX IF NOT EXISTS idx_supplier_notes_supplier ON supplier_notes(supplier_id, created_at)")
                 statement.execute(
                     """CREATE TABLE IF NOT EXISTS supplier_review_statuses (
@@ -437,7 +457,7 @@ class AdminInsightsRepository(databasePath: Path) {
             database.prepareStatement(
                 """SELECT id, supplier_id, author_id, author_name, visibility, text, alert_id, created_at
                     FROM supplier_notes
-                    WHERE supplier_id = ? AND (visibility = 'INTERNAL' OR author_id = ?)
+                    WHERE supplier_id = ? AND (visibility IN ('INTERNAL','SUPPLIER') OR author_id = ?)
                     ORDER BY created_at DESC, rowid DESC""".trimIndent(),
             ).use { statement ->
                 statement.setString(1, supplierId)
@@ -460,6 +480,9 @@ class AdminInsightsRepository(databasePath: Path) {
                 }
             }
         }
+
+    fun supplierVisibleNotes(supplierId: String): List<SupplierNoteRecord> =
+        notesFor(supplierId, "").filter { it.visibility == "SUPPLIER" }
 
     fun addNote(
         supplierId: String,

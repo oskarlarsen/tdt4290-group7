@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { CsvUploadPanel } from "./CsvUploadPanel";
 import type { SupplierOverview } from "../../types/onboarding";
@@ -16,10 +16,18 @@ type Props = {
   onChange: () => void;
   /** Which way of entering vehicles is showing: the form, or a CSV file. */
   mode: "form" | "csv";
+  /** Plates the automatic fuel lookup could not answer for in the latest review; only these ask for fuel. */
+  unchecked?: string[];
 };
 
-export function SupplierVehicleEntryForm({ agreements, working, onPreview, onChange, mode }: Props) {
+export function SupplierVehicleEntryForm({ agreements, working, onPreview, onChange, mode, unchecked = [] }: Props) {
   const [rows, setRows] = useState<VehicleFormRow[]>([createVehicleFormRow()]);
+  // Kept after the review is cleared by an edit, so the fuel field does not vanish while the supplier fills it in.
+  const [needsFuel, setNeedsFuel] = useState<string[]>([]);
+  useEffect(() => {
+    if (unchecked.length) setNeedsFuel((current) => [...new Set([...current, ...unchecked])]);
+  }, [unchecked.join(",")]);
+  const asksFuel = (row: VehicleFormRow) => row.isPlanned === true || needsFuel.includes(row.registrationNumber.trim());
 
   function updateRow(id: string, patch: Partial<VehicleFormRow>) {
     onChange();
@@ -46,8 +54,8 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
     row.agreementId &&
     (row.isPlanned === true || row.registrationNumber.trim()) &&
     row.isPlanned !== null &&
-    // A registered vehicle's fuel is checked with Statens vegvesen; a planned one has no plate, so it needs a fuel.
-    (row.isPlanned === false || row.fuelTechnology) &&
+    // Fuel is looked up for a registered vehicle; a planned one has no plate, and one the lookup missed needs it too.
+    (!asksFuel(row) || row.fuelTechnology) &&
     row.fullContractCoverage !== null &&
     (row.fullContractCoverage || (row.startYearWeek.trim() && row.endYearWeek.trim()))
   );
@@ -122,25 +130,27 @@ export function SupplierVehicleEntryForm({ agreements, working, onPreview, onCha
                   className={fieldClass}
                   required={row.isPlanned === false}
                 />
-                <span className="mt-1 block text-xs font-normal text-neutral-500">We look up the vehicle with Statens vegvesen, so you do not need to fill in fuel.</span>
               </label>
             )}
 
-            <label className="block text-sm font-medium text-neutral-700">
-              Fuel or propulsion {row.isPlanned !== true && <span className="font-normal text-neutral-500">(optional: we check it for you)</span>}
-              <select
-                value={row.fuelTechnology}
-                onChange={(event) => updateRow(row.id, { fuelTechnology: event.target.value })}
-                disabled={working}
-                className={fieldClass}
-                required={row.isPlanned === true}
-              >
-                <option value="">{row.isPlanned === true ? "Choose fuel or propulsion" : "Let Statens vegvesen decide"}</option>
-                {Object.entries(FUEL_TECHNOLOGIES).map(([code, label]) => (
-                  <option key={code} value={code}>{label}</option>
-                ))}
-              </select>
-            </label>
+            {asksFuel(row) && (
+              <label className="block text-sm font-medium text-neutral-700">
+                Fuel or propulsion
+                <select
+                  value={row.fuelTechnology}
+                  onChange={(event) => updateRow(row.id, { fuelTechnology: event.target.value })}
+                  disabled={working}
+                  className={fieldClass}
+                  required
+                >
+                  <option value="">Choose fuel or propulsion</option>
+                  {Object.entries(FUEL_TECHNOLOGIES).map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+                {row.isPlanned !== true && <span className="mt-1 block text-xs font-normal text-neutral-500">We could not fetch the fuel type automatically. Please choose it here.</span>}
+              </label>
+            )}
 
             <BooleanSelect
               label="Will it be used for the whole agreement period?"

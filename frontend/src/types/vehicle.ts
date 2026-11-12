@@ -2,7 +2,7 @@
 import type { BodyType, FuelTechnology, VehicleCategory } from "../utils/vehicleCatalog";
 export type Decimal = string;
 export type DataSource = "LIVE" | "CACHE" | "STALE_CACHE" | "UNAVAILABLE";
-export type Vehicle = { registrationNumber: string; createdAt: string; agreementId: string | null; planned: boolean; listed: boolean; updatedAt: string };
+export type Vehicle = { registrationNumber: string; createdAt: string; agreementId: string | null; planned: boolean; listed: boolean; updatedAt: string; reported?: boolean; registryChecked?: boolean; registryProblem?: "NOT_FOUND" | "UNAVAILABLE" | null; exceptionApproved?: boolean; exceptionNote?: string | null };
 export type FleetSupplier = { id: string; name: string; orgNumber: string; active: boolean; updatedAt: string | null };
 export type AgreementInput = {
   supplierId: string;

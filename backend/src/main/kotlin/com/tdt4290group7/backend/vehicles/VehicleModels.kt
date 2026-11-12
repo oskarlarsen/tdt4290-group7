@@ -14,6 +14,15 @@ data class Vehicle(
     val planned: Boolean = false,
     val listed: Boolean = false,
     val updatedAt: String = createdAt,
+    /** The supplier has reported using this vehicle. */
+    val reported: Boolean = false,
+    /** False when no Statens vegvesen data is stored for the vehicle (not checked yet, or the service was unavailable). */
+    val registryChecked: Boolean = true,
+    /** Why no registry data is stored: NOT_FOUND (plate unknown to Statens vegvesen) or UNAVAILABLE (service down). Null when checked. */
+    val registryProblem: String? = null,
+    /** Not on the approved list, but the admin approved it as a one-off exception. */
+    val exceptionApproved: Boolean = false,
+    val exceptionNote: String? = null,
 )
 
 /** Supplier observations for a period, not one individual journey or unique vehicle. */

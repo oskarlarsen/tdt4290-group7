@@ -37,7 +37,7 @@ private val ALERT_CATEGORIES = setOf("ENVIRONMENTAL_COMPLIANCE", "ENERGY_FUEL", 
 private val ALERT_FINDING_TYPES = setOf("CONFIRMED_DEVIATION", "MISSING_DOCUMENTATION", "UPCOMING_EXPIRY")
 private val ALERT_STATUSES = setOf("OPEN", "IN_PROGRESS", "UNDER_REVIEW", "RESOLVED")
 private val SUPPLIER_REVIEW_STATUSES = setOf("to-review", "in-progress", "resolved")
-private val NOTE_VISIBILITIES = setOf("SELF", "INTERNAL")
+private val NOTE_VISIBILITIES = setOf("SELF", "INTERNAL", "SUPPLIER")
 
 @Serializable
 data class DashboardKpis(
@@ -167,6 +167,10 @@ data class SupplierAlert(
     val createdAt: String,
 )
 
+/** What a supplier sees of a note addressed to them: no author or alert link. */
+@Serializable
+data class SupplierNoteView(val id: String, val text: String, val createdAt: String)
+
 @Serializable
 data class Notification(
     val id: String,
@@ -289,6 +293,13 @@ fun Route.adminDashboardRoutes(
                     )
                 },
         )
+    }
+
+    get("/api/supplier/notes") {
+        val user = call.signedInUser() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        val supplierId = user.supplierId?.takeIf { user.role == com.tdt4290group7.backend.model.Role.SUPPLIER }
+            ?: return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Supplier access required"))
+        call.respond(insights.supplierVisibleNotes(supplierId).map { SupplierNoteView(it.id, it.text, it.createdAt) })
     }
 
     get("/api/notifications") {
