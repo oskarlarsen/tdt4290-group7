@@ -18,7 +18,7 @@ export function CertificateTable({
   onArchive,
   onRestore,
   onRenew,
-  emptyMessage = "No certificates to show.",
+  emptyMessage = "Ingen sertifikater å vise.",
 }: {
   rows: CertificateRow[];
   onSelect: (row: CertificateRow) => void;
@@ -38,12 +38,12 @@ export function CertificateTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Standard &amp; certificate</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Valid until</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Leverandør og org.nr.</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Standard og sertifikat</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Avtale</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Gyldig til</th>
             <th scope="col" className="pb-2 pr-3 font-medium">Status</th>
-            <th scope="col" className="pb-2 font-medium">Actions</th>
+            <th scope="col" className="pb-2 font-medium">Handlinger</th>
           </tr>
         </thead>
         <tbody>
@@ -63,7 +63,7 @@ export function CertificateTable({
                       )}
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-500">Contract not found</span>
+                    <span className="text-xs text-neutral-500">Avtale ikke funnet</span>
                   )}
                 </td>
                 <td className="py-3 pr-3">
@@ -71,10 +71,10 @@ export function CertificateTable({
                     {CERTIFICATE_STANDARD_LABELS[certificate.standard]}
                   </div>
                   <div className="font-mono text-xs text-neutral-500">
-                    {certificate.certificateNumber ?? "Not extracted"}
+                    {certificate.certificateNumber ?? "Ingen nummer registrert"}
                   </div>
                 </td>
-                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "Not linked"}</td>
+                <td className="py-3 pr-3 text-neutral-700">{contract?.contractName ?? "Ikke tilknyttet"}</td>
                 <td
                   className={`whitespace-nowrap py-3 pr-3 ${
                     info.status === "expired" ? "font-semibold text-red-700" : "text-neutral-700"
@@ -86,27 +86,27 @@ export function CertificateTable({
                   <StatusBadge status={info.tone} label={info.label} />
                 </td>
                 <td className="py-3">
-                  <div className="flex flex-wrap items-center gap-1">
+                  <div className="flex flex-nowrap items-center gap-1 whitespace-nowrap">
                     <button
                       onClick={() => onSelect(row)}
                       className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                     >
-                      View details
+                      Vis detaljer
                     </button>
                     {onRenew && certificate.contractId && !certificate.archivedAt && info.group !== "valid" && (
                       <button
                         type="button"
                         onClick={() => onRenew(certificate)}
-                        aria-label={`Renew ${certificate.supplierName ?? "certificate"}`}
+                        aria-label={`Forny ${certificate.supplierName ?? "sertifikat"}`}
                         className="rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                       >
-                        Renew
+                        Forny
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => onEdit(certificate)}
-                      aria-label={`Edit ${certificate.supplierName ?? "certificate"}`}
+                      aria-label={`Rediger ${certificate.supplierName ?? "sertifikat"}`}
                       className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -115,7 +115,7 @@ export function CertificateTable({
                       <button
                         type="button"
                         onClick={() => onRestore(certificate)}
-                        aria-label={`Restore ${certificate.supplierName ?? "certificate"}`}
+                        aria-label={`Gjenopprett ${certificate.supplierName ?? "sertifikat"}`}
                         className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
                       >
                         <ArchiveRestore className="h-3.5 w-3.5" />
@@ -124,7 +124,7 @@ export function CertificateTable({
                       <button
                         type="button"
                         onClick={() => onArchive(certificate)}
-                        aria-label={`Archive ${certificate.supplierName ?? "certificate"}`}
+                        aria-label={`Arkiver ${certificate.supplierName ?? "sertifikat"}`}
                         className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
                       >
                         <Archive className="h-3.5 w-3.5" />

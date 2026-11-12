@@ -30,10 +30,10 @@ describe("supplier dashboard issue tiles", () => {
     ];
     render(<MemoryRouter><Dashboard /></MemoryRouter>);
 
-    const certificates = await waitFor(() => screen.getByRole("link", { name: /Certificates/ }));
+    const certificates = await waitFor(() => screen.getByRole("link", { name: /Sertifikater/ }));
     expect(certificates.textContent).toContain("2");
     expect(certificates.getAttribute("href")).toBe("/supplier/alerts?category=CERTIFICATES");
-    expect(screen.getByRole("link", { name: /Energy & fuel/ }).textContent).toContain("1");
-    expect(screen.getByRole("link", { name: /Vehicle compliance/ }).textContent).toContain("0");
+    expect(screen.getByRole("link", { name: /Energi/ }).textContent).toContain("1");
+    expect(screen.getByRole("link", { name: /Kjøretøyoppfølging/ }).textContent).toContain("0");
   });
 });

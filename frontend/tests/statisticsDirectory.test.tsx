@@ -15,23 +15,23 @@ const row: TripRow = {
 describe("statistics directory", () => {
   it("displays each appended row separately with exact values and reporting periods", () => {
     const html = renderToStaticMarkup(<StatisticsTable rows={[row, { ...row, id: "second-row" }]} onSelect={() => {}} />);
-    expect(html).toContain("Estimated CO₂");
+    expect(html).toContain("Estimert CO₂");
     expect(html.match(/123\.456789012345678/g)).toHaveLength(2);
-    expect(html.match(/View details for AB12345/g)).toHaveLength(2);
+    expect(html.match(/Vis detaljer for AB12345/g)).toHaveLength(2);
     expect(html).toContain("2026-01-01"); expect(html).toContain("2026-01-31");
   });
   it("shows zero separately from not-applicable litres in read-only row details", () => {
     const electric = { ...row, estimatedCo2Kg: null, data: { ...row.data, fuelTechnology: "5" as const, co2GramsPerKm: null, totalNoxRegisteredGrams: null, totalKmCo2Registered: null, totalKmNoxRegistered: null } };
     const html = renderToStaticMarkup(<StatisticsRowDetails row={electric} onClose={() => {}} onOpenVehicle={() => {}} />);
-    expect(html).toContain("Not applicable"); expect(html).toContain("Estimated CO₂");
-    expect(html).toContain("5 - Electric"); expect(html).toContain("Open vehicle");
-    expect(html).not.toContain("<input"); expect(html).toContain("Additional details");
+    expect(html).toContain("Ikke relevant"); expect(html).toContain("Estimert CO₂");
+    expect(html).toContain("5 - Elektrisk"); expect(html).toContain("Åpne kjøretøy");
+    expect(html).not.toContain("<input"); expect(html).toContain("Flere detaljer");
   });
   it("keeps the overview focused on suppliers with statistics and history collapsed", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><MemoryRouter><Vehicles /></MemoryRouter></QueryClientProvider>);
-    expect(html).toContain("Find supplier, organization number or vehicle");
-    expect(html).toContain("Reported data"); expect(html).toContain("Change history");
-    expect(html).toContain('href="/admin/suppliers"'); expect(html).not.toContain("Add supplier"); expect(html).not.toContain("coming soon");
+    expect(html).toContain("Finn leverandør, organisasjonsnummer eller kjøretøy");
+    expect(html).toContain("Rapporterte data"); expect(html).toContain("Endringshistorikk");
+    expect(html).toContain('href="/admin/suppliers"'); expect(html).not.toContain("Legg til leverandør"); expect(html).not.toContain("coming soon");
     expect(html).not.toContain("Add approval period");
   });
 });

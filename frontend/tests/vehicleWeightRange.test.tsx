@@ -7,14 +7,15 @@ const workspace = vi.hoisted(() => ({ data: undefined as unknown }));
 vi.mock("../src/hooks/useMySupplierOverview", () => ({
   useMySupplierOverview: () => ({ data: workspace.data, isLoading: false, isError: false, error: null }),
 }));
+import { MemoryRouter } from "react-router-dom";
 import MyVehicles from "../src/pages/supplier/MyVehicles";
 
 afterEach(cleanup);
 
 describe("vehicleWeightRange", () => {
   it("gives a weight range for each weight class and none for cars or unknown categories", () => {
-    expect(vehicleWeightRange("N2")).toBe("3,500 to 12,000 kg");
-    expect(vehicleWeightRange("M3")).toBe("over 5,000 kg");
+    expect(vehicleWeightRange("N2")).toBe("3 500 til 12 000 kg");
+    expect(vehicleWeightRange("M3")).toBe("over 5 000 kg");
     expect(vehicleWeightRange("M1")).toBeNull();
     expect(vehicleWeightRange("ZZ")).toBeNull();
     expect(vehicleWeightRange(null)).toBeNull();
@@ -39,9 +40,9 @@ describe("My Vehicles", () => {
         { registrationNumber: "CD12346", planned: false, listed: true, fuelTechnology: null, vehicleCategory: null },
       ],
     };
-    render(<MyVehicles />);
+    render(<MemoryRouter><MyVehicles /></MemoryRouter>);
     expect(screen.getByText("Diesel")).toBeTruthy();
-    expect(screen.getByText("3,500 to 12,000 kg")).toBeTruthy();
+    expect(screen.getByText(/3.500 til 12.000 kg/)).toBeTruthy();
     expect(screen.getAllByText("—")).toHaveLength(2);
   });
 });

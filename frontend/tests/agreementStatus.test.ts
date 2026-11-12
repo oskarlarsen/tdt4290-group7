@@ -37,17 +37,17 @@ describe("agreementStatusText", () => {
   const today = new Date(2026, 9, 1);
 
   it("gives the date that explains each status", () => {
-    expect(agreementStatusText({ ...agreement, startDate: "2026-10-02" }, today)).toBe(`Starts on ${formatDate("2026-10-02")}`);
-    expect(agreementStatusText(agreement, today)).toBe(`Expires on ${formatDate("2027-01-01")}`);
-    expect(agreementStatusText({ ...agreement, endDate: "2026-11-15" }, today)).toBe(`Expires on ${formatDate("2026-11-15")}`);
-    expect(agreementStatusText({ ...agreement, endDate: "2026-09-30" }, today)).toBe(`Expired on ${formatDate("2026-09-30")}`);
+    expect(agreementStatusText({ ...agreement, startDate: "2026-10-02" }, today)).toBe(`Starter ${formatDate("2026-10-02")}`);
+    expect(agreementStatusText(agreement, today)).toBe(`Utløper ${formatDate("2027-01-01")}`);
+    expect(agreementStatusText({ ...agreement, endDate: "2026-11-15" }, today)).toBe(`Utløper ${formatDate("2026-11-15")}`);
+    expect(agreementStatusText({ ...agreement, endDate: "2026-09-30" }, today)).toBe(`Utløpt ${formatDate("2026-09-30")}`);
   });
 
   it("reads an end date of today as expiring, not expired", () => {
-    expect(agreementStatusText({ ...agreement, endDate: "2026-10-01" }, today)).toBe(`Expires on ${formatDate("2026-10-01")}`);
+    expect(agreementStatusText({ ...agreement, endDate: "2026-10-01" }, today)).toBe(`Utløper ${formatDate("2026-10-01")}`);
   });
 
   it("does not claim a date for an inactive agreement", () => {
-    expect(agreementStatusText({ ...agreement, active: false }, today)).toBe("Removed");
+    expect(agreementStatusText({ ...agreement, active: false }, today)).toBe("Fjernet");
   });
 });

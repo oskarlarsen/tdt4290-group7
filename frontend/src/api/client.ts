@@ -1,4 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+export const API_BASE_URL = BASE_URL;
 
 // Notify AuthContext when the session becomes invalid
 export const SESSION_EXPIRED_EVENT = "auth:session-expired";
@@ -70,12 +71,12 @@ export async function apiFetch<T>(
   if (res.status === 401) {
     // Handle an invalid or expired session reported by the backend
     if (notifySessionExpired) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
-    throw new Error("Session expired");
+    throw new Error("Økten er utløpt");
   }
 
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: unknown; error?: unknown } | null;
-    const message = typeof body?.message === "string" ? body.message : typeof body?.error === "string" ? body.error : `API error ${res.status}`;
+    const message = typeof body?.message === "string" ? body.message : typeof body?.error === "string" ? body.error : `API-feil ${res.status}`;
     throw new ApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;

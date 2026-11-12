@@ -31,7 +31,7 @@ class CsvStreamParserTest {
             "AGR-1,SV12345,FALSE,WARP,FALSE,TRUE,,,,"
         val result = CsvStreamParser.parseAndValidate(ByteArrayInputStream(csv.toByteArray(StandardCharsets.UTF_8)), BatchEntityType.VEHICLES, setOf("AGR-1"))
 
-        assertTrue(result.errors.any { it.column == "fuel_technology" && it.message.contains("fuel code") })
+        assertTrue(result.errors.any { it.column == "fuel_technology" && it.message.contains("drivstoffkode") })
     }
 
     @Test
@@ -44,7 +44,7 @@ class CsvStreamParserTest {
             setOf("AGR-1")
         )
 
-        assertTrue(result.errors.any { it.message.contains("formula injection", ignoreCase = true) })
+        assertTrue(result.errors.any { it.message.contains("formelinjeksjon", ignoreCase = true) })
     }
 
     @Test
@@ -67,7 +67,7 @@ class CsvStreamParserTest {
             BatchEntityType.VEHICLES,
             setOf("AGR-1")
         )
-        assertTrue(r2.errors.any { it.column == "registration_number" && it.message.contains("Planned vehicles") })
+        assertTrue(r2.errors.any { it.column == "registration_number" && it.message.contains("Planlagte kjøretøy") })
     }
 
     @Test
@@ -85,14 +85,32 @@ class CsvStreamParserTest {
 
     @Test
     fun validatesEnergyReportingBounds() {
-        val invalidEnergyCsv = "agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,notes\n" +
-            "AGR-1,LOC-1,Address 1,100,50,20,2015,1000,500,0,0,0,0,Too old"
+        val invalidEnergyCsv = "agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,reporting_quarter,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,goo_covered_kwh,notes\n" +
+            "AGR-1,LOC-1,Address 1,100,50,20,2015,1,1000,500,0,0,0,0,0,Too old"
         val res = CsvStreamParser.parseAndValidate(
             ByteArrayInputStream(invalidEnergyCsv.toByteArray(StandardCharsets.UTF_8)),
             BatchEntityType.ENERGY,
             setOf("AGR-1")
         )
         assertTrue(res.errors.any { it.column == "reporting_year" })
+    }
+
+    @Test
+    fun energyQuarterMustBeOneToFourAndPartOfTheKey() {
+        val header = "agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,reporting_quarter,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,goo_covered_kwh,notes\n"
+        val parse = { body: String ->
+            CsvStreamParser.parseAndValidate(
+                ByteArrayInputStream((header + body).toByteArray(StandardCharsets.UTF_8)),
+                BatchEntityType.ENERGY,
+                setOf("AGR-1")
+            )
+        }
+        assertTrue(parse("AGR-1,LOC-1,Address 1,100,50,20,2026,5,1000,500,0,0,0,0,0,").errors.any { it.column == "reporting_quarter" })
+        assertTrue(parse("AGR-1,LOC-1,Address 1,100,50,20,2026,,1000,500,0,0,0,0,0,").errors.any { it.column == "reporting_quarter" })
+        assertTrue(parse("AGR-1,LOC-1,Address 1,100,50,20,2026,1,1000,500,0,0,0,0,-5,").errors.any { it.column == "goo_covered_kwh" })
+        // Same facility and year in different quarters is two reports, not a duplicate.
+        val twoQuarters = parse("AGR-1,LOC-1,Address 1,100,50,20,2026,1,1000,500,0,0,0,0,0,\nAGR-1,LOC-1,Address 1,100,50,20,2026,2,1000,500,0,0,0,0,0,")
+        assertTrue(twoQuarters.errors.isEmpty(), twoQuarters.errors.toString())
     }
 
     @Test
@@ -110,16 +128,16 @@ class CsvStreamParserTest {
 
     @Test
     fun rejectsDuplicateEnergyKeysWithinOneUpload() {
-        val csv = "agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,notes\n" +
-            "AGR-1,LOC-1,Address 1,100,50,20,2026,1000,500,0,0,0,0,First\n" +
-            "AGR-1,LOC-1,Address 1,100,50,20,2026,1200,500,0,0,0,0,Duplicate"
+        val csv = "agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,reporting_quarter,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,goo_covered_kwh,notes\n" +
+            "AGR-1,LOC-1,Address 1,100,50,20,2026,1,1000,500,0,0,0,0,0,First\n" +
+            "AGR-1,LOC-1,Address 1,100,50,20,2026,1,1200,500,0,0,0,0,0,Duplicate"
         val result = CsvStreamParser.parseAndValidate(
             ByteArrayInputStream(csv.toByteArray(StandardCharsets.UTF_8)),
             BatchEntityType.ENERGY,
             setOf("AGR-1")
         )
 
-        assertTrue(result.errors.any { it.row == 3 && it.column == "facility_location_code" && it.message.contains("Duplicate") })
+        assertTrue(result.errors.any { it.row == 3 && it.column == "facility_location_code" && it.message.contains("Duplisert") && it.message.contains("LOC-1") && it.message.contains("2026 Q1") })
     }
 
     @Test
@@ -133,7 +151,7 @@ class CsvStreamParserTest {
             setOf("AGR-1")
         )
 
-        assertTrue(result.errors.any { it.row == 3 && it.column == "product_code" && it.message.contains("Duplicate") })
+        assertTrue(result.errors.any { it.row == 3 && it.column == "product_code" && it.message.contains("Duplisert") })
     }
 
     @Test

@@ -20,8 +20,8 @@ export function ActionNotice({ latest, ready }: { latest?: FleetChange; ready: b
   if (!latest || visibleId !== latest.id) return null;
   return <div className="rounded-xl border border-neutral-200 bg-white p-3">
     <div role="status" className="flex flex-wrap items-center justify-between gap-3 text-sm"><span>{latest.description}</span>
-      <div className="flex gap-2">{latest.canUndo && <button className={buttonClass} disabled={undo.isPending} onClick={() => undo.mutate(latest.id)}>Undo</button>}
-        <button className={buttonClass} onClick={() => setVisibleId(null)}>Dismiss</button></div>
+      <div className="flex gap-2">{latest.canUndo && <button className={buttonClass} disabled={undo.isPending} onClick={() => undo.mutate(latest.id)}>Angre</button>}
+        <button className={buttonClass} onClick={() => setVisibleId(null)}>Skjul</button></div>
     </div><ErrorNotice error={undo.error} />
   </div>;
 }

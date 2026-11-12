@@ -7,9 +7,9 @@ export function CopyableValue({ label, value }: { label: string; value: string }
   async function copyValue() {
     try {
       await navigator.clipboard.writeText(value);
-      setMessage(`${label} copied.`);
+      setMessage(`${label} kopiert.`);
     } catch {
-      setMessage(`Copy is unavailable. Select the value and copy it manually.`);
+      setMessage(`Kopiering er ikke tilgjengelig. Marker verdien og kopier den manuelt.`);
     }
   }
 
@@ -20,11 +20,11 @@ export function CopyableValue({ label, value }: { label: string; value: string }
       <button
         type="button"
         onClick={() => void copyValue()}
-        aria-label={`Copy ${label}`}
+        aria-label={`Kopier ${label}`}
         className="inline-flex items-center gap-1 rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
       >
-        {message.endsWith("copied.") ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        Copy
+        {message.endsWith("kopiert.") ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        Kopier
       </button>
       {message && <span role="status" className="text-xs text-neutral-500">{message}</span>}
     </div>

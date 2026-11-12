@@ -67,9 +67,9 @@ export function AddSupplierDialog({
     const trimmedName = displayName.trim();
     const trimmedOrgId = orgId.trim();
     const trimmedEmail = email.trim();
-    const nextNameError = trimmedName ? "" : "Supplier name is required.";
+    const nextNameError = trimmedName ? "" : "Leverandørnavn må fylles ut.";
     const nextOrgIdError = !trimmedOrgId
-      ? "Organization ID is required."
+      ? "Organisasjons-ID må fylles ut."
       : existingSuppliers.some(
             (supplier) =>
               normalizeSupplierOrgId(supplier.orgId) === normalizeSupplierOrgId(trimmedOrgId)
@@ -77,14 +77,14 @@ export function AddSupplierDialog({
         ? DUPLICATE_SUPPLIER_ORG_ID_MESSAGE
         : "";
     const nextEmailError = !trimmedEmail
-      ? "Email address is required."
+      ? "E-postadresse må fylles ut."
       : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)
-        ? "Enter a valid email address."
+        ? "Skriv inn en gyldig e-postadresse."
         : "";
     const selectedContract = contracts.find((contract) => contract.id === contractId);
     const nextContractError =
       contractId && !selectedContract
-        ? "The selected contract is no longer available. Choose another contract or leave this blank."
+        ? "Den valgte avtalen er ikke lenger tilgjengelig. Velg en annen avtale eller la feltet stå tomt."
         : "";
     setNameError(nextNameError);
     setOrgIdError(nextOrgIdError);
@@ -106,7 +106,7 @@ export function AddSupplierDialog({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message === DUPLICATE_SUPPLIER_ORG_ID_MESSAGE) setOrgIdError(message);
-      else if (message === "Enter a valid email address.") setEmailError(message);
+      else if (message === "Skriv inn en gyldig e-postadresse.") setEmailError(message);
       else setSubmissionError(message);
     } finally {
       setIsSubmitting(false);
@@ -137,17 +137,17 @@ export function AddSupplierDialog({
       <header className="flex items-start justify-between gap-4 border-b border-neutral-100 px-4 py-4">
         <div>
           <h2 id="add-supplier-title" className="font-headline text-lg font-semibold text-neutral-900">
-            Add supplier
+            Legg til leverandør
           </h2>
           <p className="mt-1 text-sm leading-5 text-neutral-500">
-            New suppliers start as unassessed and are marked To Review.
+            Nye leverandører starter som ikke vurdert og merkes Til vurdering.
           </p>
         </div>
         <button
           type="button"
           onClick={close}
           disabled={isSubmitting}
-          aria-label="Close Add Supplier"
+          aria-label="Lukk Legg til leverandør"
           className="shrink-0 rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <X className="h-4 w-4" />
@@ -158,7 +158,7 @@ export function AddSupplierDialog({
         <div className="space-y-4">
           <div>
             <label htmlFor="supplier-name" className="mb-1.5 block text-xs font-medium text-neutral-700">
-              Supplier name <span aria-hidden="true">*</span>
+              Leverandørnavn <span aria-hidden="true">*</span>
             </label>
             <input
               id="supplier-name"
@@ -183,7 +183,7 @@ export function AddSupplierDialog({
 
           <div>
             <label htmlFor="supplier-org-id" className="mb-1.5 block text-xs font-medium text-neutral-700">
-              Organization ID <span aria-hidden="true">*</span>
+              Organisasjons-ID <span aria-hidden="true">*</span>
             </label>
             <input
               id="supplier-org-id"
@@ -207,7 +207,7 @@ export function AddSupplierDialog({
 
           <div>
             <label htmlFor="supplier-email" className="mb-1.5 block text-xs font-medium text-neutral-700">
-              Email address <span aria-hidden="true">*</span>
+              E-postadresse <span aria-hidden="true">*</span>
             </label>
             <input
               id="supplier-email"
@@ -230,14 +230,14 @@ export function AddSupplierDialog({
               </p>
             ) : (
               <p id="supplier-email-help" className="mt-1 text-xs leading-5 text-neutral-500">
-                Stored as the supplier’s login email; adding this mock record does not create an account.
+                Lagres som leverandørens innloggings-e-post; å legge til denne testposten oppretter ikke en konto.
               </p>
             )}
           </div>
 
           <div>
             <label htmlFor="supplier-contract" className="mb-1.5 block text-xs font-medium text-neutral-700">
-              Primary contract <span className="font-normal text-neutral-500">(optional)</span>
+              Hovedavtale <span className="font-normal text-neutral-500">(valgfritt)</span>
             </label>
             <select
               id="supplier-contract"
@@ -251,7 +251,7 @@ export function AddSupplierDialog({
               aria-describedby={contractError ? "supplier-contract-error" : "supplier-contract-help"}
               className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10 disabled:bg-neutral-50"
             >
-              <option value="">No primary contract</option>
+              <option value="">Ingen hovedavtale</option>
               {contracts.map((contract) => (
                 <option key={contract.id} value={contract.id}>
                   {contract.contractName} — {contract.supplierName}
@@ -265,12 +265,12 @@ export function AddSupplierDialog({
             ) : (
               <p id="supplier-contract-help" className="mt-1 text-xs leading-5 text-neutral-500">
                 {contractsLoading
-                  ? "Loading existing contracts…"
+                  ? "Laster eksisterende avtaler…"
                   : contractsError
-                    ? "Existing contracts could not be loaded. You can still add a supplier without selecting one."
+                    ? "Eksisterende avtaler kunne ikke lastes. Du kan fortsatt legge til en leverandør uten å velge en."
                     : contracts.length === 0
-                      ? "No existing contracts are available to select."
-                      : "Select an existing contract, or leave this blank."}
+                      ? "Ingen eksisterende avtaler er tilgjengelige."
+                      : "Velg en eksisterende avtale, eller la feltet stå tomt."}
               </p>
             )}
           </div>
@@ -290,14 +290,14 @@ export function AddSupplierDialog({
             disabled={isSubmitting}
             className="inline-flex min-h-8 items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Cancel
+            Avbryt
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
             className="inline-flex min-h-8 items-center justify-center rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Adding…" : "Add supplier"}
+            {isSubmitting ? "Legger til…" : "Legg til leverandør"}
           </button>
         </footer>
       </form>

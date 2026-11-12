@@ -34,7 +34,9 @@ class VehicleRelationalStorageTest {
                                 "upload_batches",
                                 "facility_energy",
                                 "contract_products",
-                                "vehicle_contract_details"
+                                "vehicle_contract_details",
+                                "agreement_energy_commitments",
+                                "energy_evidence"
                             )) {
                             vehicleTableCount++
                         }

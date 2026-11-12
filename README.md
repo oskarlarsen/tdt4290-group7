@@ -13,7 +13,7 @@ The application is a prototype: some areas have working workflows, while others 
 | Contracts | Active agreements as contracts, with each supplier's stored risk, compliance summaries and placeholder CSV export. |
 | Vehicles | Backend-connected supplier and agreement management, registered/planned vehicles, statistics, registry checks and change history with undo. |
 | Environmental Certificates | Admins can upload PDF certificates for backend text/OCR extraction and review parsed metadata. Contract attachments, registry verification and automatic reminders are not connected. |
-| Energy & Fuel | Shows no records until the backend has per-contract energy requirements; demo records are available with `VITE_USE_MOCKS=true`. |
+| Energy | Compares each contract's delivered self-produced renewable energy and guarantees of origin with its commitments, from the quarterly reports suppliers submit. Admins set the commitments per contract and can open supplier evidence files. |
 | Risk & Prediction | Placeholder page for risk analysis. |
 | Alerts | Backend-connected alerts with manual alerts, status changes, archive and restore. |
 | Reports | Placeholder page. |

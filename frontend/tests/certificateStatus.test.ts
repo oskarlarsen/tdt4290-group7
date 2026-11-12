@@ -10,7 +10,7 @@ describe("getCertificateStatus one-year warning", () => {
       const info = getCertificateStatus({ validUntil: daysAhead(300), standard }, now);
       expect(info.status).toBe("expiring");
       expect(info.group).toBe("expiring-soon");
-      expect(info.label).toBe("Renew soon (300d)");
+      expect(info.label).toBe("Forny snart (300 d)");
       expect(getCertificateStatus({ validUntil: daysAhead(365), standard }, now).status).toBe("expiring");
       expect(getCertificateStatus({ validUntil: daysAhead(366), standard }, now).status).toBe("valid");
     }

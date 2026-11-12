@@ -41,7 +41,7 @@ describe("access panel", () => {
     api.getPendingInvitations.mockResolvedValue([{ email: "waiting@example.no", role: "SUPPLIER", supplierId: "s1", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null, contact: false }]);
     mount("admin");
     expect(await screen.findByText("waiting@example.no")).toBeTruthy();
-    expect(screen.getByText(/Not yet activated/)).toBeTruthy();
+    expect(screen.getByText(/Ikke aktivert ennå/)).toBeTruthy();
   });
 
   it("creates a new link for a pending colleague whose link was lost", async () => {
@@ -49,7 +49,7 @@ describe("access panel", () => {
     api.getPendingInvitations.mockResolvedValue([{ email: "waiting@example.no", role: "SUPPLIER", supplierId: "s1", supplierName: "Acme AS", expiresAt: "2026-06-03T10:00:00Z", accessExpiresAt: null, contact: false }]);
     api.inviteToAccess.mockResolvedValue({ email: "waiting@example.no", token: "fresh", expiresAt: "x", accessExpiresAt: null });
     mount("supplier");
-    fireEvent.click(await screen.findByRole("button", { name: "Create a new link" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Opprett ny lenke" }));
     expect(await screen.findByText(/accept-invitation#fresh/)).toBeTruthy();
     expect(api.inviteToAccess).toHaveBeenCalledWith("supplier", "waiting@example.no", undefined);
   });
@@ -60,10 +60,10 @@ describe("access panel", () => {
     fleet.inviteSupplier.mockResolvedValue({ email: "contact@example.no", token: "again", expiresAt: "x" });
     mount("supplier");
     await screen.findByText("contact@example.no");
-    expect(screen.queryByRole("button", { name: "Create a new link" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Opprett ny lenke" })).toBeNull();
     cleanup();
     mount("admin");
-    fireEvent.click(await screen.findByRole("button", { name: "Create a new link" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Opprett ny lenke" }));
     expect(await screen.findByText(/accept-invitation#again/)).toBeTruthy();
     expect(fleet.inviteSupplier).toHaveBeenCalledWith("s1", "contact@example.no");
   });
@@ -72,9 +72,9 @@ describe("access panel", () => {
     api.getAccess.mockResolvedValue([]);
     api.inviteToAccess.mockResolvedValue({ email: "new@example.no", token: "tok123", expiresAt: "x", accessExpiresAt: null });
     mount("supplier");
-    fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: " new@example.no " } });
-    fireEvent.change(screen.getByLabelText(/Stand-in until/), { target: { value: new Date(Date.now() + 5 * day).toISOString().slice(0, 10) } });
-    fireEvent.click(screen.getByRole("button", { name: "Create invitation" }));
+    fireEvent.change(screen.getByLabelText(/E-postadresse/), { target: { value: " new@example.no " } });
+    fireEvent.change(screen.getByLabelText(/Midlertidig tilgang til/), { target: { value: new Date(Date.now() + 5 * day).toISOString().slice(0, 10) } });
+    fireEvent.click(screen.getByRole("button", { name: "Opprett invitasjon" }));
     await waitFor(() => expect(api.inviteToAccess).toHaveBeenCalledWith("supplier", "new@example.no", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)));
     expect(await screen.findByText(/accept-invitation#tok123/)).toBeTruthy();
   });
@@ -88,19 +88,19 @@ describe("access panel", () => {
     api.renewAccess.mockResolvedValue(undefined);
     api.revokeAccess.mockResolvedValue(undefined);
     mount("admin");
-    expect(screen.getByText("Invite an administrator")).toBeTruthy();
+    expect(screen.getByText("Inviter en administrator")).toBeTruthy();
     expect(await screen.findByText("Person soon")).toBeTruthy();
-    expect(screen.getByText(/Person me \(you\)/)).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Remove access/ })).toHaveLength(1); // not for yourself
+    expect(screen.getByText(/Person me \(deg\)/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Fjern tilgang/ })).toHaveLength(1); // not for yourself
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Godkjenn" }));
     await waitFor(() => expect(api.approveAccess).toHaveBeenCalledWith("soon"));
-    fireEvent.click(screen.getByRole("button", { name: "Renew" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forny" }));
     const newEnd = new Date(Date.now() + 40 * day).toISOString().slice(0, 10);
-    fireEvent.change(screen.getByLabelText("New end date"), { target: { value: newEnd } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(screen.getByLabelText("Ny sluttdato"), { target: { value: newEnd } });
+    fireEvent.click(screen.getByRole("button", { name: "Lagre" }));
     await waitFor(() => expect(api.renewAccess).toHaveBeenCalledWith("soon", newEnd));
-    fireEvent.click(screen.getByRole("button", { name: "Remove access for Person soon" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fjern tilgang for Person soon" }));
     await waitFor(() => expect(api.revokeAccess).toHaveBeenCalledWith("soon"));
   });
 
@@ -108,7 +108,7 @@ describe("access panel", () => {
     api.getAccess.mockResolvedValue([entry("x")]);
     api.revokeAccess.mockRejectedValue(new Error("Only the person who gave this access, or an administrator, can remove it"));
     mount("supplier");
-    fireEvent.click(await screen.findByRole("button", { name: "Remove access for Person x" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Fjern tilgang for Person x" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.getByText(/Only the person who gave this access/)).toBeTruthy();
   });

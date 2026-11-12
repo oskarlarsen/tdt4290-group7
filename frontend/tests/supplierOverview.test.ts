@@ -3,7 +3,7 @@ import { buildSupplierOverview } from "../src/utils/supplierOverview";
 import type { TopRiskSupplier, RecentAlert } from "../src/types/dashboard";
 import type { DerivedContract } from "../src/types/contract";
 import type { Certificate } from "../src/types/certificate";
-import type { EnergyRequirement, EnergyRecord } from "../src/types/energy";
+import { energyContract } from "./support/energyFixtures";
 
 describe("buildSupplierOverview", () => {
   const mockSuppliers: TopRiskSupplier[] = [
@@ -21,8 +21,8 @@ describe("buildSupplierOverview", () => {
     { id: "cert-y1", contractId: "sup-y", standard: "iso14001", certificateNumber: null, validUntil: null }
   ];
 
-  const mockEnergyReqs: EnergyRequirement[] = [{ contractId: "sup-y", minRenewableSharePercent: 80 }];
-  const mockEnergyRecs: EnergyRecord[] = [{ id: "e1", contractId: "sup-y", period: "2026", consumptionKwh: { electric: 100, biogas: 0, fossil: 100 } }];
+  // sup-y has a commitment of 1000 kWh and delivered 400, so it is below its commitment.
+  const mockEnergy = [energyContract({ agreementId: "sup-y", status: "NON_COMPLIANT", selfProducedKwh: 400, selfProducedDeviationKwh: -600 })];
 
   const mockAlerts: RecentAlert[] = [
     { id: "a1", supplierId: "sup-x", severity: "high", title: "Test", description: "Test", timeAgo: "1h", status: "OPEN" },
@@ -36,7 +36,7 @@ describe("buildSupplierOverview", () => {
       mockContracts,
       mockCerts,
       { suppliers: [], agreements: [], vehicles: [], changes: [] },
-      { requirements: mockEnergyReqs, records: mockEnergyRecs },
+      mockEnergy,
       mockAlerts
     );
 
@@ -46,7 +46,7 @@ describe("buildSupplierOverview", () => {
     expect(result.alerts[0].supplierId).toBe("sup-x");
     expect(result.summaries.certificates.valid).toBe(1);
     expect(result.summaries.certificates.missing).toBe(0);
-    // Energy state should be not-applicable because sup-x has no energy reqs
+    // Energy state should be not-applicable because sup-x has no energy summary
     expect(result.summaries.energy.state).toBe("not-applicable");
   });
 
@@ -57,22 +57,22 @@ describe("buildSupplierOverview", () => {
       mockContracts,
       mockCerts,
       { suppliers: [], agreements: [], vehicles: [], changes: [] },
-      { requirements: mockEnergyReqs, records: mockEnergyRecs },
+      mockEnergy,
       mockAlerts
     );
 
     expect(result.summaries.certificates.missing).toBe(1);
-    // sup-y energy requires 80% renewable, has 50% (100/200), so it's a breach
+    // sup-y delivered 400 of its 1000 kWh commitment
     expect(result.summaries.energy.isBreach).toBe(true);
 
     const actionTitles = result.requiredActions.map(a => a.title);
-    expect(actionTitles).toContain("Upload certificate documentation");
-    expect(actionTitles).toContain("Submit vehicle data"); // because total: 0 -> data-missing
-    expect(actionTitles).toContain("Review energy data"); // breach
+    expect(actionTitles).toContain("Last opp sertifikatdokumentasjon");
+    expect(actionTitles).toContain("Send inn kjøretøydata"); // because total: 0 -> data-missing
+    expect(actionTitles).toContain("Gå gjennom energidata"); // commitment not met
   });
 
   it("returns null for non-existent supplier", () => {
-     const result = buildSupplierOverview("sup-z", [], [], [], null, { requirements: [], records: [] }, []);
+     const result = buildSupplierOverview("sup-z", [], [], [], null, [], []);
      expect(result.supplier).toBeNull();
   });
 });

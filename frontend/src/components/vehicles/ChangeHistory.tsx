@@ -11,13 +11,13 @@ export function ChangeHistory() {
   const refresh = useRefreshVehicles();
   const undo = useMutation({ mutationFn: api.undoChange, onSuccess: refresh, retry: false });
   return <div className="space-y-3">
-    {history.isLoading && <p role="status" className="text-sm">Loading changes…</p>}
+    {history.isLoading && <p role="status" className="text-sm">Laster endringer…</p>}
     <ErrorNotice error={history.error ?? undo.error} />
     <ul className="divide-y divide-neutral-100">{history.data?.map(change => <li key={change.id} className="flex items-center justify-between gap-4 py-3">
-      <div><p className="text-sm">{change.description}</p><p className="mt-1 text-xs text-neutral-500">{timestamp(change.occurredAt)} · {change.actorName}{change.reversedBy ? " · Undone" : ""}</p></div>
-      {!change.undoOf && !change.reversedBy && <button className={buttonClass} disabled={!change.canUndo || undo.isPending} title={change.canUndo ? undefined : "Later changes prevent undoing this action."} onClick={() => undo.mutate(change.id)}>Undo</button>}
+      <div><p className="text-sm">{change.description}</p><p className="mt-1 text-xs text-neutral-500">{timestamp(change.occurredAt)} · {change.actorName}{change.reversedBy ? " · Angret" : ""}</p></div>
+      {!change.undoOf && !change.reversedBy && <button className={buttonClass} disabled={!change.canUndo || undo.isPending} title={change.canUndo ? undefined : "Senere endringer hindrer at denne handlingen kan angres."} onClick={() => undo.mutate(change.id)}>Angre</button>}
     </li>)}</ul>
-    {!history.isLoading && history.data?.length === 0 && <p className="text-sm text-neutral-500">No changes yet.</p>}
-    <div className="flex justify-end gap-2"><button className={buttonClass} disabled={page === 1 || history.isFetching} onClick={() => setPage(page - 1)}>Previous</button><button className={buttonClass} disabled={history.isFetching || (history.data?.length ?? 0) < 30} onClick={() => setPage(page + 1)}>Next</button></div>
+    {!history.isLoading && history.data?.length === 0 && <p className="text-sm text-neutral-500">Ingen endringer ennå.</p>}
+    <div className="flex justify-end gap-2"><button className={buttonClass} disabled={page === 1 || history.isFetching} onClick={() => setPage(page - 1)}>Forrige</button><button className={buttonClass} disabled={history.isFetching || (history.data?.length ?? 0) < 30} onClick={() => setPage(page + 1)}>Neste</button></div>
   </div>;
 }

@@ -134,6 +134,16 @@ enum class LookupOutcome {
     TEMPORARILY_UNAVAILABLE, NOT_CONFIGURED,
 }
 
+internal val LookupOutcome.nb: String get() = when (this) {
+    LookupOutcome.FOUND -> "funnet"
+    LookupOutcome.NOT_FOUND -> "ikke funnet"
+    LookupOutcome.INVALID_RESPONSE -> "ugyldig svar"
+    LookupOutcome.ACCESS_DENIED -> "ingen tilgang"
+    LookupOutcome.QUOTA_EXHAUSTED -> "kvoten er brukt opp"
+    LookupOutcome.TEMPORARILY_UNAVAILABLE -> "midlertidig utilgjengelig"
+    LookupOutcome.NOT_CONFIGURED -> "ikke konfigurert"
+}
+
 @Serializable
 enum class VehicleDeviation {
     NOT_ON_AGREEMENT_LIST, AGREEMENT_NOT_STARTED, AGREEMENT_EXPIRED,

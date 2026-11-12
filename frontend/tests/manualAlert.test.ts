@@ -25,28 +25,28 @@ describe("manual alert creation", () => {
       })
     );
 
-    expect(html).toContain("Create Manual Alert");
-    expect(html).toContain("Alert title *");
-    expect(html).toContain("Supplier *");
-    expect(html).toContain("Risk category *");
-    expect(html).toContain("Risk *");
-    expect(html).toContain("Alert Type *");
-    expect(html).toContain("Description *");
-    expect(html).toContain("Due Date");
-    expect(html).toContain("DD/MM/YYYY");
+    expect(html).toContain("Opprett manuelt varsel");
+    expect(html).toContain("Tittel på varsel *");
+    expect(html).toContain("Leverandør *");
+    expect(html).toContain("Risikokategori *");
+    expect(html).toContain("Risiko *");
+    expect(html).toContain("Varseltype *");
+    expect(html).toContain("Beskrivelse *");
+    expect(html).toContain("Frist");
+    expect(html).toContain("DD.MM.ÅÅÅÅ");
     expect(html).toContain('type="date"');
-    expect(html).toContain("Cancel");
-    expect(html).toContain("Create alert");
+    expect(html).toContain("Avbryt");
+    expect(html).toContain("Opprett varsel");
     for (const category of [
-      "Environmental Compliance",
-      "Energy &amp; Fuel",
-      "Vehicle Compliance",
-      "Certificates",
+      "Miljøoppfølging",
+      "Energi",
+      "Kjøretøyoppfølging",
+      "Sertifikater",
     ]) {
       expect(html).toContain(category);
     }
     expect(ALERT_CATEGORIES).not.toContain("OTHER");
-    for (const type of ["Confirmed Deviation", "Missing Documentation", "Upcoming Expiry"]) {
+    for (const type of ["Bekreftet avvik", "Dokumentasjon mangler", "Kommende utløp"]) {
       expect(html).toContain(type);
     }
   });
@@ -58,6 +58,7 @@ describe("manual alert creation", () => {
     expect(parseEuropeanDueDate("31/04/2026")).toBeUndefined();
     expect(parseEuropeanDueDate("11/05/2026")).toBe("2026-05-11");
     expect(parseEuropeanDueDate("2026-11-05")).toBeUndefined();
+    expect(parseEuropeanDueDate("05.11.2026")).toBe("2026-11-05");
   });
 
   it("creates a manual OPEN alert associated with a supplier and includes it in counts", () => {
@@ -102,7 +103,7 @@ describe("manual alert creation", () => {
         findingType: "UPCOMING_EXPIRY",
         description: "Description",
       })
-    ).toThrow("Alert title, type, description, and a valid supplier are required.");
+    ).toThrow("Tittel, type, beskrivelse og en gyldig leverandør er påkrevd for varselet.");
   });
 
   it("permanently removes an alert from the mock alerts store", () => {
@@ -121,7 +122,7 @@ describe("manual alert creation", () => {
     expect(getAllAlerts().some((alert) => alert.id === created.id)).toBe(false);
     expect(getAllAlerts().length).toBeGreaterThan(0);
     expect(indexBeforeDelete).toBeGreaterThanOrEqual(0);
-    expect(() => deleteAlert(created.id)).toThrow(`Alert "${created.id}" was not found.`);
+    expect(() => deleteAlert(created.id)).toThrow(`Varselet «${created.id}» ble ikke funnet.`);
   });
 
   it("counts down from five seconds and confirms deletion only after the deadline", () => {

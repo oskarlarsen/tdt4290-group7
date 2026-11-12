@@ -23,7 +23,7 @@ internal suspend fun ApplicationCall.adminActor(): ChangeActor? {
     val id = principal<JWTPrincipal>()?.payload?.let(JwtConfig::userId)
     val user = id?.let(UserRepository::findById)
     if (user?.role != com.tdt4290group7.backend.model.Role.ADMIN) {
-        respond(HttpStatusCode.Forbidden, ApiError("Administrator access required"))
+        respond(HttpStatusCode.Forbidden, ApiError("Krever administratortilgang"))
         return null
     }
     return ChangeActor(user.id, user.name)
@@ -34,7 +34,7 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     get("/api/vehicle-fleet/history") {
         if (call.adminActor() == null) return@get
         val rawPage = call.request.queryParameters["page"]
-        val page = if (rawPage == null) 1 else rawPage.toIntOrNull() ?: throw IllegalArgumentException("Invalid history page")
+        val page = if (rawPage == null) 1 else rawPage.toIntOrNull() ?: throw IllegalArgumentException("Ugyldig historikkside")
         call.respond(fleet.history(page))
     }
     post("/api/vehicle-fleet/suppliers") {
@@ -44,18 +44,18 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     post("/api/vehicle-fleet/suppliers/{id}/invitations") {
         val actor = call.adminActor() ?: return@post
         val supplierId = call.parameters["id"] ?: run {
-            call.respond(HttpStatusCode.BadRequest, ApiError("Supplier ID is required"))
+            call.respond(HttpStatusCode.BadRequest, ApiError("Leverandør-ID er påkrevd"))
             return@post
         }
         val supplier = fleet.overview().suppliers.firstOrNull { it.id == supplierId }
         if (supplier == null) {
-            call.respond(HttpStatusCode.NotFound, ApiError("Active supplier organization not found"))
+            call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke aktiv leverandørorganisasjon"))
             return@post
         }
         val request = try {
             decodeFleetRequest(call.receiveText(), SupplierInvitationRequest.serializer())
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request"))
+            call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig invitasjonsforespørsel"))
             return@post
         }
         try {
@@ -69,9 +69,9 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
                 SupplierInvitationResponse(request.email.trim(), invitation.token, invitation.expiresAt)
             )
         } catch (e: AccountConflictException) {
-            call.respond(HttpStatusCode.Conflict, ApiError(e.message ?: "An account already exists"))
+            call.respond(HttpStatusCode.Conflict, ApiError(e.message ?: "Det finnes allerede en konto"))
         } catch (e: IllegalArgumentException) {
-            call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid invitation"))
+            call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Ugyldig invitasjon"))
         }
     }
     put("/api/vehicle-fleet/suppliers/{id}") {
@@ -81,7 +81,7 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     }
     delete("/api/vehicle-fleet/suppliers/{id}") {
         val actor = call.adminActor() ?: return@delete
-        val id = call.parameters["id"] ?: throw IllegalArgumentException("Supplier ID is required")
+        val id = call.parameters["id"] ?: throw IllegalArgumentException("Leverandør-ID er påkrevd")
         val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
         fleet.removeSupplier(id, request.expectedUpdatedAt, actor, Instant.now())
         call.respond(HttpStatusCode.NoContent)

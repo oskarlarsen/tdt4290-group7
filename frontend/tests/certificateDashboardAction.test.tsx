@@ -18,7 +18,7 @@ describe("dashboard certificate action", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add supplier certificate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Legg til leverandørsertifikat" }));
     expect(screen.getByTestId("location").textContent).toBe("/admin/certificates?upload=true");
   });
 });

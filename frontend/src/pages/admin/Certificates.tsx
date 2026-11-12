@@ -33,14 +33,15 @@ import { downloadCsv, toCsv } from "../../utils/csv";
 import { useSearchParams } from "react-router-dom";
 import { getActiveCertificateContracts } from "../../utils/certificateContracts";
 
-type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired" | "missing-documentation";
+type CertificateFilter = "all" | "valid" | "expiring-soon" | "expired" | "missing-documentation" | "critical";
 
 const FILTERS: { value: CertificateFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "valid", label: "Valid" },
-  { value: "expiring-soon", label: "Expiring soon" },
-  { value: "expired", label: "Expired" },
-  { value: "missing-documentation", label: "Documentation missing" },
+  { value: "all", label: "Alle" },
+  { value: "valid", label: "Gyldig" },
+  { value: "expiring-soon", label: "Utløper snart" },
+  { value: "expired", label: "Utløpt" },
+  { value: "missing-documentation", label: "Dokumentasjon mangler" },
+  { value: "critical", label: "Kritisk / utløpt" },
 ];
 
 const PAGE_SIZE = 6; // same as the reference; the logic doesn't assume how many rows exist
@@ -68,8 +69,17 @@ export default function Certificates() {
   const archiveError = archiveCertificate.error ?? restoreCertificate.error;
 
   const [uploadNotice, setUploadNotice] = useState("");
+  // Archiving is instant, so the last one can be undone from a message under the table.
+  const [archived, setArchived] = useState<Certificate | null>(null);
+  // The upload confirmation is a passing message: it goes away on its own, and when the list changes.
+  useEffect(() => {
+    if (!uploadNotice) return;
+    const timer = window.setTimeout(() => setUploadNotice(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [uploadNotice]);
   const [statusFilter, setStatusFilter] = useState<CertificateFilter>("all");
   const [search, setSearch] = useState("");
+  useEffect(() => setUploadNotice(""), [statusFilter, search]);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null);
@@ -92,6 +102,7 @@ export default function Certificates() {
     archiveCertificate.mutate(certificate.id, {
       onSuccess: () => {
         if (selectedId === certificate.id) setSelectedId(null);
+        setArchived(certificate);
       },
     });
   }
@@ -111,6 +122,8 @@ export default function Certificates() {
       .sort(compareBySeverity);
   }, [certificates, fleet]);
 
+  const toggleFilter = (next: CertificateFilter) => setStatusFilter((current) => (current === next ? "all" : next));
+
   const counts = useMemo(() => {
     const result: Record<CertificateFilter | "criticalExpired", number> = {
       all: rows.length,
@@ -118,6 +131,7 @@ export default function Certificates() {
       "expiring-soon": 0,
       expired: 0,
       "missing-documentation": 0,
+      critical: 0,
       criticalExpired: 0,
     };
     for (const { certificate } of rows) {
@@ -145,7 +159,8 @@ export default function Certificates() {
             (statusFilter === "valid" && status === "valid") ||
             (statusFilter === "expiring-soon" && (status === "expiring" || status === "critical")) ||
             (statusFilter === "expired" && status === "expired") ||
-            (statusFilter === "missing-documentation" && status === "missing-documentation");
+            (statusFilter === "missing-documentation" && status === "missing-documentation") ||
+            (statusFilter === "critical" && (status === "critical" || status === "expired" || status === "missing-documentation"));
           const matchesSearch =
             query.length === 0 ||
             CERTIFICATE_STANDARD_LABELS[certificate.standard].toLowerCase().includes(query) ||
@@ -182,7 +197,7 @@ export default function Certificates() {
   }
 
   if (certsError || contractsError || !certificates || !fleet) {
-    return <div className="text-sm text-red-700">Couldn't load certificates. Try again.</div>;
+    return <div className="text-sm text-red-700">Kunne ikke laste sertifikater. Prøv igjen.</div>;
   }
 
   // Every KPI is a direct count over the certificate records.
@@ -197,16 +212,16 @@ export default function Certificates() {
     if (filteredRows.length === 0) return;
     const csv = toCsv(
       filteredRows.map(({ certificate, contract }) => ({
-        Supplier: contract?.supplierName ?? certificate.supplierName ?? "",
-        "Org ID": contract?.supplierOrgId ?? "",
-        Contract: contract?.contractName ?? "",
+        Leverandør: contract?.supplierName ?? certificate.supplierName ?? "",
+        "Org.nr.": contract?.supplierOrgId ?? "",
+        Avtale: contract?.contractName ?? "",
         Standard: CERTIFICATE_STANDARD_LABELS[certificate.standard],
-        "Certificate number": certificate.certificateNumber ?? "",
-        "Valid until": certificate.validUntil ?? "",
+        "Sertifikatnummer": certificate.certificateNumber ?? "",
+        "Gyldig til": certificate.validUntil ?? "",
         Status: getCertificateStatus(certificate).label,
       }))
     );
-    downloadCsv(`certificates-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`sertifikater-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
   return (
@@ -215,10 +230,10 @@ export default function Certificates() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="font-headline text-2xl font-semibold leading-tight tracking-[-0.04em] text-[#0f172a]">
-              Environmental Certificates
+              Miljøsertifikater
             </h1>
             <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">
-              Validity tracking of environmental certifications held by contracted suppliers, with upcoming expiries and missing documentation.
+              Oppfølging av gyldigheten til miljøsertifiseringer hos leverandører med avtale, med kommende utløp og manglende dokumentasjon.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 pt-1">
@@ -228,14 +243,14 @@ export default function Certificates() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
-            Export (CSV)
+            Eksporter (CSV)
           </button>
           <button
             onClick={() => setUploadOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
           >
             <Plus className="h-3.5 w-3.5" />
-            Upload certificate
+            Last opp sertifikat
           </button>
           </div>
         </div>
@@ -243,34 +258,42 @@ export default function Certificates() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label="Certificates tracked"
+          label="Sertifikater under oppfølging"
           value={total}
-          sublabel={`across ${contractCount} contract${contractCount === 1 ? "" : "s"}`}
+          sublabel={`fordelt på ${contractCount} ${contractCount === 1 ? "avtale" : "avtaler"}`}
           icon={<ShieldCheck className="h-4 w-4" />}
           iconClassName="bg-primary-100 text-primary-900"
+          onClick={() => setStatusFilter("all")}
+          pressed={statusFilter === "all"}
         />
         <KpiCard
-          label="Valid"
+          label="Gyldig"
           value={counts.valid}
-          note={validPercent === null ? "No certificates" : `${validPercent}% of tracked certificates`}
+          note={validPercent === null ? "Ingen sertifikater" : `${validPercent} % av sertifikatene under oppfølging`}
           noteTone="success"
           icon={<CheckCircle2 className="h-4 w-4" />}
           iconClassName="bg-tertiary-100 text-tertiary-700"
+          onClick={() => toggleFilter("valid")}
+          pressed={statusFilter === "valid"}
         />
         <KpiCard
-          label="Expiring soon"
+          label="Utløper snart"
           value={counts["expiring-soon"]}
-          note={`Expiring within ${CERTIFICATE_THRESHOLDS.yellowDays} days`}
+          note={`Utløper innen ${CERTIFICATE_THRESHOLDS.yellowDays} dager`}
           icon={<Clock3 className="h-4 w-4" />}
           iconClassName="bg-amber-100 text-amber-700"
+          onClick={() => toggleFilter("expiring-soon")}
+          pressed={statusFilter === "expiring-soon"}
         />
         <KpiCard
-          label="Critical / expired"
+          label="Kritisk / utløpt"
           value={counts.criticalExpired}
-          note={`Expired, undocumented, or ≤${CERTIFICATE_THRESHOLDS.criticalDays} days left`}
+          note={`Utløpt, uten dokumentasjon eller ≤${CERTIFICATE_THRESHOLDS.criticalDays} dager igjen`}
           noteTone={counts.criticalExpired > 0 ? "danger" : "success"}
           icon={<AlertTriangle className="h-4 w-4" />}
           iconClassName="bg-red-100 text-red-700"
+          onClick={() => toggleFilter("critical")}
+          pressed={statusFilter === "critical"}
         />
       </div>
 
@@ -283,13 +306,13 @@ export default function Certificates() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search certificate no., supplier, standard, contract…"
+              placeholder="Søk etter sertifikatnr., leverandør, standard, avtale…"
               className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
           <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
             <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
-            <span className="font-medium text-neutral-700">Show archived</span>
+            <span className="font-medium text-neutral-700">Vis arkiverte</span>
           </label>
           <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
             <span className="font-medium text-neutral-700">Status:</span>
@@ -297,7 +320,7 @@ export default function Certificates() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as CertificateFilter)}
-                aria-label="Filter certificates by status"
+                aria-label="Filtrer sertifikater etter status"
                 className="appearance-none rounded-md border border-neutral-200 bg-white px-2 py-1 pr-7 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
               >
                 {FILTERS.map((filter) => (
@@ -323,24 +346,36 @@ export default function Certificates() {
           }}
           emptyMessage={
             certificates.length === 0
-              ? "No certificate records available"
-              : "No certificates match the current filters"
+              ? "Ingen sertifikater tilgjengelig"
+              : "Ingen sertifikater samsvarer med filtrene"
           }
         />
         {uploadNotice && (
           <p role="status" className="mt-3 rounded-md bg-tertiary-50 px-3 py-2 text-sm text-tertiary-700">{uploadNotice}</p>
         )}
+        {archived && (
+          <p role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+            <span>Arkivert: {archived.supplierName ?? "sertifikatet"}. Det telles ikke lenger med i varsler, risiko eller totaler.</span>
+            <button
+              type="button"
+              onClick={() => { handleRestore(archived); setArchived(null); }}
+              className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+            >
+              Angre
+            </button>
+          </p>
+        )}
         {archiveError && (
           <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {archiveError instanceof Error ? archiveError.message : "Could not update the certificate."}
+            {archiveError instanceof Error ? archiveError.message : "Kunne ikke oppdatere sertifikatet."}
           </p>
         )}
 
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
             {filteredRows.length === 0
-              ? "No certificates match the current filters"
-              : `Showing ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, filteredRows.length)} of ${filteredRows.length} certificate${filteredRows.length === 1 ? "" : "s"}`}
+              ? "Ingen sertifikater samsvarer med filtrene"
+              : `Viser ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, filteredRows.length)} av ${filteredRows.length} ${filteredRows.length === 1 ? "sertifikat" : "sertifikater"}`}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
             <button
@@ -350,10 +385,10 @@ export default function Certificates() {
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              Previous
+              Forrige
             </button>
             <span className="font-mono text-xs text-neutral-500">
-              Page {currentPage} of {totalPages}
+              Side {currentPage} av {totalPages}
             </span>
             <button
               type="button"
@@ -361,7 +396,7 @@ export default function Certificates() {
               disabled={currentPage >= totalPages}
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Next
+              Neste
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -377,7 +412,7 @@ export default function Certificates() {
         <CertificateUploadDialog
           contracts={contracts}
           initialContractId={renewContractId}
-          onUploaded={() => setUploadNotice("Certificate uploaded.")}
+          onUploaded={() => setUploadNotice("Sertifikat lastet opp.")}
           onClose={() => {
             setUploadOpen(false);
             setRenewContractId(undefined);

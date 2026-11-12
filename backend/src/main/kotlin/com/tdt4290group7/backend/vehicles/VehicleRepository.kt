@@ -37,7 +37,7 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
     override fun listTripRows(search: String, page: Int, pageSize: Int): TripRowsListResponse {
         validatePage(page, pageSize)
         val plateSearch = normalizeRegistrationNumber(search)
-        require(plateSearch.matches(Regex("[A-Z0-9]{0,7}"))) { "search must contain up to 7 registration-number characters" }
+        require(plateSearch.matches(Regex("[A-Z0-9]{0,7}"))) { "søket kan ha opptil 7 tegn fra registreringsnummeret" }
         return readTransaction { db ->
             val parameters = listOf("%$plateSearch%")
             val total = query(db, "SELECT count(*) FROM trip_rows WHERE registration_number LIKE ?", parameters) { it.getInt(1) }.single()
@@ -84,8 +84,8 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }
 
     private fun validatePage(page: Int, pageSize: Int) {
-        require(page > 0) { "page must be a positive integer" }
-        require(pageSize in 1..100) { "pageSize must be between 1 and 100" }
+        require(page > 0) { "side må være et positivt heltall" }
+        require(pageSize in 1..100) { "sidestørrelse må være mellom 1 og 100" }
     }
 
     override fun findOrCreateVehicle(registrationNumber: String, now: Instant): Vehicle =
@@ -246,30 +246,30 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         validateTrailerFuel(input.vehicleCategory, input.fuelTechnology, "rows[$index]")
         val start = validatedDate(input.periodStart, "rows[$index].periodStart")
         val end = validatedDate(input.periodEnd, "rows[$index].periodEnd")
-        require(!end.isBefore(start)) { "rows[$index].periodEnd must not be before periodStart" }
-        require(input.make.isNotBlank() && input.model.isNotBlank()) { "rows[$index].make and model must not be blank" }
+        require(!end.isBefore(start)) { "rows[$index].periodEnd kan ikke være før periodStart" }
+        require(input.make.isNotBlank() && input.model.isNotBlank()) { "rows[$index].make og model kan ikke være tomme" }
         if (input.fuelTechnology.emissionsNotApplicable) {
             require(!input.co2Registered && tripDecimalColumns.filter { it.name in inapplicableEmissionColumns }.all { it.value(input) == null }) {
-                "rows[$index] must report co2Registered=false and null CO2/NOx measurements and registered distances for electric/hydrogen vehicles"
+                "rows[$index] må oppgi co2Registered=false og null for CO2/NOx-målinger og registrerte distanser for elektriske/hydrogenkjøretøy"
             }
         } else {
             require(tripDecimalColumns.filter { it.name in inapplicableEmissionColumns }.all { it.value(input) != null }) {
-                "rows[$index] must provide CO2/NOx measurements and registered distances for this fuel technology"
+                "rows[$index] må oppgi CO2/NOx-målinger og registrerte distanser for denne drivstoffteknologien"
             }
         }
         if (input.fuelTechnology.usesLitres) {
             require(input.averageFuelConsumptionLitresPer100Km != null && input.fuelConsumedLitres != null) {
-                "rows[$index] must provide both litres fields for this fuel technology"
+                "rows[$index] må oppgi begge literfeltene for denne drivstoffteknologien"
             }
         } else {
             require(input.averageFuelConsumptionLitresPer100Km == null && input.fuelConsumedLitres == null) {
-                "rows[$index] must omit litres fields or set them to null for electric/hydrogen vehicles and unpowered trailers"
+                "rows[$index] må utelate literfeltene eller sette dem til null for elektriske/hydrogenkjøretøy og tilhengere uten motor"
             }
         }
         tripDecimalColumns.forEach { column ->
             column.value(input)?.let {
                 try { decimalParts(it) } catch (_: IllegalArgumentException) {
-                    throw IllegalArgumentException("rows[$index].${column.name} must be non-negative and fit the supported decimal range")
+                    throw IllegalArgumentException("rows[$index].${column.name} kan ikke være negativ og må ligge innenfor det støttede desimalområdet")
                 }
             }
         }
@@ -277,25 +277,25 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
 
     private fun validateTrailerFuel(category: VehicleCategory, fuel: FuelTechnology, field: String) {
         require(category.isTrailer == (fuel == FuelTechnology.NOT_APPLICABLE)) {
-            "$field must use NOT_APPLICABLE fuel exactly when the vehicle category is O1, O2, O3 or O4"
+            "$field må bruke NOT_APPLICABLE som drivstoff nøyaktig når kjøretøykategorien er O1, O2, O3 eller O4"
         }
     }
 
     private fun validatedDate(value: String, field: String): LocalDate {
-        require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "$field must be a date (YYYY-MM-DD)" }
+        require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "$field må være en dato (ÅÅÅÅ-MM-DD)" }
         return try { LocalDate.parse(value) } catch (_: java.time.format.DateTimeParseException) {
-            throw IllegalArgumentException("$field must be a valid date (YYYY-MM-DD)")
+            throw IllegalArgumentException("$field må være en gyldig dato (ÅÅÅÅ-MM-DD)")
         }
     }
 
     private fun validateBatch(size: Int) {
-        require(size in 1..10_000) { "requests must contain between 1 and 10000 rows" }
+        require(size in 1..10_000) { "forespørsler må inneholde mellom 1 og 10000 rader" }
     }
 
     private fun validatedPlate(value: String, field: String = "registrationNumber"): String =
         normalizeRegistrationNumber(value).also {
             require(it.matches(Regex("[A-Z]{2}[1-9][0-9]{3,4}"))) {
-                "$field must contain two letters followed by four or five digits, without a leading zero"
+                "$field må bestå av to bokstaver etterfulgt av fire eller fem sifre, uten ledende null"
             }
         }
 

@@ -4,7 +4,7 @@ export function hasSaksnr(agreement: { saksnr?: string | null }): boolean {
 }
 
 export function agreementLabel(agreement: { saksnr?: string | null; note: string }): string {
-  const number = hasSaksnr(agreement) ? agreement.saksnr!.trim() : "Saksnr missing";
+  const number = hasSaksnr(agreement) ? agreement.saksnr!.trim() : "Saksnr mangler";
   const note = agreement.note.trim();
   return note ? `${number} — ${note}` : number;
 }

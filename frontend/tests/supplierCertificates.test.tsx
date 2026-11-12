@@ -44,9 +44,9 @@ describe("supplier My Certificates", () => {
       ],
     };
     mount(<MyCertificates />);
-    expect(screen.getByText("Waiting for admin review")).toBeTruthy();
-    const archived = screen.getByRole("region", { name: "Archived" });
-    expect(archived.textContent).toContain("Valid until");
+    expect(screen.getByText("Venter på vurdering fra administrator")).toBeTruthy();
+    const archived = screen.getByRole("region", { name: "Arkivert" });
+    expect(archived.textContent).toContain("Gyldig til");
     expect(screen.getAllByText("ISO 14001")).toHaveLength(3); // two live cards and the archived list row
   });
 
@@ -56,15 +56,15 @@ describe("supplier My Certificates", () => {
       certificates: [cert("soon", { contractId: "agr-2", validUntil: new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10) }), cert("fine")],
     };
     mount(<MyCertificates />);
-    expect(screen.getAllByRole("button", { name: "Renew" })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Renew" }));
-    expect((screen.getByLabelText("Agreement") as HTMLSelectElement).value).toBe("agr-2");
+    expect(screen.getAllByRole("button", { name: "Forny" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Forny" }));
+    expect((screen.getByLabelText("Avtale") as HTMLSelectElement).value).toBe("agr-2");
   });
 
   it("disables upload when the supplier has no agreement", () => {
     workspace.data = { agreements: [], certificates: [] };
     mount(<MyCertificates />);
-    expect((screen.getByRole("button", { name: "Upload certificate" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Last opp sertifikat" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 
@@ -72,9 +72,9 @@ describe("supplier certificate upload dialog", () => {
   it("sends the chosen agreement and file, and shows a server error", async () => {
     const upload = certApi.uploadSupplierCertificate.mockRejectedValue(new Error("That agreement belongs to another supplier"));
     mount(<SupplierCertificateUploadDialog agreements={agreements} onClose={vi.fn()} />);
-    const submit = screen.getByRole("button", { name: "Upload" }) as HTMLButtonElement;
+    const submit = screen.getByRole("button", { name: "Last opp" }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "agr-1" } });
+    fireEvent.change(screen.getByLabelText("Avtale"), { target: { value: "agr-1" } });
     const file = new File(["pdf"], "iso.pdf", { type: "application/pdf" });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
     fireEvent.submit(submit.closest("form")!);
@@ -96,10 +96,10 @@ describe("admin pending renewals", () => {
     const confirm = certApi.confirmCertificateArchive.mockResolvedValue(undefined);
     const reject = certApi.rejectCertificateArchive.mockResolvedValue(undefined);
     mount(<PendingRenewalsCard certificates={[old, renewal]} />);
-    expect(screen.getByText("Renewals waiting for review (1)")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm renewal for Nordvik AS" }));
+    expect(screen.getByText("Fornyelser til vurdering (1)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Bekreft fornyelse for Nordvik AS" }));
     await waitFor(() => expect(confirm).toHaveBeenCalledWith("renewal"));
-    fireEvent.click(screen.getByRole("button", { name: "Reject renewal for Nordvik AS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Avvis fornyelse for Nordvik AS" }));
     await waitFor(() => expect(reject).toHaveBeenCalledWith("renewal"));
   });
 });

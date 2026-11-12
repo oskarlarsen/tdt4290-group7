@@ -68,32 +68,32 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
         <CsvUploadPanel entity="products" disabled={working || agreements.length === 0} onPreview={onPreview} onChange={onChange} />
       )}
       {agreements.length === 0 && (
-        <p className="text-sm text-amber-700">There are no active agreements linked to this organization yet.</p>
+        <p className="text-sm text-amber-700">Ingen aktive avtaler er knyttet til denne organisasjonen ennå.</p>
       )}
 
       {mode === "form" && (
         <>
       {rows.map((row, index) => (
         <fieldset key={row.id} className="rounded-xl border border-neutral-200 p-4">
-          <legend className="px-1 font-semibold text-neutral-800">Product {index + 1}</legend>
+          <legend className="px-1 font-semibold text-neutral-800">Produkt {index + 1}</legend>
           <div className="mb-4 flex items-center justify-between">
             {rows.length > 1 && (
               <button
                 type="button"
                 onClick={() => removeRow(row.id)}
                 disabled={working}
-                aria-label={`Remove product ${index + 1}`}
+                aria-label={`Fjern produkt ${index + 1}`}
                 className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                Remove
+                Fjern
               </button>
             )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium text-neutral-700">
-              Agreement
+              Avtale
               <select
                 value={row.agreementId}
                 onChange={(event) => updateRow(row.id, { agreementId: event.target.value })}
@@ -101,7 +101,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
                 className={fieldClass}
                 required
               >
-                <option value="">Choose an agreement</option>
+                <option value="">Velg en avtale</option>
                 {agreements.map((agreement) => (
                   <option key={agreement.id} value={agreement.id}>
                     {agreementLabel(agreement)}
@@ -111,7 +111,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              Product category
+              Produktkategori
               <select
                 value={row.productCategory}
                 onChange={(event) => updateRow(row.id, { productCategory: event.target.value })}
@@ -119,7 +119,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
                 className={fieldClass}
                 required
               >
-                <option value="">Choose category</option>
+                <option value="">Velg kategori</option>
                 {Object.entries(PRODUCT_CATEGORIES).map(([code, label]) => (
                   <option key={code} value={code}>
                     {label}
@@ -129,11 +129,11 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              Product code or SKU
+              Produktkode eller SKU
               <input
                 value={row.productCode}
                 onChange={(event) => updateRow(row.id, { productCode: event.target.value })}
-                placeholder="For example, PRD-FURN-001"
+                placeholder="For eksempel PRD-FURN-001"
                 disabled={working}
                 className={fieldClass}
                 required
@@ -141,11 +141,11 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              Product name
+              Produktnavn
               <input
                 value={row.productName}
                 onChange={(event) => updateRow(row.id, { productName: event.target.value })}
-                placeholder="For example, Office Desk Solid Pine"
+                placeholder="For eksempel Kontorpult i heltre furu"
                 disabled={working}
                 className={fieldClass}
                 required
@@ -153,7 +153,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              Ecolabel standard
+              Miljømerkestandard
               <select
                 value={row.ecolabelStandard}
                 onChange={(event) =>
@@ -175,16 +175,16 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              License or certification number
+              Lisens- eller sertifiseringsnummer
               {row.ecolabelStandard === "NONE" ? (
-                <span className="font-normal text-neutral-500"> (not applicable for None)</span>
+                <span className="font-normal text-neutral-500"> (ikke aktuelt for Ingen)</span>
               ) : (
-                <span className="font-normal text-amber-600"> (required)</span>
+                <span className="font-normal text-amber-600"> (påkrevd)</span>
               )}
               <input
                 value={row.licenseNumber}
                 onChange={(event) => updateRow(row.id, { licenseNumber: event.target.value })}
-                placeholder={row.ecolabelStandard === "NONE" ? "Not applicable" : "e.g. 2048-0012"}
+                placeholder={row.ecolabelStandard === "NONE" ? "Ikke aktuelt" : "f.eks. 2048-0012"}
                 disabled={working || row.ecolabelStandard === "NONE"}
                 className={fieldClass}
                 required={row.ecolabelStandard !== "NONE"}
@@ -192,7 +192,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              Unit of measure
+              Måleenhet
               <select
                 value={row.unitOfMeasure}
                 onChange={(event) => updateRow(row.id, { unitOfMeasure: event.target.value })}
@@ -209,7 +209,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
             </label>
 
             <label className="block text-sm font-medium text-neutral-700">
-              Repaired or reused product?
+              Reparert eller gjenbrukt produkt?
               <select
                 value={row.isRepairedOrReused === null ? "" : String(row.isRepairedOrReused)}
                 onChange={(event) =>
@@ -222,20 +222,20 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
                 className={fieldClass}
                 required
               >
-                <option value="false">No (New product)</option>
-                <option value="true">Yes (Circular / Repaired / Reused)</option>
+                <option value="false">Nei (nytt produkt)</option>
+                <option value="true">Ja (sirkulært / reparert / gjenbrukt)</option>
               </select>
             </label>
 
             <label className="block text-sm font-medium text-neutral-700 sm:col-span-2">
-              Notes <span className="font-normal text-neutral-500">(optional)</span>
+              Notater <span className="font-normal text-neutral-500">(valgfritt)</span>
               <textarea
                 value={row.notes}
                 onChange={(event) => updateRow(row.id, { notes: event.target.value })}
                 disabled={working}
                 rows={2}
                 className={fieldClass}
-                placeholder="Product specifics, material origins, or circular economy notes..."
+                placeholder="Produktdetaljer, materialopprinnelse eller merknader om sirkulær økonomi..."
               />
             </label>
           </div>
@@ -250,7 +250,7 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
           className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
-          Add another product
+          Legg til nytt produkt
         </button>
         <button
           type="button"
@@ -259,12 +259,12 @@ export function SupplierProductEntryForm({ agreements, working, onPreview, onCha
           className="inline-flex items-center gap-2 rounded-lg bg-primary-900 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Upload className="h-4 w-4" aria-hidden="true" />
-          {working ? "Validating…" : "Review product details"}
+          {working ? "Validerer…" : "Gjennomgå produktopplysninger"}
         </button>
       </div>
       {!isReady && agreements.length > 0 && (
         <p className="text-xs text-neutral-500">
-          Complete each product’s required details. If an ecolabel standard is chosen, the license number is required.
+          Fyll ut de obligatoriske opplysningene for hvert produkt. Hvis det velges en miljømerkestandard, må lisensnummer oppgis.
         </p>
       )}
         </>

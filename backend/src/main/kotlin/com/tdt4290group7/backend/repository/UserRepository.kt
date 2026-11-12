@@ -259,10 +259,10 @@ object UserRepository {
         email: String,
         now: Instant = Instant.now()
     ): SupplierInvitation {
-        require(supplierId.isNotBlank()) { "Supplier organization is required" }
+        require(supplierId.isNotBlank()) { "Leverandørorganisasjon må oppgis" }
         val normalizedEmail = email.trim().lowercase()
         require(normalizedEmail.length <= 254 && normalizedEmail.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
-            "Enter a valid email address"
+            "Skriv inn en gyldig e-postadresse"
         }
         val tokenBytes = ByteArray(32).also(random::nextBytes)
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes)
@@ -270,7 +270,7 @@ object UserRepository {
 
         write { db ->
             if (user(db, "email = ?", normalizedEmail) != null) {
-                throw AccountConflictException("An account already exists for this email address")
+                throw AccountConflictException("Det finnes allerede en konto for denne e-postadressen")
             }
             // A pending invitation from another organization must never be replaced: that would let one
             // inviter cancel or take over an address another organization has invited.
@@ -284,7 +284,7 @@ object UserRepository {
                 }
             }.any { it.isAfter(now) }
             if (pendingElsewhere || pendingAccessInvitationElsewhere(db, normalizedEmail, "SUPPLIER", supplierId, now)) {
-                throw AccountConflictException("This email has a pending invitation from another organization")
+                throw AccountConflictException("Denne e-postadressen har en ventende invitasjon fra en annen organisasjon")
             }
             db.prepareStatement("DELETE FROM supplier_invitations WHERE email = ? AND supplier_id = ? AND accepted_at IS NULL").use {
                 it.setString(1, normalizedEmail)
@@ -338,20 +338,20 @@ object UserRepository {
      */
     fun createAccessInvitation(inviter: User, email: String, supplierName: String?, accessEnd: java.time.LocalDate?, now: Instant = Instant.now(), supplierId: String? = null): AccessInvitation {
         // An admin may invite a colleague into a supplier organization (supplierId); suppliers always use their own.
-        require(supplierId == null || inviter.role == Role.ADMIN) { "Only an administrator can invite into another organization" }
+        require(supplierId == null || inviter.role == Role.ADMIN) { "Bare en administrator kan invitere til en annen organisasjon" }
         val orgId = supplierId ?: inviter.supplierId
         val role = if (supplierId != null) Role.SUPPLIER.name else inviter.role.name
         val normalizedEmail = email.trim().lowercase()
-        require(normalizedEmail.length <= 254 && normalizedEmail.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) { "Enter a valid email address" }
+        require(normalizedEmail.length <= 254 && normalizedEmail.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) { "Skriv inn en gyldig e-postadresse" }
         val accessExpires = grantExpiry(inviter, accessEnd, now)
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(random::nextBytes))
         val expiresAt = now.plus(INVITATION_TTL)
         write { db ->
-            if (user(db, "email = ?", normalizedEmail) != null) throw AccountConflictException("An account already exists for this email address")
+            if (user(db, "email = ?", normalizedEmail) != null) throw AccountConflictException("Det finnes allerede en konto for denne e-postadressen")
             if (pendingAccessInvitationElsewhere(db, normalizedEmail, role, orgId, now) ||
                 pendingSupplierInvitationElsewhere(db, normalizedEmail, orgId.takeIf { role == Role.SUPPLIER.name }, now) ||
                 (role == Role.ADMIN.name && pendingSupplierInvitationElsewhere(db, normalizedEmail, "\u0000none", now))
-            ) throw AccountConflictException("This email has a pending invitation from another organization")
+            ) throw AccountConflictException("Denne e-postadressen har en ventende invitasjon fra en annen organisasjon")
             db.prepareStatement("DELETE FROM access_invitations WHERE email = ? AND accepted_at IS NULL").use { it.setString(1, normalizedEmail); it.executeUpdate() }
             db.prepareStatement(
                 """INSERT INTO access_invitations (id, email, role, supplier_id, supplier_name, token_hash, created_at, expires_at, accepted_at, invited_by, access_expires_at)
@@ -378,10 +378,10 @@ object UserRepository {
             return granterEnd // inherits the granter's end; null when the granter's access has none
         }
         val today = now.atZone(java.time.ZoneId.of("Europe/Oslo")).toLocalDate()
-        require(endDate.isAfter(today) || endDate == today) { "The end date cannot be in the past" }
-        require(!endDate.isAfter(today.plusDays(MAX_GRANT_DAYS))) { "Access can be given for at most $MAX_GRANT_DAYS days at a time" }
+        require(endDate.isAfter(today) || endDate == today) { "Sluttdatoen kan ikke være i fortiden" }
+        require(!endDate.isAfter(today.plusDays(MAX_GRANT_DAYS))) { "Tilgang kan gis for maks. $MAX_GRANT_DAYS dager om gangen" }
         val expiry = accessExpiryFor(endDate)
-        require(granterEnd == null || !expiry.isAfter(granterEnd)) { "The end date cannot be later than the end of your own access" }
+        require(granterEnd == null || !expiry.isAfter(granterEnd)) { "Sluttdatoen kan ikke være senere enn slutten på din egen tilgang" }
         return expiry
     }
 
@@ -429,15 +429,15 @@ object UserRepository {
 
     /** Renew a grant that is close to expiring (14 days or fewer left) or has expired. Never your own. */
     fun renewAccess(actor: User, targetId: String, endDate: java.time.LocalDate, now: Instant = Instant.now()) {
-        val target = findById(targetId) ?: throw NoSuchElementException("Account not found")
-        require(actor.id != target.id) { "You cannot renew your own access" }
-        require(mayManage(actor, target)) { "Only the person who gave this access, or an administrator, can renew it" }
-        val end = target.accessExpiresAt ?: throw IllegalArgumentException("This access has no end date to renew")
-        require(!target.permanent) { "This account cannot expire" }
-        require(end.isBefore(now.plus(Duration.ofDays(RENEW_WINDOW_DAYS)))) { "Access can be renewed when it has $RENEW_WINDOW_DAYS days or fewer left" }
+        val target = findById(targetId) ?: throw NoSuchElementException("Fant ikke kontoen")
+        require(actor.id != target.id) { "Du kan ikke fornye din egen tilgang" }
+        require(mayManage(actor, target)) { "Bare personen som ga denne tilgangen, eller en administrator, kan fornye den" }
+        val end = target.accessExpiresAt ?: throw IllegalArgumentException("Denne tilgangen har ingen sluttdato som kan fornyes")
+        require(!target.permanent) { "Denne kontoen kan ikke utløpe" }
+        require(end.isBefore(now.plus(Duration.ofDays(RENEW_WINDOW_DAYS)))) { "Tilgang kan fornyes når det er $RENEW_WINDOW_DAYS dager eller mindre igjen" }
         val expiry = if (actor.role == Role.ADMIN) {
             val today = now.atZone(java.time.ZoneId.of("Europe/Oslo")).toLocalDate()
-            require(!endDate.isBefore(today) && !endDate.isAfter(today.plusDays(MAX_GRANT_DAYS))) { "Access can be given for at most $MAX_GRANT_DAYS days at a time" }
+            require(!endDate.isBefore(today) && !endDate.isAfter(today.plusDays(MAX_GRANT_DAYS))) { "Tilgang kan gis for maks. $MAX_GRANT_DAYS dager om gangen" }
             accessExpiryFor(endDate)
         } else grantExpiry(actor, endDate, now)!!
         write { db ->
@@ -447,10 +447,10 @@ object UserRepository {
 
     /** Ends someone's access now. The granter or an admin can; the permanent admin never. */
     fun revokeAccess(actor: User, targetId: String, now: Instant = Instant.now()) {
-        val target = findById(targetId) ?: throw NoSuchElementException("Account not found")
-        require(!target.permanent) { "This account cannot be removed" }
-        require(actor.id != target.id) { "You cannot remove your own access" }
-        require(mayManage(actor, target)) { "Only the person who gave this access, or an administrator, can remove it" }
+        val target = findById(targetId) ?: throw NoSuchElementException("Fant ikke kontoen")
+        require(!target.permanent) { "Denne kontoen kan ikke fjernes" }
+        require(actor.id != target.id) { "Du kan ikke fjerne din egen tilgang" }
+        require(mayManage(actor, target)) { "Bare personen som ga denne tilgangen, eller en administrator, kan fjerne den" }
         write { db ->
             db.prepareStatement("UPDATE users SET access_expires_at = ? WHERE id = ?").use { it.setString(1, now.toString()); it.setString(2, targetId); it.executeUpdate() }
         }
@@ -458,9 +458,9 @@ object UserRepository {
 
     /** An admin approves a grant so it keeps working if the person who gave it later loses access. */
     fun approveAccess(admin: User, targetId: String, now: Instant = Instant.now()) {
-        require(admin.role == Role.ADMIN) { "Administrator access required" }
-        val target = findById(targetId) ?: throw NoSuchElementException("Account not found")
-        require(target.grantedBy != null) { "Only access that someone granted needs approval" }
+        require(admin.role == Role.ADMIN) { "Krever administratortilgang" }
+        val target = findById(targetId) ?: throw NoSuchElementException("Fant ikke kontoen")
+        require(target.grantedBy != null) { "Bare tilgang som noen har gitt, trenger godkjenning" }
         write { db ->
             db.prepareStatement("UPDATE users SET access_approved_by = ?, access_approved_at = ? WHERE id = ?").use {
                 it.setString(1, admin.id); it.setString(2, now.toString()); it.setString(3, targetId); it.executeUpdate()
@@ -512,7 +512,7 @@ object UserRepository {
             db.prepareStatement("UPDATE supplier_invitations SET accepted_at = ? WHERE id = ? AND accepted_at IS NULL").use {
                 it.setString(1, now.toString())
                 it.setString(2, invite.id)
-                check(it.executeUpdate() == 1) { "Invitation was already accepted" }
+                check(it.executeUpdate() == 1) { "Invitasjonen er allerede akseptert" }
             }
             user(db, "id = ?", userId)
         }
@@ -533,7 +533,7 @@ object UserRepository {
             }
         } ?: return null
         val displayName = name?.trim().orEmpty()
-        if (displayName.isEmpty() || displayName.length > 100) throw IllegalArgumentException("Enter your name")
+        if (displayName.isEmpty() || displayName.length > 100) throw IllegalArgumentException("Skriv inn navnet ditt")
         if (!invite.expiresAt.isAfter(now) || user(db, "email = ?", invite.email) != null) return null
         if (invite.role == "SUPPLIER" && !supplierIsActive(invite.supplierId.orEmpty())) return null
         // The invitation cannot create access that outlasts its end date, or the inviter's own access.
@@ -552,7 +552,7 @@ object UserRepository {
         }
         db.prepareStatement("UPDATE access_invitations SET accepted_at = ? WHERE id = ? AND accepted_at IS NULL").use {
             it.setString(1, now.toString()); it.setString(2, invite.id)
-            check(it.executeUpdate() == 1) { "Invitation was already accepted" }
+            check(it.executeUpdate() == 1) { "Invitasjonen er allerede akseptert" }
         }
         return user(db, "id = ?", userId)
     }
@@ -563,7 +563,7 @@ object UserRepository {
             db.prepareStatement("UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?").use {
                 it.setString(1, hash(newPassword))
                 it.setString(2, user.id)
-                check(it.executeUpdate() == 1) { "Account no longer exists" }
+                check(it.executeUpdate() == 1) { "Kontoen finnes ikke lenger" }
             }
         }
     }

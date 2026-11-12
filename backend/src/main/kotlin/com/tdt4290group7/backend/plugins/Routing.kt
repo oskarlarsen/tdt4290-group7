@@ -33,6 +33,8 @@ import kotlinx.serialization.SerializationException
 
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.onboarding.onboardingRoutes
+import com.tdt4290group7.backend.onboarding.adminEnergyRoutes
+import com.tdt4290group7.backend.onboarding.supplierEnergyEvidenceRoutes
 import com.tdt4290group7.backend.admin.adminDashboardRoutes
 import com.tdt4290group7.backend.admin.AdminInsightsRepository
 
@@ -65,6 +67,8 @@ fun Application.configureRouting(
                 repository.onboarding.attachCertificateRepository(certificateRepository)
                 fleetRoutes(repository.fleet, registryLookup)
                 onboardingRoutes(repository.onboarding, certificateRepository, registryLookup)
+                adminEnergyRoutes(repository.onboarding)
+                supplierEnergyEvidenceRoutes(repository.onboarding)
                 if (certificateRepository != null && adminInsightsRepository != null) {
                     adminDashboardRoutes(repository.fleet, repository, certificateRepository, adminInsightsRepository)
                 }
@@ -74,9 +78,9 @@ fun Application.configureRouting(
                 val result = try {
                     repository.vehicleDetails(call.parameters["registrationNumber"]!!)
                 } catch (cause: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid registration number"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldig registreringsnummer"))
                     return@get
-                } ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Vehicle not found"))
+                } ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke kjøretøyet"))
                 call.respond(result)
             }
 
@@ -86,9 +90,9 @@ fun Application.configureRouting(
                     repository.checkHistory(call.parameters["registrationNumber"]!!,
                         pageParameter(call.request.queryParameters["page"], 1), pageParameter(call.request.queryParameters["pageSize"], 10))
                 } catch (cause: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid history query"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldig historikkspørring"))
                     return@get
-                } ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Vehicle not found"))
+                } ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke kjøretøyet"))
                 call.respond(result)
             }
 
@@ -98,7 +102,7 @@ fun Application.configureRouting(
                     repository.listTripRows(call.request.queryParameters["search"] ?: "",
                         pageParameter(call.request.queryParameters["page"], 1), pageParameter(call.request.queryParameters["pageSize"], 25))
                 } catch (cause: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid statistics query"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldig statistikkspørring"))
                     return@get
                 }
                 call.respond(result)
@@ -110,13 +114,13 @@ fun Application.configureRouting(
                 val request = try {
                     decodeTripRowsRequest(call.receiveText())
                 } catch (_: SerializationException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError("Invalid trip rows JSON"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig JSON for turrader"))
                     return@post
                 }
                 val response = try {
                     repository.appendTripRows(request, Instant.now())
                 } catch (cause: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid trip rows"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldige turrader"))
                     return@post
                 }
                 call.application.log.info(
@@ -132,7 +136,7 @@ fun Application.configureRouting(
                     } catch (_: Exception) {
                         // Never log a raw plate, supplier observations, SVV payload or exception message.
                         call.application.log.warn("statistics_automatic_check_failed")
-                        StatisticsCheckResult(plate, error = "Statistics saved, but automatic verification failed. Retry the check from vehicle details; do not resubmit statistics.")
+                        StatisticsCheckResult(plate, error = "Statistikken er lagret, men den automatiske kontrollen mislyktes. Kjør sjekken på nytt fra kjøretøydetaljene. Ikke send inn statistikken på nytt.")
                     }
                 }
                 call.respond(HttpStatusCode.Created, response.copy(checks = results))
@@ -151,13 +155,13 @@ fun Application.configureRouting(
                 val request = try {
                     decodeVehicleCheckRequest(call.receiveText())
                 } catch (_: SerializationException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError("Invalid vehicle check JSON"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig JSON for kjøretøysjekk"))
                     return@post
                 }
                 val response = try {
                     checks.check(request)
                 } catch (cause: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid vehicle check"))
+                    call.respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldig kjøretøysjekk"))
                     return@post
                 }
                 call.application.log.info(
@@ -171,7 +175,7 @@ fun Application.configureRouting(
                 if (call.adminActor() == null) return@get
                 val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val result = repository.findCheck(id)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Vehicle check not found"))
+                    ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke kjøretøysjekken"))
                 call.respond(result)
             }
         }
@@ -179,4 +183,4 @@ fun Application.configureRouting(
 }
 
 private fun pageParameter(value: String?, default: Int): Int =
-    if (value == null) default else value.toIntOrNull() ?: throw IllegalArgumentException("Pagination values must be integers")
+    if (value == null) default else value.toIntOrNull() ?: throw IllegalArgumentException("Sidetallsverdiene må være heltall")

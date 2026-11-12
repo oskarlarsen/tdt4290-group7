@@ -65,4 +65,4 @@ private fun JsonObject.booleanFields(vararg names: String) {
     } }
 }
 
-private fun invalidType(): Nothing = throw SerializationException("Unexpected JSON field type")
+private fun invalidType(): Nothing = throw SerializationException("Uventet JSON-felttype")

@@ -38,16 +38,16 @@ describe("supplier product entry form", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "agreement-product-1" } });
-    fireEvent.change(screen.getByLabelText("Product category"), { target: { value: "FURNITURE" } });
-    fireEvent.change(screen.getByLabelText("Product code or SKU"), { target: { value: "FURN-DESK-01" } });
-    fireEvent.change(screen.getByLabelText("Product name"), { target: { value: "Standing Desk Oak" } });
-    fireEvent.change(screen.getByLabelText("Ecolabel standard"), { target: { value: "NORDIC_SWAN" } });
-    fireEvent.change(screen.getByLabelText(/License or certification number/), { target: { value: "5020-0011" } });
-    fireEvent.change(screen.getByLabelText("Unit of measure"), { target: { value: "PCS" } });
-    fireEvent.change(screen.getByLabelText("Repaired or reused product?"), { target: { value: "false" } });
+    fireEvent.change(screen.getByLabelText("Avtale"), { target: { value: "agreement-product-1" } });
+    fireEvent.change(screen.getByLabelText("Produktkategori"), { target: { value: "FURNITURE" } });
+    fireEvent.change(screen.getByLabelText("Produktkode eller SKU"), { target: { value: "FURN-DESK-01" } });
+    fireEvent.change(screen.getByLabelText("Produktnavn"), { target: { value: "Standing Desk Oak" } });
+    fireEvent.change(screen.getByLabelText("Miljømerkestandard"), { target: { value: "NORDIC_SWAN" } });
+    fireEvent.change(screen.getByLabelText(/Lisens- eller sertifiseringsnummer/), { target: { value: "5020-0011" } });
+    fireEvent.change(screen.getByLabelText("Måleenhet"), { target: { value: "PCS" } });
+    fireEvent.change(screen.getByLabelText("Reparert eller gjenbrukt produkt?"), { target: { value: "false" } });
 
-    const reviewButton = screen.getByRole("button", { name: "Review product details" });
+    const reviewButton = screen.getByRole("button", { name: "Gjennomgå produktopplysninger" });
     expect((reviewButton as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(reviewButton);
@@ -68,17 +68,17 @@ describe("supplier product entry form", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add another product" }));
-    expect(screen.getByText("Product 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Legg til nytt produkt" }));
+    expect(screen.getByText("Produkt 2")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove product 2" }));
-    expect(screen.queryByText("Product 2")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Fjern produkt 2" }));
+    expect(screen.queryByText("Produkt 2")).toBeNull();
   });
 
   it("shows the CSV upload instead of the form in CSV mode", () => {
     const onPreview = vi.fn();
     render(<SupplierProductEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={vi.fn()} mode="csv" />);
-    expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Last ned CSV-mal/ })).toBeTruthy();
     const file = new File(["a;b"], "products.csv", { type: "text/csv" });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
     expect(onPreview).toHaveBeenCalledWith(file);

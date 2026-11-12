@@ -49,7 +49,7 @@ export function NoticeReviewDialog({
         <div className="flex items-start justify-between gap-4">
           <div className={wrapReason ? "min-w-0 flex-1" : ""}>
             <h2 id="send-notice-title" className="font-headline text-lg font-semibold text-neutral-900">
-              Review notice
+              Gjennomgå melding
             </h2>
             <dl
               className={`mt-3 text-sm ${
@@ -60,7 +60,7 @@ export function NoticeReviewDialog({
             >
               {riskIndicator && (
                 <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
-                  <dt className="text-neutral-500">Risk / Risk Indicator</dt>
+                  <dt className="text-neutral-500">Risiko / risikoindikator</dt>
                   <dd
                     className={
                       wrapReason
@@ -73,7 +73,7 @@ export function NoticeReviewDialog({
                 </div>
               )}
               <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
-                <dt className="text-neutral-500">Contract</dt>
+                <dt className="text-neutral-500">Avtale</dt>
                 <dd
                   className={
                     wrapReason
@@ -85,7 +85,7 @@ export function NoticeReviewDialog({
                 </dd>
               </div>
               <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
-                <dt className="text-neutral-500">Supplier</dt>
+                <dt className="text-neutral-500">Leverandør</dt>
                 <dd
                   className={
                     wrapReason
@@ -97,7 +97,7 @@ export function NoticeReviewDialog({
                 </dd>
               </div>
               <div className={wrapReason ? "contents" : "flex justify-between gap-4"}>
-                <dt className="text-neutral-500">Reason</dt>
+                <dt className="text-neutral-500">Årsak</dt>
                 <dd
                   className={
                     wrapReason
@@ -111,7 +111,7 @@ export function NoticeReviewDialog({
             </dl>
             <div className="mt-3 rounded-lg bg-neutral-50 p-3">
               <label htmlFor="notice-message" className="text-xs font-medium text-neutral-500">
-                Notice message
+                Varselmelding
               </label>
               <textarea
                 id="notice-message"
@@ -124,13 +124,13 @@ export function NoticeReviewDialog({
             </div>
             {showDemoNote && (
               <p className="mt-3 text-xs leading-5 text-neutral-500">
-                Demo only — no email will be sent.
+                Kun demo – ingen e-post blir sendt.
               </p>
             )}
           </div>
           <button
             onClick={onCancel}
-            aria-label="Close"
+            aria-label="Lukk"
             className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
@@ -142,14 +142,14 @@ export function NoticeReviewDialog({
             onClick={onCancel}
             className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
           >
-            Cancel
+            Avbryt
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
           >
-            Send notice
+            Send melding
           </button>
         </div>
       </div>

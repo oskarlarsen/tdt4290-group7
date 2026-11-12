@@ -38,18 +38,18 @@ describe("admin alerts page filters", () => {
     expect(screen.getByText("Alert progress")).toBeTruthy();
     expect(screen.getByText("Alert review")).toBeTruthy();
     expect(screen.queryByText("Alert done")).toBeNull();
-    expect((screen.getByLabelText("Filter alerts by status") as HTMLSelectElement).value).toBe("UNRESOLVED");
+    expect((screen.getByLabelText("Filtrer varsler etter status") as HTMLSelectElement).value).toBe("UNRESOLVED");
   });
 
   it("renders without agreement data and shows everything by default", () => {
     mount("/admin/alerts");
     expect(screen.getByText("Alert done")).toBeTruthy();
-    expect(screen.queryByText(/Couldn't load alerts/)).toBeNull();
+    expect(screen.queryByText(/Kunne ikke laste varsler/)).toBeNull();
   });
 
   it("writes the chosen status back to the URL and drops it for All", () => {
     mount("/admin/alerts?status=unresolved");
-    const select = screen.getByLabelText("Filter alerts by status");
+    const select = screen.getByLabelText("Filtrer varsler etter status");
     fireEvent.change(select, { target: { value: "RESOLVED" } });
     expect(screen.getByTestId("where").textContent).toBe("/admin/alerts?status=resolved");
     expect(screen.getByText("Alert done")).toBeTruthy();

@@ -1,7 +1,7 @@
 import type { Certificate } from "../types/certificate";
 import type { DerivedContract } from "../types/contract";
 import type { RecentAlert, TopRiskSupplier } from "../types/dashboard";
-import type { EnergyRequirement, EnergyRecord } from "../types/energy";
+import type { EnergyContract } from "../types/energy";
 import type { FleetOverview } from "../types/vehicle";
 
 export const MOCK_SUPPLIER_MAPPING = "sup-c"; // Phase 1.1: Named constant for mapping
@@ -23,15 +23,15 @@ export type SupplierOverviewData = {
     vehicles: { tracked: number; flagged: number; state: "normal" | "not-applicable" | "data-missing" };
     energy: {
       state: "normal" | "not-applicable" | "data-missing";
-      renewableSharePercent?: number;
-      minRenewableSharePercent?: number;
+      selfProducedKwh?: number;
+      committedSelfProducedKwh?: number;
       isBreach?: boolean;
     };
   };
   raw: {
     vehicles: FleetOverview | null;
     certificates: Certificate[];
-    energy: { requirement: EnergyRequirement | undefined; record: EnergyRecord | undefined };
+    energy: EnergyContract | undefined;
   };
   alerts: RecentAlert[];
 };
@@ -42,7 +42,7 @@ export function buildSupplierOverview(
   allContracts: DerivedContract[],
   allCertificates: Certificate[],
   fleetRes: FleetOverview | null,
-  energyData: { requirements: EnergyRequirement[]; records: EnergyRecord[] },
+  energyData: EnergyContract[],
   allAlerts: RecentAlert[]
 ): SupplierOverviewData {
 
@@ -57,8 +57,7 @@ export function buildSupplierOverview(
 
   // Scoping data
   const myCertificates = allCertificates.filter(c => c.contractId === contractId);
-  const myEnergyReq = energyData.requirements.find(r => r.contractId === contractId);
-  const myEnergyRec = energyData.records.find(r => r.contractId === contractId);
+  const myEnergy = energyData.find(row => row.agreementId === contractId);
   const myAlerts = allAlerts.filter(a => a.supplierId === supplierId);
 
   // Summaries calculation
@@ -101,50 +100,45 @@ export function buildSupplierOverview(
       flaggedVehicles = myAlerts.filter(a => a.category === "VEHICLE_COMPLIANCE" || a.affectedItem?.type === "Vehicle").length; // Approximation for V1
   }
 
+  // Only contracts that require energy reporting have a summary.
   let energyState: "normal" | "not-applicable" | "data-missing" = "normal";
-  let renewableSharePercent: number | undefined;
-  let minRenewableSharePercent: number | undefined;
+  let selfProducedKwh: number | undefined;
+  let committedSelfProducedKwh: number | undefined;
   let isBreach = false;
 
-  if (!myEnergyReq) {
+  if (!myEnergy) {
       energyState = "not-applicable";
-  } else if (!myEnergyRec) {
+  } else if (myEnergy.status === "MISSING_DATA") {
       energyState = "data-missing";
   } else {
-      minRenewableSharePercent = myEnergyReq.minRenewableSharePercent;
-      const { electric = 0, biogas = 0, fossil = 0 } = myEnergyRec.consumptionKwh;
-      const total = electric + biogas + fossil;
-      if (total > 0) {
-          renewableSharePercent = Math.round(((electric + biogas) / total) * 100);
-          isBreach = renewableSharePercent < minRenewableSharePercent;
-      } else {
-          energyState = "data-missing";
-      }
+      selfProducedKwh = myEnergy.selfProducedKwh;
+      committedSelfProducedKwh = myEnergy.commitment?.minSelfProducedKwh;
+      isBreach = myEnergy.status === "NON_COMPLIANT";
   }
 
   // Required Actions mapping
   const requiredActions: RequiredAction[] = [];
 
   if (missingCerts > 0) {
-      requiredActions.push({ title: "Upload certificate documentation", reason: "Certificate documentation missing", link: "/supplier/certificates", priority: 1 });
+      requiredActions.push({ title: "Last opp sertifikatdokumentasjon", reason: "Sertifikatdokumentasjon mangler", link: "/supplier/certificates", priority: 1 });
   }
   if (expiredCerts > 0) {
-      requiredActions.push({ title: "Renew the certificate", reason: "Certificate expired", link: "/supplier/certificates", priority: 2 });
+      requiredActions.push({ title: "Forny sertifikatet", reason: "Sertifikatet er utløpt", link: "/supplier/certificates", priority: 2 });
   }
   if (expiringCerts > 0) {
-      requiredActions.push({ title: "Plan the renewal", reason: "Certificate expiring", link: "/supplier/certificates", priority: 3 });
+      requiredActions.push({ title: "Planlegg fornyelsen", reason: "Sertifikatet utløper snart", link: "/supplier/certificates", priority: 3 });
   }
   if (vehicleState === "data-missing") {
-      requiredActions.push({ title: "Submit vehicle data", reason: "Vehicle data not submitted", link: "/supplier/vehicles", priority: 4 });
+      requiredActions.push({ title: "Send inn kjøretøydata", reason: "Kjøretøydata er ikke sendt inn", link: "/supplier/vehicles", priority: 4 });
   }
   if (flaggedVehicles > 0) {
-      requiredActions.push({ title: "Review flagged vehicles", reason: "Flagged vehicles", link: "/supplier/vehicles", priority: 5 });
+      requiredActions.push({ title: "Gå gjennom markerte kjøretøy", reason: "Markerte kjøretøy", link: "/supplier/vehicles", priority: 5 });
   }
   if (energyState === "data-missing") {
-      requiredActions.push({ title: "Submit energy data", reason: "Energy data not submitted", link: "/supplier/energy", priority: 6 });
+      requiredActions.push({ title: "Send inn energidata", reason: "Energidata er ikke sendt inn", link: "/supplier/energy", priority: 6 });
   }
   if (isBreach) {
-      requiredActions.push({ title: "Review energy data", reason: "Energy breach or minor deviation", link: "/supplier/energy", priority: 7 });
+      requiredActions.push({ title: "Gå gjennom energidata", reason: "Energiforpliktelsen er ikke oppfylt", link: "/supplier/energy", priority: 7 });
   }
 
   requiredActions.sort((a, b) => a.priority - b.priority);
@@ -157,12 +151,12 @@ export function buildSupplierOverview(
     summaries: {
       certificates: { valid: validCerts, expiring: expiringCerts, expired: expiredCerts, missing: missingCerts },
       vehicles: { tracked: trackedVehicles, flagged: flaggedVehicles, state: vehicleState },
-      energy: { state: energyState, renewableSharePercent, minRenewableSharePercent, isBreach }
+      energy: { state: energyState, selfProducedKwh, committedSelfProducedKwh, isBreach }
     },
     raw: {
       vehicles: fleetRes,
       certificates: myCertificates,
-      energy: { requirement: myEnergyReq, record: myEnergyRec }
+      energy: myEnergy
     },
     alerts: myAlerts
   };

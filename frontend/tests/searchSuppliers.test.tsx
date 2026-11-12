@@ -14,7 +14,7 @@ afterEach(cleanup);
 describe("supplier search", () => {
   it("finds a real supplier organization and opens it on the suppliers page", () => {
     render(<MemoryRouter><SearchSuppliers /><Where /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText(/Search suppliers/), { target: { value: "acme" } });
+    fireEvent.change(screen.getByLabelText(/Søk etter leverandører/), { target: { value: "acme" } });
     fireEvent.click(screen.getByText("Acme Transport AS"));
     expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers?org=org-1");
   });

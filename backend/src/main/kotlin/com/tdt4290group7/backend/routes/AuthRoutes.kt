@@ -76,7 +76,7 @@ fun Application.configureAuthRoutes(
                     val email = request.email.trim()
 
                     if (email.isEmpty() || request.password.isEmpty()) {
-                        call.respond(HttpStatusCode.BadRequest, ErrorResponse("Email and password are required."))
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse("E-post og passord må fylles ut."))
                         return@post
                     }
 
@@ -89,8 +89,8 @@ fun Application.configureAuthRoutes(
                         call.respond(
                             HttpStatusCode.TooManyRequests,
                             ErrorResponse(
-                                "Too many failed sign-in attempts. Try again in " +
-                                    if (minutes <= 1) "a minute." else "$minutes minutes."
+                                "For mange mislykkede innloggingsforsøk. Prøv igjen om " +
+                                    if (minutes <= 1) "ett minutt." else "$minutes minutter."
                             )
                         )
                         return@post
@@ -102,7 +102,7 @@ fun Application.configureAuthRoutes(
                     if (user == null || (user.role == com.tdt4290group7.backend.model.Role.SUPPLIER &&
                             !supplierIsActive(user.supplierId.orEmpty()))) {
                         LoginAttemptTracker.recordFailure(email)
-                        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid email/username or password."))
+                        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Ugyldig e-post/brukernavn eller passord."))
                         return@post
                     }
                     LoginAttemptTracker.recordSuccess(email)
@@ -155,7 +155,7 @@ fun Application.configureAuthRoutes(
                     if (user == null) {
                         call.respond(
                             HttpStatusCode.BadRequest,
-                            ErrorResponse("Invalid or expired reset code. Request a new one.")
+                            ErrorResponse("Ugyldig eller utløpt tilbakestillingskode. Be om en ny.")
                         )
                         return@post
                     }
@@ -181,13 +181,13 @@ fun Application.configureAuthRoutes(
                             name = request.name
                         )
                     } catch (e: IllegalArgumentException) {
-                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Ugyldig forespørsel"))
                         return@post
                     }
                     if (user == null) {
                         call.respond(
                             HttpStatusCode.BadRequest,
-                            ErrorResponse("This supplier invitation is invalid, expired, or already used.")
+                            ErrorResponse("Denne leverandørinvitasjonen er ugyldig, utløpt eller allerede brukt.")
                         )
                         return@post
                     }

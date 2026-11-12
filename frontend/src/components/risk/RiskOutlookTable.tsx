@@ -6,7 +6,7 @@ import type { RiskOutlookRow } from "../../types/riskOutlook";
 export function RiskOutlookTable({
   rows,
   onSelect,
-  emptyMessage = "No contracts to show.",
+  emptyMessage = "Ingen avtaler å vise.",
 }: {
   rows: RiskOutlookRow[];
   onSelect: (row: RiskOutlookRow) => void;
@@ -21,12 +21,12 @@ export function RiskOutlookTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org no.</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Primary risk driver</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Next projected breach</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Risk priority</th>
-            <th scope="col" className="pb-2 font-medium">Action</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Leverandør og org.nr.</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Avtale</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Hovedrisikofaktor</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Neste predikerte brudd</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Risikoprioritet</th>
+            <th scope="col" className="pb-2 font-medium">Handling</th>
           </tr>
         </thead>
         <tbody>
@@ -51,12 +51,12 @@ export function RiskOutlookTable({
                       <div className="text-xs text-neutral-500">{primary.detail}</div>
                       {extra > 0 && (
                         <div className="mt-0.5 text-xs text-neutral-500">
-                          +{extra} more indicator{extra === 1 ? "" : "s"}
+                          +{extra} {extra === 1 ? "indikator til" : "indikatorer til"}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className="text-xs text-neutral-500">No risk indicators</span>
+                    <span className="text-xs text-neutral-500">Ingen risikoindikatorer</span>
                   )}
                 </td>
                 <td className="py-3 pr-3">
@@ -72,7 +72,7 @@ export function RiskOutlookTable({
                   ) : (
                     <>
                       <div className="text-neutral-500">—</div>
-                      <div className="text-xs text-neutral-500">No upcoming expiry on record</div>
+                      <div className="text-xs text-neutral-500">Ingen kommende utløp registrert</div>
                     </>
                   )}
                 </td>
@@ -84,7 +84,7 @@ export function RiskOutlookTable({
                     onClick={() => onSelect(row)}
                     className="whitespace-nowrap rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                   >
-                    View details
+                    Vis detaljer
                   </button>
                 </td>
               </tr>

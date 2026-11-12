@@ -292,7 +292,7 @@ class OnboardingWorkflowTest {
         assertFalse(previewObj["canCommit"]?.jsonPrimitive?.boolean ?: true)
         val errors = previewObj["errors"]?.jsonArray
         assertTrue(errors != null && errors.size > 0)
-        assertTrue(errors[0].jsonObject["message"]?.jsonPrimitive?.content?.contains("does not belong to your organization") ?: false)
+        assertTrue(errors[0].jsonObject["message"]?.jsonPrimitive?.content?.contains("tilhører ikke organisasjonen din") ?: false)
     }
 
     @Test
@@ -416,8 +416,8 @@ class OnboardingWorkflowTest {
 
         // 1. Submit energy data
         val energyCsv = """
-            agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,notes
-            ${energyAgreement.id},DEPOT-TRD-01,Kongens gate 1 7011 Trondheim,500,250,50,2026,15000,25000,1000,0,3500,0,Main facility
+            agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,reporting_quarter,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,goo_covered_kwh,notes
+            ${energyAgreement.id},DEPOT-TRD-01,Kongens gate 1 7011 Trondheim,500,250,50,2026,2,15000,25000,1000,0,3500,0,2000,Main facility
         """.trimIndent()
 
         val energyPreviewRes = supplier.submitFormWithBinaryData(
@@ -521,7 +521,7 @@ class OnboardingWorkflowTest {
         val failure = kotlin.runCatching {
             repo.onboarding.confirmBatch(batchId, "nordvik-transport", start.plusSeconds(16 * 60))
         }.exceptionOrNull()
-        assertTrue(failure is IllegalArgumentException && failure.message!!.contains("expired"), failure.toString())
+        assertTrue(failure is IllegalArgumentException && failure.message!!.contains("utløpt"), failure.toString())
     }
 
     @Test

@@ -50,18 +50,18 @@ export function SearchSuppliers() {
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
-        aria-label="Search suppliers, contracts and alerts"
-        placeholder="Search suppliers, contracts, alerts…"
+        aria-label="Søk etter leverandører, avtaler og varsler"
+        placeholder="Søk etter leverandører, avtaler, varsler…"
         className="w-full rounded-lg border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-sm text-neutral-700 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
       />
 
       {open && q.length > 0 && (
         <div className="absolute left-0 right-0 z-10 mt-1 max-h-96 overflow-y-auto rounded-lg border border-neutral-100 bg-white p-1 shadow-card">
           {supplierMatches.length === 0 && organizationMatches.length === 0 && alertMatches.length === 0 && (
-            <div className="px-3 py-2 text-sm text-neutral-500">No matches.</div>
+            <div className="px-3 py-2 text-sm text-neutral-500">Ingen treff.</div>
           )}
           {supplierMatches.length + organizationMatches.length > 0 && (
-            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Suppliers</div>
+            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Leverandører</div>
           )}
           {supplierMatches.map((s) => (
             <button
@@ -80,11 +80,11 @@ export function SearchSuppliers() {
               className="block w-full rounded-md px-3 py-2 text-left hover:bg-neutral-50"
             >
               <div className="text-sm font-medium text-neutral-900">{o.name}</div>
-              <div className="text-xs text-neutral-500">Supplier organization · {o.orgNumber}</div>
+              <div className="text-xs text-neutral-500">Leverandørorganisasjon · {o.orgNumber}</div>
             </button>
           ))}
           {alertMatches.length > 0 && (
-            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Alerts</div>
+            <div className="px-3 pt-2 text-[10px] font-mono uppercase tracking-wide text-neutral-500">Varsler</div>
           )}
           {alertMatches.map((a) => (
             <button

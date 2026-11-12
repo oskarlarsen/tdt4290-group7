@@ -63,13 +63,13 @@ object VehicleRegistryFill {
                         "registry_status" to "FILLED",
                     ) + (result.fuel.vehicleCategory?.let { mapOf("vehicle_category" to it) } ?: emptyMap())
                     is LookupResult.NotFound -> {
-                        errors += CsvCellError(csvRow, "registration_number", "$plate was not found in Statens vegvesen. Check the registration number.", plate)
+                        errors += CsvCellError(csvRow, "registration_number", "$plate ble ikke funnet hos Statens vegvesen. Kontroller registreringsnummeret.", plate)
                         row + ("registry_status" to "NOT_FOUND")
                     }
                     is LookupResult.NotChecked, null -> {
                         errors += CsvCellError(
                             csvRow, "fuel_technology",
-                            "Statens vegvesen could not be checked for $plate. Fill in fuel_technology yourself, or try again later.", plate,
+                            "Kunne ikke sjekke $plate hos Statens vegvesen. Fyll ut fuel_technology selv, eller prøv igjen senere.", plate,
                         )
                         row + ("registry_status" to "NOT_CHECKED")
                     }

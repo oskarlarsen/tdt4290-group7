@@ -15,18 +15,18 @@ function getSuggestedNoticeMessage(
   const detail = primary.detail ? ` ${primary.detail}` : "";
 
   if (primary.category === "certificate" && primary.kind === "predicted") {
-    return `Please review ${subject}.${detail} Please confirm the renewal plan and expected completion date.`;
+    return `Vennligst gjennomgå ${subject}.${detail} Bekreft planen for fornyelse og forventet dato for ferdigstillelse.`;
   }
 
   if (
     primary.category === "certificate" &&
     primary.kind === "active" &&
-    primary.title.toLowerCase().includes("expired")
+    /expired|utløpt/.test(primary.title.toLowerCase())
   ) {
-    return `Please address ${subject}.${detail} Please provide an update on the corrective actions planned.`;
+    return `Vennligst følg opp ${subject}.${detail} Gi en oppdatering om planlagte tiltak.`;
   }
 
-  return `Please review ${subject}.${detail} Please provide an update on any corrective actions planned.`;
+  return `Vennligst gjennomgå ${subject}.${detail} Gi en oppdatering om eventuelle planlagte tiltak.`;
 }
 
 // Uses real indicators from the top-ranked contract; avoids unsupported predictions and claims.
@@ -69,10 +69,10 @@ export function RiskAttentionCard({
 
   let description = `${primary.title}: ${primary.detail}`;
   if (others > 0) {
-    description += ` ${others} further indicator${others === 1 ? "" : "s"} on this contract.`;
+    description += ` ${others} ${others === 1 ? "ytterligere indikator" : "ytterligere indikatorer"} på denne avtalen.`;
   }
   if (nextProjected) {
-    description += ` Next projected breach: ${formatProjectedBreach(nextProjected)}.`;
+    description += ` Neste predikerte brudd: ${formatProjectedBreach(nextProjected)}.`;
   }
 
   return (
@@ -82,10 +82,10 @@ export function RiskAttentionCard({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-red-700">
-                Active attention
+                Krever oppfølging
               </span>
               <span className="font-headline text-sm font-semibold text-neutral-900">
-                High risk: {contract.supplierName}
+                Høy risiko: {contract.supplierName}
               </span>
             </div>
             <p className="mt-1.5 max-w-2xl text-sm text-neutral-600">{description}</p>
@@ -101,20 +101,20 @@ export function RiskAttentionCard({
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
             >
               <Mail className="h-3.5 w-3.5" />
-              Send notice
+              Send melding
             </button>
             <button
               onClick={() => onViewDetails(row)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
-              View details
+              Vis detaljer
             </button>
           </div>
         </div>
 
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
-            Showing {currentPage} of {attentionRows.length} high-priority contracts requiring attention
+            Viser {currentPage} av {attentionRows.length} {attentionRows.length === 1 ? "avtale" : "avtaler"} med høy prioritet som krever oppfølging
           </p>
           <div className="flex items-center gap-1.5">
             <button
@@ -123,17 +123,17 @@ export function RiskAttentionCard({
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              Previous
+              Forrige
             </button>
             <span className="font-mono text-xs text-neutral-500">
-              Page {currentPage} of {totalPages}
+              Side {currentPage} av {totalPages}
             </span>
             <button
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
               disabled={currentPage >= totalPages}
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Next
+              Neste
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -142,7 +142,7 @@ export function RiskAttentionCard({
 
       {isNoticeOpen && (
         <NoticeReviewDialog
-          riskIndicator={`${RISK_PRIORITY_INFO[row.priority].label} priority · ${primary.title}`}
+          riskIndicator={`${RISK_PRIORITY_INFO[row.priority].label}-prioritet · ${primary.title}`}
           contractName={contract.contractName}
           supplierName={contract.supplierName}
           reason={description}
@@ -163,7 +163,7 @@ export function RiskAttentionCard({
           aria-live="polite"
           className="fixed bottom-6 right-6 z-50 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
         >
-          Notice recorded for demo only; no email was sent.
+          Varselet er kun registrert som demo; ingen e-post er sendt.
         </div>
       )}
     </>

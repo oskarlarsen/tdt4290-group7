@@ -2,7 +2,7 @@ export type NotificationType =
   | "RISK_CHANGE"
   | "CERTIFICATE_EXPIRY"
   | "VEHICLE_DEVIATION"
-  | "FUEL_DEVIATION"
+  | "ENERGY_DEVIATION"
   | "DATA_SYNC"
   | "SYSTEM";
 

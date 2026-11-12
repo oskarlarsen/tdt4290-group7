@@ -12,27 +12,27 @@ export type ProductFormRow = {
 };
 
 export const PRODUCT_CATEGORIES: Record<string, string> = {
-  FURNITURE: "Furniture",
-  IT_EQUIPMENT: "IT equipment",
-  FOOD_BEVERAGE: "Food & beverage",
-  CLEANING_SUPPLIES: "Cleaning supplies",
-  OTHER: "Other",
+  FURNITURE: "Møbler",
+  IT_EQUIPMENT: "IT-utstyr",
+  FOOD_BEVERAGE: "Mat og drikke",
+  CLEANING_SUPPLIES: "Rengjøringsmidler",
+  OTHER: "Annet",
 };
 
 export const ECOLABEL_STANDARDS: Record<string, string> = {
-  NORDIC_SWAN: "Nordic Swan (Svanemerket)",
+  NORDIC_SWAN: "Svanemerket (Nordic Swan)",
   EU_ECOLABEL: "EU Ecolabel",
   MOBELFAKTA: "Møbelfakta",
   BLUE_ANGEL: "Blue Angel (Der Blaue Engel)",
   OEKO_TEX: "OEKO-TEX",
-  EPD: "Environmental Product Declaration (EPD)",
-  NONE: "None",
+  EPD: "Miljødeklarasjon (EPD)",
+  NONE: "Ingen",
 };
 
 export const UNITS_OF_MEASURE: Record<string, string> = {
-  PCS: "Pieces (pcs)",
-  KG: "Kilograms (kg)",
-  LITRE: "Litres (L)",
+  PCS: "Stykk (stk)",
+  KG: "Kilogram (kg)",
+  LITRE: "Liter (L)",
 };
 
 export const PRODUCT_CSV_HEADERS = [

@@ -69,16 +69,16 @@ fun Application.configureAccessRoutes(fleet: FleetRepository) {
             post("/api/supplier/colleagues/invitations") {
                 val user = call.signedIn()
                 val supplierId = user?.supplierId?.takeIf { user.role == Role.SUPPLIER }
-                if (user == null || supplierId == null) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Supplier access required"))
+                if (user == null || supplierId == null) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Krever leverandørtilgang"))
                 // The organization always comes from the login, never from the request.
                 val supplier = fleet.overview().suppliers.firstOrNull { it.id == supplierId }
-                    ?: return@post call.respond(HttpStatusCode.Forbidden, ApiError("Your organization is not active"))
+                    ?: return@post call.respond(HttpStatusCode.Forbidden, ApiError("Organisasjonen din er ikke aktiv"))
                 call.invite(user, supplier.name)
             }
 
             post("/api/admin/team/invitations") {
                 val user = call.signedIn()
-                if (user == null || user.role != Role.ADMIN) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Administrator access required"))
+                if (user == null || user.role != Role.ADMIN) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Krever administratortilgang"))
                 call.invite(user, null) { id -> fleet.overview().suppliers.firstOrNull { it.id == id }?.name }
             }
 
@@ -108,7 +108,7 @@ fun Application.configureAccessRoutes(fleet: FleetRepository) {
 
             post("/api/admin/access/{id}/approve") {
                 val user = call.signedIn()
-                if (user == null || user.role != Role.ADMIN) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Administrator access required"))
+                if (user == null || user.role != Role.ADMIN) return@post call.respond(HttpStatusCode.Forbidden, ApiError("Krever administratortilgang"))
                 call.manage(user) { id -> UserRepository.approveAccess(user, id) }
             }
         }
@@ -116,18 +116,18 @@ fun Application.configureAccessRoutes(fleet: FleetRepository) {
 }
 
 private suspend fun ApplicationCall.invite(inviter: User, supplierName: String?, supplierNameFor: (String) -> String? = { null }) {
-    val request = try { receive<AccessInvitationRequest>() } catch (_: Exception) { return respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request")) }
+    val request = try { receive<AccessInvitationRequest>() } catch (_: Exception) { return respond(HttpStatusCode.BadRequest, ApiError("Ugyldig invitasjonsforespørsel")) }
     try {
         // Only the admin route passes a supplierId; it must name an active supplier organization.
         val targetId = request.supplierId?.takeIf { inviter.role == Role.ADMIN }
-        val targetName = targetId?.let { supplierNameFor(it) ?: return respond(HttpStatusCode.NotFound, ApiError("Active supplier organization not found")) }
+        val targetName = targetId?.let { supplierNameFor(it) ?: return respond(HttpStatusCode.NotFound, ApiError("Fant ikke en aktiv leverandørorganisasjon")) }
         val invitation = UserRepository.createAccessInvitation(inviter, request.email, targetName ?: supplierName, request.accessEndDate?.takeIf { it.isNotBlank() }.toDate(), supplierId = targetId)
         application.log.info("access_invitation_created inviterId={} role={} standIn={}", inviter.id, inviter.role, invitation.accessExpiresAt != null)
         respond(HttpStatusCode.Created, AccessInvitationResponse(request.email.trim(), invitation.token, invitation.expiresAt, invitation.accessExpiresAt))
     } catch (e: AccountConflictException) {
-        respond(HttpStatusCode.Conflict, ApiError(e.message ?: "An account already exists"))
+        respond(HttpStatusCode.Conflict, ApiError(e.message ?: "Det finnes allerede en konto"))
     } catch (e: IllegalArgumentException) {
-        respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid invitation"))
+        respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Ugyldig invitasjon"))
     }
 }
 
@@ -138,8 +138,8 @@ private suspend fun ApplicationCall.manage(actor: User, action: suspend (String)
         application.log.info("access_changed actorId={} targetId={} path={}", actor.id, id, request.local.uri.substringBefore('?'))
         respond(HttpStatusCode.NoContent)
     } catch (_: NoSuchElementException) {
-        respond(HttpStatusCode.NotFound, ApiError("Account not found"))
+        respond(HttpStatusCode.NotFound, ApiError("Fant ikke kontoen"))
     } catch (e: IllegalArgumentException) {
-        respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid request"))
+        respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Ugyldig forespørsel"))
     }
 }

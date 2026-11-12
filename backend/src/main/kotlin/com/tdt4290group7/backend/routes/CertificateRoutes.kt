@@ -95,14 +95,14 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     val id = call.parameters["id"]
                     val existing = id?.let(repository::getById)
                     if (existing == null) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet"))
                         return@put
                     }
 
                     val request = try {
                         call.receive<UpdateCertificateRequest>()
                     } catch (_: ContentTransformationException) {
-                        call.respond(HttpStatusCode.BadRequest, ApiError("Invalid certificate details"))
+                        call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldige sertifikatopplysninger"))
                         return@put
                     }
 
@@ -113,14 +113,14 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         certificateType.isEmpty() || certificateType.length > 200 ||
                         (contractId != null && contractId.length > 200)
                     ) {
-                        call.respond(HttpStatusCode.BadRequest, ApiError("Invalid certificate details"))
+                        call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldige sertifikatopplysninger"))
                         return@put
                     }
                     val supplierName = if (contractId == null) {
                         requestedSupplierName
                     } else {
                         fleet?.activeAgreementEvidence(contractId)?.supplier?.name ?: run {
-                            call.respond(HttpStatusCode.BadRequest, ApiError("Select an active supplier agreement"))
+                            call.respond(HttpStatusCode.BadRequest, ApiError("Velg en aktiv leverandøravtale"))
                             return@put
                         }
                     }
@@ -131,7 +131,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         (request.expiryDate != null && expiryDate == null) ||
                         (issueDate != null && expiryDate != null && issueDate.isAfter(expiryDate))
                     ) {
-                        call.respond(HttpStatusCode.BadRequest, ApiError("Certificate dates are invalid"))
+                        call.respond(HttpStatusCode.BadRequest, ApiError("Sertifikatdatoene er ugyldige"))
                         return@put
                     }
 
@@ -144,7 +144,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                         status = calculateStatus(expiryDate, LocalDate.now(OSLO_ZONE)),
                     )
                     if (!repository.update(updated)) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet"))
                         return@put
                     }
                     call.respond(updated.toResponse())
@@ -154,7 +154,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     val actor = call.adminActor() ?: return@post
                     val id = call.parameters["id"]
                     if (id == null || !repository.archive(id, actor.id, java.time.Instant.now())) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found or already archived"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet, eller det er allerede arkivert"))
                         return@post
                     }
                     call.application.log.info("certificate_archived certificateId={} actorId={}", id, actor.id)
@@ -165,7 +165,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     val actor = call.adminActor() ?: return@post
                     val id = call.parameters["id"]
                     if (id == null || !repository.restore(id)) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found or not archived"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet, eller det er ikke arkivert"))
                         return@post
                     }
                     call.application.log.info("certificate_restored certificateId={} actorId={}", id, actor.id)
@@ -177,7 +177,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     val actor = call.adminActor() ?: return@post
                     val renewal = call.parameters["id"]?.let(repository::getById)?.takeIf { it.archivePendingFor != null }
                     if (renewal == null) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("No pending renewal found"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ingen ventende fornyelse"))
                         return@post
                     }
                     repository.archive(renewal.archivePendingFor!!, actor.id, Instant.now(), replacedBy = renewal.id)
@@ -190,7 +190,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     val actor = call.adminActor() ?: return@post
                     val id = call.parameters["id"]
                     if (id == null || !repository.clearPendingArchive(id)) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("No pending renewal found"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ingen ventende fornyelse"))
                         return@post
                     }
                     call.application.log.info("certificate_archive_rejected renewalId={} actorId={}", id, actor.id)
@@ -201,7 +201,7 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
                     if (call.adminActor() == null) return@delete
                     val id = call.parameters["id"]
                     if (id == null || !repository.delete(id)) {
-                        call.respond(HttpStatusCode.NotFound, ApiError("Certificate not found"))
+                        call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke sertifikatet"))
                         return@delete
                     }
                     call.respond(HttpStatusCode.NoContent)
@@ -221,11 +221,11 @@ fun Application.configureCertificateRoutes(repository: CertificateRepository, fl
             post("/api/supplier/certificates") {
                 val user = call.principal<JWTPrincipal>()?.payload?.let(JwtConfig::userId)?.let(UserRepository::findById)
                 if (user?.role != Role.SUPPLIER || user.supplierId == null) {
-                    call.respond(HttpStatusCode.Forbidden, ApiError("Supplier access required"))
+                    call.respond(HttpStatusCode.Forbidden, ApiError("Krever leverandørtilgang"))
                     return@post
                 }
                 if (!SupplierUploadLimiter.tryAcquire(user.supplierId)) {
-                    call.respond(HttpStatusCode.TooManyRequests, ApiError("Too many certificate uploads. Try again later."))
+                    call.respond(HttpStatusCode.TooManyRequests, ApiError("For mange sertifikatopplastinger. Prøv igjen senere."))
                     return@post
                 }
                 call.handleCertificateUpload(repository, fleet, Uploader("SUPPLIER", user.id, user.supplierId))
@@ -273,22 +273,22 @@ private suspend fun ApplicationCall.handleCertificateUpload(repository: Certific
     val upload = try {
         receiveCertificateUpload(requireSupplierName = uploader.supplierId == null)
     } catch (cause: IllegalArgumentException) {
-        respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Invalid certificate upload"))
+        respond(HttpStatusCode.BadRequest, ApiError(cause.message ?: "Ugyldig sertifikatopplasting"))
         return
     }
     val evidence = upload.contractId?.let { fleet?.activeAgreementEvidence(it) }
     if (uploader.supplierId != null) {
         // A supplier may only upload against its own active agreements; the supplier name comes from the agreement.
         if (upload.contractId == null || evidence == null) {
-            respond(HttpStatusCode.BadRequest, ApiError("Select one of your active agreements"))
+            respond(HttpStatusCode.BadRequest, ApiError("Velg en av dine aktive avtaler"))
             return
         }
         if (evidence.supplier.id != uploader.supplierId) {
-            respond(HttpStatusCode.Forbidden, ApiError("That agreement belongs to another supplier"))
+            respond(HttpStatusCode.Forbidden, ApiError("Den avtalen tilhører en annen leverandør"))
             return
         }
     } else if (upload.contractId != null && evidence == null) {
-        respond(HttpStatusCode.BadRequest, ApiError("Select an active supplier agreement"))
+        respond(HttpStatusCode.BadRequest, ApiError("Velg en aktiv leverandøravtale"))
         return
     }
     val supplierName = evidence?.supplier?.name ?: upload.supplierName
@@ -296,7 +296,7 @@ private suspend fun ApplicationCall.handleCertificateUpload(repository: Certific
     val tempFile = try {
         Files.createTempFile("certificate-upload-", ".pdf")
     } catch (_: IOException) {
-        respond(HttpStatusCode.InternalServerError, ApiError("Could not process certificate upload"))
+        respond(HttpStatusCode.InternalServerError, ApiError("Kunne ikke behandle sertifikatopplastingen"))
         return
     }
 
@@ -305,13 +305,13 @@ private suspend fun ApplicationCall.handleCertificateUpload(repository: Certific
         val pageCount = try {
             Loader.loadPDF(tempFile.toFile()).use { it.numberOfPages }
         } catch (_: IOException) {
-            respond(HttpStatusCode.BadRequest, ApiError("Certificate PDF could not be read"))
+            respond(HttpStatusCode.BadRequest, ApiError("Sertifikat-PDF-en kunne ikke leses"))
             return
         }
         if (pageCount !in 1..MAX_PDF_PAGES) {
             respond(
                 HttpStatusCode.BadRequest,
-                ApiError("Certificate PDF must contain between 1 and $MAX_PDF_PAGES pages"),
+                ApiError("Sertifikat-PDF-en må ha mellom 1 og $MAX_PDF_PAGES sider"),
             )
             return
         }
@@ -321,15 +321,15 @@ private suspend fun ApplicationCall.handleCertificateUpload(repository: Certific
         } catch (_: IllegalStateException) {
             respond(
                 HttpStatusCode.ServiceUnavailable,
-                ApiError("Could not extract certificate text; check the local OCR setup"),
+                ApiError("Kunne ikke hente ut tekst fra sertifikatet. Sjekk OCR-oppsettet"),
             )
             return
         } catch (_: IOException) {
-            respond(HttpStatusCode.BadRequest, ApiError("Certificate PDF could not be read"))
+            respond(HttpStatusCode.BadRequest, ApiError("Sertifikat-PDF-en kunne ikke leses"))
             return
         }
         if (text.isBlank()) {
-            respond(HttpStatusCode.UnprocessableEntity, ApiError("No readable text was found in the certificate"))
+            respond(HttpStatusCode.UnprocessableEntity, ApiError("Fant ingen lesbar tekst i sertifikatet"))
             return
         }
 
@@ -354,7 +354,7 @@ private suspend fun ApplicationCall.handleCertificateUpload(repository: Certific
         if (renewed != null && uploader.role == "ADMIN") repository.archive(renewed.id, uploader.actorId, Instant.now(), replacedBy = certificate.id)
         respond(HttpStatusCode.Created, toRepository.toResponse())
     } catch (_: IOException) {
-        respond(HttpStatusCode.InternalServerError, ApiError("Could not process certificate upload"))
+        respond(HttpStatusCode.InternalServerError, ApiError("Kunne ikke behandle sertifikatopplastingen"))
     } finally {
         try {
             Files.deleteIfExists(tempFile)
@@ -392,23 +392,23 @@ private suspend fun io.ktor.server.application.ApplicationCall.receiveCertificat
         try {
             when (part) {
                 is PartData.FormItem -> if (part.name == "supplierName") {
-                    if (supplierName != null) validationError = "Supplier name must be provided once"
+                    if (supplierName != null) validationError = "Leverandørnavn kan bare oppgis én gang"
                     supplierName = part.value.trim()
                 } else if (part.name == "contractId") {
-                    if (contractIdSeen) validationError = "Contract ID must be provided once"
+                    if (contractIdSeen) validationError = "Avtale-ID kan bare oppgis én gang"
                     contractIdSeen = true
                     contractId = part.value.trim().takeIf { it.isNotEmpty() }
                 }
                 is PartData.FileItem -> if (part.name == "file") {
                     if (pdf != null) {
-                        validationError = "Upload one PDF file at a time"
+                        validationError = "Last opp én PDF-fil om gangen"
                     } else {
                         val filename = part.originalFileName
                             ?.substringAfterLast('/')
                             ?.substringAfterLast('\\')
                             ?.trim()
                         if (filename.isNullOrBlank() || !filename.endsWith(".pdf", ignoreCase = true)) {
-                            validationError = "Upload a PDF file"
+                            validationError = "Last opp en PDF-fil"
                         } else {
                             sourceFile = filename.take(255)
                             pdf = part.provider().toInputStream().use { it.readBytes() }
@@ -425,15 +425,15 @@ private suspend fun io.ktor.server.application.ApplicationCall.receiveCertificat
     validationError?.let { throw IllegalArgumentException(it) }
     // A supplier's upload takes the name from its own agreement, so the field is optional there.
     val name = supplierName?.takeIf { it.isNotBlank() && it.length <= 200 }
-        ?: if (requireSupplierName) throw IllegalArgumentException("Supplier name is required and must be at most 200 characters") else ""
+        ?: if (requireSupplierName) throw IllegalArgumentException("Leverandørnavn må fylles ut og kan ha maks. 200 tegn") else ""
     val selectedContractId = contractId
     if (selectedContractId != null && selectedContractId.length > 200) {
-        throw IllegalArgumentException("Contract ID must be at most 200 characters")
+        throw IllegalArgumentException("Avtale-ID kan ha maks. 200 tegn")
     }
-    val filename = sourceFile ?: throw IllegalArgumentException("Certificate PDF is required")
+    val filename = sourceFile ?: throw IllegalArgumentException("Sertifikat-PDF må legges ved")
     val bytes = pdf?.takeIf { it.isNotEmpty() } ?: throw IllegalArgumentException("Certificate PDF is empty")
     val header = bytes.copyOfRange(0, minOf(bytes.size, 1024)).toString(Charsets.ISO_8859_1)
-    if (!header.contains("%PDF-")) throw IllegalArgumentException("Uploaded file is not a valid PDF")
+    if (!header.contains("%PDF-")) throw IllegalArgumentException("Den opplastede filen er ikke en gyldig PDF")
     return CertificateUpload(name, filename, bytes, selectedContractId)
 }
 

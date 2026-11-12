@@ -47,27 +47,27 @@ describe("supplier details dialog", () => {
   it("shows the full alert text, every category and the counts", () => {
     mount();
     expect(screen.getByText("Statens vegvesen data identifies a vehicle as deregistered.")).toBeTruthy();
-    expect(screen.getByText("Vehicle deviation, Certificate expiry")).toBeTruthy();
-    expect(screen.getByText("2 agreements")).toBeTruthy();
-    expect(screen.getByText("5 vehicles")).toBeTruthy();
-    expect(screen.getByText("3 energy records")).toBeTruthy();
-    expect(screen.getByText("10 products")).toBeTruthy();
+    expect(screen.getByText("Kjøretøyavvik, Sertifikatutløp")).toBeTruthy();
+    expect(screen.getByText("2 avtaler")).toBeTruthy();
+    expect(screen.getByText("5 kjøretøy")).toBeTruthy();
+    expect(screen.getByText("3 energirapporter")).toBeTruthy();
+    expect(screen.getByText("10 produkter")).toBeTruthy();
   });
 
   it("shows a placeholder for data the supplier has not provided", () => {
     mount();
-    expect(screen.getAllByText("Not provided yet")).toHaveLength(1); // certificates: 0
+    expect(screen.getAllByText("Ikke oppgitt ennå")).toHaveLength(1); // certificates: 0
   });
 
   it("opens the submitted reporting data dialog", () => {
     mount();
-    fireEvent.click(screen.getByRole("button", { name: "View submitted reporting data" }));
-    expect(screen.getByText("Submitted information · Nordvik Transport AS")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Vis innsendte rapporteringsdata" }));
+    expect(screen.getByText("Innsendt informasjon · Nordvik Transport AS")).toBeTruthy();
   });
 
   it("closes from the close button", () => {
     const onClose = mount();
-    fireEvent.click(screen.getByRole("button", { name: "Close Details for Nordvik Transport AS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lukk Detaljer for Nordvik Transport AS" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

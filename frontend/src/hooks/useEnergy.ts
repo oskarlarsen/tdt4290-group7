@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { getEnergyData } from "../api/energy";
+import { getEnergy } from "../api/energy";
 
-export function useEnergy() {
+export function useEnergy(year: number) {
   return useQuery({
-    queryKey: ["energy"],
-    queryFn: getEnergyData,
+    queryKey: ["energy", year],
+    queryFn: () => getEnergy(year),
     staleTime: 60_000,
   });
 }

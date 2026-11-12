@@ -103,8 +103,8 @@ class VehicleRegistryFillTest {
 
         assertFalse(preview.canCommit)
         assertEquals(listOf(2 to "registration_number", 3 to "fuel_technology", 4 to "fuel_technology"), preview.errors.map { it.row to it.column })
-        assertTrue(preview.errors[0].message.contains("not found in Statens vegvesen"))
-        assertTrue(preview.errors[1].message.contains("Fill in fuel_technology yourself"))
+        assertTrue(preview.errors[0].message.contains("ikke funnet hos Statens vegvesen"))
+        assertTrue(preview.errors[1].message.contains("Fyll ut fuel_technology selv"))
     }
 
     @Test
@@ -113,7 +113,7 @@ class VehicleRegistryFillTest {
         val (repo, agreement, registry) = fixture(lookups) { RegistryLookup.Found(data("2", plate = it)) }
         val preview = preview(repo, registry, header + "$agreement,,TRUE,TRUE,,,,")
         assertFalse(preview.canCommit)
-        assertTrue(preview.errors.single().message.contains("planned vehicles"))
+        assertTrue(preview.errors.single().message.contains("planlagte kjøretøy"))
         assertEquals(emptyList(), lookups)
     }
 

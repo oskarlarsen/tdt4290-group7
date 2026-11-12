@@ -1,3 +1,3 @@
 export function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en-GB").format(value);
+  return new Intl.NumberFormat("nb-NO").format(value);
 }

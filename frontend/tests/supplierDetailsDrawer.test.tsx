@@ -70,25 +70,25 @@ describe("supplier details drawer (summary)", () => {
     expect(screen.getByText("Vehicle deregistered")).toBeTruthy();
     expect(screen.getByText("Euro-5 heavy vehicle")).toBeTruthy();
     expect(screen.getByText("Certificate expired")).toBeTruthy();
-    expect(screen.getByText("+1 more")).toBeTruthy();
+    expect(screen.getByText("+1 til")).toBeTruthy();
     expect(screen.queryByText("Fourth alert")).toBeNull();
     expect(screen.queryByText("Already handled")).toBeNull();
     expect(screen.queryByText("Other supplier alert")).toBeNull();
     // Long text and counts belong in the Details window, not the summary.
     expect(screen.queryByText("Full text of Vehicle deregistered")).toBeNull();
-    expect(screen.queryByText("2 agreements")).toBeNull();
-    expect(screen.queryByRole("button", { name: "View submitted reporting data" })).toBeNull();
+    expect(screen.queryByText("2 avtaler")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Vis innsendte rapporteringsdata" })).toBeNull();
   });
 
   it("calls the follow-up section by that name and drops the stored-locally sentence", () => {
     mount();
-    expect(screen.getByText("Follow-up status")).toBeTruthy();
+    expect(screen.getByText("Oppfølgingsstatus")).toBeTruthy();
     expect(screen.queryByText(/stored locally/)).toBeNull();
   });
 
   it("opens the Details window from the Details button", () => {
     const { onOpenDetails } = mount();
-    fireEvent.click(screen.getByRole("button", { name: "Details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Detaljer" }));
     expect(onOpenDetails).toHaveBeenCalledTimes(1);
   });
 });

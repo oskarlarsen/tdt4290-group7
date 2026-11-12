@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { NoticeReviewDialog } from "../ui/NoticeReviewDialog";
 import type { DerivedContract } from "../../types/contract";
 
-const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, compliant: 2, unassessed: 3 };
+const RISK_PRIORITY: Record<DerivedContract["risk"], number> = { high: 0, medium: 1, low: 2, compliant: 3, unassessed: 4 };
 
 export function ContractComplianceSummary({
   contracts,
@@ -36,13 +36,13 @@ export function ContractComplianceSummary({
   const needsAttention = current.risk === "high" || current.risk === "medium";
   const noticeReason =
     current.status === "Expired"
-      ? "The contract has expired."
+      ? "Avtalen er utløpt."
       : current.status === "Expiring Soon"
-        ? "The contract is expiring soon."
+        ? "Avtalen utløper snart."
         : current.risk === "high"
-          ? "Environmental compliance is non-compliant."
-          : "Environmental compliance is partial and requires follow-up.";
-  const noticeMessage = `Please review ${current.mainIssue || "the outstanding environmental requirements"} for ${current.contractName} and provide an update on any corrective actions planned.`;
+          ? "Avtalen har avvik i miljøoppfølgingen."
+          : "Avtalen har funn som krever oppfølging.";
+  const noticeMessage = `Vennligst gjennomgå ${current.mainIssue || "de utestående miljøkravene"} for ${current.contractName} og gi en oppdatering om eventuelle planlagte tiltak.`;
 
   return (
     <div className="space-y-3">
@@ -52,15 +52,15 @@ export function ContractComplianceSummary({
             <div className="flex flex-wrap items-center gap-2">
               {needsAttention && (
                 <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-red-700">
-                  Active attention
+                  Krever oppfølging
                 </span>
               )}
               <span className="font-headline text-sm font-semibold text-neutral-900">
-                Selected contract: {current.contractName}
+                Valgt avtale: {current.contractName}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-neutral-500">
-              Supplier: <span className="font-medium text-neutral-600">{current.supplierName}</span>
+              Leverandør: <span className="font-medium text-neutral-600">{current.supplierName}</span>
             </p>
           </div>
 
@@ -75,31 +75,31 @@ export function ContractComplianceSummary({
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
               >
                 <Mail className="h-3.5 w-3.5" />
-                Send notice
+                Send melding
               </button>
             )}
             <button
               onClick={() => onViewDetails(current)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
-              View details
+              Vis detaljer
             </button>
           </div>
         </div>
 
         <div className="mt-3 border-t border-neutral-100 pt-3">
           <div className="text-[10px] font-mono uppercase tracking-wide text-neutral-500">
-            Key issue summary
+            Oppsummering av hovedproblem
           </div>
           <p className="mt-1 text-sm text-neutral-700">
-            {current.mainIssue || "No open issues on record."}
+            {current.mainIssue || "Ingen åpne saker registrert."}
           </p>
         </div>
 
         {needsAttention && (
           <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
             <p className="text-xs text-neutral-500">
-              Showing {safeAttentionIndex + 1} of {attentionContracts.length} {attentionContracts.length === 1 ? "contract" : "contracts"} requiring attention
+              Viser {safeAttentionIndex + 1} av {attentionContracts.length} {attentionContracts.length === 1 ? "avtale" : "avtaler"} som krever oppfølging
             </p>
             <div className="flex items-center gap-1.5">
               <button
@@ -108,7 +108,7 @@ export function ContractComplianceSummary({
                 className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
-                Previous
+                Forrige
               </button>
               <span className="font-mono text-xs text-neutral-500">
                 Page {safeAttentionIndex + 1} of {attentionContracts.length}
@@ -120,7 +120,7 @@ export function ContractComplianceSummary({
                 disabled={safeAttentionIndex >= attentionContracts.length - 1}
                 className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                Neste
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -149,7 +149,7 @@ export function ContractComplianceSummary({
           aria-live="polite"
           className="fixed bottom-6 right-6 z-50 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
         >
-          Notice recorded for demo only; no email was sent.
+          Varselet er kun registrert som demo; ingen e-post er sendt.
         </div>
       )}
     </div>

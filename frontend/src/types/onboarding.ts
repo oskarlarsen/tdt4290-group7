@@ -80,6 +80,8 @@ export type CsvPreview = {
     value: string | null;
   }>;
   previewRows: Array<Record<string, string>>;
+  /** Non-blocking heads-ups, e.g. an existing quarter report that the import will replace. */
+  notices?: string[];
 };
 
 export type CsvConfirmation = {

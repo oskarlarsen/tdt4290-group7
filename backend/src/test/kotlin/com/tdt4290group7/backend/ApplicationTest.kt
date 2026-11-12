@@ -70,7 +70,7 @@ class ApplicationTest {
                 val response = postJson("/api/trip-rows", body)
                 assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
                 assertEquals(
-                    """{"error":"Vehicle database is busy; try again later"}""",
+                    """{"error":"Kjøretøydatabasen er opptatt. Prøv igjen senere"}""",
                     response.bodyAsText(),
                 )
             } finally {
@@ -104,7 +104,7 @@ class ApplicationTest {
             Json.encodeToString(AppendTripRowsRequest(rows = listOf(syntheticTrip("AB12345"), syntheticTrip("CD12345")))),
         )
         assertEquals(HttpStatusCode.InternalServerError, response.status)
-        assertEquals("Internal server error", response.bodyAsText())
+        assertEquals("Intern serverfeil", response.bodyAsText())
         databaseConnection(path).use { db ->
             assertEquals(0, countRows(db, "vehicles"))
             assertEquals(0, countRows(db, "trip_rows"))

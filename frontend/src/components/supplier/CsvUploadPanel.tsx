@@ -10,18 +10,18 @@ export function CsvUploadPanel({ entity, disabled, onPreview, onChange }: {
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-neutral-300 p-3 text-sm text-neutral-600">
-      <span className="mr-auto">Download the template, fill it in, then upload it for review.</span>
+      <span className="mr-auto">Last ned malen, fyll den ut og last den opp for gjennomgang.</span>
       <button
         type="button"
         onClick={() => void downloadCsvTemplate(entity)}
         className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
       >
         <Download className="h-4 w-4" aria-hidden="true" />
-        Download CSV template
+        Last ned CSV-mal
       </button>
       <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 ${disabled ? "pointer-events-none opacity-50" : ""}`}>
         <FileUp className="h-4 w-4" aria-hidden="true" />
-        Upload a filled-in CSV
+        Last opp utfylt CSV
         <input
           type="file"
           accept=".csv,text/csv"

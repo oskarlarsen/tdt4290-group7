@@ -229,7 +229,7 @@ class FleetRepositoryTest {
     @Test fun agreementLabelCombinesSaksnrAndNote() {
         assertEquals("2024/1234 — Skolerute", agreementLabel("2024/1234", " Skolerute "))
         assertEquals("2024/1234", agreementLabel("2024/1234", ""))
-        assertEquals("Saksnr missing — Skolerute", agreementLabel(null, "Skolerute"))
-        assertEquals("Saksnr missing", agreementLabel("  ", ""))
+        assertEquals("Saksnr mangler — Skolerute", agreementLabel(null, "Skolerute"))
+        assertEquals("Saksnr mangler", agreementLabel("  ", ""))
     }
 }

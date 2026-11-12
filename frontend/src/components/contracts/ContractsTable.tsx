@@ -8,15 +8,22 @@ const STATUS_CLASSES: Record<DerivedContract["status"], string> = {
   Expired: "bg-red-100 text-red-700",
 };
 
+const STATUS_LABELS: Record<DerivedContract["status"], string> = {
+  Active: "Aktiv",
+  "Expiring Soon": "Utløper snart",
+  Expired: "Utløpt",
+};
+
 const COMPLIANCE_CLASSES: Record<DerivedContract["risk"], string> = {
   unassessed: "bg-neutral-100 text-neutral-600",
   compliant: "bg-tertiary-100 text-tertiary-700",
   medium: "bg-amber-100 text-amber-800",
+  low: "bg-sky-100 text-sky-800",
   high: "bg-red-100 text-red-700",
 };
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function ContractsTable({
@@ -29,7 +36,7 @@ export function ContractsTable({
   const navigate = useNavigate();
 
   if (contracts.length === 0) {
-    return <div className="py-8 text-center text-sm text-neutral-500">No contracts to show.</div>;
+    return <div className="py-8 text-center text-sm text-neutral-500">Ingen avtaler å vise.</div>;
   }
 
   return (
@@ -37,13 +44,13 @@ export function ContractsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Linked supplier</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Contract status</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Start date</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">End date</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Environmental compliance</th>
-            <th scope="col" className="pb-2 font-medium">Actions</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Avtale</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Tilknyttet leverandør</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Avtalestatus</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Startdato</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Sluttdato</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Miljøoppfølging</th>
+            <th scope="col" className="pb-2 font-medium">Handlinger</th>
           </tr>
         </thead>
         <tbody>
@@ -63,7 +70,7 @@ export function ContractsTable({
 
               <td className="py-3 pr-3">
                 <span className={`rounded px-2 py-0.5 text-xs font-mono font-medium ${STATUS_CLASSES[c.status]}`}>
-                  {c.status}
+                  {STATUS_LABELS[c.status]}
                 </span>
               </td>
 
@@ -74,7 +81,7 @@ export function ContractsTable({
                 <span
                   className={`rounded px-2 py-0.5 text-xs font-mono font-medium ${COMPLIANCE_CLASSES[c.risk]}`}
                 >
-                  {c.risk === "medium" ? "Partial" : getEnvironmentalComplianceLabel(c.risk)}
+                  {c.risk === "medium" ? "Delvis" : getEnvironmentalComplianceLabel(c.risk)}
                 </span>
               </td>
 
@@ -83,7 +90,7 @@ export function ContractsTable({
                   onClick={() => onViewDetails(c)}
                   className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                 >
-                  View details
+                  Vis detaljer
                 </button>
               </td>
             </tr>

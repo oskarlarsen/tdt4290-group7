@@ -1,134 +1,111 @@
 import { formatNumber } from "../utils/formatNumber";
 
-export type EnergyCarrier = "electric" | "biogas" | "fossil";
+// Mirrors the backend's EnergyContractSummary. The server decides the status; the page only displays it.
+export type EnergyStatus = "COMPLIANT" | "AT_RISK" | "NON_COMPLIANT" | "MISSING_DATA" | "NO_COMMITMENT";
 
-export const ENERGY_CARRIER_LABELS: Record<EnergyCarrier, string> = {
-  electric: "Electric",
-  biogas: "Biogas",
-  fossil: "Fossil",
+export const ENERGY_STATUS_LABELS: Record<EnergyStatus, string> = {
+  COMPLIANT: "Ingen avvik",
+  AT_RISK: "Fare for avvik",
+  NON_COMPLIANT: "Avvik",
+  MISSING_DATA: "Mangler data",
+  NO_COMMITMENT: "Ingen forpliktelse",
 };
 
-// Every carrier is expressed in kWh (fuel volumes as energy equivalent).
-// One record per contract = its latest reporting period. History is not modeled.
-export type EnergyRecord = {
+export const ENERGY_STATUS_TONES: Record<EnergyStatus, "red" | "orange" | "yellow" | "tertiary"> = {
+  NON_COMPLIANT: "red",
+  AT_RISK: "orange",
+  MISSING_DATA: "yellow",
+  NO_COMMITMENT: "yellow",
+  COMPLIANT: "tertiary",
+};
+
+// Lower = more urgent. Used for sorting by status.
+export const ENERGY_STATUS_RANK: Record<EnergyStatus, number> = {
+  NON_COMPLIANT: 0,
+  AT_RISK: 1,
+  MISSING_DATA: 2,
+  NO_COMMITMENT: 3,
+  COMPLIANT: 4,
+};
+
+export type EnergyCommitment = { minSelfProducedKwh: number; minGooKwh: number };
+
+export type EnergyQuarterTotal = { quarter: number; selfProducedKwh: number; gooCoveredKwh: number; consumedKwh: number };
+
+export type EnergyFacilityQuarter = {
+  locationCode: string;
+  address: string;
+  quarter: number;
+  totalAreaSqm: number;
+  consumedKwh: number;
+  selfProducedKwh: number;
+  gooCoveredKwh: number;
+};
+
+export type EnergyEvidence = {
   id: string;
-  contractId: string;
-  period: string; // e.g. "Q3 2026"
-  consumptionKwh: Record<EnergyCarrier, number>;
+  reportingYear: number;
+  reportingQuarter: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
 };
 
-// The contract's requirement. "Renewable" = electric + biogas.
-// The maximum fossil share is the complement (100 - minimum).
-export type EnergyRequirement = {
-  contractId: string;
-  minRenewableSharePercent: number;
+/** One contract's energy position for one year. */
+export type EnergyContract = {
+  agreementId: string;
+  supplierId: string;
+  supplierName: string;
+  orgNumber: string;
+  saksnr: string | null;
+  year: number;
+  commitment: EnergyCommitment | null;
+  status: EnergyStatus;
+  reportedQuarters: number[];
+  selfProducedKwh: number;
+  gooCoveredKwh: number;
+  consumedKwh: number;
+  /** Projected year-end minus committed; negative = below the commitment. Null without a commitment or data. */
+  selfProducedDeviationKwh: number | null;
+  gooDeviationKwh: number | null;
+  projectedSelfProducedKwh: number | null;
+  projectedGooKwh: number | null;
+  selfProducedSharePercent: number | null;
+  kwhPerSqm: number | null;
+  quarterTotals: EnergyQuarterTotal[];
+  facilities: EnergyFacilityQuarter[];
+  evidence: EnergyEvidence[];
 };
 
-export type EnergyData = {
-  requirements: EnergyRequirement[];
-  records: EnergyRecord[];
+export type EnergyData = EnergyContract[];
+
+export type EnergyTotals = {
+  contractCount: number;
+  withCommitmentCount: number;
+  selfProducedKwh: number;
+  committedSelfProducedKwh: number;
+  gooCoveredKwh: number;
+  committedGooKwh: number;
+  nonCompliantCount: number;
+  atRiskCount: number;
+  reportedCount: number;
 };
 
-export type EnergyComplianceStatus = "compliant" | "minor-deviation" | "breach";
-export type EnergyTone = "red" | "yellow" | "tertiary";
-
-// PROVISIONAL: the customer defines no energy deviation bands. A shortfall up to
-// this many percentage points is a "minor deviation"; anything larger is a breach.
-export const ENERGY_THRESHOLDS = { minorDeviationPoints: 5 } as const;
-
-export type EnergyAnalysis = {
-  totalKwh: number;
-  shares: Record<EnergyCarrier, number>; // percent of total, 0-100
-  renewableSharePercent: number;
-  minRenewableSharePercent: number;
-  maxFossilSharePercent: number;
-  shortfallPoints: number; // > 0 means below the contract minimum
-  fossilExcessKwh: number; // fossil energy above the allowed amount, whole kWh, >= 0
-  status: EnergyComplianceStatus;
-  tone: EnergyTone;
-  label: string;
-  rank: number; // lower = more urgent
-};
-
-const EPSILON = 1e-9;
-
-export function getTotalKwh(consumption: Record<EnergyCarrier, number>): number {
-  return consumption.electric + consumption.biogas + consumption.fossil;
-}
-
-// Derived, never stored, so it can't drift from the consumption behind it.
-export function analyzeEnergy(record: EnergyRecord, requirement: EnergyRequirement): EnergyAnalysis {
-  const { electric, biogas, fossil } = record.consumptionKwh;
-  const totalKwh = getTotalKwh(record.consumptionKwh);
-  const toPercent = (kwh: number) => (totalKwh > 0 ? (kwh / totalKwh) * 100 : 0);
-
-  const shares: Record<EnergyCarrier, number> = {
-    electric: toPercent(electric),
-    biogas: toPercent(biogas),
-    fossil: toPercent(fossil),
-  };
-  const renewableSharePercent = shares.electric + shares.biogas;
-  const minRenewableSharePercent = requirement.minRenewableSharePercent;
-  const maxFossilSharePercent = 100 - minRenewableSharePercent;
-  const shortfallPoints = minRenewableSharePercent - renewableSharePercent;
-  const fossilExcessKwh = Math.max(
-    0,
-    Math.round(fossil - (maxFossilSharePercent / 100) * totalKwh)
-  );
-
-  const base = {
-    totalKwh,
-    shares,
-    renewableSharePercent,
-    minRenewableSharePercent,
-    maxFossilSharePercent,
-    shortfallPoints,
-    fossilExcessKwh,
-  };
-
-  if (shortfallPoints <= EPSILON) {
-    return { ...base, status: "compliant", tone: "tertiary", label: "Compliant", rank: 2 };
-  }
-  if (shortfallPoints <= ENERGY_THRESHOLDS.minorDeviationPoints) {
-    return { ...base, status: "minor-deviation", tone: "yellow", label: "Minor deviation", rank: 1 };
-  }
-  return { ...base, status: "breach", tone: "red", label: "Breach", rank: 0 };
-}
-
-export type EnergySummary = {
-  totalKwh: number;
-  renewableKwh: number;
-  renewableSharePercent: number | null;
-  weightedMinimumPercent: number | null;
-  fossilExcessKwh: number;
-};
-
-export function summarizeEnergyRows(
-  rows: readonly {
-    record: EnergyRecord;
-    requirement: EnergyRequirement;
-    analysis: EnergyAnalysis;
-  }[]
-): EnergySummary {
-  const totalKwh = rows.reduce((sum, row) => sum + row.analysis.totalKwh, 0);
-  const renewableKwh = rows.reduce(
-    (sum, row) => sum + row.record.consumptionKwh.electric + row.record.consumptionKwh.biogas,
-    0
-  );
-
+// Delivered and committed kWh are summed only over contracts that have both a commitment and data,
+// so a contract with no commitment can't inflate or deflate the percentage.
+export function summarizeEnergy(contracts: readonly EnergyContract[]): EnergyTotals {
+  const assessed = contracts.filter((c) => c.commitment !== null && c.reportedQuarters.length > 0);
   return {
-    totalKwh,
-    renewableKwh,
-    renewableSharePercent: totalKwh > 0 ? (renewableKwh / totalKwh) * 100 : null,
-    weightedMinimumPercent:
-      totalKwh > 0
-        ? rows.reduce(
-            (sum, row) =>
-              sum + row.requirement.minRenewableSharePercent * row.analysis.totalKwh,
-            0
-          ) / totalKwh
-        : null,
-    fossilExcessKwh: rows.reduce((sum, row) => sum + row.analysis.fossilExcessKwh, 0),
+    contractCount: contracts.length,
+    withCommitmentCount: assessed.length,
+    selfProducedKwh: assessed.reduce((sum, c) => sum + c.selfProducedKwh, 0),
+    committedSelfProducedKwh: assessed.reduce((sum, c) => sum + (c.commitment?.minSelfProducedKwh ?? 0), 0),
+    gooCoveredKwh: assessed.reduce((sum, c) => sum + c.gooCoveredKwh, 0),
+    committedGooKwh: assessed.reduce((sum, c) => sum + (c.commitment?.minGooKwh ?? 0), 0),
+    nonCompliantCount: contracts.filter((c) => c.status === "NON_COMPLIANT").length,
+    atRiskCount: contracts.filter((c) => c.status === "AT_RISK").length,
+    reportedCount: contracts.filter((c) => c.reportedQuarters.length > 0).length,
   };
 }
 
@@ -137,11 +114,23 @@ export function formatPercent(value: number): string {
 }
 
 export function formatKwh(kwh: number): string {
-  return `${formatNumber(Math.round(kwh))} kWh`;
+  // Real values, never rounded to whole kWh or MWh (the customer asked for exactly what was reported).
+  return `${formatNumber(kwh)} kWh`;
 }
 
-export function formatEnergy(kwh: number): string {
-  if (kwh >= 1_000_000) return `${(kwh / 1_000_000).toFixed(2)} GWh`;
-  if (kwh >= 1_000) return `${formatNumber(Math.round(kwh / 1_000))} MWh`;
-  return `${formatNumber(Math.round(kwh))} kWh`;
+/** Signed, for deviations: "+1 200 kWh" or "−12 400 kWh". */
+export function formatSignedKwh(kwh: number): string {
+  return `${kwh > 0 ? "+" : kwh < 0 ? "−" : ""}${formatNumber(Math.abs(kwh))} kWh`;
+}
+
+/** Same upper bound as the backend: 10 TWh a year. Anything above is a typo, not a contract. */
+export const MAX_ENERGY_COMMITMENT_KWH = 10_000_000_000;
+
+/** A year is closed once Q4 is reported or the year has passed; until then the deviation is a projection. */
+export function isEnergyYearClosed(row: Pick<EnergyContract, "year" | "reportedQuarters">, now: Date = new Date()): boolean {
+  return row.reportedQuarters.includes(4) || row.year < now.getFullYear();
+}
+
+export function currentReportingYear(now: Date = new Date()): number {
+  return now.getFullYear();
 }

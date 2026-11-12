@@ -35,7 +35,7 @@ class VehicleInputRulesTest {
         assertEquals("N3", categoryGroup("N3G")); assertEquals("O1", categoryGroup("O1"))
         assertEquals("N3G", categoryCode("N3G").code)
         assertEquals("22", fuelCode("22").code)
-        assertEquals("Ethanol", fuelCode("15").name)
+        assertEquals("Etanol", fuelCode("15").name)
     }
 
 

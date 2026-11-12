@@ -17,7 +17,7 @@ export async function getContracts(): Promise<DerivedContract[]> {
     const daysLeft = (Date.parse(agreement.endDate) - Date.parse(today)) / 86_400_000;
     return [{
       id: agreement.id,
-      contractName: agreement.saksnr ?? "Agreement without case number",
+      contractName: agreement.saksnr ?? "Avtale uten saksnummer",
       supplierId: supplier.id,
       supplierName: supplier.name,
       supplierOrgId: supplier.orgNumber,

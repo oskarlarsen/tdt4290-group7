@@ -8,7 +8,7 @@ import java.sql.ResultSet
 import org.sqlite.SQLiteErrorCode
 import org.sqlite.SQLiteException
 
-internal class VehicleStorageBusyException(cause: SQLiteException) : RuntimeException("Vehicle database is busy", cause)
+internal class VehicleStorageBusyException(cause: SQLiteException) : RuntimeException("Kjøretøydatabasen er opptatt", cause)
 
 internal class VehicleDatabase(path: Path) {
     private val databaseUrl: String

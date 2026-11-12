@@ -21,6 +21,24 @@ enum class BatchEntityType {
     PRODUCTS
 }
 
+/** Norwegian words for the user-facing messages; the enum names themselves stay for code and JSON. */
+internal val OnboardingStatus.nb: String get() = when (this) {
+    OnboardingStatus.INVITED -> "invitert"
+    OnboardingStatus.PROFILE_PENDING -> "profil venter"
+    OnboardingStatus.DATA_DRAFT -> "pågår"
+    OnboardingStatus.VALIDATING -> "validerer"
+    OnboardingStatus.SUBMITTED -> "innsendt"
+    OnboardingStatus.UNDER_REVIEW -> "under vurdering"
+    OnboardingStatus.APPROVED -> "godkjent"
+    OnboardingStatus.REVISION_REQUIRED -> "endringer ønskes"
+}
+
+internal val BatchEntityType.nb: String get() = when (this) {
+    BatchEntityType.VEHICLES -> "kjøretøy"
+    BatchEntityType.ENERGY -> "energi"
+    BatchEntityType.PRODUCTS -> "produkter"
+}
+
 @Serializable
 enum class BatchStatus {
     PREVIEWED,
@@ -115,7 +133,9 @@ data class CsvPreviewResponse(
     val errorRows: Int,
     val canCommit: Boolean,
     val errors: List<CsvCellError>,
-    val previewRows: List<Map<String, String>>
+    val previewRows: List<Map<String, String>>,
+    /** Things worth a second look that do not block the import, e.g. an existing quarter report being replaced. */
+    val notices: List<String> = emptyList()
 )
 
 @Serializable
@@ -141,12 +161,14 @@ data class FacilityEnergyRecord(
     val workshopAreaSqm: Double?,
     val otherAreaSqm: Double?,
     val reportingYear: Int,
+    val reportingQuarter: Int,
     val electricityKwh: Double,
     val districtHeatingKwh: Double,
     val biogasKwh: Double,
     val fossilFuelKwh: Double,
     val selfProducedSolarKwh: Double,
     val selfProducedHeatpumpKwh: Double,
+    val gooCoveredKwh: Double,
     val notes: String?,
     val createdAt: String,
     val updatedAt: String

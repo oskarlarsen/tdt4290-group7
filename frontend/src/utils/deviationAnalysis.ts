@@ -2,7 +2,7 @@ import { vehicleDate } from "./vehicle";
 import type { DeviationFinding, RegistryCode, VehicleCheck } from "../types/vehicle";
 import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, catalogLabel, categoryGroup, fuelGroups, statisticNotApplicable } from "./vehicleCatalog";
 
-const missing = "Not available in this saved check";
+const missing = "Ikke tilgjengelig i denne lagrede kontrollen";
 export type Comparison = { leftLabel: string; rightLabel: string; rows: { label: string; left: string; right: string }[] };
 export type DeviationAnalysis = { title: string; explanation: string; comparison: Comparison; inputs?: [string, string][]; note?: string };
 
@@ -34,20 +34,20 @@ export function exactRatio(numerator: string | null | undefined, denominator: st
 const number = (value: string | null | undefined, unit: string) => value == null ? missing : `${value} ${unit}`;
 const whole = (value: string | null | undefined, unit: string) => number(exactRatio(value, "1", 1n, 0), unit);
 const fuelLabel = (value?: RegistryCode | null) => value ? FUEL_TECHNOLOGIES[value.code as keyof typeof FUEL_TECHNOLOGIES]
-  ? catalogLabel(FUEL_TECHNOLOGIES, value.code) : `${value.code} — ${value.name ?? "Unrecognized fuel technology"}` : missing;
+  ? catalogLabel(FUEL_TECHNOLOGIES, value.code) : `${value.code} — ${value.name ?? "Ikke gjenkjent drivstoffteknologi"}` : missing;
 
 const plain = (value?: string | null) => value ? value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, " ") : value;
 
 const titles: Record<string, string> = {
-  NOT_ON_AGREEMENT_LIST: "Vehicle is not in the agreement's vehicle list", AGREEMENT_NOT_STARTED: "Supplier agreement has not started",
-  AGREEMENT_EXPIRED: "Supplier agreement has ended", AGREEMENT_PERIOD_NOT_COVERED: "Reporting period extends outside the agreement",
-  FUEL_MISMATCH: "Fuel technologies do not match", CATEGORY_MISMATCH: "Vehicle categories do not match",
-  BODY_TYPE_MISMATCH: "Reported body type differs from Statens vegvesen", BRAND_MISMATCH: "Vehicle brands do not match", MODEL_MISMATCH: "Vehicle models do not match",
-  CO2_CLASSIFICATION_MISMATCH: "CO₂-emitting classification does not match", CO2_MISMATCH: "Reported CO₂ rate does not match",
-  REGISTRY_CO2_DISAGREEMENT: "Registry CO₂ measurements differ", NOX_MISMATCH: "NOx rates do not match",
-  CONSUMPTION_MISMATCH: "Fuel consumption figures do not agree", OVERLAPPING_STATISTICS: "Reporting periods overlap",
-  UNABLE_TO_VERIFY: "Some information could not be verified", DEREGISTERED: "Vehicle is deregistered", EXPORTED: "Vehicle is exported",
-  SCRAPPED: "Vehicle is scrapped", UNREGISTERED: "Vehicle is unregistered", UNKNOWN_REGISTRATION_STATUS: "Registration status is unknown",
+  NOT_ON_AGREEMENT_LIST: "Kjøretøyet er ikke på avtalens kjøretøyliste", AGREEMENT_NOT_STARTED: "Leverandørens avtale har ikke startet",
+  AGREEMENT_EXPIRED: "Leverandørens avtale er avsluttet", AGREEMENT_PERIOD_NOT_COVERED: "Rapporteringsperioden går utenfor avtalen",
+  FUEL_MISMATCH: "Drivstoffteknologiene samsvarer ikke", CATEGORY_MISMATCH: "Kjøretøykategoriene samsvarer ikke",
+  BODY_TYPE_MISMATCH: "Oppgitt karosseritype avviker fra Statens vegvesen", BRAND_MISMATCH: "Kjøretøymerkene samsvarer ikke", MODEL_MISMATCH: "Kjøretøymodellene samsvarer ikke",
+  CO2_CLASSIFICATION_MISMATCH: "Klassifiseringen som CO₂-utslipp samsvarer ikke", CO2_MISMATCH: "Oppgitt CO₂-utslipp samsvarer ikke",
+  REGISTRY_CO2_DISAGREEMENT: "CO₂-målingene i registeret avviker", NOX_MISMATCH: "NOx-verdiene samsvarer ikke",
+  CONSUMPTION_MISMATCH: "Drivstofforbruket samsvarer ikke", OVERLAPPING_STATISTICS: "Rapporteringsperiodene overlapper",
+  UNABLE_TO_VERIFY: "Noe informasjon kunne ikke verifiseres", DEREGISTERED: "Kjøretøyet er avregistrert", EXPORTED: "Kjøretøyet er eksportert",
+  SCRAPPED: "Kjøretøyet er vraket", UNREGISTERED: "Kjøretøyet er ikke registrert", UNKNOWN_REGISTRATION_STATUS: "Registreringsstatus er ukjent",
 };
 
 /** Project existing saved evidence only. No API calls, description parsing or new compliance decisions. */
@@ -57,125 +57,125 @@ export function analyzeDeviation(finding: DeviationFinding, check: VehicleCheck)
   const data = check.registry.data;
   const fuel = finding.fuelIndex == null ? undefined : data?.fuels[finding.fuelIndex];
   const measurement = finding.measurementIndex == null ? undefined : fuel?.measurements[finding.measurementIndex];
-  const method = measurement?.measurementMethod?.code ?? "method not recorded";
+  const method = measurement?.measurementMethod?.code ?? "metode ikke registrert";
   const result: DeviationAnalysis = { title: titles[finding.code] ?? finding.code.toLowerCase().replace(/_/g, " "),
-    explanation: finding.description, comparison: { leftLabel: "Reported / expected", rightLabel: "Saved reference", rows: [] } };
+    explanation: finding.description, comparison: { leftLabel: "Oppgitt / forventet", rightLabel: "Lagret referanse", rows: [] } };
   const compare = (label: string, left: string | null | undefined, right: string | null | undefined) => result.comparison.rows.push({ label, left: left ?? missing, right: right ?? missing });
-  const period = (start?: string | null, end?: string | null) => start ? `${vehicleDate(start)} to ${end ? vehicleDate(end) : "indefinite"}` : missing;
+  const period = (start?: string | null, end?: string | null) => start ? `${vehicleDate(start)} til ${end ? vehicleDate(end) : "uten sluttdato"}` : missing;
   switch (finding.code) {
     case "NOX_MISMATCH": {
-      result.explanation = "The supplier's total NOx is converted from grams into milligrams per kilometer, then compared with the registry rate.";
-      result.comparison.leftLabel = "Supplier statistics (calculated)"; result.comparison.rightLabel = `Statens vegvesen (${method})`;
+      result.explanation = "Leverandørens samlede NOx omregnes fra gram til milligram per kilometer og sammenlignes deretter med verdien i registeret.";
+      result.comparison.leftLabel = "Leverandørens statistikk (beregnet)"; result.comparison.rightLabel = `Statens vegvesen (${method})`;
       const calculated = exactRatio(row?.data.totalNoxRegisteredGrams, row?.data.totalKmNoxRegistered, 1000n);
-      compare("NOx rate", number(calculated, "mg/km"), number(measurement?.noxMgPerKm, "mg/km"));
-      compare("Values used for comparison (rounded)", number(exactRatio(row?.data.totalNoxRegisteredGrams, row?.data.totalKmNoxRegistered, 1000n, 0), "mg/km"), whole(measurement?.noxMgPerKm, "mg/km"));
-      result.inputs = [["Supplier total NOx", number(row?.data.totalNoxRegisteredGrams, "g")], ["NOx-registered distance", number(row?.data.totalKmNoxRegistered, "km")]];
-      result.note = "Calculation: total NOx grams × 1000 ÷ NOx-registered distance. Registry test figures and period figures are not equivalent measurements; this discrepancy needs review. Calculated display values use up to six decimals; comparisons use exact integer rounding.";
+      compare("NOx-verdi", number(calculated, "mg/km"), number(measurement?.noxMgPerKm, "mg/km"));
+      compare("Verdier brukt i sammenligningen (avrundet)", number(exactRatio(row?.data.totalNoxRegisteredGrams, row?.data.totalKmNoxRegistered, 1000n, 0), "mg/km"), whole(measurement?.noxMgPerKm, "mg/km"));
+      result.inputs = [["Leverandørens samlede NOx", number(row?.data.totalNoxRegisteredGrams, "g")], ["NOx-registrert distanse", number(row?.data.totalKmNoxRegistered, "km")]];
+      result.note = "Beregning: samlede gram NOx × 1000 ÷ NOx-registrert distanse. Testverdier i registeret og verdier for perioden er ikke likeverdige målinger, så dette avviket må vurderes. Beregnede visningsverdier har opptil seks desimaler, mens sammenligningene bruker nøyaktig heltallsavrunding.";
       break;
     }
     case "CO2_MISMATCH":
-      result.explanation = "The supplier's CO₂ rate and this registry measurement round to different whole numbers.";
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = `Statens vegvesen (${method})`;
-      compare("CO₂ rate", number(row?.data.co2GramsPerKm, "g/km"), number(measurement?.co2GramsPerKm, "g/km"));
-      compare("Values used for comparison (rounded)", whole(row?.data.co2GramsPerKm, "g/km"), whole(measurement?.co2GramsPerKm, "g/km"));
-      result.note = "Every relevant registry measurement is checked, even if another one matches. Different measurement methods may explain a discrepancy.";
+      result.explanation = "Leverandørens CO₂-utslipp og denne målingen i registeret rundes av til ulike heltall.";
+      result.comparison.leftLabel = "Leverandørens statistikk"; result.comparison.rightLabel = `Statens vegvesen (${method})`;
+      compare("CO₂-utslipp", number(row?.data.co2GramsPerKm, "g/km"), number(measurement?.co2GramsPerKm, "g/km"));
+      compare("Verdier brukt i sammenligningen (avrundet)", whole(row?.data.co2GramsPerKm, "g/km"), whole(measurement?.co2GramsPerKm, "g/km"));
+      result.note = "Alle relevante målinger i registeret kontrolleres, selv om en annen måling stemmer. Ulike målemetoder kan forklare et avvik.";
       break;
     case "CONSUMPTION_MISMATCH":
-      result.explanation = "The reported average does not agree with an average calculated from this row's liters and distance.";
-      result.comparison.leftLabel = "Supplier's reported average"; result.comparison.rightLabel = "Calculated from supplier totals";
-      compare("Average fuel consumption", number(row?.data.averageFuelConsumptionLitresPer100Km, "L/100km"), number(exactRatio(row?.data.fuelConsumedLitres, row?.data.totalTripKm, 100n), "L/100km"));
-      compare("Values used for comparison (rounded)", whole(row?.data.averageFuelConsumptionLitresPer100Km, "L/100km"), number(exactRatio(row?.data.fuelConsumedLitres, row?.data.totalTripKm, 100n, 0), "L/100km"));
-      result.inputs = [["Total fuel consumed", number(row?.data.fuelConsumedLitres, "L")], ["Total distance", number(row?.data.totalTripKm, "km")]];
-      result.note = "Calculation: liters × 100 ÷ total distance. This assumes both totals describe the same reporting scope. The calculated display uses up to six decimals; integer comparisons are calculated directly from the totals.";
+      result.explanation = "Oppgitt gjennomsnitt stemmer ikke med et gjennomsnitt beregnet ut fra liter og distanse på denne raden.";
+      result.comparison.leftLabel = "Leverandørens oppgitte gjennomsnitt"; result.comparison.rightLabel = "Beregnet ut fra leverandørens totaler";
+      compare("Gjennomsnittlig drivstofforbruk", number(row?.data.averageFuelConsumptionLitresPer100Km, "L/100km"), number(exactRatio(row?.data.fuelConsumedLitres, row?.data.totalTripKm, 100n), "L/100km"));
+      compare("Verdier brukt i sammenligningen (avrundet)", whole(row?.data.averageFuelConsumptionLitresPer100Km, "L/100km"), number(exactRatio(row?.data.fuelConsumedLitres, row?.data.totalTripKm, 100n, 0), "L/100km"));
+      result.inputs = [["Totalt drivstofforbruk", number(row?.data.fuelConsumedLitres, "L")], ["Total distanse", number(row?.data.totalTripKm, "km")]];
+      result.note = "Beregning: liter × 100 ÷ total distanse. Dette forutsetter at begge totalene gjelder samme rapporteringsomfang. Beregnet visning har opptil seks desimaler, mens heltallssammenligningene beregnes direkte fra totalene.";
       break;
     case "BODY_TYPE_MISMATCH":
-      result.explanation = "The reported body style differs from the registered body style. Body style is separate from the technical vehicle category.";
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
-      compare("Body style", row ? catalogLabel(BODY_TYPES, row.data.bodyType) : null, data?.bodyType ? catalogLabel(BODY_TYPES, data.bodyType.code) : null);
+      result.explanation = "Oppgitt karosseritype avviker fra registrert karosseritype. Karosseritype er noe annet enn teknisk kjøretøykategori.";
+      result.comparison.leftLabel = "Leverandørens statistikk"; result.comparison.rightLabel = "Statens vegvesen";
+      compare("Karosseritype", row ? catalogLabel(BODY_TYPES, row.data.bodyType) : null, data?.bodyType ? catalogLabel(BODY_TYPES, data.bodyType.code) : null);
       break;
     case "FUEL_MISMATCH":
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
-      compare("Fuel technology", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
-      result.note = "The agreed gas variants are grouped, but CNG and LNG stay separate. The registry's original codes are retained.";
+      result.comparison.leftLabel = "Leverandørens statistikk"; result.comparison.rightLabel = "Statens vegvesen";
+      compare("Drivstoffteknologi", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
+      result.note = "De avtalte gassvariantene er slått sammen, men CNG og LNG holdes adskilt. Registerets opprinnelige koder beholdes.";
       break;
     case "CATEGORY_MISMATCH":
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
-      compare("Vehicle category", row ? catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory) : null, data?.vehicleCategory ? catalogLabel(VEHICLE_CATEGORIES, categoryGroup(data.vehicleCategory.code)) : null);
-      if (data?.vehicleCategory) compare("Original registry code", "Compared using its normalized category", data.vehicleCategory.code);
+      result.comparison.leftLabel = "Leverandørens statistikk"; result.comparison.rightLabel = "Statens vegvesen";
+      compare("Kjøretøykategori", row ? catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory) : null, data?.vehicleCategory ? catalogLabel(VEHICLE_CATEGORIES, categoryGroup(data.vehicleCategory.code)) : null);
+      if (data?.vehicleCategory) compare("Opprinnelig registerkode", "Sammenlignet med normalisert kategori", data.vehicleCategory.code);
       break;
     case "BRAND_MISMATCH": case "MODEL_MISMATCH":
-      result.comparison.leftLabel = "Supplier statistics"; result.comparison.rightLabel = "Statens vegvesen";
-      compare(finding.code === "BRAND_MISMATCH" ? "Vehicle brand" : "Vehicle model", finding.code === "BRAND_MISMATCH" ? row?.data.make : row?.data.model, finding.code === "BRAND_MISMATCH" ? data?.make : data?.model);
-      result.note = "Case, spacing and punctuation are ignored. Naming differences may still explain this finding.";
+      result.comparison.leftLabel = "Leverandørens statistikk"; result.comparison.rightLabel = "Statens vegvesen";
+      compare(finding.code === "BRAND_MISMATCH" ? "Kjøretøymerke" : "Kjøretøymodell", finding.code === "BRAND_MISMATCH" ? row?.data.make : row?.data.model, finding.code === "BRAND_MISMATCH" ? data?.make : data?.model);
+      result.note = "Store og små bokstaver, mellomrom og tegnsetting ignoreres. Forskjellig navnsetting kan likevel forklare dette funnet.";
       break;
     case "AGREEMENT_PERIOD_NOT_COVERED":
-      result.comparison.leftLabel = "Supplier reporting period"; result.comparison.rightLabel = "Agreement / vehicle list";
-      compare("Period", period(row?.data.periodStart, row?.data.periodEnd), check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "No agreement linked");
+      result.comparison.leftLabel = "Leverandørens rapporteringsperiode"; result.comparison.rightLabel = "Avtale / kjøretøyliste";
+      compare("Periode", period(row?.data.periodStart, row?.data.periodEnd), check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "Ingen avtale koblet");
       break;
     case "OVERLAPPING_STATISTICS":
-      result.comparison.leftLabel = "Reporting row 1"; result.comparison.rightLabel = "Reporting row 2";
-      compare("Period", period(row?.data.periodStart, row?.data.periodEnd), period(otherRow?.data.periodStart, otherRow?.data.periodEnd));
-      compare("Distance", number(row?.data.totalTripKm, "km"), number(otherRow?.data.totalTripKm, "km"));
-      result.note = "Both rows remain stored. Overlap may be intentional; their totals are not automatically added together.";
+      result.comparison.leftLabel = "Rapporteringsrad 1"; result.comparison.rightLabel = "Rapporteringsrad 2";
+      compare("Periode", period(row?.data.periodStart, row?.data.periodEnd), period(otherRow?.data.periodStart, otherRow?.data.periodEnd));
+      compare("Distanse", number(row?.data.totalTripKm, "km"), number(otherRow?.data.totalTripKm, "km"));
+      result.note = "Begge radene er lagret. Overlappet kan være tilsiktet, og totalene legges ikke automatisk sammen.";
       break;
     case "REGISTRY_CO2_DISAGREEMENT":
-      result.comparison.leftLabel = "Registry CO₂ measurement"; result.comparison.rightLabel = "Rounded comparison value";
+      result.comparison.leftLabel = "CO₂-måling i registeret"; result.comparison.rightLabel = "Avrundet sammenligningsverdi";
       for (const m of fuel?.measurements ?? []) if (m.co2GramsPerKm != null)
-        compare(m.measurementMethod?.code ?? "Method not recorded", number(m.co2GramsPerKm, "g/km"), whole(m.co2GramsPerKm, "g/km"));
-      result.note = "No method is preferred here. Different test methods can explain differing figures.";
+        compare(m.measurementMethod?.code ?? "Metode ikke registrert", number(m.co2GramsPerKm, "g/km"), whole(m.co2GramsPerKm, "g/km"));
+      result.note = "Ingen metode foretrekkes her. Ulike testmetoder kan forklare forskjellige verdier.";
       break;
     case "CO2_CLASSIFICATION_MISMATCH": {
       const electricOrHydrogen = data?.fuels.length && data.fuels.every(f => f.fuelTechnology?.code === "5" || f.fuelTechnology?.code === "6");
-      compare("Registered as CO₂-emitting", row ? row.data.co2Registered ? "Yes" : "No" : null, electricOrHydrogen ? "No under the electric/hydrogen reporting rule" : "A positive registry CO₂ measurement is recorded");
+      compare("Registrert som CO₂-utslipp", row ? row.data.co2Registered ? "Ja" : "Nei" : null, electricOrHydrogen ? "Nei etter rapporteringsregelen for elektrisk/hydrogen" : "En positiv CO₂-måling er registrert i registeret");
       for (const f of data?.fuels ?? []) {
-        compare("Fuel technology", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, fuelLabel(f.fuelTechnology));
-        for (const m of f.measurements) if (m.co2GramsPerKm != null) compare(`CO₂ (${m.measurementMethod?.code ?? "unknown method"})`, row && statisticNotApplicable("co2GramsPerKm", row.data.fuelTechnology) ? "Not applicable" : number(row?.data.co2GramsPerKm, "g/km"), number(m.co2GramsPerKm, "g/km"));
+        compare("Drivstoffteknologi", row ? catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology) : null, fuelLabel(f.fuelTechnology));
+        for (const m of f.measurements) if (m.co2GramsPerKm != null) compare(`CO₂ (${m.measurementMethod?.code ?? "ukjent metode"})`, row && statisticNotApplicable("co2GramsPerKm", row.data.fuelTechnology) ? "Ikke relevant" : number(row?.data.co2GramsPerKm, "g/km"), number(m.co2GramsPerKm, "g/km"));
       }
-      result.note = "Electric/hydrogen No is an agreed reporting convention, not a claim about lifecycle emissions.";
+      result.note = "Nei for elektrisk/hydrogen er en avtalt rapporteringspraksis og ikke en påstand om utslipp over livssyklusen.";
       break;
     }
     case "UNABLE_TO_VERIFY": {
       const noxDenominatorProblem = row?.data.totalKmNoxRegistered != null && decimalParts(row.data.totalKmNoxRegistered)?.coefficient === 0n && (decimalParts(row.data.totalNoxRegisteredGrams ?? "")?.coefficient ?? 0n) > 0n;
       const fuelDenominatorProblem = row && decimalParts(row.data.totalTripKm)?.coefficient === 0n && ((decimalParts(row.data.fuelConsumedLitres ?? "")?.coefficient ?? 0n) > 0n || (decimalParts(row.data.averageFuelConsumptionLitresPer100Km ?? "")?.coefficient ?? 0n) > 0n);
       if (row && (noxDenominatorProblem || fuelDenominatorProblem)) {
-        result.comparison.leftLabel = "Supplier reporting row"; result.comparison.rightLabel = "Calculation requirement";
+        result.comparison.leftLabel = "Leverandørens rapporteringsrad"; result.comparison.rightLabel = "Krav til beregningen";
         if (noxDenominatorProblem) {
-          compare("NOx-registered distance", number(row.data.totalKmNoxRegistered, "km"), "Greater than 0 km to calculate mg/km");
-          compare("Total NOx", number(row.data.totalNoxRegisteredGrams, "g"), "A positive mass needs a usable distance for this calculation");
+          compare("NOx-registrert distanse", number(row.data.totalKmNoxRegistered, "km"), "Større enn 0 km for å beregne mg/km");
+          compare("Samlet NOx", number(row.data.totalNoxRegisteredGrams, "g"), "En positiv masse krever en brukbar distanse i denne beregningen");
         }
         if (fuelDenominatorProblem) {
-          compare("Total distance", number(row.data.totalTripKm, "km"), "Greater than 0 km to calculate L/100km");
-          compare("Total fuel consumed", number(row.data.fuelConsumedLitres, "L"), "Cannot derive a consumption rate without distance");
+          compare("Total distanse", number(row.data.totalTripKm, "km"), "Større enn 0 km for å beregne L/100km");
+          compare("Totalt drivstofforbruk", number(row.data.fuelConsumedLitres, "L"), "Kan ikke beregne forbruk uten distanse");
         }
-        result.note = "Division by zero is undefined. The missing calculated rate must not be substituted with zero.";
+        result.note = "Deling på null er udefinert. Den manglende beregnede verdien skal ikke erstattes med null.";
         break;
       }
-      compare("Registry lookup", "A successful lookup with the required reference facts", plain(check.registry.lookupOutcome));
-      compare("Registry data source", "Usable reference data", plain(check.registry.dataSource));
-      compare("Registry fetched (UTC)", "Reference facts available at the saved check time", check.registry.fetchedAt);
+      compare("Registeroppslag", "Et vellykket oppslag med nødvendige referanseopplysninger", plain(check.registry.lookupOutcome));
+      compare("Datakilde i registeret", "Brukbare referansedata", plain(check.registry.dataSource));
+      compare("Register hentet (UTC)", "Referanseopplysninger tilgjengelige på tidspunktet for den lagrede kontrollen", check.registry.fetchedAt);
       if (row) {
-        compare("Fuel technology", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology), data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
-        result.inputs = [["Total distance", number(row.data.totalTripKm, "km")], ["NOx-registered distance", statisticNotApplicable("totalKmNoxRegistered", row.data.fuelTechnology) ? "Not applicable" : number(row.data.totalKmNoxRegistered, "km")], ["Total NOx", statisticNotApplicable("totalNoxRegisteredGrams", row.data.fuelTechnology) ? "Not applicable" : number(row.data.totalNoxRegisteredGrams, "g")]];
+        compare("Drivstoffteknologi", catalogLabel(FUEL_TECHNOLOGIES, row.data.fuelTechnology), data?.fuels.map(f => fuelLabel(f.fuelTechnology)).join("\n") || null);
+        result.inputs = [["Total distanse", number(row.data.totalTripKm, "km")], ["NOx-registrert distanse", statisticNotApplicable("totalKmNoxRegistered", row.data.fuelTechnology) ? "Ikke relevant" : number(row.data.totalKmNoxRegistered, "km")], ["Samlet NOx", statisticNotApplicable("totalNoxRegisteredGrams", row.data.fuelTechnology) ? "Ikke relevant" : number(row.data.totalNoxRegisteredGrams, "g")]];
         const relevant = data?.fuels.filter(f => fuelGroups(f.fuelTechnology?.code ?? "").includes(row.data.fuelTechnology));
         for (const [label, reported, reference] of [
-          ["Vehicle category", catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory), data?.vehicleCategory?.code],
-          ["Body style", catalogLabel(BODY_TYPES, row.data.bodyType), data?.bodyType?.code],
-          ["Vehicle brand", row.data.make, data?.make], ["Vehicle model", row.data.model, data?.model],
+          ["Kjøretøykategori", catalogLabel(VEHICLE_CATEGORIES, row.data.vehicleCategory), data?.vehicleCategory?.code],
+          ["Karosseritype", catalogLabel(BODY_TYPES, row.data.bodyType), data?.bodyType?.code],
+          ["Kjøretøymerke", row.data.make, data?.make], ["Kjøretøymodell", row.data.model, data?.model],
         ]) if (!reference) compare(label!, reported, null);
-        if (row.data.co2GramsPerKm != null && !relevant?.some(f => f.measurements.some(m => m.co2GramsPerKm != null))) compare("CO₂ rate", number(row.data.co2GramsPerKm, "g/km"), null);
-        if (row.data.totalNoxRegisteredGrams != null && !relevant?.some(f => f.measurements.some(m => m.noxMgPerKm != null))) compare("NOx rate", number(exactRatio(row.data.totalNoxRegisteredGrams, row.data.totalKmNoxRegistered, 1000n), "mg/km"), null);
+        if (row.data.co2GramsPerKm != null && !relevant?.some(f => f.measurements.some(m => m.co2GramsPerKm != null))) compare("CO₂-utslipp", number(row.data.co2GramsPerKm, "g/km"), null);
+        if (row.data.totalNoxRegisteredGrams != null && !relevant?.some(f => f.measurements.some(m => m.noxMgPerKm != null))) compare("NOx-verdi", number(exactRatio(row.data.totalNoxRegisteredGrams, row.data.totalKmNoxRegistered, 1000n), "mg/km"), null);
       }
-      result.note = "A missing reference or zero denominator prevents comparison. This is not proof that the reported value is wrong. Read the recorded reason below for this particular finding.";
+      result.note = "Manglende referanse eller null i nevneren hindrer sammenligning. Dette er ikke bevis på at den oppgitte verdien er feil. Les den registrerte begrunnelsen nedenfor for dette funnet.";
       break;
     }
     default:
       if (finding.origin === "AGREEMENT") {
-        result.comparison.leftLabel = "Vehicle"; result.comparison.rightLabel = "Supplier agreement";
-        compare("Listed", check.vehicle.registrationNumber, check.vehicle.listed ? "In vehicle list" : "Not in vehicle list");
-        compare("Agreement period", "Covers the check date", check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "No agreement linked");
+        result.comparison.leftLabel = "Kjøretøy"; result.comparison.rightLabel = "Leverandørens avtale";
+        compare("På listen", check.vehicle.registrationNumber, check.vehicle.listed ? "På kjøretøylisten" : "Ikke på kjøretøylisten");
+        compare("Avtaleperiode", "Dekker kontrolldatoen", check.agreement ? period(check.agreement.agreement.startDate, check.agreement.agreement.endDate) : "Ingen avtale koblet");
       } else {
-        result.comparison.leftLabel = "Expected registration"; result.comparison.rightLabel = "Statens vegvesen";
-        compare("Registration status", "Registered", data?.registrationStatus ?? check.registry.registrationStatus);
+        result.comparison.leftLabel = "Forventet registrering"; result.comparison.rightLabel = "Statens vegvesen";
+        compare("Registreringsstatus", "Registrert", data?.registrationStatus ?? check.registry.registrationStatus);
       }
   }
   return result;

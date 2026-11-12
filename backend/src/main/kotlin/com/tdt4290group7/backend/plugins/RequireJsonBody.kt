@@ -27,7 +27,7 @@ private val RequireJsonBody = createApplicationPlugin("RequireJsonBody") {
         if (!hasBody) return@onCall
         val type = request.contentType()
         if (!type.match(ContentType.Application.Json) && !type.match(ContentType.MultiPart.FormData)) {
-            call.respond(HttpStatusCode.UnsupportedMediaType, ApiError("Send JSON or multipart form data"))
+            call.respond(HttpStatusCode.UnsupportedMediaType, ApiError("Send JSON eller skjemadata (multipart)"))
         }
     }
 }

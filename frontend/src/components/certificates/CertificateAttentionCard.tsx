@@ -39,23 +39,23 @@ export function CertificateAttentionCard({
   const info = getCertificateStatus(certificate);
 
   const standard = CERTIFICATE_STANDARD_LABELS[certificate.standard];
-  const supplierName = contract?.supplierName ?? certificate.supplierName ?? "Unknown supplier";
-  const contractName = contract?.contractName ?? "an unknown contract";
+  const supplierName = contract?.supplierName ?? certificate.supplierName ?? "Ukjent leverandør";
+  const contractName = contract?.contractName ?? "en ukjent avtale";
   const days = Math.abs(info.daysRemaining ?? 0);
 
   const title =
     info.status === "expired"
-      ? "Certificate lapsed"
+      ? "Sertifikatet er utløpt"
       : info.status === "missing-documentation"
-        ? "Certificate documentation missing"
-        : "Certificate expiring soon";
+        ? "Sertifikatdokumentasjon mangler"
+        : "Sertifikatet utløper snart";
 
   const description =
     info.status === "expired"
-      ? `${standard} expired on ${formatCertificateDate(certificate.validUntil!)} (${days} day${days === 1 ? "" : "s"} ago) for contract "${contractName}".`
+      ? `${standard} utløp ${formatCertificateDate(certificate.validUntil!)} (for ${days} ${days === 1 ? "dag" : "dager"} siden) for avtalen «${contractName}».`
       : info.status === "missing-documentation"
-        ? `${standard} is required for contract "${contractName}", but no documentation has been submitted.`
-        : `${standard} expires on ${formatCertificateDate(certificate.validUntil!)} (in ${days} day${days === 1 ? "" : "s"}) for contract "${contractName}".`;
+        ? `${standard} kreves for avtalen «${contractName}», men ingen dokumentasjon er levert.`
+        : `${standard} utløper ${formatCertificateDate(certificate.validUntil!)} (om ${days} ${days === 1 ? "dag" : "dager"}) for avtalen «${contractName}».`;
 
   return (
     <>
@@ -64,7 +64,7 @@ export function CertificateAttentionCard({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide text-red-700">
-                Active attention
+                Krever oppfølging
               </span>
               <span className="font-headline text-sm font-semibold text-neutral-900">
                 {title} ({supplierName})
@@ -78,14 +78,14 @@ export function CertificateAttentionCard({
               onClick={() => onViewDetails(row)}
               className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
-              View details
+              Vis detaljer
             </button>
           </div>
         </div>
 
         <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="text-xs text-neutral-500">
-            Showing {safeAttentionIndex + 1} of {attentionRows.length} contracts requiring attention
+            Viser {safeAttentionIndex + 1} av {attentionRows.length} {attentionRows.length === 1 ? "avtale" : "avtaler"} som krever oppfølging
           </p>
           <div className="flex items-center gap-1.5">
             <button
@@ -95,10 +95,10 @@ export function CertificateAttentionCard({
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              Previous
+              Forrige
             </button>
             <span className="font-mono text-xs text-neutral-500">
-              Page {safeAttentionIndex + 1} of {attentionRows.length}
+              Side {safeAttentionIndex + 1} av {attentionRows.length}
             </span>
             <button
               type="button"
@@ -108,13 +108,13 @@ export function CertificateAttentionCard({
               disabled={safeAttentionIndex >= attentionRows.length - 1}
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Next
+              Neste
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
         <p className="mt-3 text-xs text-neutral-500">
-          Supplier notices are not yet sent or tracked by the backend.
+          Varsler til leverandører sendes eller spores ikke av backend ennå.
         </p>
       </div>
     </>

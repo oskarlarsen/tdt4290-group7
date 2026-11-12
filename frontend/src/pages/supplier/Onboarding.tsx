@@ -15,7 +15,7 @@ import {
   Truck,
   Zap,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   confirmCsv,
   getOnboardingStatus,
@@ -43,16 +43,16 @@ import { agreementLabel } from "../../utils/agreementLabel";
 
 // What the preview says about where a vehicle's fuel came from.
 const REGISTRY_STATUS_LABELS: Record<string, string> = {
-  FILLED: "Yes, filled in for you",
-  PROVIDED: "No, you entered it",
-  NOT_FOUND: "Plate not found",
-  NOT_CHECKED: "Could not be checked",
+  FILLED: "Ja, fylt ut for deg",
+  PROVIDED: "Nei, du skrev det inn",
+  NOT_FOUND: "Skiltet ble ikke funnet",
+  NOT_CHECKED: "Kunne ikke sjekkes",
 };
 
 const ENTITY_OPTIONS: Array<{ value: CsvEntity; label: string }> = [
-  { value: "vehicles", label: "Vehicles" },
-  { value: "energy", label: "Energy" },
-  { value: "products", label: "Products" },
+  { value: "vehicles", label: "Kjøretøy" },
+  { value: "energy", label: "Energi" },
+  { value: "products", label: "Produkter" },
 ];
 
 const ENTITY_API_VALUES: Record<CsvEntity, "VEHICLES" | "ENERGY" | "PRODUCTS"> = {
@@ -62,45 +62,47 @@ const ENTITY_API_VALUES: Record<CsvEntity, "VEHICLES" | "ENERGY" | "PRODUCTS"> =
 };
 
 const VEHICLE_FIELD_LABELS: Record<string, string> = {
-  agreement_id: "Agreement",
-  registration_number: "Vehicle registration plate",
-  is_planned: "Planned vehicle",
-  fuel_technology: "Fuel or propulsion",
-  is_hybrid: "Hybrid vehicle",
-  full_contract_coverage: "Full agreement-period coverage",
-  start_year_week: "Coverage starts",
-  end_year_week: "Coverage ends",
-  attachment_reference: "Supporting document reference",
-  notes: "Notes",
+  agreement_id: "Avtale",
+  registration_number: "Registreringsnummer",
+  is_planned: "Planlagt kjøretøy",
+  fuel_technology: "Drivstoff eller framdrift",
+  is_hybrid: "Hybridkjøretøy",
+  full_contract_coverage: "Dekker hele avtaleperioden",
+  start_year_week: "Dekning starter",
+  end_year_week: "Dekning slutter",
+  attachment_reference: "Referanse til dokumentasjon",
+  notes: "Notater",
 };
 
 const ENERGY_FIELD_LABELS: Record<string, string> = {
-  agreement_id: "Agreement",
-  facility_location_code: "Facility or location code",
-  facility_address: "Facility address",
-  reporting_year: "Reporting year",
-  electricity_kwh: "Electricity (kWh)",
-  district_heating_kwh: "District heating (kWh)",
-  biogas_kwh: "Biogas (kWh)",
-  fossil_fuel_kwh: "Fossil fuel (kWh)",
-  self_produced_solar_kwh: "Self-produced solar (kWh)",
-  self_produced_heatpump_kwh: "Self-produced heat pump (kWh)",
-  storage_area_sqm: "Storage area (m²)",
-  workshop_area_sqm: "Workshop area (m²)",
-  other_area_sqm: "Other area (m²)",
-  notes: "Notes",
+  agreement_id: "Avtale",
+  facility_location_code: "Anleggs- eller lokasjonskode",
+  facility_address: "Anleggsadresse",
+  reporting_year: "Rapporteringsår",
+  reporting_quarter: "Kvartal",
+  goo_covered_kwh: "Dekket av opprinnelsesgarantier (GoO) (kWh)",
+  electricity_kwh: "Strøm (kWh)",
+  district_heating_kwh: "Fjernvarme (kWh)",
+  biogas_kwh: "Biogass (kWh)",
+  fossil_fuel_kwh: "Fossilt brensel (kWh)",
+  self_produced_solar_kwh: "Egenprodusert sol (kWh)",
+  self_produced_heatpump_kwh: "Egenprodusert varmepumpe (kWh)",
+  storage_area_sqm: "Lagerareal (m²)",
+  workshop_area_sqm: "Verkstedareal (m²)",
+  other_area_sqm: "Annet areal (m²)",
+  notes: "Notater",
 };
 
 const PRODUCT_FIELD_LABELS: Record<string, string> = {
-  agreement_id: "Agreement",
-  product_code: "Product code or SKU",
-  product_name: "Product name",
-  product_category: "Product category",
-  ecolabel_standard: "Ecolabel standard",
-  license_number: "License number",
-  unit_of_measure: "Unit of measure",
-  is_repaired_or_reused: "Repaired or reused product",
-  notes: "Notes",
+  agreement_id: "Avtale",
+  product_code: "Produktkode eller SKU",
+  product_name: "Produktnavn",
+  product_category: "Produktkategori",
+  ecolabel_standard: "Miljømerkestandard",
+  license_number: "Lisensnummer",
+  unit_of_measure: "Måleenhet",
+  is_repaired_or_reused: "Reparert eller gjenbrukt produkt",
+  notes: "Notater",
 };
 
 function friendlyFieldLabel(entity: CsvEntity, column: string): string {
@@ -124,18 +126,18 @@ function friendlyErrorMessage(entity: CsvEntity, message: string): string {
 }
 
 function friendlyBoolean(value: string | undefined): string {
-  return value === "TRUE" || value === "1" ? "Yes" : value === "FALSE" || value === "0" ? "No" : "";
+  return value === "TRUE" || value === "1" ? "Ja" : value === "FALSE" || value === "0" ? "Nei" : "";
 }
 
 const STATUS_LABELS: Record<OnboardingStatus, string> = {
-  INVITED: "Invited",
-  PROFILE_PENDING: "Profile pending",
-  DATA_DRAFT: "In progress",
-  VALIDATING: "Validating",
-  SUBMITTED: "Submitted",
-  UNDER_REVIEW: "Under review",
-  APPROVED: "Approved",
-  REVISION_REQUIRED: "Changes requested",
+  INVITED: "Invitert",
+  PROFILE_PENDING: "Profil venter",
+  DATA_DRAFT: "Pågår",
+  VALIDATING: "Validerer",
+  SUBMITTED: "Innsendt",
+  UNDER_REVIEW: "Under vurdering",
+  APPROVED: "Godkjent",
+  REVISION_REQUIRED: "Endringer ønskes",
 };
 
 const STATUS_STYLES: Record<OnboardingStatus, string> = {
@@ -151,7 +153,7 @@ const STATUS_STYLES: Record<OnboardingStatus, string> = {
 
 function messageFrom(error: unknown) {
   if (error instanceof ApiError) return error.message;
-  return error instanceof Error ? error.message : "Something went wrong. Please try again.";
+  return error instanceof Error ? error.message : "Noe gikk galt. Prøv igjen.";
 }
 
 function Metric({
@@ -181,7 +183,10 @@ export default function Onboarding() {
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
-  const [entity, setEntity] = useState<CsvEntity>("vehicles");
+  // ?entity=energy (from the Energy page) opens the energy form directly.
+  const [searchParams] = useSearchParams();
+  const requestedEntity = searchParams.get("entity");
+  const [entity, setEntity] = useState<CsvEntity>(requestedEntity === "energy" || requestedEntity === "products" ? requestedEntity : "vehicles");
   // Each kind of data can be entered in a form or as a CSV file; each way keeps its own preview.
   const [method, setMethod] = useState<"form" | "csv">("form");
   const [previews, setPreviews] = useState<Record<"form" | "csv", CsvPreview | null>>({ form: null, csv: null });
@@ -257,14 +262,14 @@ export default function Onboarding() {
     await perform(async () => {
       await updateOnboardingProfile({ contactName, contactEmail, contactPhone });
       await refresh();
-    }, "Contact details saved.");
+    }, "Kontaktopplysningene er lagret.");
   }
 
   async function handlePreview(formFile: File) {
     await perform(async () => {
       const result = await previewCsv(entity, formFile);
       setPreview(result);
-      setNotice(result.canCommit ? "Validation passed. Review the entries before importing." : null);
+      setNotice(result.canCommit ? "Validering bestått. Se gjennom oppføringene før import." : null);
     });
   }
 
@@ -290,7 +295,7 @@ export default function Onboarding() {
       const result = await submitOnboarding();
       setStatus(result);
       await refresh();
-      navigate("/supplier/dashboard", { replace: true, state: { notice: "Your onboarding information has been submitted for review." } });
+      navigate("/supplier/dashboard", { replace: true, state: { notice: "Registreringen din er sendt inn til vurdering." } });
     });
   }
 
@@ -300,11 +305,17 @@ export default function Onboarding() {
     status?.status === "UNDER_REVIEW" ||
     status?.status === "APPROVED";
 
+  // Energy is reported every quarter, so its form stays open after the onboarding has been submitted.
+  const energyStaysOpen = locked && !!status?.requiredEntities.includes("ENERGY");
+  useEffect(() => {
+    if (energyStaysOpen && entity !== "energy") setEntity("energy");
+  }, [energyStaysOpen, entity]);
+
   if (loading) {
     return (
       <div className="flex min-h-64 items-center justify-center gap-2 text-neutral-500">
         <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
-        Loading supplier workspace…
+        Laster leverandørarbeidsområde…
       </div>
     );
   }
@@ -315,10 +326,10 @@ export default function Onboarding() {
         <div className="flex gap-3 text-red-800">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div>
-            <h1 className="font-semibold">Supplier onboarding is unavailable</h1>
+            <h1 className="font-semibold">Registrering av leverandør er utilgjengelig</h1>
             <p className="mt-1 text-sm">{error}</p>
             <p className="mt-2 text-sm text-neutral-600">
-              The supplier account must be linked to an organization in the backend before this workspace can load.
+              Leverandørkontoen må kobles til en organisasjon i systemet før dette arbeidsområdet kan lastes.
             </p>
             <button
               type="button"
@@ -330,7 +341,7 @@ export default function Onboarding() {
               className="mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-neutral-50"
             >
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              Try again
+              Prøv igjen
             </button>
           </div>
         </div>
@@ -345,21 +356,21 @@ export default function Onboarding() {
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-primary-100">
               <Leaf className="h-3.5 w-3.5" aria-hidden="true" />
-              Supplier portal
+              Leverandørportal
             </div>
             <h1 className="text-2xl font-semibold sm:text-3xl">{overview.supplierName}</h1>
             <p className="mt-1 text-sm text-primary-100">
-              Organization number {overview.orgNumber} · onboarding checklist and reporting
+              Organisasjonsnummer {overview.orgNumber} · sjekkliste for registrering og rapportering
             </p>
           </div>
-          <span className={`inline-flex w-fit items-center rounded-full px-3 py-1.5 text-sm font-medium ${STATUS_STYLES[status.status]}`}>
+          <span className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium ${STATUS_STYLES[status.status]}`}>
             {STATUS_LABELS[status.status]}
           </span>
         </div>
         <div className="mt-7 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-primary-100">Onboarding progress</p>
-            <p className="mt-1 text-lg font-semibold">{completedSteps} of {stepCount} steps complete</p>
+            <p className="text-sm text-primary-100">Fremdrift i registreringen</p>
+            <p className="mt-1 text-lg font-semibold">{completedSteps} av {stepCount} trinn fullført</p>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-white/20 sm:w-64">
             <div
@@ -385,23 +396,23 @@ export default function Onboarding() {
 
       {status.reviewerNotes && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <span className="font-semibold">Reviewer feedback: </span>{status.reviewerNotes}
+          <span className="font-semibold">Tilbakemelding fra saksbehandler: </span>{status.reviewerNotes}
         </div>
       )}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric icon={Building2} label="Agreements" value={overview.agreements.length} />
-        <Metric icon={Truck} label="Vehicles" value={overview.totalVehicles} />
-        <Metric icon={ShieldCheck} label="Certificates" value={overview.totalCertificates} />
-        <Metric icon={Zap} label="Energy reports" value={overview.totalEnergyRecords} />
+        <Metric icon={Building2} label="Avtaler" value={overview.agreements.length} />
+        <Metric icon={Truck} label="Kjøretøy" value={overview.totalVehicles} />
+        <Metric icon={ShieldCheck} label="Sertifikater" value={overview.totalCertificates} />
+        <Metric icon={Zap} label="Energirapporter" value={overview.totalEnergyRecords} />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.8fr)]">
         <section className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-neutral-900">Onboarding checklist</h2>
-              <p className="mt-1 text-sm text-neutral-500">Your information is saved to your supplier account.</p>
+              <h2 className="text-lg font-semibold text-neutral-900">Sjekkliste for registrering</h2>
+              <p className="mt-1 text-sm text-neutral-500">Opplysningene dine lagres på leverandørkontoen din.</p>
             </div>
             <FileCheck2 className="h-5 w-5 text-primary-700" aria-hidden="true" />
           </div>
@@ -419,25 +430,25 @@ export default function Onboarding() {
             ))}
           </ol>
           <div className="mt-6 border-t border-neutral-100 pt-5">
-            <h3 className="mb-1 text-sm font-semibold text-neutral-800">Agreements</h3>
+            <h3 className="mb-1 text-sm font-semibold text-neutral-800">Avtaler</h3>
             <p className="mb-3 text-xs text-neutral-500">
-              The administrator selects which information is required for each agreement.
+              Administratoren velger hvilken informasjon som kreves for hver avtale.
             </p>
             {overview.agreements.length === 0 ? (
-              <p className="text-sm text-neutral-500">No agreements are linked to this supplier account yet.</p>
+              <p className="text-sm text-neutral-500">Ingen avtaler er knyttet til denne leverandørkontoen ennå.</p>
             ) : (
               <ul className="space-y-2">
                 {overview.agreements.map((agreement) => (
                   <li key={agreement.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-sm">
                     <span className="min-w-0">
                       <span className="block font-medium text-neutral-800">{agreementLabel(agreement)}</span>
-                      <CopyableValue label="Agreement ID" value={agreement.id} />
+                      <CopyableValue label="Avtale-ID" value={agreement.id} />
                     </span>
                     <span className="text-right text-neutral-500">
                       {[
-                        agreement.requiresVehicles && "Vehicles",
-                        agreement.requiresEnergy && "Energy",
-                        agreement.requiresProducts && "Products",
+                        agreement.requiresVehicles && "Kjøretøy",
+                        agreement.requiresEnergy && "Energi",
+                        agreement.requiresProducts && "Produkter",
                       ].filter(Boolean).join(" · ")}
                     </span>
                   </li>
@@ -448,11 +459,11 @@ export default function Onboarding() {
         </section>
 
         <section className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
-          <h2 className="text-lg font-semibold text-neutral-900">Sustainability contact</h2>
-          <p className="mt-1 text-sm text-neutral-500">Who should the municipality contact about environmental reporting?</p>
+          <h2 className="text-lg font-semibold text-neutral-900">Kontaktperson for bærekraft</h2>
+          <p className="mt-1 text-sm text-neutral-500">Hvem skal kommunen kontakte om miljørapportering?</p>
           <form onSubmit={saveProfile} className="mt-5 space-y-4">
             <label className="block text-sm font-medium text-neutral-700">
-              Contact name
+              Navn på kontaktperson
               <input
                 required
                 minLength={2}
@@ -464,7 +475,7 @@ export default function Onboarding() {
               />
             </label>
             <label className="block text-sm font-medium text-neutral-700">
-              Email
+              E-post
               <input
                 required
                 type="email"
@@ -475,11 +486,11 @@ export default function Onboarding() {
               />
             </label>
             <label className="block text-sm font-medium text-neutral-700">
-              Phone <span className="font-normal text-neutral-500">(optional)</span>
+              Telefon <span className="font-normal text-neutral-500">(valgfritt)</span>
               <input
                 type="tel"
                 pattern="\+?[0-9 \(\)\-]{4,20}"
-                title="Enter a phone number, for example +47 123 45 678"
+                title="Skriv inn et telefonnummer, for eksempel +47 123 45 678"
                 value={contactPhone}
                 onChange={(event) => setContactPhone(event.target.value)}
                 disabled={working || locked}
@@ -492,7 +503,7 @@ export default function Onboarding() {
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {working ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Save contact
+              Lagre kontaktperson
             </button>
           </form>
         </section>
@@ -501,27 +512,32 @@ export default function Onboarding() {
       <section className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">Enter reporting data</h2>
+            <h2 className="text-lg font-semibold text-neutral-900">Skriv inn rapporteringsdata</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Complete the required details in the form. The system will validate and process your submission automatically.
+              Fyll ut de nødvendige opplysningene i skjemaet. Systemet validerer og behandler innsendingen automatisk.
             </p>
           </div>
           <Boxes className="hidden h-5 w-5 text-primary-700 sm:block" aria-hidden="true" />
         </div>
 
-        {locked ? (
+        {locked && !energyStaysOpen ? (
           <p className="mt-5 rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-            Reporting changes are unavailable while this submission is {STATUS_LABELS[status.status].toLowerCase()}.
+            Rapporteringsendringer er ikke tilgjengelige mens denne innsendingen er {STATUS_LABELS[status.status].toLowerCase()}.
           </p>
         ) : status.requiredEntities.length === 0 ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-            Your administrator has not assigned any information to collect yet.
+            Administratoren din har ikke tildelt noen informasjon som skal samles inn ennå.
           </p>
         ) : (
           <div className="mt-5 space-y-5">
+            {energyStaysOpen && (
+              <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                Registreringen din er {STATUS_LABELS[status.status].toLowerCase()}. Kjøretøy og produkter er låst, men du kan fortsette å rapportere energi hvert kvartal.
+              </p>
+            )}
             <div className="max-w-xs">
               <label className="block text-sm font-medium text-neutral-700">
-                Information type
+                Informasjonstype
                 <select
                   value={entity}
                   onChange={(event) => {
@@ -534,7 +550,7 @@ export default function Onboarding() {
                   className="mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm"
                 >
                   {ENTITY_OPTIONS.filter((option) =>
-                    status.requiredEntities.includes(ENTITY_API_VALUES[option.value]),
+                    status.requiredEntities.includes(ENTITY_API_VALUES[option.value]) && (!energyStaysOpen || option.value === "energy"),
                   ).map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -544,8 +560,8 @@ export default function Onboarding() {
               </label>
             </div>
 
-            <div role="tablist" aria-label="How to enter the data" className="inline-flex rounded-lg border border-neutral-200 p-0.5 text-sm">
-              {([["form", "Fill in a form"], ["csv", "Upload a CSV file"]] as const).map(([value, label]) => (
+            <div role="tablist" aria-label="Slik skriver du inn dataene" className="inline-flex rounded-lg border border-neutral-200 p-0.5 text-sm">
+              {([["form", "Fyll ut skjema"], ["csv", "Last opp CSV-fil"]] as const).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -601,13 +617,13 @@ export default function Onboarding() {
               <div>
                 <h3 className="font-semibold text-neutral-900">
                   {entity === "vehicles"
-                    ? "Vehicle details"
+                    ? "Kjøretøyopplysninger"
                     : entity === "energy"
-                      ? "Energy facility details"
-                      : "Product details"}
+                      ? "Opplysninger om energianlegg"
+                      : "Produktopplysninger"}
                 </h3>
                 <p className="mt-1 text-sm text-neutral-500">
-                  {preview.validRows} ready · {preview.errorRows} with errors · {preview.totalRows} total
+                  {preview.validRows} klare · {preview.errorRows} med feil · {preview.totalRows} totalt
                 </p>
               </div>
               {preview.canCommit ? (
@@ -618,21 +634,29 @@ export default function Onboarding() {
                   className="inline-flex items-center gap-2 rounded-lg bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-50"
                 >
                   <Check className="h-4 w-4" aria-hidden="true" />
-                  Confirm import
+                  Bekreft import
                 </button>
               ) : (
-                <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">Fix errors to import</span>
+                <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">Rett feil for å importere</span>
               )}
             </div>
+
+            {preview.notices && preview.notices.length > 0 && (
+              <ul role="status" className="mt-4 space-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {preview.notices.map((notice) => (
+                  <li key={notice}>{notice}</li>
+                ))}
+              </ul>
+            )}
 
             {preview.errors.length > 0 && (
               <div className="mt-4 overflow-x-auto rounded-lg border border-red-100">
                 <table className="w-full min-w-[560px] text-left text-sm">
                   <thead className="bg-red-50 text-red-900">
                     <tr>
-                      <th scope="col" className="px-3 py-2 font-semibold">Row</th>
-                      <th scope="col" className="px-3 py-2 font-semibold">Field</th>
-                      <th scope="col" className="px-3 py-2 font-semibold">Issue</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Rad</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Felt</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Problem</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-red-50">
@@ -651,7 +675,7 @@ export default function Onboarding() {
                 </table>
                 {preview.errors.length > 30 && (
                   <p className="bg-red-50 px-3 py-2 text-xs text-red-800">
-                    Showing 30 of {preview.errors.length} validation errors.
+                    Viser 30 av {preview.errors.length} valideringsfeil.
                   </p>
                 )}
               </div>
@@ -663,7 +687,7 @@ export default function Onboarding() {
                   <table className="w-full min-w-[620px] text-left text-xs">
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
-                        {["Agreement", "Vehicle", "Fuel / propulsion", "Hybrid", "Weight", "Checked with Statens vegvesen", "Coverage"].map((label) => (
+                        {["Avtale", "Kjøretøy", "Drivstoff / framdrift", "Hybrid", "Vekt", "Sjekket mot Statens vegvesen", "Dekning"].map((label) => (
                           <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
@@ -673,13 +697,13 @@ export default function Onboarding() {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
                         const fuel = Object.entries(FUEL_TECHNOLOGIES)
                           .find(([code]) => code === row.fuel_technology)?.[1] ?? "—";
-                        const coverage = friendlyBoolean(row.full_contract_coverage) === "Yes"
-                          ? "Full agreement period"
-                          : row.start_year_week && row.end_year_week ? `${row.start_year_week} to ${row.end_year_week}` : "—";
+                        const coverage = friendlyBoolean(row.full_contract_coverage) === "Ja"
+                          ? "Hele avtaleperioden"
+                          : row.start_year_week && row.end_year_week ? `${row.start_year_week} til ${row.end_year_week}` : "—";
                         return (
                           <tr key={index}>
                             <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
-                            <td className="px-3 py-2">{row.registration_number || "Planned vehicle"}</td>
+                            <td className="px-3 py-2">{row.registration_number || "Planlagt kjøretøy"}</td>
                             <td className="px-3 py-2">{fuel}</td>
                             <td className="px-3 py-2">{friendlyBoolean(row.is_hybrid)}</td>
                             <td className="px-3 py-2">{vehicleWeightRange(row.vehicle_category) ?? "—"}</td>
@@ -691,25 +715,31 @@ export default function Onboarding() {
                     </tbody>
                   </table>
                 ) : entity === "energy" ? (
-                  <table className="w-full min-w-[620px] text-left text-xs">
+                  <table className="w-full min-w-[760px] text-left text-xs">
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
-                        {["Agreement", "Facility code", "Address", "Year", "Electricity", "District heating"].map((label) => (
-                          <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
+                        {["Avtale", "Anlegg", "Periode", "Strøm", "Fjernvarme", "Sol", "Varmepumpe", "Opprinnelsesgarantier"].map((label) => (
+                          <th scope="col" key={label} className="px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
                       {preview.previewRows.map((row, index) => {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
+                        const kwh = (value: string | undefined) => (value ? `${formatNumber(Number(value))} kWh` : "—");
                         return (
                           <tr key={index}>
                             <td className="px-3 py-2">{agreement ? agreementLabel(agreement) : row.agreement_id}</td>
-                            <td className="px-3 py-2 font-mono font-medium">{row.facility_location_code}</td>
-                            <td className="px-3 py-2">{row.facility_address}</td>
-                            <td className="px-3 py-2">{row.reporting_year}</td>
-                            <td className="px-3 py-2">{row.electricity_kwh ? `${formatNumber(Number(row.electricity_kwh))} kWh` : "—"}</td>
-                            <td className="px-3 py-2">{row.district_heating_kwh ? `${formatNumber(Number(row.district_heating_kwh))} kWh` : "—"}</td>
+                            <td className="px-3 py-2">
+                              <div className="font-mono font-medium">{row.facility_location_code}</div>
+                              <div className="text-neutral-500">{row.facility_address}</div>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2">{row.reporting_year} Q{row.reporting_quarter}</td>
+                            <td className="whitespace-nowrap px-3 py-2">{kwh(row.electricity_kwh)}</td>
+                            <td className="whitespace-nowrap px-3 py-2">{kwh(row.district_heating_kwh)}</td>
+                            <td className="whitespace-nowrap px-3 py-2">{kwh(row.self_produced_solar_kwh)}</td>
+                            <td className="whitespace-nowrap px-3 py-2">{kwh(row.self_produced_heatpump_kwh)}</td>
+                            <td className="whitespace-nowrap px-3 py-2">{kwh(row.goo_covered_kwh)}</td>
                           </tr>
                         );
                       })}
@@ -719,7 +749,7 @@ export default function Onboarding() {
                   <table className="w-full min-w-[620px] text-left text-xs">
                     <thead className="bg-neutral-50 text-neutral-600">
                       <tr>
-                        {["Agreement", "Product code", "Product name", "Category", "Ecolabel", "Unit", "Repaired/Reused"].map((label) => (
+                        {["Avtale", "Produktkode", "Produktnavn", "Kategori", "Miljømerke", "Enhet", "Reparert/gjenbrukt"].map((label) => (
                           <th scope="col" key={label} className="whitespace-nowrap px-3 py-2 font-semibold">{label}</th>
                         ))}
                       </tr>
@@ -729,7 +759,7 @@ export default function Onboarding() {
                         const agreement = overview.agreements.find((item) => item.id === row.agreement_id);
                         const category = PRODUCT_CATEGORIES[row.product_category] ?? row.product_category;
                         const ecolabel = row.ecolabel_standard === "NONE"
-                          ? "None"
+                          ? "Ingen"
                           : `${ECOLABEL_STANDARDS[row.ecolabel_standard] ?? row.ecolabel_standard}${row.license_number ? ` (#${row.license_number})` : ""}`;
                         const unit = UNITS_OF_MEASURE[row.unit_of_measure] ?? row.unit_of_measure;
                         return (
@@ -755,12 +785,12 @@ export default function Onboarding() {
 
       <section className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
-          <h2 className="font-semibold text-neutral-900">Ready to submit?</h2>
+          <h2 className="font-semibold text-neutral-900">Klar til å sende inn?</h2>
           <p className="mt-1 text-sm text-neutral-500">
-            Required information is checked by the server before it is sent for municipal review.
+            Nødvendig informasjon kontrolleres av serveren før den sendes til kommunal vurdering.
           </p>
           {!status.canSubmit && status.requiredEntities.length === 0 && (
-            <p className="mt-2 text-sm text-amber-700">Ask your administrator to assign the information required under the agreement.</p>
+            <p className="mt-2 text-sm text-amber-700">Be administratoren din tildele informasjonen som kreves under avtalen.</p>
           )}
         </div>
         <button
@@ -770,7 +800,7 @@ export default function Onboarding() {
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {working ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Submit onboarding
+          Send inn registreringen
         </button>
       </section>
     </div>

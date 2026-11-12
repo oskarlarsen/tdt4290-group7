@@ -32,8 +32,8 @@ describe("supplier My Alerts", () => {
     mount();
     expect(await screen.findByText("Alert a1")).toBeTruthy();
     expect(screen.getByText("Fix a1")).toBeTruthy();
-    expect(screen.getByText("Resolved")).toBeTruthy();
-    expect(screen.getByText(/Due/)).toBeTruthy();
+    expect(screen.getByText("Løst")).toBeTruthy();
+    expect(screen.getByText(/Frist/)).toBeTruthy();
     expect(getSupplierAlerts).toHaveBeenCalledWith(undefined);
   });
 
@@ -41,17 +41,17 @@ describe("supplier My Alerts", () => {
     getSupplierAlerts.mockResolvedValue([alert("v1")]);
     mount("/supplier/alerts?category=VEHICLE_COMPLIANCE");
     await waitFor(() => expect(getSupplierAlerts).toHaveBeenCalledWith("VEHICLE_COMPLIANCE"));
-    expect((screen.getByLabelText("Filter alerts by category") as HTMLSelectElement).value).toBe("VEHICLE_COMPLIANCE");
-    fireEvent.change(screen.getByLabelText("Filter alerts by category"), { target: { value: "CERTIFICATES" } });
+    expect((screen.getByLabelText("Filtrer varsler etter kategori") as HTMLSelectElement).value).toBe("VEHICLE_COMPLIANCE");
+    fireEvent.change(screen.getByLabelText("Filtrer varsler etter kategori"), { target: { value: "CERTIFICATES" } });
     expect(screen.getByTestId("where").textContent).toBe("/supplier/alerts?category=CERTIFICATES");
-    fireEvent.change(screen.getByLabelText("Filter alerts by category"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Filtrer varsler etter kategori"), { target: { value: "" } });
     expect(screen.getByTestId("where").textContent).toBe("/supplier/alerts");
   });
 
   it("says so when there are no alerts, and shows the error when loading fails", async () => {
     getSupplierAlerts.mockResolvedValueOnce([]);
     mount("/supplier/alerts?category=CERTIFICATES");
-    expect(await screen.findByText("No alerts in this category.")).toBeTruthy();
+    expect(await screen.findByText("Ingen varsler i denne kategorien.")).toBeTruthy();
     cleanup();
     getSupplierAlerts.mockRejectedValueOnce(new Error("Supplier access required"));
     mount();

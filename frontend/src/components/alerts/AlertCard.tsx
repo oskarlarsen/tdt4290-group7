@@ -1,4 +1,5 @@
 import type { RecentAlert } from "../../types/dashboard";
+import { ALERT_SEVERITY_LABELS } from "./AlertBadges";
 
 const SEVERITY_CLASSES: Record<RecentAlert["severity"], string> = {
   high: "bg-red-100 text-red-700",
@@ -23,7 +24,7 @@ export function AlertCard({
         <span
           className={`rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold uppercase tracking-wide ${SEVERITY_CLASSES[alert.severity]}`}
         >
-          {alert.severity}
+          {ALERT_SEVERITY_LABELS[alert.severity]}
         </span>
         <span className="font-mono text-xs text-neutral-500">{alert.timeAgo}</span>
       </div>
@@ -32,12 +33,12 @@ export function AlertCard({
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
-          aria-label={isUpdating ? "Updating alert" : "Mark alert resolved"}
+          aria-label={isUpdating ? "Oppdaterer varsel" : "Marker varsel som løst"}
           onClick={() => onResolve?.(alert.id)}
           disabled={isUpdating || !onResolve}
           className="inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-900/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isUpdating ? "Updating…" : "Mark resolved"}
+          {isUpdating ? "Oppdaterer…" : "Marker som løst"}
         </button>
         {alert.supplierId && (
           <button
@@ -46,7 +47,7 @@ export function AlertCard({
             className="inline-flex items-center justify-center rounded-lg bg-primary-900 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!onInvestigate}
           >
-            View details
+            Vis detaljer
           </button>
         )}
       </div>

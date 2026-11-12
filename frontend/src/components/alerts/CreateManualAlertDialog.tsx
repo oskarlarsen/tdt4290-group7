@@ -10,26 +10,26 @@ import type {
 } from "../../types/dashboard";
 
 const CATEGORY_LABELS: Record<AlertCategory, string> = {
-  ENVIRONMENTAL_COMPLIANCE: "Environmental Compliance",
-  ENERGY_FUEL: "Energy & Fuel",
-  VEHICLE_COMPLIANCE: "Vehicle Compliance",
-  CERTIFICATES: "Certificates",
+  ENVIRONMENTAL_COMPLIANCE: "Miljøoppfølging",
+  ENERGY_FUEL: "Energi",
+  VEHICLE_COMPLIANCE: "Kjøretøyoppfølging",
+  CERTIFICATES: "Sertifikater",
 };
 
 const SEVERITIES: { value: AlertSeverity; label: string }[] = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "high", label: "Høy" },
+  { value: "medium", label: "Middels" },
+  { value: "low", label: "Lav" },
 ];
 
 const ALERT_TYPES: { value: AlertFindingType; label: string }[] = [
-  { value: "CONFIRMED_DEVIATION", label: "Confirmed Deviation" },
-  { value: "MISSING_DOCUMENTATION", label: "Missing Documentation" },
-  { value: "UPCOMING_EXPIRY", label: "Upcoming Expiry" },
+  { value: "CONFIRMED_DEVIATION", label: "Bekreftet avvik" },
+  { value: "MISSING_DOCUMENTATION", label: "Dokumentasjon mangler" },
+  { value: "UPCOMING_EXPIRY", label: "Kommende utløp" },
 ];
 
 export function parseEuropeanDueDate(value: string): string | undefined {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  const match = /^(\d{2})[./](\d{2})[./](\d{4})$/.exec(value);
   if (!match) return undefined;
 
   const [, dayText, monthText, yearText] = match;
@@ -53,7 +53,7 @@ export function parseEuropeanDueDate(value: string): string | undefined {
 
 function formatDueDateForInput(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
 }
 
 type Props = {
@@ -112,15 +112,15 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
     const trimmedDescription = description.trim();
     const dueDate = dueDateInput ? parseEuropeanDueDate(dueDateInput) : undefined;
     if (!trimmedTitle || !supplierId || !category || !severity || !findingType || !trimmedDescription) {
-      setError("Complete all required fields before creating the alert.");
+      setError("Fyll ut alle påkrevde felt før du oppretter varselet.");
       return;
     }
     if (dueDateInput && !dueDate) {
-      setError("Enter a valid due date in DD/MM/YYYY format.");
+      setError("Skriv inn en gyldig frist i formatet DD.MM.ÅÅÅÅ.");
       return;
     }
     if (saveNote && !noteText.trim()) {
-      setError("Write the note, or untick \"Save a note to self\".");
+      setError("Skriv notatet, eller fjern haken for «Lagre et notat til meg selv».");
       return;
     }
 
@@ -140,7 +140,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
       onClose();
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "Could not create the alert. Try again."
+        submitError instanceof Error ? submitError.message : "Kunne ikke opprette varselet. Prøv igjen."
       );
     } finally {
       setIsSaving(false);
@@ -169,17 +169,17 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
       <header className="flex items-start justify-between gap-4 border-b border-neutral-100 px-5 py-4">
         <div>
           <h2 id="create-manual-alert-title" className="font-headline text-lg font-semibold text-neutral-900">
-            Create manual alert
+            Opprett manuelt varsel
           </h2>
           <p className="mt-1 text-sm leading-5 text-neutral-500">
-            Record a follow-up alert for a supplier. The title and description are shown to the supplier, so write them for them.
+            Registrer et oppfølgingsvarsel for en leverandør. Tittel og beskrivelse vises til leverandøren, så skriv dem med leverandøren som leser.
           </p>
         </div>
         <button
           type="button"
           onClick={close}
           disabled={isSaving}
-          aria-label="Close Create Manual Alert"
+          aria-label="Lukk opprett manuelt varsel"
           className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 disabled:opacity-50"
         >
           <X className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         )}
 
         <label className={labelClassName}>
-          Alert title *
+          Tittel på varsel *
           <input
             required
             value={title}
@@ -205,14 +205,14 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         </label>
 
         <label className={labelClassName}>
-          Supplier *
+          Leverandør *
           <select
             required
             value={supplierId}
             onChange={(event) => setSupplierId(event.target.value)}
             className={fieldClassName}
           >
-            <option value="">Select a supplier</option>
+            <option value="">Velg en leverandør</option>
             {suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.displayName} · {supplier.orgId}
@@ -223,7 +223,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={labelClassName}>
-            Risk category *
+            Risikokategori *
             <select
               required
               value={category}
@@ -233,7 +233,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
               }}
               className={fieldClassName}
             >
-              <option value="">Select a category</option>
+              <option value="">Velg en kategori</option>
               {ALERT_CATEGORIES.map((item) => (
                 <option key={item} value={item}>{CATEGORY_LABELS[item]}</option>
               ))}
@@ -241,7 +241,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
           </label>
 
           <label className={labelClassName}>
-            Risk *
+            Risiko *
             <select
               required
               value={severity}
@@ -251,7 +251,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
               }}
               className={fieldClassName}
             >
-              <option value="">Select severity</option>
+              <option value="">Velg risikonivå</option>
               {SEVERITIES.map((item) => (
                 <option key={item.value} value={item.value}>{item.label}</option>
               ))}
@@ -260,7 +260,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         </div>
 
         <label className={labelClassName}>
-          Alert Type *
+          Varseltype *
           <select
             required
             value={findingType}
@@ -270,7 +270,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
             }}
             className={fieldClassName}
           >
-            <option value="">Select an alert type</option>
+            <option value="">Velg en varseltype</option>
             {ALERT_TYPES.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}
@@ -278,7 +278,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         </label>
 
         <label className={labelClassName}>
-          Description *
+          Beskrivelse *
           <textarea
             required
             rows={4}
@@ -289,13 +289,13 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
         </label>
 
         <label className={labelClassName}>
-          Due Date
+          Frist
           <span className="mt-1 flex gap-2">
             <input
               type="text"
               inputMode="numeric"
-              placeholder="DD/MM/YYYY"
-              aria-label="Due Date (DD/MM/YYYY)"
+              placeholder="DD.MM.ÅÅÅÅ"
+              aria-label="Frist (DD.MM.ÅÅÅÅ)"
               value={dueDateInput}
               onChange={(event) => setDueDateInput(event.target.value)}
               className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
@@ -304,24 +304,24 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
               <CalendarDays className="h-4 w-4" aria-hidden="true" />
               <input
                 type="date"
-                aria-label="Choose due date"
+                aria-label="Velg frist"
                 value={parseEuropeanDueDate(dueDateInput) ?? ""}
                 onChange={(event) => setDueDateInput(formatDueDateForInput(event.target.value))}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
               />
             </span>
           </span>
-          <span className="sr-only">Enter date as day/month/year.</span>
+          <span className="sr-only">Skriv inn dato som dag.måned.år.</span>
         </label>
 
         <div>
           <label className="flex items-center gap-2 text-sm text-neutral-700">
             <input type="checkbox" checked={saveNote} onChange={(event) => setSaveNote(event.target.checked)} />
-            Save a note to self
+            Lagre et notat til meg selv
           </label>
           {saveNote && (
             <label className={`${labelClassName} mt-2`}>
-              Note to self
+              Notat til meg selv
               <textarea
                 value={noteText}
                 onChange={(event) => setNoteText(event.target.value)}
@@ -329,7 +329,7 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
                 rows={3}
                 className={fieldClassName}
               />
-              <span className="mt-1 block font-normal text-neutral-500">Only you see this note. It is never shown to the supplier.</span>
+              <span className="mt-1 block font-normal text-neutral-500">Bare du ser dette notatet. Det vises aldri til leverandøren.</span>
             </label>
           )}
         </div>
@@ -341,14 +341,14 @@ export function CreateManualAlertDialog({ open, suppliers, onClose, onCreate }: 
             disabled={isSaving}
             className="rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
           >
-            Cancel
+            Avbryt
           </button>
           <button
             type="submit"
             disabled={isSaving || suppliers.length === 0}
             className="rounded-lg bg-primary-900 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSaving ? "Creating…" : "Create alert"}
+            {isSaving ? "Oppretter…" : "Opprett varsel"}
           </button>
         </div>
       </form>

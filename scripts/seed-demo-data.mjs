@@ -46,12 +46,12 @@ const CERTIFICATES = [
   [5, "01-iso-14001-valid.pdf"], [7, "03-gront-punkt-expiring-60d.pdf"],
 ];
 const ALERTS = [
-  [0, "Registry mismatch on two vehicles", "VEHICLE_COMPLIANCE", "high", "CONFIRMED_DEVIATION", "Two registered vehicles do not match the agreed fuel type."],
-  [1, "Fuel report missing for Q3", "ENERGY_FUEL", "medium", "MISSING_DOCUMENTATION", "No fuel consumption report has been received for the latest quarter."],
-  [2, "Environmental certificate expiring", "CERTIFICATES", "high", "UPCOMING_EXPIRY", "The certificate expires within the next weeks."],
-  [3, "Planned vehicles not yet registered", "VEHICLE_COMPLIANCE", "low", "MISSING_DOCUMENTATION", "Three planned vehicles still lack a registration number."],
-  [4, "Agreement has ended", "ENVIRONMENTAL_COMPLIANCE", "medium", "CONFIRMED_DEVIATION", "The agreement ended without a renewal."],
-  [5, "Renewable share below requirement", "ENERGY_FUEL", "medium", "CONFIRMED_DEVIATION", "Reported energy use is below the agreed renewable share."],
+  [0, "Registeravvik på to kjøretøy", "VEHICLE_COMPLIANCE", "high", "CONFIRMED_DEVIATION", "To registrerte kjøretøy samsvarer ikke med avtalt drivstofftype."],
+  [1, "Energirapport mangler for 3. kvartal", "ENERGY_FUEL", "medium", "MISSING_DOCUMENTATION", "Det er ikke mottatt energirapport for siste kvartal."],
+  [2, "Miljøsertifikat utløper snart", "CERTIFICATES", "high", "UPCOMING_EXPIRY", "Sertifikatet utløper i løpet av de neste ukene."],
+  [3, "Planlagte kjøretøy er ikke registrert ennå", "VEHICLE_COMPLIANCE", "low", "MISSING_DOCUMENTATION", "Tre planlagte kjøretøy mangler fortsatt registreringsnummer."],
+  [4, "Avtalen er avsluttet", "ENVIRONMENTAL_COMPLIANCE", "medium", "CONFIRMED_DEVIATION", "Avtalen utløp uten fornyelse."],
+  [5, "Fornybarandel under kravet", "ENERGY_FUEL", "medium", "CONFIRMED_DEVIATION", "Rapportert energibruk er under avtalt fornybarandel."],
 ];
 
 await api("/auth/login", { json: { email: "advisor.hansen@kommune.no", password } });
@@ -63,7 +63,7 @@ for (const [index, s] of SUPPLIERS.entries()) {
   const supplier = await api("/vehicle-fleet/suppliers", { json: { name: s.name, orgNumber: s.org } });
   const agreement = await api("/vehicle-fleet/agreements", { json: {
     supplierId: supplier.id, saksnr: `2026/${String(100 + index).padStart(4, "0")}`, startDate: day(s.start), endDate: day(s.end),
-    allowedVehicles: s.vehicles, note: "Demo agreement", requiresVehicles: s.flags[0], requiresEnergy: s.flags[1], requiresProducts: s.flags[2],
+    allowedVehicles: s.vehicles, note: "Demoavtale", requiresVehicles: s.flags[0], requiresEnergy: s.flags[1], requiresProducts: s.flags[2],
   } });
   for (let i = 0; i < s.planned; i++) await api(`/vehicle-fleet/agreements/${agreement.id}/vehicles`, { json: { planned: true } });
   ids[index] = { supplier: supplier.id, agreement: agreement.id };
@@ -82,6 +82,6 @@ for (const [index, file] of CERTIFICATES) {
 for (const [index, title, category, severity, findingType, description] of ALERTS) {
   if (ids[index].existed) continue;
   await api("/admin/alerts", { json: { title, supplierId: ids[index].supplier, category, severity, findingType, description, dueDate: day(14) } });
-  await api(`/admin/suppliers/${ids[index].supplier}/notes`, { json: { text: `Follow-up agreed on: ${title}.`, visibility: "INTERNAL" } }).catch(() => {});
+  await api(`/admin/suppliers/${ids[index].supplier}/notes`, { json: { text: `Oppfølging avtalt: ${title}.`, visibility: "INTERNAL" } }).catch(() => {});
 }
 console.log(`Done. ${ids.filter((x) => !x.existed).length} suppliers added, ${ids.filter((x) => x.existed).length} already present.`);
