@@ -3,6 +3,7 @@ package com.tdt4290group7.backend.repository
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.tdt4290group7.backend.auth.PasswordPolicy
 import com.tdt4290group7.backend.backendSetting
+import com.tdt4290group7.backend.databasePath
 import com.tdt4290group7.backend.config.requireSecret
 import com.tdt4290group7.backend.model.Role
 import com.tdt4290group7.backend.model.User
@@ -33,65 +34,11 @@ object UserRepository {
     private val dummyPasswordHash = hash(UUID.randomUUID().toString())
 
     init {
-        val path = Path.of(backendSetting("USER_DB_PATH") ?: "data/users.db").toAbsolutePath().normalize()
+        val path = databasePath()
         Files.createDirectories(path.parent)
         databaseUrl = "jdbc:sqlite:$path"
         write { db ->
-            db.createStatement().use { statement ->
-                statement.execute(
-                    """CREATE TABLE IF NOT EXISTS users (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        email TEXT NOT NULL COLLATE NOCASE UNIQUE,
-                        password_hash TEXT NOT NULL,
-                        role TEXT NOT NULL CHECK(role IN ('ADMIN', 'SUPPLIER')),
-                        supplier_id TEXT,
-                        token_version INTEGER NOT NULL DEFAULT 0
-                    ) STRICT"""
-                )
-                statement.execute(
-                    """CREATE TABLE IF NOT EXISTS supplier_invitations (
-                        id TEXT PRIMARY KEY,
-                        email TEXT NOT NULL COLLATE NOCASE,
-                        supplier_id TEXT NOT NULL,
-                        supplier_name TEXT NOT NULL,
-                        token_hash TEXT NOT NULL UNIQUE,
-                        created_at TEXT NOT NULL,
-                        expires_at TEXT NOT NULL,
-                        accepted_at TEXT
-                    ) STRICT"""
-                )
-                statement.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_supplier_invitations_email ON supplier_invitations(email, accepted_at)"
-                )
-                // Added after first release: nullable ADD COLUMN only, so an older release can still read the file.
-                val existing = statement.executeQuery("PRAGMA table_info(users)").use { rows ->
-                    buildSet { while (rows.next()) add(rows.getString("name")) }
-                }
-                if ("last_active_at" !in existing) statement.execute("ALTER TABLE users ADD COLUMN last_active_at TEXT")
-                for ((column, type) in listOf(
-                    "access_expires_at" to "TEXT", "granted_by" to "TEXT", "access_approved_by" to "TEXT",
-                    "access_approved_at" to "TEXT", "is_permanent" to "INTEGER NOT NULL DEFAULT 0",
-                )) {
-                    if (column !in existing) statement.execute("ALTER TABLE users ADD COLUMN $column $type")
-                }
-                // New invitations (a supplier inviting a colleague, an admin inviting an admin, with optional stand-in end date).
-                statement.execute(
-                    """CREATE TABLE IF NOT EXISTS access_invitations (
-                        id TEXT PRIMARY KEY,
-                        email TEXT NOT NULL COLLATE NOCASE,
-                        role TEXT NOT NULL CHECK(role IN ('ADMIN', 'SUPPLIER')),
-                        supplier_id TEXT,
-                        supplier_name TEXT,
-                        token_hash TEXT NOT NULL UNIQUE,
-                        created_at TEXT NOT NULL,
-                        expires_at TEXT NOT NULL,
-                        accepted_at TEXT,
-                        invited_by TEXT NOT NULL,
-                        access_expires_at TEXT
-                    ) STRICT"""
-                )
-            }
+            createUserTables(db)
             val adminPassword = hash(requireSeedPassword("SEED_ADMIN_PASSWORD"))
             db.prepareStatement(
                 "INSERT OR IGNORE INTO users (id, name, email, password_hash, role, supplier_id, token_version) VALUES (?, ?, ?, ?, 'ADMIN', NULL, 0)"
@@ -269,7 +216,8 @@ object UserRepository {
         val expiresAt = now.plus(INVITATION_TTL)
 
         write { db ->
-            if (user(db, "email = ?", normalizedEmail) != null) {
+            val existing = user(db, "email = ?", normalizedEmail)
+            if (existing != null && !isBlockedMember(existing, supplierId, now)) {
                 throw AccountConflictException("An account already exists for this email address")
             }
             // A pending invitation from another organization must never be replaced: that would let one
@@ -347,7 +295,10 @@ object UserRepository {
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(random::nextBytes))
         val expiresAt = now.plus(INVITATION_TTL)
         write { db ->
-            if (user(db, "email = ?", normalizedEmail) != null) throw AccountConflictException("An account already exists for this email address")
+            val existing = user(db, "email = ?", normalizedEmail)
+            if (existing != null && !(role == Role.SUPPLIER.name && isBlockedMember(existing, orgId.orEmpty(), now))) {
+                throw AccountConflictException("An account already exists for this email address")
+            }
             if (pendingAccessInvitationElsewhere(db, normalizedEmail, role, orgId, now) ||
                 pendingSupplierInvitationElsewhere(db, normalizedEmail, orgId.takeIf { role == Role.SUPPLIER.name }, now) ||
                 (role == Role.ADMIN.name && pendingSupplierInvitationElsewhere(db, normalizedEmail, "\u0000none", now))
@@ -468,6 +419,10 @@ object UserRepository {
         }
     }
 
+    /** A supplier account whose access has ended, for example because the organization was archived, may be invited again and is then reused. */
+    private fun isBlockedMember(existing: User, supplierId: String, now: Instant) =
+        existing.role == Role.SUPPLIER && existing.supplierId == supplierId && existing.accessExpiresAt?.let { !it.isAfter(now) } == true
+
     /** Returns null for unknown, expired, or already-consumed invitation tokens. */
     fun acceptSupplierInvitation(
         token: String,
@@ -495,7 +450,20 @@ object UserRepository {
                     )
                 }
             } ?: return@write acceptAccessInvitation(db, tokenHash, password, name, now, supplierIsActive)
-            if (!invite.expiresAt.isAfter(now) || !supplierIsActive(invite.supplierId) || user(db, "email = ?", invite.email) != null) return@write null
+            if (!invite.expiresAt.isAfter(now) || !supplierIsActive(invite.supplierId)) return@write null
+            val existing = user(db, "email = ?", invite.email)
+            if (existing != null) {
+                if (!isBlockedMember(existing, invite.supplierId, now)) return@write null
+                // Back again after the organization was archived: same account, new password, old sessions end, access restored.
+                db.prepareStatement("UPDATE users SET password_hash = ?, token_version = token_version + 1, access_expires_at = NULL WHERE id = ?").use {
+                    it.setString(1, hash(password)); it.setString(2, existing.id); it.executeUpdate()
+                }
+                db.prepareStatement("UPDATE supplier_invitations SET accepted_at = ? WHERE id = ? AND accepted_at IS NULL").use {
+                    it.setString(1, now.toString()); it.setString(2, invite.id)
+                    check(it.executeUpdate() == 1) { "Invitation was already accepted" }
+                }
+                return@write user(db, "id = ?", existing.id)
+            }
 
             val userId = UUID.randomUUID().toString()
             db.prepareStatement(
@@ -534,12 +502,29 @@ object UserRepository {
         } ?: return null
         val displayName = name?.trim().orEmpty()
         if (displayName.isEmpty() || displayName.length > 100) throw IllegalArgumentException("Enter your name")
-        if (!invite.expiresAt.isAfter(now) || user(db, "email = ?", invite.email) != null) return null
+        if (!invite.expiresAt.isAfter(now)) return null
+        val existing = user(db, "email = ?", invite.email)
+        if (existing != null && !(invite.role == "SUPPLIER" && isBlockedMember(existing, invite.supplierId.orEmpty(), now))) return null
         if (invite.role == "SUPPLIER" && !supplierIsActive(invite.supplierId.orEmpty())) return null
         // The invitation cannot create access that outlasts its end date, or the inviter's own access.
         if (invite.accessExpiresAt != null && !now.isBefore(invite.accessExpiresAt)) return null
         val inviter = user(db, "id = ?", invite.invitedBy)
         if (inviter == null || !isAccessActive(inviter, now)) return null
+
+        if (existing != null) {
+            // Back after their access ended: same account, new password, old sessions end, access as the invitation says.
+            db.prepareStatement(
+                "UPDATE users SET password_hash = ?, token_version = token_version + 1, access_expires_at = ?, granted_by = ?, access_approved_by = NULL, access_approved_at = NULL WHERE id = ?"
+            ).use {
+                it.setString(1, hash(password)); it.setString(2, invite.accessExpiresAt?.toString()); it.setString(3, invite.invitedBy); it.setString(4, existing.id)
+                it.executeUpdate()
+            }
+            db.prepareStatement("UPDATE access_invitations SET accepted_at = ? WHERE id = ? AND accepted_at IS NULL").use {
+                it.setString(1, now.toString()); it.setString(2, invite.id)
+                check(it.executeUpdate() == 1) { "Invitation was already accepted" }
+            }
+            return user(db, "id = ?", existing.id)
+        }
 
         val userId = UUID.randomUUID().toString()
         db.prepareStatement(

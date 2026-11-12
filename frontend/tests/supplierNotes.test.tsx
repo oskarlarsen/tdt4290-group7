@@ -38,10 +38,10 @@ describe("supplier notes in the drawer", () => {
     vi.spyOn(notesApi, "getSupplierNotes").mockResolvedValue([note("n1", "INTERNAL", "Shared"), note("n2", "SELF", "Mine")]);
     mountDrawer();
     expect(await screen.findByText("Shared")).toBeTruthy();
-    // Each label appears once as a choice and once as a tag on a note.
-    expect(screen.getAllByText("Internal note")).toHaveLength(2);
-    expect(screen.getAllByText("Note to self")).toHaveLength(2);
-    expect(screen.getByText("Notes are never shown to the supplier.")).toBeTruthy();
+    // The choices carry a hint ("Internal note (all admins)"); the exact label appears only as the tag on a note.
+    expect(screen.getAllByText("Internal note")).toHaveLength(1);
+    expect(screen.getAllByText("Note to self")).toHaveLength(1);
+    expect(screen.getByText("The supplier will not see this note.")).toBeTruthy();
   });
 
   it("saves a note to self by default and an internal note when chosen first", async () => {
@@ -55,7 +55,7 @@ describe("supplier notes in the drawer", () => {
     await waitFor(() => expect(add).toHaveBeenCalledTimes(1));
     expect(add.mock.calls[0][2]).toEqual({ text: "First", visibility: "SELF" });
 
-    fireEvent.click(screen.getByRole("radio", { name: "Internal note" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Internal note (all admins)" }));
     fireEvent.change(box, { target: { value: "Second" } });
     fireEvent.click(screen.getByRole("button", { name: "Add note" }));
     await waitFor(() => expect(add).toHaveBeenCalledTimes(2));

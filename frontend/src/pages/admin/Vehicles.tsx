@@ -17,12 +17,14 @@ export default function Vehicles() {
   const refresh = useRefreshVehicles();
   const [params, setParams] = useSearchParams();
   const plate = params.get("plate");
+  // A truck listed under several agreements is opened for one of them.
+  const agreementId = params.get("agreement");
   const [search, setSearch] = useState("");
   const [agreementSupplier, setAgreementSupplier] = useState<FleetSupplier | null>(null);
   const [statistics, setStatistics] = useState(false);
   const [showStatistics, setShowStatistics] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  function open(plate: string) { setParams({ plate }); }
+  function open(plate: string, agreementId?: string) { setParams(agreementId ? { plate, agreement: agreementId } : { plate }); }
   function saved() { setAgreementSupplier(null); setStatistics(false); void refresh(); }
   const query = search.trim().toLowerCase();
   const data = fleet.data;
@@ -55,7 +57,7 @@ export default function Vehicles() {
     {data && !suppliers?.length && <p className="rounded-xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">{query ? "No matching suppliers or vehicles." : "Add a supplier in Suppliers to create your first agreement."}</p>}
     <details onToggle={event => setShowStatistics(event.currentTarget.open)} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium">Reported data</summary>{showStatistics && <div className="mt-4"><StatisticsDirectory onOpenVehicle={open} /></div>}</details>
     <details onToggle={event => setShowHistory(event.currentTarget.open)} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium">Change history</summary>{showHistory && <div className="mt-3"><ChangeHistory /></div>}</details>
-    {plate && <VehicleDetails key={plate} plate={plate} onClose={() => setParams({})} />}
+    {plate && <VehicleDetails key={`${plate}|${agreementId ?? ""}`} plate={plate} agreementId={agreementId} onClose={() => setParams({})} />}
     {agreementSupplier && <AgreementForm supplier={agreementSupplier} onClose={() => setAgreementSupplier(null)} onSaved={saved} />}
     {statistics && <StatisticsForm onClose={() => setStatistics(false)} onSaved={() => saved()} />}
   </div>;

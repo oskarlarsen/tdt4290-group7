@@ -11,6 +11,7 @@ import { SupplierDetailsDialog } from "../../components/suppliers/SupplierDetail
 import { useAlerts } from "../../hooks/useAlerts";
 import { SupplierReportingDataDialog } from "../../components/suppliers/SupplierReportingDataDialog";
 import { SuppliersOverviewHeader } from "../../components/suppliers/SuppliersOverviewHeader";
+import { ArchivedSuppliers } from "../../components/suppliers/ArchivedSuppliers";
 import { AgreementForm, InviteSupplierForm, RemoveSupplierAction, SupplierForm } from "../../components/vehicles/FleetForms";
 import { ErrorNotice, buttonClass, primaryClass } from "../../components/vehicles/VehicleDialog";
 import { toCsv, downloadCsv } from "../../utils/csv";
@@ -108,6 +109,12 @@ export default function Suppliers() {
     void refreshFleet();
     if (supplier) setInvitationSupplier(supplier);
     setSuccessMessage("Agreement saved. Create an invitation for the supplier contact.");
+  }
+
+  function handleSupplierReactivated(supplier: FleetSupplier) {
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    setAgreementSupplier(supplier);
+    setSuccessMessage(`${supplier.name} is active again. Create a new agreement, then invite a contact: its old accounts stay blocked.`);
   }
 
   function handleOrganizationRemoved() {
@@ -230,6 +237,8 @@ export default function Suppliers() {
           </ul>
         )}
       </section>
+
+      <ArchivedSuppliers onReactivated={handleSupplierReactivated} />
 
       {data && <section className="rounded-xl border border-neutral-100 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

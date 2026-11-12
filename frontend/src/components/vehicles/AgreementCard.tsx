@@ -14,7 +14,7 @@ export function VehicleAllowance({ count, allowed }: { count: number; allowed: n
   return <span className={`text-sm font-medium ${count > allowed ? "text-red-700" : "text-neutral-700"}`}>{count} of {allowed} vehicles</span>;
 }
 
-export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { supplier: FleetSupplier; agreement: FleetAgreement; vehicles: Vehicle[]; onOpen: (plate: string) => void }) {
+export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { supplier: FleetSupplier; agreement: FleetAgreement; vehicles: Vehicle[]; onOpen: (plate: string, agreementId: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [entry, setEntry] = useState<Vehicle | "new" | null>(null);
   const [removing, setRemoving] = useState<Vehicle | "agreement" | null>(null);
@@ -26,7 +26,7 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
   const reported = vehicles.filter(vehicle => vehicle.reported); // distinct plates, so re-uploading a vehicle never counts twice
   const unchecked = vehicles.filter(vehicle => vehicle.listed && !vehicle.planned && vehicle.registryChecked === false && vehicle.registryProblem !== "NOT_FOUND");
   const unapproved = reported.filter(vehicle => !vehicle.listed);
-  const approveException = useMutation({ mutationFn: (vehicle: Vehicle) => api.approveException(vehicle.registrationNumber, notes[vehicle.registrationNumber] ?? ""), onSuccess: () => void refresh(), retry: false });
+  const approveException = useMutation({ mutationFn: (vehicle: Vehicle) => api.approveException(vehicle, notes[vehicle.registrationNumber] ?? ""), onSuccess: () => void refresh(), retry: false });
   function removalSaved() { setRemoving(null); void refresh(); }
   const remove = useMutation({ mutationFn: api.removeVehicle, onSuccess: removalSaved, retry: false });
   const removeAgreement = useMutation({ mutationFn: () => api.removeAgreement(agreement), onSuccess: removalSaved, retry: false });
@@ -36,7 +36,7 @@ export function AgreementCard({ supplier, agreement, vehicles, onOpen }: { suppl
       <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-medium">{vehicle.planned ? "Planned vehicle" : vehicle.registrationNumber}</span>{vehicle.planned && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">Registration pending</span>}
         {vehicle.registryProblem === "NOT_FOUND" && <span role="alert" className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">Plate not found in Statens vegvesen. Check that the registration number is correct.</span>}</div>
       <div className="flex flex-wrap gap-2">
-        {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber)}>View details</button>}
+        {!vehicle.planned && <button className={buttonClass} onClick={() => onOpen(vehicle.registrationNumber, agreement.id)}>View details</button>}
         {vehicle.listed && <><button className={buttonClass} onClick={() => setEntry(vehicle)}>{vehicle.planned ? "Register vehicle" : "Replace vehicle"}</button>
           <button className={buttonClass} disabled={remove.isPending} onClick={() => { remove.reset(); setRemoving(vehicle); }}>Remove</button></>}
       </div>

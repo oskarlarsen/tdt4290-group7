@@ -38,7 +38,7 @@ Certificate routes require an administrator session.
 | GET | `/api/certificates` | List extracted certificate metadata, most urgent first. |
 | POST | `/api/certificates` | Upload one PDF, extract its certificate type and dates, and store the metadata. |
 | PUT | `/api/certificates/{id}` | Correct saved supplier, certificate type, dates and optional contract reference. |
-| DELETE | `/api/certificates/{id}` | Delete certificate metadata. |
+| DELETE | `/api/certificates/{id}` | Archives the certificate (same as `POST /api/certificates/{id}/archive`); nothing is deleted. |
 
 `POST /api/certificates` accepts `multipart/form-data` fields `supplierName`, `file` and optional `contractId`. Uploads are limited to 8 MB and 25 pages. Text-based PDFs use PDFBox; scanned pages require Tesseract with Norwegian and English language data. The response includes the parsed `certificateType`, `issueDate`, `expiryDate`, `sourceFile`, `contractId` and recalculated status. Check parsed values before relying on them as compliance evidence.
 
@@ -109,17 +109,19 @@ An agreement belongs to a supplier and specifies dates and vehicle allowance. Ve
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/vehicle-fleet` | Active suppliers, agreements, vehicles and recent changes. |
+| GET | `/api/vehicle-fleet` | Active suppliers, agreements, vehicles and recent changes. A vehicle appears once per agreement it is listed under (the same plate can be listed under several agreements, also of different suppliers). |
+| GET | `/api/vehicle-fleet/archive` | Archived suppliers with every agreement and vehicle they ever had, newest archived first. |
 | GET | `/api/vehicle-fleet/history?page=1` | Change history. |
-| POST | `/api/vehicle-fleet/suppliers` | Create a supplier. |
+| POST | `/api/vehicle-fleet/suppliers` | Create a supplier. Answers `409` with `code` `ARCHIVED_SUPPLIER_MATCH` (same organization number) or `ARCHIVED_SUPPLIER_NAME_MATCH` (same name, other number) and the archived `supplier`, so the client can ask "is this the same supplier?". Send `confirmNewSupplier: true` after answering "no" to the name warning. |
+| POST | `/api/vehicle-fleet/suppliers/{id}/reactivate` | Bring an archived supplier back (`{ "expectedUpdatedAt" }`). Old agreements stay archived and its accounts stay blocked. |
 | PUT | `/api/vehicle-fleet/suppliers/{id}` | Update a supplier. |
 | POST | `/api/vehicle-fleet/suppliers/{id}/invitations` | Admin creates a one-time supplier account invitation by email. |
 | POST | `/api/vehicle-fleet/agreements` | Create an agreement. |
 | PUT | `/api/vehicle-fleet/agreements/{id}` | Update an agreement. |
-| DELETE | `/api/vehicle-fleet/agreements/{id}` | Remove an agreement and unlist its vehicles. |
+| DELETE | `/api/vehicle-fleet/agreements/{id}` | Archive an agreement and unlist its vehicles. |
 | POST | `/api/vehicle-fleet/agreements/{id}/vehicles` | Add a registered/planned entry. |
-| POST | `/api/vehicle-fleet/vehicles/{plate}/replace` | Replace a listed entry. |
-| DELETE | `/api/vehicle-fleet/vehicles/{plate}` | Unlist a vehicle. |
+| POST | `/api/vehicle-fleet/vehicles/{plate}/replace?agreementId=` | Replace a listed entry. `agreementId` says which listing when the vehicle is listed under several agreements (otherwise `400`). |
+| DELETE | `/api/vehicle-fleet/vehicles/{plate}?agreementId=` | Unlist a vehicle under one agreement; the other agreements' listings stay. |
 | POST | `/api/vehicle-fleet/history/{id}/undo` | Undo an eligible change. |
 
 For example, create a supplier:
@@ -161,7 +163,7 @@ Stale writes return `409`. Reducing an allowance below the current count is perm
 | Method | Endpoint | Purpose |
 |---|---|---|
 | GET | `/health` | Public health check: `{ "status": "UP" }`. |
-| GET | `/api/vehicles/{plate}` | Vehicle details, statistics and latest saved check. |
+| GET | `/api/vehicles/{plate}?agreementId=` | Vehicle details, statistics and latest saved check, for one agreement (`404` if it is not listed under it). Without `agreementId`, the best fit: a listed one whose agreement is active and covers today, then the most recently started. |
 | GET | `/api/vehicles/{plate}/checks` | Saved check history. |
 | GET | `/api/trip-rows` | Reported statistics. |
 | POST | `/api/trip-rows` | Save statistics, then check each distinct plate. |
@@ -213,10 +215,10 @@ An invalid row rejects the batch. Repeated submissions append duplicate rows. A 
 `POST /api/vehicle-checks`:
 
 ```json
-{ "registrationNumber": "AB12345", "forceRefresh": false }
+{ "registrationNumber": "AB12345", "forceRefresh": false, "agreementId": "optional" }
 ```
 
-A check compares saved reporting rows with agreement coverage and registry facts. Results include prioritised `findings`, registry source/outcome and saved evidence. Browsing details or history does not perform registry lookups.
+A check is made against one agreement. A vehicle listed under several agreements (also of different suppliers) is checked once per agreement: send `agreementId` to choose, otherwise the best-fitting listing is used. The saved check records that agreement and its supplier, so each supplier's alerts come from its own agreement's check. A check compares saved reporting rows with agreement coverage and registry facts. Results include prioritised `findings`, registry source/outcome and saved evidence. Browsing details or history does not perform registry lookups.
 
 Checks can reuse a registry snapshot for `SVV_CACHE_TTL_DAYS` (default 14). `forceRefresh=true` requests a new lookup. Inspect `dataSource`, `lookupOutcome`, `refreshFailure` and `fetchedAt`: an HTTP success does not establish successful registry verification. Registry sources are `LIVE`, `CACHE`, `STALE_CACHE` and `UNAVAILABLE`.
 

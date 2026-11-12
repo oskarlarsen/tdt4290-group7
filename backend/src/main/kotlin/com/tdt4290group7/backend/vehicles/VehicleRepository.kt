@@ -19,10 +19,10 @@ interface VehicleStore {
     fun latestSnapshot(registrationNumber: String): RegistrySnapshot?
     fun saveCheck(check: VehicleCheckResponse, newSnapshot: RegistrySnapshot?)
     fun findCheck(id: String): VehicleCheckResponse?
-    fun vehicleDetails(registrationNumber: String): VehicleDetailsResponse?
+    fun vehicleDetails(registrationNumber: String, agreementId: String? = null): VehicleDetailsResponse?
     fun checkHistory(registrationNumber: String, page: Int, pageSize: Int): VehicleHistoryResponse?
     /** True when an admin approved this unlisted vehicle as a one-off exception. */
-    fun exceptionApproved(registrationNumber: String): Boolean = false
+    fun exceptionApproved(registrationNumber: String, agreementId: String? = null): Boolean = false
 }
 private val timestampFormat = DateTimeFormatterBuilder().appendInstant(9).toFormatter()
 internal fun Instant.storageTimestamp(): String = timestampFormat.format(this)
@@ -50,17 +50,29 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
         }
     }
 
-    override fun exceptionApproved(registrationNumber: String) = readTransaction { db ->
-        query(db, "SELECT 1 FROM vehicles WHERE registration_number = ? AND exception_approved = 1", listOf(registrationNumber)) { it.getInt(1) }.isNotEmpty()
+    /** True when the listing the check judges the truck by (the given agreement, or the best fit) carries an admin-approved exception. */
+    override fun exceptionApproved(registrationNumber: String, agreementId: String?) = readTransaction { db ->
+        fleet.usage(db, registrationNumber, agreementId)?.get("exception_approved") == 1
     }
 
-    override fun vehicleDetails(registrationNumber: String): VehicleDetailsResponse? = readTransaction { db ->
+    /**
+     * A truck can be listed under several agreements. [agreementId] picks the one to judge it by; without it the best fit is used
+     * (see [FleetRepository.usage]). The vehicle, agreement and latest check in the answer all belong to that one listing.
+     */
+    override fun vehicleDetails(registrationNumber: String, agreementId: String?): VehicleDetailsResponse? = readTransaction { db ->
         val plate = validatedPlate(registrationNumber)
-        val vehicle = query(db, "SELECT * FROM vehicles WHERE registration_number = ?", listOf(plate), ::vehicleFrom).firstOrNull() ?: return@readTransaction null
-        VehicleDetailsResponse(vehicle, fleet.evidence(db, plate),
+        val truck = query(db, "SELECT * FROM vehicles WHERE registration_number = ?", listOf(plate), ::vehicleFrom).firstOrNull() ?: return@readTransaction null
+        val usage = fleet.usage(db, plate, agreementId)
+        if (agreementId != null && usage == null) return@readTransaction null
+        val vehicle = usage?.let { Vehicle(plate, it["created_at"] as String, it["agreement_id"] as String, it["planned"] == 1, it["listed"] == 1, it["updated_at"] as String) } ?: truck
+        // The latest check for this agreement; a truck with one listing also falls back to its checks from before agreements were tracked per check.
+        val chosen = usage?.get("agreement_id") as String?
+        val latest = checkSummaries(db, plate, if (agreementId != null) chosen else null, 1, 0).firstOrNull()
+            ?: if (agreementId != null && fleet.usageCount(db, plate) == 1) checkSummaries(db, plate, null, 1, 0).firstOrNull() else null
+        VehicleDetailsResponse(vehicle, fleet.evidence(db, plate, agreementId),
             query(db, "SELECT * FROM trip_rows WHERE registration_number = ? ORDER BY period_start DESC, created_at DESC", listOf(plate), ::tripFrom),
             query(db, "SELECT * FROM svv_snapshots WHERE registration_number = ? ORDER BY fetched_at DESC, rowid DESC LIMIT 1", listOf(plate)) { snapshotFrom(db, it) }.firstOrNull(),
-            checkSummaries(db, plate, 1, 0).firstOrNull())
+            latest)
     }
 
     override fun checkHistory(registrationNumber: String, page: Int, pageSize: Int): VehicleHistoryResponse? {
@@ -69,16 +81,18 @@ class VehicleRepository(databasePath: Path) : VehicleStore {
             val plate = validatedPlate(registrationNumber)
             if (query(db, "SELECT 1 FROM vehicles WHERE registration_number = ?", listOf(plate)) { it.getInt(1) }.isEmpty()) return@readTransaction null
             val total = query(db, "SELECT count(*) FROM vehicle_checks WHERE registration_number = ?", listOf(plate)) { it.getInt(1) }.single()
-            VehicleHistoryResponse(checkSummaries(db, plate, pageSize, (page.toLong() - 1) * pageSize), total, page, pageSize)
+            VehicleHistoryResponse(checkSummaries(db, plate, null, pageSize, (page.toLong() - 1) * pageSize), total, page, pageSize)
         }
     }
 
+    /** The truck row. Which agreements it is listed under is in vehicle_usages; the old columns on this row are frozen. */
     private fun vehicleFrom(row: ResultSet) = Vehicle(row.getString("registration_number"), row.getString("created_at"),
-        row.getString("agreement_id"), row.getInt("planned") == 1, row.getInt("listed") == 1, row.getString("updated_at"))
+        null, row.getInt("planned") == 1, false, row.getString("updated_at"))
 
-    private fun checkSummaries(db: Connection, plate: String, limit: Int, offset: Long): List<VehicleCheckSummary> =
+    private fun checkSummaries(db: Connection, plate: String, agreementId: String?, limit: Int, offset: Long): List<VehicleCheckSummary> =
         query(db, """SELECT c.*, s.fetched_at FROM vehicle_checks c LEFT JOIN svv_snapshots s ON s.id = c.snapshot_id
-            WHERE c.registration_number = ? ORDER BY c.checked_at DESC, c.rowid DESC LIMIT ? OFFSET ?""", listOf(plate, limit, offset)) { row ->
+            WHERE c.registration_number = ?${if (agreementId != null) " AND c.agreement_id = ?" else ""}
+            ORDER BY c.checked_at DESC, c.rowid DESC LIMIT ? OFFSET ?""", listOfNotNull(plate, agreementId) + listOf(limit, offset)) { row ->
             val id = row.getString("id")
             VehicleCheckSummary(id, row.getString("checked_at"), RegistryDataSource.valueOf(row.getString("registry_data_source")), LookupOutcome.valueOf(row.getString("lookup_outcome")),
                 row.getString("fetched_at"), row.getString("refresh_failure")?.let(LookupOutcome::valueOf),

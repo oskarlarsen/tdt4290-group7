@@ -416,7 +416,7 @@ fun Route.adminDashboardRoutes(
         val text = input.text.trim()
         require(text.length in 1..2000) { "Note must be between 1 and 2000 characters" }
         require(input.visibility in NOTE_VISIBILITIES) { "Select who can see the note" }
-        require(input.alertId == null || input.alertId.length <= 100) { "Invalid alert reference" }
+        require(input.alertId == null || insights.alertExists(input.alertId)) { "Invalid alert reference" }
         val note = insights.addNote(supplierId, actor.id, actor.name, input.visibility, text, input.alertId, Instant.now())
         call.application.log.info("admin_note_created noteId={} actorId={} visibility={}", note.id, actor.id, note.visibility)
         call.respond(HttpStatusCode.Created, note.toNote())
@@ -468,7 +468,7 @@ private fun refreshFindings(
     overview.vehicles.filter { it.listed && !it.planned }.forEach { vehicle ->
         val supplierId = vehicle.agreementId?.let(agreements::get)?.supplierId ?: return@forEach
         if (supplierId !in activeSuppliers) return@forEach
-        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber)?.latestCheck?.id ?: return@forEach
+        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber, vehicle.agreementId)?.latestCheck?.id ?: return@forEach
         val check = vehicles.findCheck(latestCheckId) ?: return@forEach
         check.findings.forEach { finding ->
             val findingKey = "vehicle:${check.id}:${finding.code}:${finding.tripRowId.orEmpty()}"
@@ -577,7 +577,7 @@ private fun buildSummary(
     overview.vehicles.filter { it.listed && !it.planned }.forEach { vehicle ->
         val supplierId = vehicle.agreementId?.let(agreementsById::get)?.supplierId
             ?.takeIf(activeSuppliers::containsKey) ?: return@forEach
-        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber)?.latestCheck?.id ?: return@forEach
+        val latestCheckId = vehicles.vehicleDetails(vehicle.registrationNumber, vehicle.agreementId)?.latestCheck?.id ?: return@forEach
         val check = vehicles.findCheck(latestCheckId) ?: return@forEach
         val supplierEvidence = evidence.getValue(supplierId)
         supplierEvidence.hasEvidence = true

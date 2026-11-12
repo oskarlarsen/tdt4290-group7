@@ -6,7 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { SupplierAlert } from "../../src/api/supplierAlerts";
 
 const getSupplierAlerts = vi.hoisted(() => vi.fn());
-vi.mock("../../src/api/supplierAlerts", () => ({ getSupplierAlerts }));
+const getSupplierNotes = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock("../../src/api/supplierAlerts", () => ({ getSupplierAlerts, getSupplierNotes }));
 vi.mock("../../src/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1", name: "Supplier", role: "SUPPLIER", supplierId: "s1" } }) }));
 
 import MyAlerts from "../../src/pages/supplier/MyAlerts";

@@ -8,7 +8,9 @@ data class FleetSupplier(val id: String, val name: String, val orgNumber: String
     val updatedAt: String? = null)
 
 @Serializable
-data class SupplierInput(val name: String, val orgNumber: String)
+data class SupplierInput(val name: String, val orgNumber: String,
+    /** Set after the admin answered "no, this is a new supplier" to the archived-name warning. */
+    val confirmNewSupplier: Boolean = false)
 
 @Serializable
 data class SupplierInvitationRequest(val email: String)
@@ -87,5 +89,18 @@ data class FleetOverview(val suppliers: List<FleetSupplier>, val agreements: Lis
     val vehicles: List<Vehicle>, val changes: List<FleetChange>)
 
 data class ChangeActor(val id: String, val name: String)
+
+/** An archived supplier with its earlier agreements and vehicles, for admins who need the history. */
+@Serializable
+data class ArchivedSupplier(val supplier: FleetSupplier, val archivedAt: String?, val agreements: List<FleetAgreement>, val vehicles: List<Vehicle>)
+
+@Serializable
+data class FleetArchive(val suppliers: List<ArchivedSupplier>)
+
+/** Answer to adding a supplier whose organization number belonged to an archived one: ask "is this the same supplier?". */
+@Serializable
+data class ArchivedSupplierMatch(val error: String, val code: String, val supplier: FleetSupplier, val archivedAt: String?, val agreementCount: Int)
+
+class ArchivedSupplierMatchException(val match: ArchivedSupplierMatch) : RuntimeException(match.error)
 
 class FleetConflictException(message: String) : RuntimeException(message)

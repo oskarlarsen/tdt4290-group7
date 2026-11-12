@@ -41,9 +41,21 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup, c
         val page = if (rawPage == null) 1 else rawPage.toIntOrNull() ?: throw IllegalArgumentException("Invalid history page")
         call.respond(fleet.history(page))
     }
+    get("/api/vehicle-fleet/archive") { if (call.adminActor() != null) call.respond(fleet.archive()) }
     post("/api/vehicle-fleet/suppliers") {
         val actor = call.adminActor() ?: return@post
-        call.respond(HttpStatusCode.Created, fleet.saveSupplier(null, decodeFleetRequest(call.receiveText(), SupplierInput.serializer()), actor, Instant.now()))
+        val input = decodeFleetRequest(call.receiveText(), SupplierInput.serializer())
+        try {
+            call.respond(HttpStatusCode.Created, fleet.saveSupplier(null, input, actor, Instant.now()))
+        } catch (match: ArchivedSupplierMatchException) {
+            call.respond(HttpStatusCode.Conflict, match.match)
+        }
+    }
+    post("/api/vehicle-fleet/suppliers/{id}/reactivate") {
+        val actor = call.adminActor() ?: return@post
+        val id = call.parameters["id"] ?: throw IllegalArgumentException("Supplier ID is required")
+        val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
+        call.respond(fleet.reactivateSupplier(id, request.expectedUpdatedAt, actor, Instant.now()))
     }
     post("/api/vehicle-fleet/suppliers/{id}/invitations") {
         val actor = call.adminActor() ?: return@post
@@ -135,19 +147,19 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup, c
     delete("/api/vehicle-fleet/vehicles/{plate}") {
         val actor = call.adminActor() ?: return@delete
         val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
-        fleet.removeVehicle(call.parameters["plate"]!!, request.expectedUpdatedAt, actor, Instant.now())
+        fleet.removeVehicle(call.parameters["plate"]!!, request.expectedUpdatedAt, actor, Instant.now(), call.request.queryParameters["agreementId"])
         call.respond(HttpStatusCode.NoContent)
     }
     post("/api/vehicle-fleet/vehicles/{plate}/replace") {
         val actor = call.adminActor() ?: return@post
         val request = decodeFleetRequest(call.receiveText(), ReplacementRequest.serializer())
         val (snapshot, problem) = registry.checkForList(request.replacement)
-        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot, problem))
+        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot, problem, call.request.queryParameters["agreementId"]))
     }
     post("/api/vehicle-fleet/vehicles/{plate}/exception") {
         val actor = call.adminActor() ?: return@post
         val request = decodeFleetRequest(call.receiveText(), ExceptionRequest.serializer())
-        fleet.approveException(normalizeRegistrationNumber(call.parameters["plate"]!!), request.note, actor, Instant.now())
+        fleet.approveException(normalizeRegistrationNumber(call.parameters["plate"]!!), request.note, actor, Instant.now(), call.request.queryParameters["agreementId"])
         call.respond(HttpStatusCode.NoContent)
     }
     post("/api/vehicle-fleet/history/{id}/undo") {

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import * as api from "../../api/vehicles";
-import type { FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
+import { ApiError } from "../../api/client";
+import type { ArchivedSupplierMatch, FleetAgreement, FleetSupplier, Vehicle } from "../../types/vehicle";
 import { agreementDuration, validDate, validPlate } from "../../utils/vehicle";
 import { VehicleDialog, Field, ErrorNotice, buttonClass, dangerClass, primaryClass, inputClass } from "./VehicleDialog";
 import { RegistrationNumberInput } from "./VehicleInputs";
@@ -15,15 +16,42 @@ function FormFooter({ busy, label, onClose }: { busy: boolean; label: string; on
   </footer>;
 }
 
+/** The backend answers 409 with this body when the organization number, or just the name, belonged to an archived supplier. */
+function archivedMatch(error: unknown): ArchivedSupplierMatch | null {
+  const body = error instanceof ApiError ? (error.body as Partial<ArchivedSupplierMatch> | null) : null;
+  return (body?.code === "ARCHIVED_SUPPLIER_MATCH" || body?.code === "ARCHIVED_SUPPLIER_NAME_MATCH") && body.supplier ? (body as ArchivedSupplierMatch) : null;
+}
+
 export function SupplierForm({ supplier, onClose, onSaved }: { supplier?: FleetSupplier; onClose: () => void; onSaved: (savedSupplier: FleetSupplier) => void }) {
   const [name, setName] = useState(supplier?.name ?? "");
   const [orgNumber, setOrgNumber] = useState(supplier?.orgNumber ?? "");
-  const save = useMutation({ mutationFn: () => api.saveSupplier({ name, orgNumber }, supplier), onSuccess: onSaved, retry: false });
-  return <VehicleDialog title={supplier ? "Edit supplier" : "Add supplier"} onClose={onClose} busy={save.isPending}>
+  // confirmNew is true after the admin answered "no, this is a new supplier" to the archived-name warning.
+  const save = useMutation({ mutationFn: (confirmNew?: boolean) => api.saveSupplier({ name, orgNumber, ...(confirmNew ? { confirmNewSupplier: true } : {}) }, supplier), onSuccess: onSaved, retry: false });
+  const match = archivedMatch(save.error);
+  const reactivate = useMutation({ mutationFn: () => api.reactivateSupplier(match!.supplier), onSuccess: onSaved, retry: false });
+  const busy = save.isPending || reactivate.isPending;
+  return <VehicleDialog title={supplier ? "Edit supplier" : "Add supplier"} onClose={onClose} busy={busy}>
     <form className="space-y-4" onChange={() => { if (save.isError) save.reset(); }} onSubmit={event => { event.preventDefault(); save.mutate(); }}>
       <Field label="Supplier name"><input autoFocus required maxLength={200} className={inputClass} value={name} onChange={e => setName(e.target.value)} /></Field>
       <Field label="Organization number"><input required inputMode="numeric" pattern="[0-9]{9}" title="Enter the 9-digit organization number" maxLength={9} className={inputClass} value={orgNumber} onChange={e => setOrgNumber(e.target.value.replace(/\s/g, ""))} /></Field>
-      <ErrorNotice error={save.error} /><FormFooter busy={save.isPending} label="Save supplier" onClose={onClose} />
+      {match?.code === "ARCHIVED_SUPPLIER_NAME_MATCH" ? <div role="alert" className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-800">
+        <p>An archived supplier has the same name: <strong>{match.supplier.name}</strong>, organization number <span className="font-mono">{match.supplier.orgNumber}</span>, archived{match.archivedAt ? ` ${new Date(match.archivedAt).toLocaleDateString()}` : ""} after {match.agreementCount} agreement{match.agreementCount === 1 ? "" : "s"}. You entered <span className="font-mono">{orgNumber}</span>. Is this the same supplier?</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={primaryClass} disabled={busy} onClick={() => reactivate.mutate()}>{reactivate.isPending ? "Reactivating…" : `Yes, reactivate ${match.supplier.name}`}</button>
+          <button type="button" className={buttonClass} disabled={busy} onClick={() => save.mutate(true)}>No, create a new supplier</button>
+        </div>
+        <p className="text-xs text-neutral-500">Reactivating keeps the organization number {match.supplier.orgNumber}; edit the supplier afterwards if the number you entered is the right one.</p>
+        <ErrorNotice error={reactivate.error} />
+      </div> : match ? <div role="alert" className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-800">
+        <p>This organization number belonged to <strong>{match.supplier.name}</strong>, archived{match.archivedAt ? ` ${new Date(match.archivedAt).toLocaleDateString()}` : ""} after {match.agreementCount} agreement{match.agreementCount === 1 ? "" : "s"}. Is this the same supplier?</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={primaryClass} disabled={busy} onClick={() => reactivate.mutate()}>{reactivate.isPending ? "Reactivating…" : `Yes, reactivate ${match.supplier.name}`}</button>
+          <button type="button" className={buttonClass} disabled={busy} onClick={() => save.reset()}>No, check the number</button>
+        </div>
+        <p className="text-xs text-neutral-500">Its old agreements and vehicles stay archived, and its user accounts stay blocked until you invite a contact again.</p>
+        <ErrorNotice error={reactivate.error} />
+      </div> : <ErrorNotice error={save.error} />}
+      <FormFooter busy={busy} label="Save supplier" onClose={onClose} />
     </form>
   </VehicleDialog>;
 }
@@ -48,7 +76,7 @@ export function RemoveSupplierAction({ supplier, agreementCount, vehicleCount, o
       onConfirm={() => remove.mutate()}
     >
       <p>This removes the organization and deactivates its {agreementCount} active agreement{agreementCount === 1 ? "" : "s"} and {vehicleCount} listed vehicle{vehicleCount === 1 ? "" : "s"}.</p>
-      <p className="mt-2">Historical records are kept. You can undo this from Change history.</p>
+      <p className="mt-2">Historical records are kept, and the organization stays in the archive so it can come back later. Its user accounts are blocked and open invitations cancelled. You can undo the removal from Change history, but the accounts stay blocked until you invite a contact again.</p>
     </ConfirmAction>}
   </>;
 }

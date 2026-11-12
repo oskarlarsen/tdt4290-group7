@@ -10,7 +10,9 @@ export default function MyVehicles() {
 
   const approved = data.vehicles.filter((vehicle) => vehicle.listed);
   const uploaded = data.vehicles.filter((vehicle) => vehicle.uploaded);
-  const approvedPlates = new Set(approved.map((vehicle) => vehicle.registrationNumber));
+  // A truck can be under several agreements, so a listing is the plate together with its agreement.
+  const listingKey = (vehicle: { registrationNumber: string; agreementId: string | null }) => `${vehicle.registrationNumber}|${vehicle.agreementId}`;
+  const approvedListings = new Set(approved.map(listingKey));
 
   function table(rows: typeof approved, showApproval: boolean) {
     return (
@@ -26,16 +28,16 @@ export default function MyVehicles() {
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {rows.map((vehicle) => (
-              <tr key={vehicle.registrationNumber} className="hover:bg-neutral-50/50">
+              <tr key={listingKey(vehicle)} className="hover:bg-neutral-50/50">
                 <td className="px-4 py-3 font-mono font-medium text-neutral-900">{vehicle.planned ? "Registration pending" : vehicle.registrationNumber}</td>
                 <td className="px-4 py-3">{vehicle.fuelTechnology ? (FUEL_TECHNOLOGIES as Record<string, string>)[vehicle.fuelTechnology] ?? vehicle.fuelTechnology : "—"}</td>
                 <td className="px-4 py-3">{vehicleWeightRange(vehicle.vehicleCategory) ?? "—"}</td>
                 {showApproval && <td className="px-4 py-3">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${approvedPlates.has(vehicle.registrationNumber) || vehicle.exceptionApproved ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
-                    {approvedPlates.has(vehicle.registrationNumber) ? "On the list" : vehicle.exceptionApproved ? "Approved as an exception" : "Not on the list: deviation"}
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${approvedListings.has(listingKey(vehicle)) || vehicle.exceptionApproved ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                    {approvedListings.has(listingKey(vehicle)) ? "On the list" : vehicle.exceptionApproved ? "Approved as an exception" : "Not on the list: deviation"}
                   </span>
                   {vehicle.registryProblem === "NOT_FOUND" && <p role="alert" className="mt-1 text-xs font-medium text-red-700">Plate not found in Statens vegvesen. Check that the registration number you reported is correct.</p>}
-                  {vehicle.exceptionApproved && vehicle.exceptionNote && !approvedPlates.has(vehicle.registrationNumber) && <p className="mt-1 text-xs text-neutral-600">Note from the administrator: {vehicle.exceptionNote}</p>}
+                  {vehicle.exceptionApproved && vehicle.exceptionNote && !approvedListings.has(listingKey(vehicle)) && <p className="mt-1 text-xs text-neutral-600">Note from the administrator: {vehicle.exceptionNote}</p>}
                 </td>}
               </tr>
             ))}

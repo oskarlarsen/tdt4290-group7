@@ -18,7 +18,8 @@ class VehicleCheckService(
         val now = Instant.now(clock)
         repository.findOrCreateVehicle(request.registrationNumber, now)
         // Read the vehicle, agreement, statistics and cache in one SQLite snapshot.
-        val state = requireNotNull(repository.vehicleDetails(request.registrationNumber))
+        val state = repository.vehicleDetails(request.registrationNumber, request.agreementId)
+            ?: throw IllegalArgumentException("This vehicle is not listed under that agreement")
         val vehicle = state.vehicle
         val agreement = state.agreement
         val tripRows = state.tripRows
@@ -28,7 +29,7 @@ class VehicleCheckService(
             DeviationFinding(code, if (code == VehicleDeviation.UNKNOWN_REGISTRATION_STATUS) DeviationPriority.MODERATE else DeviationPriority.HIGH,
                 DeviationOrigin.REGISTRY, "Statens vegvesen registration status: ${registryResult.registrationStatus ?: "not available"}.")
         } + evaluateDeviationRules(agreement, vehicle, tripRows, registryResult, LocalDate.now(clock))
-            .filterNot { it.code == VehicleDeviation.NOT_ON_AGREEMENT_LIST && !vehicle.listed && repository.exceptionApproved(vehicle.registrationNumber) }
+            .filterNot { it.code == VehicleDeviation.NOT_ON_AGREEMENT_LIST && !vehicle.listed && repository.exceptionApproved(vehicle.registrationNumber, vehicle.agreementId) }
         val deviations = findings.map { it.code }.distinct()
         val response = VehicleCheckResponse(
             id = UUID.randomUUID().toString(),
