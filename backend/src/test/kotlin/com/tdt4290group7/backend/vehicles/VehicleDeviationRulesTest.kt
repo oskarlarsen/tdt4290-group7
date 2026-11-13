@@ -66,7 +66,7 @@ class VehicleDeviationRulesTest {
     @Test fun zeroDistanceNeverDividesAndMissingNumbersAreNotCoercedToZero() {
         val results = evaluate(listOf(row(row().data.copy(totalTripKm = BigDecimal.ZERO))), registry = registry(listOf(null), nox = null))
         assertFalse(results.any { it.code == VehicleDeviation.CO2_MISMATCH })
-        assertTrue(results.any { it.code == VehicleDeviation.UNABLE_TO_VERIFY && "fuel consumption" in it.description })
+        assertTrue(results.any { it.code == VehicleDeviation.UNABLE_TO_VERIFY && "drivstofforbruk" in it.description })
         assertTrue(results.any { it.code == VehicleDeviation.UNABLE_TO_VERIFY && "CO₂" in it.description })
     }
     @Test fun electricityNullsSkipEmissionAndLitreComparisons() {

@@ -19,11 +19,11 @@ export function getAgreementStatus(agreement: FleetAgreement, today = new Date()
   return daysUntilEnd <= 90 ? "Expiring soon" : "Active";
 }
 
-/** The status with the date that explains it, e.g. "Expires on 31.12.2026". */
+/** The status with the date that explains it, e.g. "Utløper 31.12.2026". */
 export function agreementStatusText(agreement: FleetAgreement, today = new Date()): string {
-  if (!agreement.active) return "Removed";
+  if (!agreement.active) return "Fjernet";
   const status = getAgreementStatus(agreement, today);
-  if (status === "Expired") return `Expired on ${formatDate(agreement.endDate)}`;
-  if (status === "Upcoming") return `Starts on ${formatDate(agreement.startDate)}`;
-  return `Expires on ${formatDate(agreement.endDate)}`;
+  if (status === "Expired") return `Utløpt ${formatDate(agreement.endDate)}`;
+  if (status === "Upcoming") return `Starter ${formatDate(agreement.startDate)}`;
+  return `Utløper ${formatDate(agreement.endDate)}`;
 }

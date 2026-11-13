@@ -79,7 +79,10 @@ export type CsvPreview = {
     message: string;
     value: string | null;
   }>;
+  warnings?: string[];
   previewRows: Array<Record<string, string>>;
+  /** Non-blocking heads-ups, e.g. an existing quarter report that the import will replace. */
+  notices?: string[];
 };
 
 export type CsvConfirmation = {

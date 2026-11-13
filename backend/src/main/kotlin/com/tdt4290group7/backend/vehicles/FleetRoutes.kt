@@ -23,18 +23,22 @@ internal suspend fun ApplicationCall.adminActor(): ChangeActor? {
     val id = principal<JWTPrincipal>()?.payload?.let(JwtConfig::userId)
     val user = id?.let(UserRepository::findById)
     if (user?.role != com.tdt4290group7.backend.model.Role.ADMIN) {
-        respond(HttpStatusCode.Forbidden, ApiError("Administrator access required"))
+        respond(HttpStatusCode.Forbidden, ApiError("Krever administratortilgang"))
         return null
     }
     return ChangeActor(user.id, user.name)
 }
 
-fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
+fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup, checks: VehicleCheckService? = null) {
+    // Deviations are checked automatically when the admin adds a vehicle; a failed check never undoes the add.
+    suspend fun autoCheck(vehicle: Vehicle) {
+        if (!vehicle.planned) runCatching { checks?.check(VehicleCheckRequest(vehicle.registrationNumber)) }
+    }
     get("/api/vehicle-fleet") { if (call.adminActor() != null) call.respond(fleet.overview()) }
     get("/api/vehicle-fleet/history") {
         if (call.adminActor() == null) return@get
         val rawPage = call.request.queryParameters["page"]
-        val page = if (rawPage == null) 1 else rawPage.toIntOrNull() ?: throw IllegalArgumentException("Invalid history page")
+        val page = if (rawPage == null) 1 else rawPage.toIntOrNull() ?: throw IllegalArgumentException("Ugyldig historikkside")
         call.respond(fleet.history(page))
     }
     get("/api/vehicle-fleet/archive") { if (call.adminActor() != null) call.respond(fleet.archive()) }
@@ -56,18 +60,18 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     post("/api/vehicle-fleet/suppliers/{id}/invitations") {
         val actor = call.adminActor() ?: return@post
         val supplierId = call.parameters["id"] ?: run {
-            call.respond(HttpStatusCode.BadRequest, ApiError("Supplier ID is required"))
+            call.respond(HttpStatusCode.BadRequest, ApiError("Leverandør-ID er påkrevd"))
             return@post
         }
         val supplier = fleet.overview().suppliers.firstOrNull { it.id == supplierId }
         if (supplier == null) {
-            call.respond(HttpStatusCode.NotFound, ApiError("Active supplier organization not found"))
+            call.respond(HttpStatusCode.NotFound, ApiError("Fant ikke aktiv leverandørorganisasjon"))
             return@post
         }
         val request = try {
             decodeFleetRequest(call.receiveText(), SupplierInvitationRequest.serializer())
         } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, ApiError("Invalid invitation request"))
+            call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig invitasjonsforespørsel"))
             return@post
         }
         try {
@@ -81,9 +85,9 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
                 SupplierInvitationResponse(request.email.trim(), invitation.token, invitation.expiresAt)
             )
         } catch (e: AccountConflictException) {
-            call.respond(HttpStatusCode.Conflict, ApiError(e.message ?: "An account already exists"))
+            call.respond(HttpStatusCode.Conflict, ApiError(e.message ?: "Det finnes allerede en konto"))
         } catch (e: IllegalArgumentException) {
-            call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid invitation"))
+            call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Ugyldig invitasjon"))
         }
     }
     put("/api/vehicle-fleet/suppliers/{id}") {
@@ -93,7 +97,7 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     }
     delete("/api/vehicle-fleet/suppliers/{id}") {
         val actor = call.adminActor() ?: return@delete
-        val id = call.parameters["id"] ?: throw IllegalArgumentException("Supplier ID is required")
+        val id = call.parameters["id"] ?: throw IllegalArgumentException("Leverandør-ID er påkrevd")
         val request = decodeFleetRequest(call.receiveText(), VehicleChangeRequest.serializer())
         fleet.removeSupplier(id, request.expectedUpdatedAt, actor, Instant.now())
         call.respond(HttpStatusCode.NoContent)
@@ -117,8 +121,28 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
         val actor = call.adminActor() ?: return@post
         val input = decodeFleetRequest(call.receiveText(), VehicleEntryInput.serializer())
         // Never hold a SQLite write lock during a remote lookup. Capacity is checked at commit time.
-        val snapshot = registry.verifyEntry(input)
-        call.respond(HttpStatusCode.Created, fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot))
+        val (snapshot, problem) = registry.checkForList(input)
+        val added = fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot, problem)
+        autoCheck(added)
+        call.respond(HttpStatusCode.Created, added)
+    }
+    post("/api/vehicle-fleet/agreements/{id}/vehicles/bulk") {
+        val actor = call.adminActor() ?: return@post
+        val plates = decodeFleetRequest(call.receiveText(), BulkVehicleRequest.serializer()).registrationNumbers.distinct()
+        require(plates.size in 1..200) { "Send between 1 and 200 registration numbers" }
+        val added = mutableListOf<String>()
+        val failed = mutableListOf<BulkVehicleFailure>()
+        // One by one: a bad plate must not block the rest, and each add keeps its own history entry.
+        for (plate in plates) try {
+            val input = VehicleEntryInput(plate)
+            val (snapshot, problem) = registry.checkForList(input)
+            val vehicle = fleet.addVehicle(call.parameters["id"]!!, input, actor, Instant.now(), snapshot, problem)
+            autoCheck(vehicle)
+            added += vehicle.registrationNumber
+        } catch (e: Exception) {
+            failed += BulkVehicleFailure(plate, e.message ?: "Could not be added")
+        }
+        call.respond(HttpStatusCode.Created, BulkVehicleResult(added, failed))
     }
     delete("/api/vehicle-fleet/vehicles/{plate}") {
         val actor = call.adminActor() ?: return@delete
@@ -129,8 +153,14 @@ fun Route.fleetRoutes(fleet: FleetRepository, registry: VehicleRegistryLookup) {
     post("/api/vehicle-fleet/vehicles/{plate}/replace") {
         val actor = call.adminActor() ?: return@post
         val request = decodeFleetRequest(call.receiveText(), ReplacementRequest.serializer())
-        val snapshot = registry.verifyEntry(request.replacement)
-        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot, call.request.queryParameters["agreementId"]))
+        val (snapshot, problem) = registry.checkForList(request.replacement)
+        call.respond(fleet.replaceVehicle(call.parameters["plate"]!!, request, actor, Instant.now(), snapshot, problem, call.request.queryParameters["agreementId"]))
+    }
+    post("/api/vehicle-fleet/vehicles/{plate}/exception") {
+        val actor = call.adminActor() ?: return@post
+        val request = decodeFleetRequest(call.receiveText(), ExceptionRequest.serializer())
+        fleet.approveException(normalizeRegistrationNumber(call.parameters["plate"]!!), request.note, actor, Instant.now(), call.request.queryParameters["agreementId"])
+        call.respond(HttpStatusCode.NoContent)
     }
     post("/api/vehicle-fleet/history/{id}/undo") {
         val actor = call.adminActor() ?: return@post

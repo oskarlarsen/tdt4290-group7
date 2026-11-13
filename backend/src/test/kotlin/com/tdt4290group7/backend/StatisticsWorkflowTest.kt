@@ -90,7 +90,7 @@ class StatisticsWorkflowTest {
         val body = response.bodyAsText()
         assertFalse(body.contains("Sensitive synthetic"))
         val result = Json.parseToJsonElement(body).jsonObject.getValue("checks").jsonArray.single().jsonObject
-        assertTrue(result.getValue("error").jsonPrimitive.content.contains("do not resubmit"))
+        assertTrue(result.getValue("error").jsonPrimitive.content.contains("Ikke send inn statistikken på nytt"))
         assertEquals(1, repository.tripRowsForVehicle("AB12345").size)
     }
 

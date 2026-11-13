@@ -4,7 +4,7 @@ import java.math.BigDecimal
 import java.sql.Connection
 
 internal fun VehicleDatabase.insertRegistrySnapshot(db: Connection, snapshot: RegistrySnapshot) {
-    require(snapshot.registrationNumber == snapshot.data.registrationNumber) { "Snapshot vehicle mismatch" }
+    require(snapshot.registrationNumber == snapshot.data.registrationNumber) { "Registerutdraget tilhører et annet kjøretøy" }
     val data = snapshot.data
     val values = linkedMapOf<String, Any?>(
         "id" to snapshot.id, "registration_number" to snapshot.registrationNumber,

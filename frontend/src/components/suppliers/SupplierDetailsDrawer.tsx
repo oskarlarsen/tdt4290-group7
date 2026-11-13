@@ -9,9 +9,9 @@ import { describeLastActive, describeLastUpdated } from "../../utils/activity";
 import type { TopRiskSupplier, RecentAlert, NoteVisibility } from "../../types/dashboard";
 
 const REVIEW_STATUS_BADGES: Record<FollowUpStatus, { label: string; color: "yellow" | "orange" | "tertiary" }> = {
-  "to-review": { label: "To Review", color: "yellow" },
-  "in-progress": { label: "In Progress", color: "orange" },
-  resolved: { label: "Resolved", color: "tertiary" },
+  "to-review": { label: "Til vurdering", color: "yellow" },
+  "in-progress": { label: "Under arbeid", color: "orange" },
+  resolved: { label: "Løst", color: "tertiary" },
 };
 
 type Props = {
@@ -25,6 +25,8 @@ type Props = {
   onOpenDetails: () => void;
   onClose: () => void;
 };
+
+const NOTE_LABELS: Record<NoteVisibility, string> = { SELF: "Notat til meg selv", INTERNAL: "Internt notat", SUPPLIER: "Notat til leverandør" };
 
 export function SupplierDetailsDrawer({
   supplier,
@@ -81,7 +83,7 @@ export function SupplierDetailsDrawer({
         inert={!isOpen}
         role="dialog"
         aria-modal="true"
-        aria-label={supplier ? `${supplier.displayName} details` : undefined}
+        aria-label={supplier ? `Sammendrag for ${supplier.displayName}` : undefined}
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
@@ -99,7 +101,7 @@ export function SupplierDetailsDrawer({
               </div>
               <button
                 onClick={onClose}
-                aria-label="Close"
+                aria-label="Lukk"
                 className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
@@ -107,20 +109,20 @@ export function SupplierDetailsDrawer({
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Main issue">
+              <Section title="Hovedproblem">
                 <p className="text-sm font-semibold text-red-700">
-                  {supplier.mainIssue || "No open issues on record."}
+                  {supplier.mainIssue || "Ingen åpne saker registrert."}
                 </p>
               </Section>
 
-              <Section title="Activity">
+              <Section title="Aktivitet">
                 <p className="text-sm text-neutral-700">{describeLastActive(supplier.lastActiveAt, trackingSince)}</p>
                 <p className="text-sm text-neutral-500">{describeLastUpdated(supplier.lastUpdatedAt, supplier.lastUpdatedBy)}</p>
               </Section>
 
-              <Section title="Active alerts">
+              <Section title="Aktive varsler">
                 {supplierAlerts.length === 0 ? (
-                  <p className="text-sm text-neutral-500">No active alerts.</p>
+                  <p className="text-sm text-neutral-500">Ingen aktive varsler.</p>
                 ) : (
                   <ul className="flex flex-wrap gap-1.5">
                     {supplierAlerts.slice(0, MAX_KEYWORDS).map((alert) => (
@@ -130,21 +132,21 @@ export function SupplierDetailsDrawer({
                     ))}
                     {supplierAlerts.length > MAX_KEYWORDS && (
                       <li className="rounded-full px-2 py-1 text-xs text-neutral-500">
-                        +{supplierAlerts.length - MAX_KEYWORDS} more
+                        +{supplierAlerts.length - MAX_KEYWORDS} til
                       </li>
                     )}
                   </ul>
                 )}
               </Section>
 
-              <Section title="Follow-up status">
+              <Section title="Oppfølgingsstatus">
                 <div className="flex items-center gap-2">
                   <StatusBadge
                     status={REVIEW_STATUS_BADGES[reviewStatus].color}
                     label={REVIEW_STATUS_BADGES[reviewStatus].label}
                   />
                   {reviewStatus === "in-progress" && (
-                    <span className="text-xs text-neutral-500">Assigned to you</span>
+                    <span className="text-xs text-neutral-500">Tildelt deg</span>
                   )}
                 </div>
                 <div className="mt-2 flex gap-2">
@@ -153,7 +155,7 @@ export function SupplierDetailsDrawer({
                       onClick={() => onChangeReviewStatus("in-progress")}
                       className="rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                     >
-                      Start Review
+                      Start vurdering
                     </button>
                   )}
                   {reviewStatus === "in-progress" && (
@@ -161,16 +163,16 @@ export function SupplierDetailsDrawer({
                       onClick={() => onChangeReviewStatus("resolved")}
                       className="rounded-lg border border-tertiary-200 px-2.5 py-1.5 text-xs font-medium text-tertiary-700 hover:bg-tertiary-50"
                     >
-                      Mark resolved
+                      Marker som løst
                     </button>
                   )}
                 </div>
               </Section>
 
-              <Section title="Notes">
+              <Section title="Notater">
                 <div className="space-y-2">
                   {notes.length === 0 && (
-                    <p className="text-sm text-neutral-500">No notes yet for this supplier.</p>
+                    <p className="text-sm text-neutral-500">Ingen notater for denne leverandøren ennå.</p>
                   )}
                   {notes.map((note) => (
                     <div key={note.id} className="rounded-lg bg-neutral-50 p-2.5">
@@ -178,13 +180,14 @@ export function SupplierDetailsDrawer({
                         <span className="text-xs font-medium text-neutral-700">
                           {note.authorName}
                           <span className="ml-2 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-normal text-neutral-600">
-                            {note.visibility === "SELF" ? "Note to self" : "Internal note"}
+                            {NOTE_LABELS[note.visibility]}
                           </span>
                         </span>
                         <span className="font-mono text-[11px] text-neutral-500">
-                          {new Date(note.createdAt).toLocaleString("en-GB", {
+                          {new Date(note.createdAt).toLocaleString("nb-NO", {
                             day: "numeric",
                             month: "short",
+                            year: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
@@ -195,33 +198,37 @@ export function SupplierDetailsDrawer({
                   ))}
                 </div>
                 <fieldset className="mt-2">
-                  <legend className="sr-only">Who can see this note</legend>
+                  <legend className="sr-only">Hvem kan se dette notatet</legend>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-700">
                     <label className="flex items-center gap-1.5">
                       <input type="radio" name="note-visibility" checked={visibility === "SELF"} onChange={() => setVisibility("SELF")} />
-                      Note to self
+                      Notat til meg selv (bare du)
                     </label>
                     <label className="flex items-center gap-1.5">
                       <input type="radio" name="note-visibility" checked={visibility === "INTERNAL"} onChange={() => setVisibility("INTERNAL")} />
-                      Internal note
+                      Internt notat (alle administratorer)
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="note-visibility" checked={visibility === "SUPPLIER"} onChange={() => setVisibility("SUPPLIER")} />
+                      Notat til leverandør
                     </label>
                   </div>
-                  <p className="mt-1 text-xs text-neutral-500">Notes are never shown to the supplier.</p>
+                  <p className="mt-1 text-xs text-neutral-500">{visibility === "SUPPLIER" ? "Leverandøren ser dette notatet." : "Leverandøren ser ikke dette notatet."}</p>
                 </fieldset>
                 <div className="mt-2 flex gap-2">
                   <textarea
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
                     maxLength={2000}
-                    aria-label="Note about this supplier"
-                    placeholder="Add a note about this supplier…"
+                    aria-label="Notat om denne leverandøren"
+                    placeholder="Legg til et notat om denne leverandøren…"
                     rows={2}
                     className="flex-1 resize-none rounded-lg border border-neutral-200 px-2.5 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700/20 focus:border-primary-700"
                   />
                   <button
                     onClick={handleSubmitNote}
                     disabled={!noteText.trim() || addNote.isPending}
-                    aria-label="Add note"
+                    aria-label="Legg til notat"
                     className="rounded-lg bg-primary-900 px-2.5 text-white hover:bg-primary-700 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
@@ -234,7 +241,7 @@ export function SupplierDetailsDrawer({
                 onClick={onOpenDetails}
                 className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
               >
-                Details
+                Detaljer
               </button>
             </div>
           </>

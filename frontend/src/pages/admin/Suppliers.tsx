@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useDashboardSummary } from "../../hooks/useDashboardSummary";
 import { useSupplierReviewStatus, type FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
 import { useFleet, useRefreshVehicles } from "../../hooks/useVehicles";
-import { TopRiskSuppliersTable } from "../../components/suppliers/TopRiskSuppliersTable";
+import { TopRiskSuppliersTable, type SupplierSortDirection, type SupplierSortKey } from "../../components/suppliers/TopRiskSuppliersTable";
 import { SupplierDetailsDrawer } from "../../components/suppliers/SupplierDetailsDrawer";
 import { SupplierDetailsDialog } from "../../components/suppliers/SupplierDetailsDialog";
 import { useAlerts } from "../../hooks/useAlerts";
@@ -21,10 +21,64 @@ import type { FleetSupplier } from "../../types/vehicle";
 const RISK_ORDER: Record<TopRiskSupplier["risk"], number> = {
   high: 0,
   medium: 1,
-  compliant: 2,
-  unassessed: 3,
+  low: 2,
+  compliant: 3,
+  unassessed: 4,
 };
-const SUPPLIERS_PAGE_SIZE = 3;
+const RISK_LABELS: Record<TopRiskSupplier["risk"], string> = {
+  high: "Høy",
+  medium: "Middels",
+  low: "Lav",
+  compliant: "Ingen funn",
+  unassessed: "Ikke vurdert",
+};
+const SUPPLIERS_PAGE_SIZE = 10;
+const ISSUE_FILTER_CATEGORY = { vehicle: "VEHICLE_DEVIATION", certificate: "CERTIFICATE_EXPIRY", energy: "ENERGY_DEVIATION" } as const;
+
+/** One organization: name and org number, with its actions folded away behind a dropdown button. */
+function OrganizationRow({ supplier, highlighted, agreementCount, vehicleCount, onEdit, onReporting, onInvite, onRemoved }: {
+  supplier: FleetSupplier;
+  highlighted: boolean;
+  agreementCount: number;
+  vehicleCount: number;
+  onEdit: () => void;
+  onReporting: () => void;
+  onInvite: () => void;
+  onRemoved: () => void;
+}) {
+  const [open, setOpen] = useState(highlighted);
+  const panelId = `org-actions-${supplier.id}`;
+  return (
+    <li id={`org-${supplier.id}`} className={`rounded-lg border p-3 ${highlighted ? "border-primary-700 ring-2 ring-primary-700/20" : "border-neutral-100"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-medium text-neutral-900">{supplier.name}</p>
+          <p className="font-mono text-xs text-neutral-500">{supplier.orgNumber}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label={`${open ? "Skjul" : "Vis"} handlinger for ${supplier.name}`}
+          className={`${buttonClass} gap-1`}
+        >
+          Handlinger
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+      </div>
+      {open && (
+        <div id={panelId} className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
+          <button type="button" className={buttonClass} onClick={onEdit}>Rediger</button>
+          <button type="button" className={buttonClass} onClick={onReporting}>Innsendt informasjon</button>
+          <button type="button" className={buttonClass} onClick={onInvite}>Inviter kontaktperson</button>
+          <Link to="/admin/vehicles" className={buttonClass}>Administrer avtaler og kjøretøy</Link>
+          <RemoveSupplierAction supplier={supplier} agreementCount={agreementCount} vehicleCount={vehicleCount} onRemoved={onRemoved} />
+        </div>
+      )}
+    </li>
+  );
+}
 
 export default function Suppliers() {
   const { data, isLoading, isError } = useDashboardSummary();
@@ -43,7 +97,7 @@ export default function Suppliers() {
   // The risk filter lives in the URL so dashboard links such as ?risk=high can set it.
   const riskParam = searchParams.get("risk");
   const riskFilter: "all" | TopRiskSupplier["risk"] =
-    riskParam === "high" || riskParam === "medium" || riskParam === "compliant" || riskParam === "unassessed" ? riskParam : "all";
+    riskParam === "high" || riskParam === "medium" || riskParam === "low" || riskParam === "compliant" || riskParam === "unassessed" ? riskParam : "all";
   function setRiskFilter(next: "all" | TopRiskSupplier["risk"]) {
     const params = new URLSearchParams(searchParams);
     if (next === "all") params.delete("risk");
@@ -51,14 +105,16 @@ export default function Suppliers() {
     setSearchParams(params, { replace: true });
   }
   const issueParam = searchParams.get("issue");
-  const issueFilter: "all" | "vehicle" | "certificate" = issueParam === "vehicle" || issueParam === "certificate" ? issueParam : "all";
-  function setIssueFilter(next: "all" | "vehicle" | "certificate") {
+  const issueFilter: "all" | "vehicle" | "certificate" | "energy" =
+    issueParam === "vehicle" || issueParam === "certificate" || issueParam === "energy" ? issueParam : "all";
+  function setIssueFilter(next: "all" | "vehicle" | "certificate" | "energy") {
     const params = new URLSearchParams(searchParams);
     if (next === "all") params.delete("issue");
     else params.set("issue", next);
     setSearchParams(params, { replace: true });
   }
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | FollowUpStatus>("all");
+  const [sort, setSort] = useState<{ key: SupplierSortKey; direction: SupplierSortDirection }>({ key: "risk", direction: "asc" });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [successMessage, setSuccessMessage] = useState("");
@@ -97,9 +153,9 @@ export default function Suppliers() {
     void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     if (isNewSupplier) {
       setAgreementSupplier(savedSupplier);
-      setSuccessMessage("Supplier created. Configure the agreement and required information before inviting the contact.");
+      setSuccessMessage("Leverandør opprettet. Sett opp avtalen og påkrevd informasjon før du inviterer kontaktpersonen.");
     } else {
-      setSuccessMessage("Supplier organization saved successfully.");
+      setSuccessMessage("Leverandørorganisasjonen er lagret.");
     }
   }
 
@@ -108,7 +164,7 @@ export default function Suppliers() {
     setAgreementSupplier(null);
     void refreshFleet();
     if (supplier) setInvitationSupplier(supplier);
-    setSuccessMessage("Agreement saved. Create an invitation for the supplier contact.");
+    setSuccessMessage("Avtalen er lagret. Opprett en invitasjon til leverandørens kontaktperson.");
   }
 
   function handleSupplierReactivated(supplier: FleetSupplier) {
@@ -120,18 +176,28 @@ export default function Suppliers() {
   function handleOrganizationRemoved() {
     void refreshFleet();
     void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-    setSuccessMessage("Supplier organization removed successfully.");
+    setSuccessMessage("Leverandørorganisasjonen er fjernet.");
   }
 
-  const sortedSuppliers = [...(data?.topRiskSuppliers ?? [])].sort(
-    (a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk]
-  );
+  // Default: highest risk first. "asc" on Risk means high -> unassessed; ties fall back to name.
+  const sign = sort.direction === "asc" ? 1 : -1;
+  const sortedSuppliers = [...(data?.topRiskSuppliers ?? [])].sort((a, b) => {
+    const byName = a.displayName.localeCompare(b.displayName);
+    // Within a risk level the higher score (more and heavier findings) comes first.
+    const primary = sort.key === "risk"
+      ? RISK_ORDER[a.risk] - RISK_ORDER[b.risk] || (b.riskScore ?? 0) - (a.riskScore ?? 0)
+      : byName;
+    return (primary || byName) * (primary ? sign : 1);
+  });
+  function handleSort(key: SupplierSortKey) {
+    setSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
+  }
   const query = search.trim().toLowerCase();
   const filteredSuppliers = sortedSuppliers.filter((supplier) => {
     const matchesRisk = riskFilter === "all" || supplier.risk === riskFilter;
     const categories = supplier.issueCategories ?? (supplier.issueCategory ? [supplier.issueCategory] : []);
     const matchesIssue =
-      issueFilter === "all" || categories.includes(issueFilter === "vehicle" ? "VEHICLE_DEVIATION" : "CERTIFICATE_EXPIRY");
+      issueFilter === "all" || categories.includes(ISSUE_FILTER_CATEGORY[issueFilter]);
     const matchesReviewStatus =
       reviewStatusFilter === "all" || getStatus(supplier.id) === reviewStatusFilter;
     const matchesSearch =
@@ -151,30 +217,30 @@ export default function Suppliers() {
   function handleExportDirectory() {
     const csv = toCsv(
       sortedSuppliers.map((s) => ({
-        Supplier: s.displayName,
-        "Org ID": s.orgId,
-        Contract: s.primaryContract,
-        Risk: s.risk.toUpperCase(),
-        "Main issue": s.mainIssue,
+        Leverandør: s.displayName,
+        "Org.nr.": s.orgId,
+        Avtale: s.primaryContract,
+        Risiko: RISK_LABELS[s.risk],
+        "Hovedproblem": s.mainIssue,
       }))
     );
-    downloadCsv(`suppliers-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`leverandorer-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
   return (
     <div className="space-y-4 p-4">
       {reviewStatusError && (
         <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          Could not save supplier review status: {reviewStatusError}
+          Kunne ikke lagre vurderingsstatus for leverandør: {reviewStatusError}
         </p>
       )}
       {isLoading && (
         <div role="status" className="flex h-12 items-center gap-2 text-sm text-neutral-500">
-          <Loader2 className="h-5 w-5 animate-spin" /> Loading supplier risk dashboard…
+          <Loader2 className="h-5 w-5 animate-spin" /> Laster risikodashbord for leverandører…
         </div>
       )}
       {(isError || !data) && !isLoading && (
-        <p role="alert" className="text-sm text-red-700">Couldn't load the supplier risk dashboard. Organization management is still available below.</p>
+        <p role="alert" className="text-sm text-red-700">Kunne ikke laste risikodashbordet for leverandører. Organisasjonsadministrasjonen er fortsatt tilgjengelig nedenfor.</p>
       )}
       {data && (
         <SuppliersOverviewHeader
@@ -182,6 +248,9 @@ export default function Suppliers() {
           modeledSupplierCount={sortedSuppliers.length}
           highCount={data.riskClassification.high.count}
           mediumCount={data.riskClassification.medium.count}
+          lowCount={data.riskClassification.low.count}
+          activeRisk={riskFilter}
+          onSelectRisk={(next) => setRiskFilter(next === riskFilter ? "all" : next)}
           compliantCount={data.riskClassification.compliant.count}
           compliantPercent={data.riskClassification.compliant.percent}
           onExport={handleExportDirectory}
@@ -195,48 +264,6 @@ export default function Suppliers() {
         </p>
       )}
 
-      <section className="rounded-xl border border-neutral-100 bg-white p-4">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-900">Supplier organizations</h2>
-            <p className="mt-1 max-w-2xl text-sm text-neutral-500">
-              Create a supplier, configure its agreement and required reporting categories, then invite its contact to submit only the requested information.
-            </p>
-          </div>
-        </div>
-
-        {fleet.isLoading && <p role="status" className="text-sm text-neutral-500">Loading supplier organizations…</p>}
-        {fleet.isError && <div className="space-y-2"><ErrorNotice error={fleet.error} /><button type="button" className={buttonClass} onClick={() => void fleet.refetch()}>Try again</button></div>}
-        {fleet.data && fleet.data.suppliers.length === 0 && (
-          <p className="rounded-lg border border-dashed border-neutral-200 p-5 text-center text-sm text-neutral-500">
-            No organizations yet. Add one to create its agreements and invite a supplier contact.
-          </p>
-        )}
-        {fleet.data && fleet.data.suppliers.length > 0 && (
-          <ul className="space-y-3">
-            {fleet.data.suppliers.map((supplier) => (
-              <li key={supplier.id} id={`org-${supplier.id}`} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${supplier.id === highlightedOrg ? "border-primary-700 ring-2 ring-primary-700/20" : "border-neutral-100"}`}>
-                <div>
-                  <p className="font-medium text-neutral-900">{supplier.name}</p>
-                  <p className="font-mono text-xs text-neutral-500">{supplier.orgNumber}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className={buttonClass} onClick={() => setOrganizationForm(supplier)}>Edit</button>
-                  <button type="button" className={buttonClass} onClick={() => setReportingSupplier(supplier)}>Submitted information</button>
-                  <button type="button" className={buttonClass} onClick={() => setInvitationSupplier(supplier)}>Invite contact</button>
-                  <Link to="/admin/vehicles" className={buttonClass}>Manage agreements and vehicles</Link>
-                  <RemoveSupplierAction
-                    supplier={supplier}
-                    agreementCount={fleet.data.agreements.filter((agreement) => agreement.supplierId === supplier.id && agreement.active).length}
-                    vehicleCount={fleet.data.vehicles.filter((vehicle) => vehicle.listed && fleet.data.agreements.some((agreement) => agreement.id === vehicle.agreementId && agreement.supplierId === supplier.id && agreement.active)).length}
-                    onRemoved={handleOrganizationRemoved}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       <ArchivedSuppliers onReactivated={handleSupplierReactivated} />
 
@@ -247,65 +274,69 @@ export default function Suppliers() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search suppliers…"
-              aria-label="Search suppliers"
+              placeholder="Søk etter leverandører…"
+              aria-label="Søk etter leverandører"
               className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs text-neutral-600">
-              <span className="font-medium text-neutral-700">Risk:</span>
+              <span className="font-medium text-neutral-700">Risiko:</span>
               <select
                 value={riskFilter}
                 onChange={(event) => setRiskFilter(event.target.value as "all" | TopRiskSupplier["risk"])}
                 className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-                aria-label="Filter suppliers by risk level"
+                aria-label="Filtrer leverandører etter risikonivå"
               >
-                <option value="all">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="compliant">Compliant</option>
-                <option value="unassessed">Unassessed</option>
+                <option value="all">Alle</option>
+                <option value="high">Høy</option>
+                <option value="medium">Middels</option>
+                <option value="low">Lav</option>
+                <option value="compliant">Ingen funn</option>
+                <option value="unassessed">Ikke vurdert</option>
               </select>
             </label>
             <label className="flex items-center gap-2 text-xs text-neutral-600">
-              <span className="font-medium text-neutral-700">Issue:</span>
+              <span className="font-medium text-neutral-700">Problem:</span>
               <select
                 value={issueFilter}
-                onChange={(event) => setIssueFilter(event.target.value as "all" | "vehicle" | "certificate")}
+                onChange={(event) => setIssueFilter(event.target.value as "all" | "vehicle" | "certificate" | "energy")}
                 className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-                aria-label="Filter suppliers by issue category"
+                aria-label="Filtrer leverandører etter problemkategori"
               >
-                <option value="all">All</option>
-                <option value="vehicle">Vehicle deviations</option>
-                <option value="certificate">Certificate issues</option>
+                <option value="all">Alle</option>
+                <option value="vehicle">Kjøretøyavvik</option>
+                <option value="certificate">Sertifikatproblemer</option>
+                <option value="energy">Energiavvik</option>
               </select>
             </label>
 
             <label className="flex items-center gap-2 text-xs text-neutral-600">
-              <span className="font-medium text-neutral-700">Review Status:</span>
+              <span className="font-medium text-neutral-700">Vurderingsstatus:</span>
               <select
                 value={reviewStatusFilter}
                 onChange={(event) => setReviewStatusFilter(event.target.value as "all" | FollowUpStatus)}
                 className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-                aria-label="Filter suppliers by review status"
+                aria-label="Filtrer leverandører etter vurderingsstatus"
               >
-                <option value="all">All</option>
-                <option value="to-review">To Review</option>
-                <option value="in-progress">In Progress</option>
-                <option value="resolved">Resolved</option>
+                <option value="all">Alle</option>
+                <option value="to-review">Til vurdering</option>
+                <option value="in-progress">Under arbeid</option>
+                <option value="resolved">Løst</option>
               </select>
             </label>
           </div>
         </div>
 
         {filteredSuppliers.length === 0 ? (
-          <div className="py-8 text-center text-sm text-neutral-500">No suppliers match the selected filters.</div>
+          <div className="py-8 text-center text-sm text-neutral-500">Ingen leverandører samsvarer med valgte filtre.</div>
         ) : (
           <TopRiskSuppliersTable
             suppliers={paginatedSuppliers}
-            actionLabel="View details"
+            sort={sort}
+            onSort={handleSort}
+            actionLabel="Vis detaljer"
             onSelect={(supplier) => setSelectedSupplierId(supplier.id)}
             getReviewStatus={getStatus}
             showOnboardingStatus
@@ -314,8 +345,8 @@ export default function Suppliers() {
 
         <div className="-mx-4 -mb-4 mt-4 flex items-center justify-between gap-2 rounded-b-xl bg-neutral-50 px-4 py-3">
           <p className="min-w-0 text-xs text-neutral-500">
-            Showing {filteredSuppliers.length === 0 ? 0 : pageStart + 1}–
-            {Math.min(pageStart + SUPPLIERS_PAGE_SIZE, filteredSuppliers.length)} of {filteredSuppliers.length} suppliers
+            Viser {filteredSuppliers.length === 0 ? 0 : pageStart + 1}–
+            {Math.min(pageStart + SUPPLIERS_PAGE_SIZE, filteredSuppliers.length)} av {filteredSuppliers.length} {filteredSuppliers.length === 1 ? "leverandør" : "leverandører"}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
             <button
@@ -325,10 +356,10 @@ export default function Suppliers() {
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              Previous
+              Forrige
             </button>
             <span className="font-mono text-xs text-neutral-500">
-              Page {currentPage} of {totalPages}
+              Side {currentPage} av {totalPages}
             </span>
             <button
               type="button"
@@ -336,12 +367,48 @@ export default function Suppliers() {
               disabled={currentPage >= totalPages}
               className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Next
+              Neste
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       </section>}
+
+      <section className="rounded-xl border border-neutral-100 bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900">Leverandørorganisasjoner</h2>
+            <p className="mt-1 max-w-2xl text-sm text-neutral-500">
+              Opprett en leverandør, sett opp avtalen og påkrevde rapporteringskategorier, og inviter kontaktpersonen til å sende inn kun den etterspurte informasjonen.
+            </p>
+          </div>
+        </div>
+
+        {fleet.isLoading && <p role="status" className="text-sm text-neutral-500">Laster leverandørorganisasjoner…</p>}
+        {fleet.isError && <div className="space-y-2"><ErrorNotice error={fleet.error} /><button type="button" className={buttonClass} onClick={() => void fleet.refetch()}>Prøv igjen</button></div>}
+        {fleet.data && fleet.data.suppliers.length === 0 && (
+          <p className="rounded-lg border border-dashed border-neutral-200 p-5 text-center text-sm text-neutral-500">
+            Ingen organisasjoner ennå. Legg til en for å opprette avtaler og invitere en kontaktperson hos leverandøren.
+          </p>
+        )}
+        {fleet.data && fleet.data.suppliers.length > 0 && (
+          <ul className="space-y-3">
+            {fleet.data.suppliers.map((supplier) => (
+              <OrganizationRow
+                key={supplier.id}
+                supplier={supplier}
+                highlighted={supplier.id === highlightedOrg}
+                agreementCount={fleet.data.agreements.filter((agreement) => agreement.supplierId === supplier.id && agreement.active).length}
+                vehicleCount={fleet.data.vehicles.filter((vehicle) => vehicle.listed && fleet.data.agreements.some((agreement) => agreement.id === vehicle.agreementId && agreement.supplierId === supplier.id && agreement.active)).length}
+                onEdit={() => setOrganizationForm(supplier)}
+                onReporting={() => setReportingSupplier(supplier)}
+                onInvite={() => setInvitationSupplier(supplier)}
+                onRemoved={handleOrganizationRemoved}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
 
       <SupplierDetailsDrawer
         supplier={detailsOpen ? null : selectedSupplier}
@@ -375,7 +442,7 @@ export default function Suppliers() {
         />
       )}
       {invitationSupplier && (
-        <InviteSupplierForm supplier={invitationSupplier} onInvited={() => setSuccessMessage(`Invitation created for ${invitationSupplier.name}.`)} onClose={() => setInvitationSupplier(null)} />
+        <InviteSupplierForm supplier={invitationSupplier} onInvited={() => setSuccessMessage(`Invitasjon opprettet for ${invitationSupplier.name}.`)} onClose={() => setInvitationSupplier(null)} />
       )}
       {reportingSupplier && (
         <SupplierReportingDataDialog supplier={reportingSupplier} onClose={() => setReportingSupplier(null)} />

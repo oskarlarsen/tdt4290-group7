@@ -17,24 +17,24 @@ import { ProfileMenu } from "../components/ui/ProfileMenu";
 import { NotificationBell } from "../components/ui/NotificationBell";
 
 const NAV = [
-  { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "onboarding", label: "Onboarding", icon: ClipboardList },
-  { to: "company", label: "My Company", icon: Building2 },
-  { to: "contracts", label: "My Contracts", icon: FileText },
-  { to: "vehicles", label: "My Vehicles", icon: Truck },
-  { to: "certificates", label: "My Certificates", icon: BadgeCheck },
-  { to: "energy", label: "Energy & Fuel", icon: Zap },
-  { to: "compliance", label: "My Compliance", icon: Scale },
-  { to: "risk", label: "My Risk & Prediction", icon: ShieldAlert },
-  { to: "alerts", label: "My Alerts", icon: Bell },
-  { to: "team", label: "My Team", icon: Users },
-  { to: "required-actions", label: "Required Actions", icon: AlertTriangle },
+  { to: "dashboard", label: "Dashbord", icon: LayoutDashboard },
+  { to: "onboarding", label: "Registrering", icon: ClipboardList },
+  { to: "company", label: "Mitt selskap", icon: Building2 },
+  { to: "contracts", label: "Mine avtaler", icon: FileText },
+  { to: "vehicles", label: "Mine kjøretøy", icon: Truck },
+  { to: "certificates", label: "Mine sertifikater", icon: BadgeCheck },
+  { to: "energy", label: "Energi", icon: Zap },
+  { to: "compliance", label: "Min miljøoppfølging", icon: Scale },
+  { to: "risk", label: "Min risiko og prediksjon", icon: ShieldAlert },
+  { to: "alerts", label: "Mine varsler", icon: Bell },
+  { to: "team", label: "Mine kollegaer", icon: Users },
+  { to: "required-actions", label: "Påkrevde tiltak", icon: AlertTriangle },
 ];
 
 export function SupplierLayout() {
   return (
     <div className="flex min-h-screen bg-neutral-50">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-900 focus:shadow-card">Skip to main content</a>
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-900 focus:shadow-card">Hopp til hovedinnhold</a>
       <aside className="flex w-14 shrink-0 flex-col md:w-60 border-r border-neutral-100 bg-white">
         <div className="flex items-center justify-center gap-2 px-2 py-4 md:justify-start md:px-4">
           <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg" />
@@ -43,13 +43,13 @@ export function SupplierLayout() {
               Miljø &amp; Kontrakt
             </div>
             <div className="text-[10px] font-mono uppercase tracking-wide text-neutral-500">
-              Supplier Portal
+              Leverandørportal
             </div>
           </div>
         </div>
 
         <div className="hidden px-4 pb-1 pt-3 text-[10px] md:block font-mono uppercase tracking-wide text-neutral-500">
-          Supplier Actions
+          Leverandørvalg
         </div>
 
         <nav className="flex-1 space-y-0.5 px-2 overflow-y-auto">
@@ -80,7 +80,7 @@ export function SupplierLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Supplier-safe Top Bar */}
+        {/* Toppfelt for leverandør */}
         <div className="flex items-center justify-end gap-4 border-b border-neutral-100 bg-white px-6 py-3 h-14">
           <div className="flex items-center gap-2">
             {/* The bell lists this supplier's own notifications only; the supplier search stays admin-only. */}

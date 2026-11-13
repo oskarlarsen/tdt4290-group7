@@ -76,10 +76,10 @@ class VegvesenVehicleRegistryClient(
 
 /** Project immediately at the boundary. Unselected fields never reach storage or responses. */
 internal fun projectRegistryVehicle(element: JsonElement, requestedPlate: String): RegistryVehicleData {
-    val vehicle = element as? JsonObject ?: error("Invalid vehicle object")
+    val vehicle = element as? JsonObject ?: error("Ugyldig kjøretøyobjekt")
     val plate = vehicle.at("kjoretoyId", "kjennemerke").stringOrNull()
-        ?: error("Missing registration number")
-    require(normalizeRegistrationNumber(plate) == requestedPlate) { "Unexpected vehicle" }
+        ?: error("Registreringsnummer mangler")
+    require(normalizeRegistrationNumber(plate) == requestedPlate) { "Uventet kjøretøy" }
     val approval = vehicle.at("godkjenning", "tekniskGodkjenning")
     val technical = approval.at("tekniskeData")
     val general = technical.at("generelt")
@@ -125,23 +125,23 @@ private fun JsonElement?.at(vararg path: String): JsonElement? =
 private fun JsonElement?.stringOrNull(): String? = when (this) {
     null, JsonNull -> null
     is JsonPrimitive -> {
-        require(isString) { "Expected text" }
+        require(isString) { "Forventet tekst" }
         content
     }
-    else -> error("Expected text")
+    else -> error("Forventet tekst")
 }
 
 private fun JsonElement?.arrayOrEmpty(): JsonArray = when (this) {
     null, JsonNull -> JsonArray(emptyList())
     is JsonArray -> this
-    else -> error("Expected array")
+    else -> error("Forventet liste")
 }
 
 private fun JsonElement?.registryCode(): RegistryCode? = when (this) {
     null, JsonNull -> null
     is JsonPrimitive -> RegistryCode(requireNotNull(stringOrNull()))
     is JsonObject -> at("kodeVerdi").stringOrNull()?.let { RegistryCode(it, at("kodeNavn").stringOrNull()) }
-    else -> error("Expected code")
+    else -> error("Forventet kode")
 }
 
 private fun JsonElement?.decimalOrNull(): java.math.BigDecimal? = when (this) {
@@ -150,6 +150,6 @@ private fun JsonElement?.decimalOrNull(): java.math.BigDecimal? = when (this) {
 }
 
 private fun JsonElement?.dateOrNull(): String? = stringOrNull()?.also {
-    require(it.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Invalid inspection date" }
+    require(it.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Ugyldig kontrolldato" }
     java.time.LocalDate.parse(it)
 }

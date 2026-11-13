@@ -10,19 +10,20 @@ import type { RiskIndicator, RiskIndicatorCategory, RiskOutlookRow } from "../..
 import type { SupplierRisk } from "../../types/dashboard";
 
 const SUPPLIER_RISK_LABELS: Record<SupplierRisk, string> = {
-  unassessed: "Not yet assessed",
-  high: "High",
-  medium: "Medium",
-  compliant: "Compliant",
+  unassessed: "Ikke vurdert ennå",
+  high: "Høy",
+  medium: "Middels",
+  low: "Lav",
+  compliant: "Ingen funn",
 };
 
 const INDICATOR_LINKS: Record<
   RiskIndicatorCategory,
   { label: string; path: (contractId: string) => string }
 > = {
-  vehicle: { label: "View vehicles", path: (id) => `/admin/vehicles?contractId=${id}` },
-  energy: { label: "View energy data", path: () => "/admin/energy" },
-  certificate: { label: "View certificates", path: () => "/admin/certificates" },
+  vehicle: { label: "Vis kjøretøy", path: (id) => `/admin/vehicles?contractId=${id}` },
+  energy: { label: "Vis energidata", path: () => "/admin/energy" },
+  certificate: { label: "Vis sertifikater", path: () => "/admin/certificates" },
 };
 
 const PRIORITY_TONES = RISK_PRIORITY_INFO;
@@ -69,7 +70,7 @@ export function RiskDetailsDrawer({
         inert={!isOpen}
         role="dialog"
         aria-modal="true"
-        aria-label={contract ? `${contract.supplierName} risk details` : undefined}
+        aria-label={contract ? `Risikodetaljer for ${contract.supplierName}` : undefined}
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
@@ -83,12 +84,12 @@ export function RiskDetailsDrawer({
                 </h2>
                 <p className="mt-0.5 text-sm text-neutral-500">{contract.contractName}</p>
                 <div className="mt-1.5">
-                  <StatusBadge status={info.tone} label={`${info.label} priority`} />
+                  <StatusBadge status={info.tone} label={`${info.label} prioritet`} />
                 </div>
               </div>
               <button
                 onClick={onClose}
-                aria-label="Close"
+                aria-label="Lukk"
                 className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
@@ -96,10 +97,10 @@ export function RiskDetailsDrawer({
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title={`Risk indicators (${row.indicators.length})`}>
+              <Section title={`Risikoindikatorer (${row.indicators.length})`}>
                 {row.indicators.length === 0 ? (
                   <p className="text-sm text-neutral-500">
-                    No risk indicators on record for this contract.
+                    Ingen risikoindikatorer registrert for denne avtalen.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -114,36 +115,36 @@ export function RiskDetailsDrawer({
                 )}
               </Section>
 
-              <Section title="Not calculated yet">
+              <Section title="Ikke beregnet ennå">
                 <p className="text-sm text-neutral-500">
-                  Trend-based predictions (energy consumption and fuel-distribution trends) need
-                  several periods of historical statistics. Only one period of demo data exists, so
-                  none are calculated. No probabilities or scores are shown for the same reason.
+                  Trendbaserte prediksjoner (energi- og kjøretøytrender) krever flere perioder med
+                  rapportert statistikk. Inntil nok kvartaler er lagret brukes bare den lineære
+                  energiframskrivingen og utløpsdatoer for sertifikater, og ingen sannsynligheter
+                  vises.
                 </p>
               </Section>
 
-              <Section title="Contract & supplier">
-                <Field label="Contract" value={contract.contractName} />
-                <Field label="Supplier" value={contract.supplierName} />
-                <Field label="Org ID" value={contract.supplierOrgId} />
-                <Field label="Supplier risk badge" value={SUPPLIER_RISK_LABELS[contract.risk]} />
+              <Section title="Avtale og leverandør">
+                <Field label="Avtale" value={contract.contractName} />
+                <Field label="Leverandør" value={contract.supplierName} />
+                <Field label="Org.nr." value={contract.supplierOrgId} />
+                <Field label="Risikomerke for leverandør" value={SUPPLIER_RISK_LABELS[contract.risk]} />
                 <p className="mt-1 text-xs text-neutral-500">
-                  The supplier risk badge shown on other pages is the supplier's stored assessment. It is not
-                  derived from the indicators above, so the two can differ.
+                  Leverandørens risikomerke summerer alle leverandørens avtaler, så en leverandør med flere
+                  avtaler kan rangeres høyere enn en enkeltavtale her.
                 </p>
                 <button
                   onClick={() => navigate(`/admin/suppliers?supplierId=${contract.supplierId}`)}
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-secondary-700 hover:text-secondary-800"
                 >
-                  View supplier
+                  Vis leverandør
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </button>
               </Section>
 
               <p className="rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-500">
-                Demo data. Indicators are calculated in the browser from fictional vehicle,
-                certificate and energy records. No prediction model, historical dataset or backend
-                job exists.
+                Indikatorene beregnes fra lagrede kjøretøysjekker, utløpsdatoer for sertifikater
+                og energirapporter. Det finnes ingen statistisk prediksjonsmodell ennå.
               </p>
             </div>
           </>
@@ -181,7 +182,7 @@ function IndicatorCard({
       <p className="mt-1.5 text-sm text-neutral-600">{indicator.detail}</p>
       {indicator.date && (
         <p className="mt-1 text-xs text-neutral-500">
-          {indicator.kind === "predicted" ? "Projected breach date" : "Lapsed on"}:{" "}
+          {indicator.kind === "predicted" ? "Predikert bruddato" : "Utløpte"}:{" "}
           {formatCertificateDate(indicator.date)}
         </p>
       )}

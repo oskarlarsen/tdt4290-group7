@@ -9,8 +9,8 @@ describe("agreementLabel", () => {
     expect(agreementLabel({ saksnr: "2024/1234", note: "" })).toBe("2024/1234");
   });
   it("marks agreements without a saksnr", () => {
-    expect(agreementLabel({ saksnr: null, note: "Skolerute" })).toBe("Saksnr missing — Skolerute");
-    expect(agreementLabel({ saksnr: "  ", note: "" })).toBe("Saksnr missing");
+    expect(agreementLabel({ saksnr: null, note: "Skolerute" })).toBe("Saksnr mangler — Skolerute");
+    expect(agreementLabel({ saksnr: "  ", note: "" })).toBe("Saksnr mangler");
     expect(hasSaksnr({ saksnr: "  " })).toBe(false);
     expect(hasSaksnr({ saksnr: "2024/1" })).toBe(true);
   });

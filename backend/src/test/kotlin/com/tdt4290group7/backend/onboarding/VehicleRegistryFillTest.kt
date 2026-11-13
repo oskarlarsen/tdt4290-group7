@@ -25,6 +25,14 @@ class VehicleRegistryFillTest {
         RegistryVehicleData(plate, vehicleCategory = category?.let { RegistryCode(it) }, fuels = codes.map { RegistryFuel(RegistryCode(it)) })
 
     @Test
+    fun approvedPlatesAreFilledFromTheListWithoutAnyRegistryCall() = runBlocking {
+        val rows = listOf(mapOf("registration_number" to "AB12345", "fuel_technology" to ""))
+        val result = VehicleRegistryFill.fillFromRegistry(rows, null, Instant.now(), mapOf("AB12345" to FilledFuel("2", false)))
+        assertTrue(result.errors.isEmpty())
+        assertEquals("2", result.rows.single()["fuel_technology"])
+    }
+
+    @Test
     fun fuelAndHybridComeFromTheFuelsTheRegistryLists() {
         assertEquals(FilledFuel("2", false), VehicleRegistryFill.fuelFrom(data("2")))
         assertEquals(FilledFuel("5", false), VehicleRegistryFill.fuelFrom(data("5")))
@@ -76,17 +84,61 @@ class VehicleRegistryFillTest {
     }
 
     @Test
-    fun suppliedFuelIsKeptAndNotLookedUp() {
+    fun suppliedFuelIsKept() {
         val lookups = mutableListOf<String>()
         val (repo, agreement, registry) = fixture(lookups) { RegistryLookup.Found(data("2", plate = it)) }
         val oldHeader = "agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes\n"
         val preview = preview(repo, registry, oldHeader + "$agreement,AB12345,FALSE,13,FALSE,TRUE,,,,\n$agreement,CD12346,FALSE,8,,TRUE,,,,")
 
         assertTrue(preview.canCommit, preview.errors.toString())
-        assertEquals(emptyList(), lookups)
+        assertEquals(listOf("AB12345", "CD12346"), lookups) // still checked, to catch a wrong plate
         assertEquals(listOf("PROVIDED", "PROVIDED"), preview.previewRows.map { it["registry_status"] })
         // A blank hybrid flag is worked out from the fuel the supplier chose.
         assertEquals(listOf("FALSE", "TRUE"), preview.previewRows.map { it["is_hybrid"] })
+    }
+
+    @Test
+    fun platesNotCheckedAtPreviewAreCheckedAfterConfirmAndAWrongPlateIsShownToTheSupplier() = runBlocking {
+        var answer: RegistryLookup = RegistryLookup.Failed(LookupOutcome.TEMPORARILY_UNAVAILABLE)
+        val (repo, agreement, registry) = fixture(mutableListOf()) { answer }
+        val csv = "agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes\n$agreement,AB12345,FALSE,2,FALSE,TRUE,,,,"
+        val preview = preview(repo, registry, csv)
+        assertTrue(preview.canCommit, preview.errors.toString())
+        assertEquals(listOf("AB12345"), repo.onboarding.unverifiedPlates(preview.batchId))
+        repo.onboarding.confirmBatch(preview.batchId, "nordvik", Instant.now())
+        answer = RegistryLookup.Failed(LookupOutcome.NOT_FOUND)
+        repo.onboarding.verifyAfterUpload(listOf("AB12345"), registry)
+        assertEquals("NOT_FOUND", repo.onboarding.getSupplierVehicles("nordvik").single().registryProblem)
+    }
+
+    @Test
+    fun aRegistryOutageDoesNotBlockBlankFuelRowsAndTheFuelIsFilledInAfterwards() = runBlocking {
+        var answer: RegistryLookup = RegistryLookup.Failed(LookupOutcome.TEMPORARILY_UNAVAILABLE)
+        val (repo, agreement, registry) = fixture(mutableListOf()) { answer }
+        val preview = preview(repo, registry, header + "$agreement,AB12345,FALSE,TRUE,,,,")
+        assertTrue(preview.canCommit, preview.errors.toString())
+        repo.onboarding.confirmBatch(preview.batchId, "nordvik", Instant.now())
+        assertEquals("", repo.onboarding.getSupplierVehicles("nordvik").single().fuelTechnology)
+        // Reporting the same plate again during an outage keeps what is stored.
+        val again = preview(repo, registry, header + "$agreement,AB12345,FALSE,TRUE,,,,")
+        repo.onboarding.confirmBatch(again.batchId, "nordvik", Instant.now())
+        answer = RegistryLookup.Found(data("2"))
+        repo.onboarding.verifyAfterUpload(listOf("AB12345"), registry)
+        assertEquals("2", repo.onboarding.getSupplierVehicles("nordvik").single().fuelTechnology)
+        // Once filled in, a later outage upload does not wipe it.
+        answer = RegistryLookup.Failed(LookupOutcome.TEMPORARILY_UNAVAILABLE)
+        val third = preview(repo, registry, header + "$agreement,AB12345,FALSE,TRUE,,,,")
+        repo.onboarding.confirmBatch(third.batchId, "nordvik", Instant.now())
+        assertEquals("2", repo.onboarding.getSupplierVehicles("nordvik").single().fuelTechnology)
+    }
+
+    @Test
+    fun aPlateUnknownToTheRegistryIsAnErrorEvenWhenTheFuelIsGiven() {
+        val (repo, agreement, registry) = fixture(mutableListOf()) { RegistryLookup.Failed(LookupOutcome.NOT_FOUND) }
+        val header = "agreement_id,registration_number,is_planned,fuel_technology,is_hybrid,full_contract_coverage,start_year_week,end_year_week,attachment_reference,notes\n"
+        val preview = preview(repo, registry, header + "$agreement,AB12345,FALSE,13,FALSE,TRUE,,,,")
+        assertFalse(preview.canCommit)
+        assertTrue(preview.errors.single().message.contains("was not found in Statens vegvesen"))
     }
 
     @Test
@@ -102,9 +154,9 @@ class VehicleRegistryFillTest {
         val preview = preview(repo, registry, header + "$agreement,AB12345,FALSE,TRUE,,,,\n$agreement,CD12346,FALSE,TRUE,,,,\n$agreement,EF12347,FALSE,TRUE,,,,")
 
         assertFalse(preview.canCommit)
-        assertEquals(listOf(2 to "registration_number", 3 to "fuel_technology", 4 to "fuel_technology"), preview.errors.map { it.row to it.column })
-        assertTrue(preview.errors[0].message.contains("not found in Statens vegvesen"))
-        assertTrue(preview.errors[1].message.contains("Fill in fuel_technology yourself"))
+        assertEquals(listOf(2 to "registration_number"), preview.errors.map { it.row to it.column })
+        assertTrue(preview.errors[0].message.contains("ikke funnet hos Statens vegvesen"))
+        assertTrue(preview.warnings.single().contains("kunne ikke hente drivstofftype"))
     }
 
     @Test
@@ -113,7 +165,7 @@ class VehicleRegistryFillTest {
         val (repo, agreement, registry) = fixture(lookups) { RegistryLookup.Found(data("2", plate = it)) }
         val preview = preview(repo, registry, header + "$agreement,,TRUE,TRUE,,,,")
         assertFalse(preview.canCommit)
-        assertTrue(preview.errors.single().message.contains("planned vehicles"))
+        assertTrue(preview.errors.single().message.contains("planlagte kjøretøy"))
         assertEquals(emptyList(), lookups)
     }
 
@@ -133,8 +185,9 @@ class VehicleRegistryFillTest {
         val rows = (1..52).joinToString("\n") { "$agreement,AB${10000 + it},FALSE,TRUE,,,," }
         val preview = preview(repo, registry, header + rows)
         assertEquals(VehicleRegistryFill.MAX_LOOKUPS_PER_PREVIEW, lookups.size)
-        assertEquals(2, preview.errors.size)
-        assertTrue(preview.errors.all { it.column == "fuel_technology" })
+        // Rows the registry was not asked about do not block the import; one warning says so.
+        assertTrue(preview.canCommit, preview.errors.toString())
+        assertEquals(1, preview.warnings.size)
     }
 
     @Test

@@ -3,7 +3,7 @@ import {
   formatCertificateDate,
   getCertificateStatus,
 } from "./certificate";
-import { analyzeEnergy, formatPercent, getTotalKwh } from "./energy";
+import { formatSignedKwh } from "./energy";
 import type { Certificate } from "./certificate";
 import type { DerivedContract } from "./contract";
 import type { EnergyData } from "./energy";
@@ -18,16 +18,16 @@ export const RISK_PRIORITY_INFO: Record<
   RiskPriority,
   { label: string; tone: RiskTone; rank: number }
 > = {
-  high: { label: "High", tone: "red", rank: 0 },
-  medium: { label: "Medium", tone: "orange", rank: 1 },
-  low: { label: "Low", tone: "yellow", rank: 2 },
-  none: { label: "No indicators", tone: "tertiary", rank: 3 },
+  high: { label: "Høy", tone: "red", rank: 0 },
+  medium: { label: "Middels", tone: "orange", rank: 1 },
+  low: { label: "Lav", tone: "yellow", rank: 2 },
+  none: { label: "Ingen indikatorer", tone: "tertiary", rank: 3 },
 };
 
 export const RISK_INDICATOR_KIND_LABELS: Record<RiskIndicatorKind, string> = {
-  active: "Active deviation",
-  predicted: "Predicted",
-  "data-gap": "Data not submitted",
+  active: "Aktivt avvik",
+  predicted: "Predikert",
+  "data-gap": "Data ikke innsendt",
 };
 
 export type RiskIndicator = {
@@ -42,7 +42,14 @@ export type RiskIndicator = {
   daysUntil: number | null; // only set for predicted indicators
 };
 
+/** Points per finding priority; keep in step with the backend (AdminDashboardRoutes.kt). */
+const RISK_POINTS = { high: 10, medium: 4, low: 1 } as const;
+const HIGH_RISK_SCORE = 10;
+const MEDIUM_RISK_SCORE = 4;
+
 export type RiskOutlookRow = {
+  /** Total points of all indicators; the row's priority is derived from it. */
+  score: number;
   contract: DerivedContract;
   indicators: RiskIndicator[]; // most urgent first
   priority: RiskPriority; // the highest indicator priority, or "none"
@@ -81,18 +88,18 @@ function compareRows(a: RiskOutlookRow, b: RiskOutlookRow): number {
 }
 
 export function formatDaysUntil(days: number): string {
-  if (days === 0) return "today";
-  return days === 1 ? "in 1 day" : `in ${days} days`;
+  if (days === 0) return "i dag";
+  return days === 1 ? "om 1 dag" : `om ${days} dager`;
 }
 
 export function formatDaysValue(days: number): string {
-  if (days === 0) return "Today";
-  return days === 1 ? "1 day" : `${days} days`;
+  if (days === 0) return "I dag";
+  return days === 1 ? "1 dag" : `${days} dager`;
 }
 
 export function formatProjectedBreach(indicator: RiskIndicator): string {
   if (!indicator.date || indicator.daysUntil === null) return indicator.title;
-  return `${indicator.title} on ${formatCertificateDate(indicator.date)} (${formatDaysUntil(indicator.daysUntil)})`;
+  return `${indicator.title} den ${formatCertificateDate(indicator.date)} (${formatDaysUntil(indicator.daysUntil)})`;
 }
 
 // Risk levels follow customer priorities; expiry predictions use a 180-day horizon.
@@ -102,8 +109,7 @@ export function buildRiskOutlook(
   now: Date = new Date()
 ): RiskOutlookRow[] {
   const { contracts, certificates, energy } = input;
-  const requirementByContract = new Map(energy.requirements.map((r) => [r.contractId, r]));
-  const recordByContract = new Map(energy.records.map((r) => [r.contractId, r]));
+  const energyByContract = new Map(energy.map((row) => [row.agreementId, row]));
 
   const rows = contracts.map<RiskOutlookRow>((contract) => {
     const indicators: RiskIndicator[] = [];
@@ -117,15 +123,15 @@ export function buildRiskOutlook(
       const vehicleCountDetail =
         contract.vehicleCount === undefined
           ? ""
-          : ` of ${contract.vehicleCount} tracked vehicle${contract.vehicleCount === 1 ? "" : "s"}`;
+          : ` av ${contract.vehicleCount} overvåkede kjøretøy`;
       indicators.push({
         id: `vehicle-${contract.id}`,
         contractId: contract.id,
         category: "vehicle",
         kind: "active",
         priority: "high",
-        title: "Vehicle deviations",
-        detail: `${contract.flaggedVehicleCount}${vehicleCountDetail} flagged (not on the approved list, or deregistered, prohibited or exported).`,
+        title: "Kjøretøyavvik",
+        detail: `${contract.flaggedVehicleCount}${vehicleCountDetail} markert (ikke på den godkjente kjøretøylisten, eller avregistrert, med bruksforbud eller eksportert).`,
         date: null,
         daysUntil: null,
       });
@@ -135,47 +141,49 @@ export function buildRiskOutlook(
         contractId: contract.id,
         category: "vehicle",
         kind: "data-gap",
-        priority: "medium",
-        title: "Vehicle data not submitted",
-        detail: "This contract involves vehicles, but no vehicle data has been submitted, so deviations can't be checked",
+        priority: "low",
+        title: "Kjøretøydata ikke innsendt",
+        detail: "Avtalen omfatter kjøretøy, men ingen kjøretøydata er sendt inn, så avvik kan ikke kontrolleres",
         date: null,
         daysUntil: null,
       });
     }
 
-    // Energy
-    const requirement = requirementByContract.get(contract.id);
-    if (requirement) {
-      const record = recordByContract.get(contract.id);
-      if (!record || getTotalKwh(record.consumptionKwh) <= 0) {
-        indicators.push({
-          id: `energy-${contract.id}`,
-          contractId: contract.id,
-          category: "energy",
-          kind: "data-gap",
-          priority: "medium",
-          title: "Energy data not submitted",
-          detail: "This contract has an energy requirement, but no consumption data has been submitted, so compliance can't be checked",
-          date: null,
-          daysUntil: null,
-        });
-      } else {
-        const analysis = analyzeEnergy(record, requirement);
-        if (analysis.status !== "compliant") {
-          const isBreach = analysis.status === "breach";
-          indicators.push({
-            id: `energy-${contract.id}`,
-            contractId: contract.id,
-            category: "energy",
-            kind: "active",
-            priority: isBreach ? "high" : "medium",
-            title: isBreach ? "Energy breach" : "Minor energy deviation",
-            detail: `Renewable share was ${formatPercent(analysis.renewableSharePercent)} in ${record.period}, ${analysis.shortfallPoints.toFixed(1)} percentage points below the contract minimum of ${formatPercent(requirement.minRenewableSharePercent)}.`,
-            date: null,
-            daysUntil: null,
-          });
-        }
-      }
+    // Energy. Only contracts that require energy reporting have a summary.
+    const energyRow = energyByContract.get(contract.id);
+    if (energyRow?.status === "MISSING_DATA") {
+      indicators.push({
+        id: `energy-${contract.id}`,
+        contractId: contract.id,
+        category: "energy",
+        kind: "data-gap",
+        priority: "low",
+        title: "Energidata ikke innsendt",
+        detail: "Avtalen har et energikrav, men ingen energirapport er sendt inn, så avvik ikke kan kontrolleres",
+        date: null,
+        daysUntil: null,
+      });
+    } else if (energyRow?.status === "NON_COMPLIANT" || energyRow?.status === "AT_RISK") {
+      const isBreach = energyRow.status === "NON_COMPLIANT";
+      const shortfalls = [
+        energyRow.selfProducedDeviationKwh !== null && energyRow.selfProducedDeviationKwh < 0
+          ? `egenprodusert fornybar energi ${formatSignedKwh(energyRow.selfProducedDeviationKwh)}`
+          : null,
+        energyRow.gooDeviationKwh !== null && energyRow.gooDeviationKwh < 0
+          ? `opprinnelsesgarantier (GoO) ${formatSignedKwh(energyRow.gooDeviationKwh)}`
+          : null,
+      ].filter((text): text is string => text !== null);
+      indicators.push({
+        id: `energy-${contract.id}`,
+        contractId: contract.id,
+        category: "energy",
+        kind: "active",
+        priority: isBreach ? "high" : "medium",
+        title: isBreach ? "Energiforpliktelse ikke oppfylt" : "Energiforpliktelse i fare",
+        detail: `${isBreach ? "Levert for" : "Anslått for"} ${energyRow.year} sammenlignet med avtalen: ${shortfalls.join(", ")}.`,
+        date: null,
+        daysUntil: null,
+      });
     }
 
     // Certificates
@@ -192,8 +200,8 @@ export function buildRiskOutlook(
           category: "certificate",
           kind: "active",
           priority: "medium",
-          title: `${label} expired`,
-          detail: `Expired on ${formatCertificateDate(certificate.validUntil)} (${ago} day${ago === 1 ? "" : "s"} ago).`,
+          title: `${label} utløpt`,
+          detail: `Utløp ${formatCertificateDate(certificate.validUntil)} (for ${ago} ${ago === 1 ? "dag" : "dager"} siden).`,
           date: certificate.validUntil,
           daysUntil: null,
         });
@@ -204,8 +212,8 @@ export function buildRiskOutlook(
           category: "certificate",
           kind: "active",
           priority: "medium",
-          title: `${label}: documentation missing`,
-          detail: "Required by the contract, but no certificate documentation has been submitted",
+          title: `${label}: dokumentasjon mangler`,
+          detail: "Påkrevd i avtalen, men ingen sertifikatdokumentasjon er sendt inn",
           date: null,
           daysUntil: null,
         });
@@ -220,8 +228,8 @@ export function buildRiskOutlook(
           category: "certificate",
           kind: "predicted",
           priority: "low",
-          title: `${label} expiring`,
-          detail: `Expires on ${formatCertificateDate(certificate.validUntil)} (${formatDaysUntil(info.daysRemaining)}).`,
+          title: `${label} utløper`,
+          detail: `Utløper ${formatCertificateDate(certificate.validUntil)} (${formatDaysUntil(info.daysRemaining)}).`,
           date: certificate.validUntil,
           daysUntil: info.daysRemaining,
         });
@@ -235,10 +243,13 @@ export function buildRiskOutlook(
         .filter((i) => i.kind === "predicted" && i.daysUntil !== null)
         .sort((a, b) => (a.daysUntil ?? 0) - (b.daysUntil ?? 0))[0] ?? null;
 
+    // Same model as the Suppliers page: the level comes from the total of the findings' points, not the single worst one.
+    const score = indicators.reduce((sum, i) => sum + RISK_POINTS[i.priority], 0);
     return {
       contract,
       indicators,
-      priority: primary ? primary.priority : "none",
+      score,
+      priority: score >= HIGH_RISK_SCORE ? "high" : score >= MEDIUM_RISK_SCORE ? "medium" : score >= 1 ? "low" : "none",
       primary,
       nextProjected,
     };

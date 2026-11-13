@@ -59,17 +59,17 @@ export function CertificateEditDialog({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="edit-certificate-title" className="font-headline text-lg font-semibold text-neutral-900">
-              Edit certificate details
+              Rediger sertifikatopplysninger
             </h2>
             <p className="mt-1 text-sm text-neutral-600">
-              Correct extracted metadata. The original PDF is not retained.
+              Rett opp uthentede metadata. Den opprinnelige PDF-en lagres ikke.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={update.isPending}
-            aria-label="Close"
+            aria-label="Lukk"
             className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
@@ -78,7 +78,7 @@ export function CertificateEditDialog({
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-neutral-700">
-            Supplier
+            Leverandør
             <input
               required
               maxLength={200}
@@ -88,7 +88,7 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700">
-            Certificate type
+            Sertifikattype
             <input
               required
               maxLength={200}
@@ -98,7 +98,7 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700">
-            Issue date
+            Utstedelsesdato
             <input
               type="date"
               name="issueDate"
@@ -107,7 +107,7 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700">
-            Expiry date
+            Utløpsdato
             <input
               type="date"
               name="expiryDate"
@@ -116,15 +116,15 @@ export function CertificateEditDialog({
             />
           </label>
           <label className="text-sm font-medium text-neutral-700 sm:col-span-2">
-            Agreement
+            Avtale
             <select
               name="contractId"
               defaultValue={certificate.contractId}
               className="mt-1 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm font-normal outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             >
-              <option value="">Not linked</option>
+              <option value="">Ikke tilknyttet</option>
               {certificate.contractId && !contracts.some((contract) => contract.id === certificate.contractId) && (
-                <option value={certificate.contractId}>Existing agreement no longer active</option>
+                <option value={certificate.contractId}>Eksisterende avtale er ikke lenger aktiv</option>
               )}
               {contracts.map((contract) => (
                 <option key={contract.id} value={contract.id}>
@@ -137,7 +137,7 @@ export function CertificateEditDialog({
 
         {update.isError && (
           <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {update.error instanceof Error ? update.error.message : "Could not update certificate."}
+            {update.error instanceof Error ? update.error.message : "Kunne ikke oppdatere sertifikatet."}
           </p>
         )}
 
@@ -148,14 +148,14 @@ export function CertificateEditDialog({
             disabled={update.isPending}
             className="rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
           >
-            Cancel
+            Avbryt
           </button>
           <button
             type="submit"
             disabled={update.isPending}
             className="rounded-lg bg-primary-900 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
           >
-            {update.isPending ? "Saving…" : "Save changes"}
+            {update.isPending ? "Lagrer…" : "Lagre endringer"}
           </button>
         </div>
       </form>

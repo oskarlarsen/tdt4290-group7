@@ -6,7 +6,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
 
-class RegistryUnavailableException : RuntimeException("Statens vegvesen is unavailable. The vehicle was not added. Try again.")
+class RegistryUnavailableException : RuntimeException("Statens vegvesen er utilgjengelig. Kjøretøyet ble ikke lagt til. Prøv igjen.")
 
 /** Shared lookup boundary. Adding requires a live response; checks may use historical cache. */
 class VehicleRegistryLookup(
@@ -20,10 +20,14 @@ class VehicleRegistryLookup(
         val plate = input.validatedRegistrationNumber() ?: return null
         val (result, snapshot) = resolve(plate, null, true, Instant.now(clock))
         if (result.lookupOutcome == LookupOutcome.NOT_FOUND)
-            throw IllegalArgumentException("Registration number was not found in Statens vegvesen. Check the number and try again.")
+            throw IllegalArgumentException("Registreringsnummeret ble ikke funnet hos Statens vegvesen. Kontroller nummeret og prøv igjen.")
         if (snapshot == null) throw RegistryUnavailableException()
         return snapshot
     }
+
+    /** Being on the approved list is what approves a vehicle, so a failed or negative registry lookup must not block adding it; vehicle checks report the mismatch as a deviation. */
+    suspend fun checkForList(input: VehicleEntryInput): Pair<RegistrySnapshot?, String?> =
+        try { verifyEntry(input) to null } catch (_: IllegalArgumentException) { null to "NOT_FOUND" } catch (_: RegistryUnavailableException) { null to "UNAVAILABLE" }
 
     suspend fun resolve(
         registrationNumber: String,

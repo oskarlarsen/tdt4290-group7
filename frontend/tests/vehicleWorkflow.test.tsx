@@ -43,10 +43,10 @@ describe("vehicle registration and consequential actions", () => {
     const save = vi.spyOn(api, "saveSupplier").mockRejectedValue(new ApiError(409, "This record changed; reload before editing"));
     const saved = vi.fn();
     mount(<SupplierForm supplier={supplier} onClose={() => {}} onSaved={saved} />);
-    fireEvent.change(screen.getByLabelText("Supplier name"), { target: { value: "My edit" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save supplier" }));
+    fireEvent.change(screen.getByLabelText("Leverandørnavn"), { target: { value: "My edit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lagre leverandør" }));
     expect((await screen.findByRole("alert")).textContent).toContain("reload before editing");
-    expect((screen.getByLabelText("Supplier name") as HTMLInputElement).value).toBe("My edit");
+    expect((screen.getByLabelText("Leverandørnavn") as HTMLInputElement).value).toBe("My edit");
     expect(saved).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalledTimes(1);
     expect(save.mock.calls[0]).toEqual([{ name: "My edit", orgNumber: supplier.orgNumber }, supplier]);
@@ -55,13 +55,13 @@ describe("vehicle registration and consequential actions", () => {
     const remove = vi.spyOn(api, "removeSupplier").mockResolvedValue(undefined);
     const removed = vi.fn();
     mount(<RemoveSupplierAction supplier={supplier} agreementCount={2} vehicleCount={3} onRemoved={removed} />);
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    const confirmation = screen.getByRole("dialog", { name: "Remove supplier Test supplier?" });
-    expect(confirmation.textContent).toContain("2 active agreements and 3 listed vehicles");
-    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fjern" }));
+    const confirmation = screen.getByRole("dialog", { name: "Fjerne leverandøren Test supplier?" });
+    expect(confirmation.textContent).toContain("2 aktive avtaler og 3 kjøretøy på listen");
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Avbryt" }));
     expect(remove).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Remove supplier Test supplier?" })).getByRole("button", { name: "Remove supplier" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fjern" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Fjerne leverandøren Test supplier?" })).getByRole("button", { name: "Fjern leverandør" }));
     await waitFor(() => expect(removed).toHaveBeenCalledTimes(1));
     expect(remove).toHaveBeenCalledWith(supplier);
   });
@@ -69,15 +69,15 @@ describe("vehicle registration and consequential actions", () => {
     const save = vi.spyOn(api, "saveAgreement").mockResolvedValue(agreement);
     mount(<AgreementForm supplier={supplier} agreement={{ ...agreement, saksnr: null }} onClose={() => {}} onSaved={() => {}} />);
     fireEvent.change(screen.getByLabelText(/Saksnr/), { target: { value: "   " } });
-    fireEvent.submit(screen.getByRole("button", { name: "Save agreement" }).closest("form")!);
-    expect(await screen.findByText(/Enter the saksnr/)).toBeTruthy();
+    fireEvent.submit(screen.getByRole("button", { name: "Lagre avtale" }).closest("form")!);
+    expect(await screen.findByText(/Oppgi saksnummer/)).toBeTruthy();
     expect(save).not.toHaveBeenCalled();
   });
   it("saves an ordinary agreement edit without extra confirmation", async () => {
     const save = vi.spyOn(api, "saveAgreement").mockResolvedValue({ ...agreement, allowedVehicles: 1 });
     mount(<AgreementForm supplier={supplier} agreement={agreement} onClose={() => {}} onSaved={() => {}} />);
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Maximum vehicles" }), { target: { value: "1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save agreement" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Maks. antall kjøretøy" }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lagre avtale" }));
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
   });
@@ -85,25 +85,25 @@ describe("vehicle registration and consequential actions", () => {
   it("keeps unsaved reported data when cancelling discard", () => {
     const closed = vi.fn();
     mount(<StatisticsForm plate={vehicle.registrationNumber} onClose={closed} onSaved={() => {}} />);
-    fireEvent.change(screen.getByLabelText("Comment (optional)"), { target: { value: "Keep this note" } });
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    const confirmation = screen.getByRole("dialog", { name: "Discard reported data?" });
-    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    fireEvent.change(screen.getByLabelText("Kommentar (valgfritt)"), { target: { value: "Keep this note" } });
+    fireEvent.click(screen.getByRole("button", { name: "Avbryt" }));
+    const confirmation = screen.getByRole("dialog", { name: "Forkaste rapporterte data?" });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Avbryt" }));
     expect(closed).not.toHaveBeenCalled();
-    expect((screen.getByLabelText("Comment (optional)") as HTMLTextAreaElement).value).toBe("Keep this note");
+    expect((screen.getByLabelText("Kommentar (valgfritt)") as HTMLTextAreaElement).value).toBe("Keep this note");
   });
 
   it.each([400, 503])("keeps the registration and permits an explicit retry after HTTP %s", async status => {
     const add = vi.spyOn(api, "addVehicle").mockRejectedValueOnce(new ApiError(status, "Statens vegvesen lookup failed. Try again.")).mockResolvedValue(vehicle);
     const saved = vi.fn();
     mount(<VehicleEntryForm agreementId={agreement.id} onClose={() => {}} onSaved={saved} />);
-    fireEvent.change(screen.getByRole("textbox", { name: /^Registration number/ }), { target: { value: "AB12345" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add vehicle" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /^Registreringsnummer/ }), { target: { value: "AB12345" } });
+    fireEvent.click(screen.getByRole("button", { name: "Legg til kjøretøy" }));
     await screen.findByRole("alert");
-    expect((screen.getByRole("textbox", { name: /^Registration number/ }) as HTMLInputElement).value).toBe("AB12345");
+    expect((screen.getByRole("textbox", { name: /^Registreringsnummer/ }) as HTMLInputElement).value).toBe("AB12345");
     expect(saved).not.toHaveBeenCalled();
     expect(screen.getAllByRole("dialog")).toHaveLength(1); // Ordinary additions have no extra confirmation.
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Prøv igjen" }));
     await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
     expect(add).toHaveBeenCalledTimes(2);
     expect(add.mock.calls[1]).toEqual([agreement.id, { planned: false, registrationNumber: "AB12345" }]);
@@ -112,15 +112,15 @@ describe("vehicle registration and consequential actions", () => {
   it("does not send a replacement until confirmed and cancellation preserves the form", async () => {
     const replace = vi.spyOn(api, "replaceVehicle").mockResolvedValue({ ...vehicle, registrationNumber: "CD12345" });
     mount(<VehicleEntryForm agreementId={agreement.id} replacing={vehicle} onClose={() => {}} onSaved={() => {}} />);
-    fireEvent.change(screen.getByRole("textbox", { name: /^Registration number/ }), { target: { value: "CD12345" } });
-    fireEvent.click(screen.getByRole("button", { name: "Replace vehicle" }));
-    const confirmation = screen.getByRole("dialog", { name: "Replace AB12345 with CD12345?" });
+    fireEvent.change(screen.getByRole("textbox", { name: /^Registreringsnummer/ }), { target: { value: "CD12345" } });
+    fireEvent.click(screen.getByRole("button", { name: "Erstatt kjøretøy" }));
+    const confirmation = screen.getByRole("dialog", { name: "Erstatte AB12345 med CD12345?" });
     expect(replace).not.toHaveBeenCalled();
-    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Avbryt" }));
     expect(replace).not.toHaveBeenCalled();
-    expect((screen.getByRole("textbox", { name: /^Registration number/ }) as HTMLInputElement).value).toBe("CD12345");
-    fireEvent.click(screen.getByRole("button", { name: "Replace vehicle" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Replace AB12345 with CD12345?" })).getByRole("button", { name: "Replace vehicle" }));
+    expect((screen.getByRole("textbox", { name: /^Registreringsnummer/ }) as HTMLInputElement).value).toBe("CD12345");
+    fireEvent.click(screen.getByRole("button", { name: "Erstatt kjøretøy" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Erstatte AB12345 med CD12345?" })).getByRole("button", { name: "Erstatt kjøretøy" }));
     await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
   });
 
@@ -128,17 +128,17 @@ describe("vehicle registration and consequential actions", () => {
     const remove = vi.spyOn(api, "removeVehicle").mockResolvedValue(undefined);
     const removeAgreement = vi.spyOn(api, "removeAgreement").mockResolvedValue(undefined);
     mount(<AgreementCard supplier={supplier} agreement={agreement} vehicles={[vehicle]} onOpen={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: /^Remove$/ }));
-    const confirmation = screen.getByRole("dialog", { name: "Remove AB12345?" });
-    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fjern$/ }));
+    const confirmation = screen.getByRole("dialog", { name: "Fjerne AB12345?" });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Avbryt" }));
     expect(remove).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /^Remove$/ }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Remove AB12345?" })).getByRole("button", { name: "Remove vehicle" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fjern$/ }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Fjerne AB12345?" })).getByRole("button", { name: "Fjern kjøretøy" }));
     await waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
     expect(remove.mock.calls[0][0]).toEqual(vehicle);
-    fireEvent.click(screen.getByText("Agreement details", { selector: "summary" }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove agreement" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Remove agreement for Test supplier?" })).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByText("Avtaledetaljer", { selector: "summary" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fjern avtale" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Fjerne avtalen for Test supplier?" })).getByRole("button", { name: "Avbryt" }));
     expect(removeAgreement).not.toHaveBeenCalled();
   });
 });
@@ -148,12 +148,12 @@ describe("statistics source and period presentation", () => {
     vi.spyOn(api, "getVehicle").mockResolvedValue({ vehicle, agreement: { agreement, supplier }, tripRows: rows, latestSnapshot: snapshot, latestCheck: null });
     vi.spyOn(api, "getHistory").mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10 });
     const view = mount(<VehicleDetails plate={vehicle.registrationNumber} onClose={() => {}} />);
-    const registry = await screen.findByRole("region", { name: "Vehicle data (Statens vegvesen)" });
-    const reported = screen.getByRole("region", { name: "Reported data" });
+    const registry = await screen.findByRole("region", { name: "Kjøretøydata (Statens vegvesen)" });
+    const reported = screen.getByRole("region", { name: "Rapporterte data" });
     expect(registry.compareDocumentPosition(reported) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getAllByRole("heading", { name: "Vehicle data (Statens vegvesen)" })).toHaveLength(1);
-    expect(within(registry).getByText("10.01.2025")).toBeTruthy();
-    expect(within(registry).getByText("10.01.2027")).toBeTruthy();
+    expect(screen.getAllByRole("heading", { name: "Kjøretøydata (Statens vegvesen)" })).toHaveLength(1);
+    expect(within(registry).getByText("10. jan. 2025")).toBeTruthy();
+    expect(within(registry).getByText("10. jan. 2027")).toBeTruthy();
     expect(within(registry).getByText("Euro 6 (6)")).toBeTruthy();
     expect(within(registry).getByText("26.789")).toBeTruthy();
     expect(within(registry).getByText("NEDC")).toBeTruthy();
@@ -162,10 +162,10 @@ describe("statistics source and period presentation", () => {
 
   it("calculates reported NOx without replacing missing or zero-distance data with zero", () => {
     const view = render(<StatisticsCard row={row} />);
-    expect(view.container.textContent).toContain("12.5 g × 1,000 ÷ 500 km = 25 mg/km");
-    expect(view.container.textContent).toContain("Reported NOx rate (mg/km)");
+    expect(view.container.textContent).toContain("12.5 g × 1 000 ÷ 500 km = 25 mg/km");
+    expect(view.container.textContent).toContain("Rapportert NOx-utslipp (mg/km)");
     view.rerender(<StatisticsCard row={{ ...row, data: { ...row.data, totalKmNoxRegistered: "0" } }} />);
-    expect(view.container.textContent).toContain("NOx rate is unavailable");
+    expect(view.container.textContent).toContain("NOx-utslipp er utilgjengelig");
     expect(view.container.textContent).not.toContain("= 0 mg/km");
     view.rerender(<StatisticsCard row={{ ...row, data: { ...row.data, totalNoxRegisteredGrams: "0" } }} />);
     expect(view.container.textContent).toContain("= 0 mg/km");

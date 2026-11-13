@@ -44,9 +44,9 @@ class VehicleRegistryClientTest {
         val data = projectRegistryVehicle(Json.parseToJsonElement(payload).jsonObject.getValue("kjoretoydataListe")
             .let { (it as kotlinx.serialization.json.JsonArray).single() }, "AB12345")
         assertEquals("Test Make", data.make)
-        assertEquals(RegistryCode("M1", "Passenger car"), data.vehicleCategory)
-        assertEquals(RegistryCode("AC", "Station wagon"), data.bodyType)
-        assertEquals(RegistryCode("5", "Electric"), data.fuels.last().fuelTechnology)
+        assertEquals(RegistryCode("M1", "Personbil"), data.vehicleCategory)
+        assertEquals(RegistryCode("AC", "Stasjonsvogn"), data.bodyType)
+        assertEquals(RegistryCode("5", "Elektrisk"), data.fuels.last().fuelTechnology)
         assertEquals("6", data.euroClass?.code)
         assertEquals("2025-01-10", data.lastApprovedInspectionDate)
         assertEquals("2027-01-01", data.nextInspectionDueDate)
@@ -59,7 +59,7 @@ class VehicleRegistryClientTest {
         assertEquals("NEDC", measurements.last().measurementMethod?.code)
         val saved = Json.encodeToString(data)
         listOf("PRIVATE_SENTINEL", "kontrollfrist", "tillattTotalvekt", "forbrukBlandetKjoring",
-            "partikkelfilter", "utslippPartikler", "understellsnummer", "hybridCategory", "Personbil", "Stasjonsvogn", "Elektrisk").forEach { assertTrue(it !in saved) }
+            "partikkelfilter", "utslippPartikler", "understellsnummer", "hybridCategory").forEach { assertTrue(it !in saved) }
     }
 
     @Test

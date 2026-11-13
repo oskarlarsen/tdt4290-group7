@@ -4,6 +4,7 @@ export type EnergyFormRow = {
   locationCode: string;
   address: string;
   reportingYear: number;
+  reportingQuarter: number;
   storageAreaSqm: string;
   workshopAreaSqm: string;
   otherAreaSqm: string;
@@ -13,6 +14,7 @@ export type EnergyFormRow = {
   fossilFuelKwh: string;
   selfProducedSolarKwh: string;
   selfProducedHeatpumpKwh: string;
+  gooCoveredKwh: string;
   notes: string;
 };
 
@@ -24,12 +26,14 @@ export const ENERGY_CSV_HEADERS = [
   "workshop_area_sqm",
   "other_area_sqm",
   "reporting_year",
+  "reporting_quarter",
   "electricity_kwh",
   "district_heating_kwh",
   "biogas_kwh",
   "fossil_fuel_kwh",
   "self_produced_solar_kwh",
   "self_produced_heatpump_kwh",
+  "goo_covered_kwh",
   "notes",
 ] as const;
 
@@ -47,12 +51,14 @@ export function energyRowsToCsv(rows: EnergyFormRow[]) {
     row.workshopAreaSqm,
     row.otherAreaSqm,
     String(row.reportingYear),
+    String(row.reportingQuarter),
     row.electricityKwh,
     row.districtHeatingKwh,
     row.biogasKwh,
     row.fossilFuelKwh,
     row.selfProducedSolarKwh,
     row.selfProducedHeatpumpKwh,
+    row.gooCoveredKwh,
     row.notes,
   ]);
   return [ENERGY_CSV_HEADERS, ...data]
@@ -67,6 +73,7 @@ export function createEnergyFormRow(): EnergyFormRow {
     locationCode: "",
     address: "",
     reportingYear: new Date().getFullYear(),
+    reportingQuarter: Math.floor(new Date().getMonth() / 3) + 1,
     storageAreaSqm: "",
     workshopAreaSqm: "",
     otherAreaSqm: "",
@@ -76,6 +83,7 @@ export function createEnergyFormRow(): EnergyFormRow {
     fossilFuelKwh: "",
     selfProducedSolarKwh: "",
     selfProducedHeatpumpKwh: "",
+    gooCoveredKwh: "",
     notes: "",
   };
 }

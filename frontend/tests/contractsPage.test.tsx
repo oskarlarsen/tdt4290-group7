@@ -35,20 +35,20 @@ describe("admin supplier agreements page", () => {
     mount();
 
     expect(await screen.findByText("Canonical Transport AS · 2024/1234 — Transport services")).toBeTruthy();
-    expect(screen.queryByText(/Environmental compliance is not assessed/)).toBeNull();
-    expect(screen.getByText(`Expires on ${formatDate("2027-12-31")}`)).toBeTruthy();
+    expect(screen.queryByText(/Miljøoppfølging er ikke vurdert/)).toBeNull();
+    expect(screen.getByText(`Utløper ${formatDate("2027-12-31")}`)).toBeTruthy();
     expect(fetch.mock.calls[0][0]).toContain("/vehicle-fleet");
 
-    fireEvent.click(screen.getByRole("button", { name: "Add agreement" }));
-    fireEvent.change(screen.getByRole("combobox", { name: "Supplier" }), { target: { value: supplier.id } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Legg til avtale" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Leverandør" }), { target: { value: supplier.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Fortsett" }));
     fireEvent.change(screen.getByLabelText(/Saksnr/), { target: { value: " 2025/77 " } });
-    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-11-01" } });
-    fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2027-10-31" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Maximum vehicles" }), { target: { value: "3" } });
-    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "New agreement" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Energy" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save agreement" }));
+    fireEvent.change(screen.getByLabelText("Startdato"), { target: { value: "2026-11-01" } });
+    fireEvent.change(screen.getByLabelText("Sluttdato"), { target: { value: "2027-10-31" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Maks. antall kjøretøy" }), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Notat (valgfritt)"), { target: { value: "New agreement" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Energi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lagre avtale" }));
 
     await waitFor(() => expect(fetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
     const request = fetch.mock.calls.find(([, init]) => init?.method === "POST");
@@ -72,13 +72,13 @@ describe("admin supplier agreements page", () => {
       new Response(JSON.stringify({ suppliers: [supplier], agreements: [agreement, old], vehicles: [], changes: [] }), { status: 200 })));
     mount();
 
-    expect(await screen.findByText("Canonical Transport AS · Saksnr missing — Old agreement")).toBeTruthy();
-    expect(screen.getAllByText("Saksnr missing")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Add saksnr" })).toBeTruthy();
+    expect(await screen.findByText("Canonical Transport AS · Saksnr mangler — Old agreement")).toBeTruthy();
+    expect(screen.getAllByText("Saksnr mangler")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Legg til saksnr" })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Agreement status"), { target: { value: "Missing saksnr" } });
+    fireEvent.change(screen.getByLabelText("Avtalestatus"), { target: { value: "Missing saksnr" } });
     expect(screen.queryByText("Canonical Transport AS · 2024/1234 — Transport services")).toBeNull();
-    expect(screen.getByText("Canonical Transport AS · Saksnr missing — Old agreement")).toBeTruthy();
+    expect(screen.getByText("Canonical Transport AS · Saksnr mangler — Old agreement")).toBeTruthy();
   });
 
   it("opens the agreement details from its name and shows the saksnr and end date", async () => {
@@ -87,12 +87,12 @@ describe("admin supplier agreements page", () => {
     mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Canonical Transport AS · 2024/1234 — Transport services" }));
-    const drawer = screen.getByRole("dialog", { name: "2024/1234 — Transport services details" });
+    const drawer = screen.getByRole("dialog", { name: "Detaljer for 2024/1234 — Transport services" });
     expect(drawer.textContent).toContain("2024/1234");
     expect(drawer.textContent).toContain(formatDate("2027-12-31"));
     expect(drawer.textContent).toContain("Canonical Transport AS");
     expect(drawer.textContent).toContain("123456789");
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog", { name: "2024/1234 — Transport services details" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Lukk" }));
+    expect(screen.queryByRole("dialog", { name: "Detaljer for 2024/1234 — Transport services" })).toBeNull();
   });
 });

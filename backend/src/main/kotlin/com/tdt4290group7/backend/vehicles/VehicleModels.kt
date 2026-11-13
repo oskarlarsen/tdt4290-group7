@@ -14,6 +14,15 @@ data class Vehicle(
     val planned: Boolean = false,
     val listed: Boolean = false,
     val updatedAt: String = createdAt,
+    /** The supplier has reported using this vehicle. */
+    val reported: Boolean = false,
+    /** False when no Statens vegvesen data is stored for the vehicle (not checked yet, or the service was unavailable). */
+    val registryChecked: Boolean = true,
+    /** Why no registry data is stored: NOT_FOUND (plate unknown to Statens vegvesen) or UNAVAILABLE (service down). Null when checked. */
+    val registryProblem: String? = null,
+    /** Not on the approved list, but the admin approved it as a one-off exception. */
+    val exceptionApproved: Boolean = false,
+    val exceptionNote: String? = null,
 )
 
 /** Supplier observations for a period, not one individual journey or unique vehicle. */
@@ -46,7 +55,9 @@ fun TripRowInput.estimateCo2Kg(): BigDecimal? =
     co2GramsPerKm?.let { totalTripKm.multiply(it).movePointLeft(3).stripTrailingZeros() }
 
 @Serializable
-data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>)
+data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>,
+    /** Which agreement the automatic check after saving judges the truck by. */
+    val agreementId: String? = null)
 
 @Serializable
 data class StoredTripRow(
@@ -134,6 +145,16 @@ data class RegistrySnapshot(
 enum class LookupOutcome {
     FOUND, NOT_FOUND, INVALID_RESPONSE, ACCESS_DENIED, QUOTA_EXHAUSTED,
     TEMPORARILY_UNAVAILABLE, NOT_CONFIGURED,
+}
+
+internal val LookupOutcome.nb: String get() = when (this) {
+    LookupOutcome.FOUND -> "funnet"
+    LookupOutcome.NOT_FOUND -> "ikke funnet"
+    LookupOutcome.INVALID_RESPONSE -> "ugyldig svar"
+    LookupOutcome.ACCESS_DENIED -> "ingen tilgang"
+    LookupOutcome.QUOTA_EXHAUSTED -> "kvoten er brukt opp"
+    LookupOutcome.TEMPORARILY_UNAVAILABLE -> "midlertidig utilgjengelig"
+    LookupOutcome.NOT_CONFIGURED -> "ikke konfigurert"
 }
 
 @Serializable

@@ -292,7 +292,7 @@ class OnboardingWorkflowTest {
         assertFalse(previewObj["canCommit"]?.jsonPrimitive?.boolean ?: true)
         val errors = previewObj["errors"]?.jsonArray
         assertTrue(errors != null && errors.size > 0)
-        assertTrue(errors[0].jsonObject["message"]?.jsonPrimitive?.content?.contains("does not belong to your organization") ?: false)
+        assertTrue(errors[0].jsonObject["message"]?.jsonPrimitive?.content?.contains("tilhører ikke organisasjonen din") ?: false)
     }
 
     @Test
@@ -353,10 +353,11 @@ class OnboardingWorkflowTest {
             setBody("""{"batchId":"$batchId"}""")
         }
         assertEquals(HttpStatusCode.OK, confirmed.status, confirmed.bodyAsText())
-        // Both suppliers list the same truck, each under its own agreement; the first one's listing is untouched.
+        // The truck is under both agreements; only the admin's approved list sets listed, so the supplier's own upload does not list it.
         val listings = repo.fleet.overview().vehicles.filter { it.registrationNumber == "AB12345" }
         assertEquals(setOf(ownAgreementId, otherAgreement.id), listings.map { it.agreementId }.toSet())
-        assertTrue(listings.all { it.listed })
+        assertTrue(listings.single { it.agreementId == otherAgreement.id }.listed)
+        assertFalse(listings.single { it.agreementId == ownAgreementId }.listed)
         // Contract details belong to the supplier's own listing only.
         val detailRows = repo.database.read { db -> repo.database.query(db, "SELECT usage_id, notes FROM vehicle_usage_details") { it.getString(1) to it.getString(2) } }
         assertEquals(listOf("AB12345|$ownAgreementId" to "Shared truck"), detailRows)
@@ -424,8 +425,8 @@ class OnboardingWorkflowTest {
 
         // 1. Submit energy data
         val energyCsv = """
-            agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,notes
-            ${energyAgreement.id},DEPOT-TRD-01,Kongens gate 1 7011 Trondheim,500,250,50,2026,15000,25000,1000,0,3500,0,Main facility
+            agreement_id,facility_location_code,facility_address,storage_area_sqm,workshop_area_sqm,other_area_sqm,reporting_year,reporting_quarter,electricity_kwh,district_heating_kwh,biogas_kwh,fossil_fuel_kwh,self_produced_solar_kwh,self_produced_heatpump_kwh,goo_covered_kwh,notes
+            ${energyAgreement.id},DEPOT-TRD-01,Kongens gate 1 7011 Trondheim,500,250,50,2026,2,15000,25000,1000,0,3500,0,2000,Main facility
         """.trimIndent()
 
         val energyPreviewRes = supplier.submitFormWithBinaryData(
@@ -529,7 +530,7 @@ class OnboardingWorkflowTest {
         val failure = kotlin.runCatching {
             repo.onboarding.confirmBatch(batchId, "nordvik-transport", start.plusSeconds(16 * 60))
         }.exceptionOrNull()
-        assertTrue(failure is IllegalArgumentException && failure.message!!.contains("expired"), failure.toString())
+        assertTrue(failure is IllegalArgumentException && failure.message!!.contains("utløpt"), failure.toString())
     }
 
     @Test

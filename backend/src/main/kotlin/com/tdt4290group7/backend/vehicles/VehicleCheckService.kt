@@ -27,8 +27,9 @@ class VehicleCheckService(
         val (registryResult, newSnapshot) = registryLookup.resolve(vehicle.registrationNumber, cached, request.forceRefresh, now)
         val findings = registryResult.deviations.map { code ->
             DeviationFinding(code, if (code == VehicleDeviation.UNKNOWN_REGISTRATION_STATUS) DeviationPriority.MODERATE else DeviationPriority.HIGH,
-                DeviationOrigin.REGISTRY, "Statens vegvesen registration status: ${registryResult.registrationStatus ?: "not available"}.")
+                DeviationOrigin.REGISTRY, "Registreringsstatus hos Statens vegvesen: ${registryResult.registrationStatus ?: "ikke tilgjengelig"}.")
         } + evaluateDeviationRules(agreement, vehicle, tripRows, registryResult, LocalDate.now(clock))
+            .filterNot { it.code == VehicleDeviation.NOT_ON_AGREEMENT_LIST && !vehicle.listed && repository.exceptionApproved(vehicle.registrationNumber, vehicle.agreementId) }
         val deviations = findings.map { it.code }.distinct()
         val response = VehicleCheckResponse(
             id = UUID.randomUUID().toString(),

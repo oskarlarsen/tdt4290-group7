@@ -12,7 +12,7 @@ export function getSuppliers() {
 export function createSupplier(input: NewSupplierInput): Promise<TopRiskSupplier> {
   if (!USE_MOCKS) {
     return Promise.reject(
-      new Error("Adding suppliers is unavailable until supplier creation is supported by the backend.")
+      new Error("Det er ikke mulig å legge til leverandører før backend støtter opprettelse av leverandører.")
     );
   }
   return Promise.resolve(db.addSupplier(input));

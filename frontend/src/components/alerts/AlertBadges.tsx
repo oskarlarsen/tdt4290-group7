@@ -2,28 +2,30 @@ import { StatusBadge } from "../ui/StatusBadge";
 import type { AlertFindingType, AlertSeverity, AlertStatus } from "../../types/dashboard";
 
 export const ALERT_SEVERITY_LABELS: Record<AlertSeverity, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
+  high: "Høy",
+  medium: "Middels",
+  low: "Lav",
 };
 
 export const ALERT_STATUS_LABELS: Record<AlertStatus, string> = {
-  OPEN: "Open",
-  IN_PROGRESS: "In Progress",
-  UNDER_REVIEW: "Under Review",
-  RESOLVED: "Resolved",
+  OPEN: "Åpen",
+  IN_PROGRESS: "Under arbeid",
+  UNDER_REVIEW: "Under vurdering",
+  RESOLVED: "Løst",
 };
 
 export const ALERT_FINDING_LABELS: Record<AlertFindingType, string> = {
-  CONFIRMED_DEVIATION: "Confirmed Deviation",
-  MISSING_DOCUMENTATION: "Missing Documentation",
-  UPCOMING_EXPIRY: "Upcoming Expiry",
+  CONFIRMED_DEVIATION: "Bekreftet avvik",
+  MISSING_DOCUMENTATION: "Dokumentasjon mangler",
+  UPCOMING_EXPIRY: "Kommende utløp",
+  PREDICTED_DEVIATION: "Predikert avvik",
 };
 
 const ALERT_FINDING_CLASSES: Record<AlertFindingType, string> = {
   CONFIRMED_DEVIATION: "bg-neutral-100 text-neutral-700",
   MISSING_DOCUMENTATION: "bg-amber-100 text-amber-800",
   UPCOMING_EXPIRY: "bg-blue-100 text-blue-700",
+  PREDICTED_DEVIATION: "bg-blue-100 text-blue-700",
 };
 
 export function SeverityBadge({ severity }: { severity: AlertSeverity }) {

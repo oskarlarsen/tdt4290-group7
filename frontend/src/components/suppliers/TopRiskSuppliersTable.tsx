@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { RiskBadge } from "../ui/RiskBadge";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -5,19 +6,47 @@ import type { TopRiskSupplier } from "../../types/dashboard";
 import type { FollowUpStatus } from "../../hooks/useSupplierReviewStatus";
 
 const REVIEW_STATUS_BADGES: Record<FollowUpStatus, { label: string; color: "yellow" | "orange" | "tertiary" }> = {
-  "to-review": { label: "To Review", color: "yellow" },
-  "in-progress": { label: "In Progress", color: "orange" },
-  resolved: { label: "Resolved", color: "tertiary" },
+  "to-review": { label: "Til vurdering", color: "yellow" },
+  "in-progress": { label: "Under arbeid", color: "orange" },
+  resolved: { label: "Løst", color: "tertiary" },
 };
 
+const ONBOARDING_STATUS_LABELS: Record<string, string> = { INVITED: "Invitert", PROFILE_PENDING: "Profil venter", DATA_DRAFT: "Pågår", VALIDATING: "Validerer", SUBMITTED: "Innsendt", UNDER_REVIEW: "Under vurdering", APPROVED: "Godkjent", REVISION_REQUIRED: "Endringer ønskes" };
+
+export type SupplierSortKey = "supplier" | "risk";
+export type SupplierSortDirection = "asc" | "desc";
+
+function SortHeader({ label, sortKey, sort, onSort }: {
+  label: string;
+  sortKey: SupplierSortKey;
+  sort: { key: SupplierSortKey; direction: SupplierSortDirection };
+  onSort: (key: SupplierSortKey) => void;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ChevronsUpDown : sort.direction === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <th scope="col" aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"} className="pb-2 pr-3 font-medium">
+      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 font-mono uppercase tracking-wide hover:text-neutral-900">
+        {label}
+        <Icon className={`h-3 w-3 ${active ? "text-neutral-900" : "text-neutral-400"}`} aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
 export function TopRiskSuppliersTable({
+  sort,
+  onSort,
   suppliers,
-  actionLabel = "Investigate",
+  actionLabel = "Undersøk",
   onSelect,
   getReviewStatus,
   showOnboardingStatus = false,
   onMarkReviewComplete,
 }: {
+  /** Optional: makes the Supplier and Risk headers sortable (Suppliers page). */
+  sort?: { key: SupplierSortKey; direction: SupplierSortDirection };
+  onSort?: (key: SupplierSortKey) => void;
   suppliers: TopRiskSupplier[];
   actionLabel?: string;
   onSelect?: (supplier: TopRiskSupplier) => void;
@@ -37,7 +66,7 @@ export function TopRiskSuppliersTable({
   if (suppliers.length === 0) {
     return (
       <div className="py-8 text-center text-sm text-neutral-500">
-        No suppliers to show.
+        Ingen leverandører å vise.
       </div>
     );
   }
@@ -47,13 +76,13 @@ export function TopRiskSuppliersTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th scope="col" className="pb-2 pr-3 font-medium">Supplier &amp; org ID</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Primary contract</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Risk</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Main issue</th>
-            {showOnboardingStatus && <th scope="col" className="pb-2 pr-3 font-medium">Onboarding</th>}
-            {getReviewStatus && <th scope="col" className="pb-2 pr-3 font-medium">Review status</th>}
-            <th scope="col" className="pb-2 font-medium">Action</th>
+            {sort && onSort ? <SortHeader label="Leverandør og org.-ID" sortKey="supplier" sort={sort} onSort={onSort} /> : <th scope="col" className="pb-2 pr-3 font-medium">Leverandør og org.-ID</th>}
+            <th scope="col" className="pb-2 pr-3 font-medium">Hovedavtale</th>
+            {sort && onSort ? <SortHeader label="Risiko" sortKey="risk" sort={sort} onSort={onSort} /> : <th scope="col" className="pb-2 pr-3 font-medium">Risiko</th>}
+            <th scope="col" className="pb-2 pr-3 font-medium">Hovedproblem</th>
+            {showOnboardingStatus && <th scope="col" className="pb-2 pr-3 font-medium">Registrering</th>}
+            {getReviewStatus && <th scope="col" className="pb-2 pr-3 font-medium">Vurderingsstatus</th>}
+            <th scope="col" className="pb-2 font-medium">Handling</th>
           </tr>
         </thead>
         <tbody>
@@ -71,11 +100,12 @@ export function TopRiskSuppliersTable({
               <td className="py-3 pr-3 text-neutral-700">{s.primaryContract}</td>
               <td className="py-3 pr-3">
                 <RiskBadge level={s.risk} />
+                {sort && s.riskScore ? <div className="mt-0.5 font-mono text-xs text-neutral-500">poengsum {s.riskScore}</div> : null}
               </td>
               <td className="py-3 pr-3 text-neutral-700">{s.mainIssue}</td>
               {showOnboardingStatus && (
                 <td className="py-3 pr-3 whitespace-nowrap text-xs font-medium text-neutral-700">
-                  {s.onboardingStatus === "INVITED" && !s.registeredAccountCount ? "NO ACCOUNT" : (s.onboardingStatus ?? "INVITED").replace(/_/g, " ")}
+                  {s.onboardingStatus === "INVITED" && !s.registeredAccountCount && !s.pendingInvitationCount ? "Ingen konto" : ONBOARDING_STATUS_LABELS[s.onboardingStatus ?? "INVITED"]}
                 </td>
               )}
               {getReviewStatus && (
@@ -101,12 +131,12 @@ export function TopRiskSuppliersTable({
                   {onMarkReviewComplete && (
                     <button
                       type="button"
-                      aria-label="Mark review complete"
-                      title="Mark review complete"
+                      aria-label="Marker som vurdert"
+                      title="Marker denne leverandøren som vurdert"
                       onClick={() => onMarkReviewComplete(s)}
                       className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg border border-tertiary-200 px-3 text-xs font-medium leading-none text-tertiary-700 hover:bg-tertiary-50"
                     >
-                      Done
+                      Vurdert
                     </button>
                   )}
                 </div>

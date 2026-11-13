@@ -27,15 +27,15 @@ describe("returning supplier", () => {
     vi.stubGlobal("fetch", fetch);
     const onSaved = vi.fn();
     wrap(<SupplierForm onClose={() => {}} onSaved={onSaved} />);
-    fireEvent.change(screen.getByLabelText("Supplier name"), { target: { value: "Old Transport" } });
-    fireEvent.change(screen.getByLabelText("Organization number"), { target: { value: "123456789" } });
-    fireEvent.click(screen.getByText("Save supplier"));
+    fireEvent.change(screen.getByLabelText("Leverandørnavn"), { target: { value: "Old Transport" } });
+    fireEvent.change(screen.getByLabelText("Organisasjonsnummer"), { target: { value: "123456789" } });
+    fireEvent.click(screen.getByText("Lagre leverandør"));
 
-    expect(await screen.findByText(/Is this the same supplier\?/)).toBeTruthy();
+    expect(await screen.findByText(/Er dette den samme leverandøren\?/)).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("Old Transport AS");
-    expect(screen.getByRole("alert").textContent).toContain("2 agreements");
+    expect(screen.getByRole("alert").textContent).toContain("etter 2 avtaler");
 
-    fireEvent.click(screen.getByText("Yes, reactivate Old Transport AS"));
+    fireEvent.click(screen.getByText("Ja, reaktiver Old Transport AS"));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(onSaved.mock.calls[0][0]).toEqual({ ...archivedSupplier, active: true });
     expect(fetch.mock.calls[1][0]).toContain("/vehicle-fleet/suppliers/s1/reactivate");
@@ -48,12 +48,12 @@ describe("returning supplier", () => {
       .mockResolvedValueOnce(json({ error: "This organization number already belongs to a supplier" }, 409));
     vi.stubGlobal("fetch", fetch);
     wrap(<SupplierForm onClose={() => {}} onSaved={() => {}} />);
-    fireEvent.change(screen.getByLabelText("Supplier name"), { target: { value: "X" } });
-    fireEvent.change(screen.getByLabelText("Organization number"), { target: { value: "123456789" } });
-    fireEvent.click(screen.getByText("Save supplier"));
-    fireEvent.click(await screen.findByText("No, check the number"));
-    await waitFor(() => expect(screen.queryByText(/Is this the same supplier\?/)).toBeNull());
-    fireEvent.click(screen.getByText("Save supplier"));
+    fireEvent.change(screen.getByLabelText("Leverandørnavn"), { target: { value: "X" } });
+    fireEvent.change(screen.getByLabelText("Organisasjonsnummer"), { target: { value: "123456789" } });
+    fireEvent.click(screen.getByText("Lagre leverandør"));
+    fireEvent.click(await screen.findByText("Nei, sjekk nummeret"));
+    await waitFor(() => expect(screen.queryByText(/Er dette den samme leverandøren\?/)).toBeNull());
+    fireEvent.click(screen.getByText("Lagre leverandør"));
     expect((await screen.findByRole("alert")).textContent).toBe("This organization number already belongs to a supplier");
   });
 
@@ -64,15 +64,15 @@ describe("returning supplier", () => {
     vi.stubGlobal("fetch", fetch);
     const onSaved = vi.fn();
     wrap(<SupplierForm onClose={() => {}} onSaved={onSaved} />);
-    fireEvent.change(screen.getByLabelText("Supplier name"), { target: { value: "Old Transport AS" } });
-    fireEvent.change(screen.getByLabelText("Organization number"), { target: { value: "222222222" } });
-    fireEvent.click(screen.getByText("Save supplier"));
-    expect(await screen.findByText(/An archived supplier has the same name/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Leverandørnavn"), { target: { value: "Old Transport AS" } });
+    fireEvent.change(screen.getByLabelText("Organisasjonsnummer"), { target: { value: "222222222" } });
+    fireEvent.click(screen.getByText("Lagre leverandør"));
+    expect(await screen.findByText(/En arkivert leverandør har samme navn/)).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("123456789");
     expect(screen.getByRole("alert").textContent).toContain("222222222");
     expect(JSON.parse(fetch.mock.calls[0][1].body).confirmNewSupplier).toBeUndefined();
 
-    fireEvent.click(screen.getByText("No, create a new supplier"));
+    fireEvent.click(screen.getByText("Nei, opprett en ny leverandør"));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ name: "Old Transport AS", orgNumber: "222222222", confirmNewSupplier: true });
     expect(onSaved.mock.calls[0][0]).toEqual(created);
@@ -91,10 +91,10 @@ describe("returning supplier", () => {
     vi.stubGlobal("fetch", fetch);
     const onReactivated = vi.fn();
     wrap(<ArchivedSuppliers onReactivated={onReactivated} />);
-    expect(await screen.findByText("Archived suppliers (1)")).toBeTruthy();
+    expect(await screen.findByText("Arkiverte leverandører (1)")).toBeTruthy();
     expect(screen.getByText("Old Transport AS")).toBeTruthy();
-    expect(screen.getByText(/2020-01-01 to 2021-12-31 · 2020\/1 · up to 3 vehicles · 1 registered/)).toBeTruthy();
-    fireEvent.click(screen.getByText("Reactivate"));
+    expect(screen.getByText(/2020-01-01 til 2021-12-31 · 2020\/1 · opptil 3 kjøretøy · 1 registrert/)).toBeTruthy();
+    fireEvent.click(screen.getByText("Reaktiver"));
     await waitFor(() => expect(onReactivated).toHaveBeenCalledWith({ ...archivedSupplier, active: true }));
   });
 

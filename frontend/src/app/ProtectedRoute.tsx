@@ -9,7 +9,7 @@ export function ProtectedRoute({ role, children }: Props) {
   const { user, isInitializing } = useAuth();
 
   if (isInitializing) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading…</div>;
+    return <div className="min-h-screen flex items-center justify-center text-gray-500">Laster…</div>;
   }
 
   if (!user) return <Navigate to="/login" replace state={{ from: window.location.pathname + window.location.search + window.location.hash }} />;

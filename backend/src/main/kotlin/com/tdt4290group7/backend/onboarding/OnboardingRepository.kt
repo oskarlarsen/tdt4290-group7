@@ -3,6 +3,8 @@ package com.tdt4290group7.backend.onboarding
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.vehicles.FleetRepository
 import com.tdt4290group7.backend.vehicles.VehicleDatabase
+import com.tdt4290group7.backend.vehicles.VehicleEntryInput
+import com.tdt4290group7.backend.vehicles.insertRegistrySnapshot
 import java.security.MessageDigest
 import java.sql.Connection
 import java.sql.ResultSet
@@ -67,6 +69,25 @@ internal class OnboardingRepository(
                        WHERE v.agreement_id IS NOT NULL"""
                 )
             }
+            migrateFacilityEnergyToQuarterly(db)
+        }
+    }
+
+    /** Older databases hold one yearly row per facility. SQLite cannot change a UNIQUE key in place, so rebuild and map each to Q4. */
+    private fun migrateFacilityEnergyToQuarterly(db: Connection) {
+        val columns = database.query(db, "PRAGMA table_info(facility_energy)") { it.getString("name") }.toSet()
+        if ("reporting_quarter" in columns) return
+        val oldColumns = listOf(
+            "id", "agreement_id", "location_code", "address", "storage_area_sqm", "workshop_area_sqm", "other_area_sqm",
+            "reporting_year", "electricity_kwh", "district_heating_kwh", "biogas_kwh", "fossil_fuel_kwh",
+            "self_produced_solar_kwh", "self_produced_heatpump_kwh", "notes", "created_at", "updated_at"
+        ).joinToString(",")
+        db.createStatement().use { st ->
+            st.execute("DROP INDEX IF EXISTS idx_facility_energy_agreement")
+            st.execute("ALTER TABLE facility_energy RENAME TO facility_energy_yearly")
+            onboardingSchemaStatements.filter { it.contains("facility_energy") }.forEach { st.executeUpdate(it) }
+            st.execute("INSERT INTO facility_energy ($oldColumns, reporting_quarter) SELECT $oldColumns, 4 FROM facility_energy_yearly")
+            st.execute("DROP TABLE facility_energy_yearly")
         }
     }
 
@@ -100,11 +121,11 @@ internal class OnboardingRepository(
                 "updated_at" to formatTimestamp(now)
             )
         )
-        return queryStatusRow(db, supplierId) ?: error("Failed to create initial onboarding record")
+        return queryStatusRow(db, supplierId) ?: error("Kunne ikke opprette første registreringspost")
     }
 
     private fun statusResponse(db: Connection, supplierId: String): OnboardingStatusResponse {
-        val row = queryStatusRow(db, supplierId) ?: error("Onboarding status record is missing")
+        val row = queryStatusRow(db, supplierId) ?: error("Registreringsstatus mangler")
         val status = OnboardingStatus.valueOf(row["status"] as String)
         val contactName = row["contact_name"] as? String
         val contactEmail = row["contact_email"] as? String
@@ -130,24 +151,24 @@ internal class OnboardingRepository(
             supplierId = supplierId,
             status = status,
             steps = listOf(
-                OnboardingStepStatus("PROFILE", "Environmental & Compliance Contact", profileComplete,
-                    if (profileComplete) "$contactName ($contactEmail)" else "Contact details required"),
-                OnboardingStepStatus("AGREEMENTS", "Framework Agreements Linked", agreements.isNotEmpty(),
-                    "${agreements.size} active contract(s) registered"),
+                OnboardingStepStatus("PROFILE", "Kontaktperson for miljøoppfølging", profileComplete,
+                    if (profileComplete) "$contactName ($contactEmail)" else "Kontaktopplysninger er påkrevd"),
+                OnboardingStepStatus("AGREEMENTS", "Tilknyttede rammeavtaler", agreements.isNotEmpty(),
+                    "${agreements.size} aktive avtaler registrert"),
                 if (BatchEntityType.VEHICLES in requiredEntities) OnboardingStepStatus(
-                    "VEHICLES", "Vehicles", missingVehicleAgreements == 0,
-                    if (missingVehicleAgreements == 0) "$vehicleCount vehicle(s) registered"
-                    else "$missingVehicleAgreements agreement(s) still need vehicle information"
+                    "VEHICLES", "Kjøretøy", missingVehicleAgreements == 0,
+                    if (missingVehicleAgreements == 0) "$vehicleCount kjøretøy registrert"
+                    else "$missingVehicleAgreements avtaler mangler fortsatt kjøretøyopplysninger"
                 ) else null,
                 if (BatchEntityType.ENERGY in requiredEntities) OnboardingStepStatus(
-                    "ENERGY", "Energy", missingEnergyAgreements == 0,
-                    if (missingEnergyAgreements == 0) "$energyCount energy record(s) submitted"
-                    else "$missingEnergyAgreements agreement(s) still need energy information"
+                    "ENERGY", "Energi", missingEnergyAgreements == 0,
+                    if (missingEnergyAgreements == 0) "$energyCount energiregistreringer sendt inn"
+                    else "$missingEnergyAgreements avtaler mangler fortsatt energiopplysninger"
                 ) else null,
                 if (BatchEntityType.PRODUCTS in requiredEntities) OnboardingStepStatus(
-                    "PRODUCTS", "Products", missingProductAgreements == 0,
-                    if (missingProductAgreements == 0) "$productsCount product(s) submitted"
-                    else "$missingProductAgreements agreement(s) still need product information"
+                    "PRODUCTS", "Produkter", missingProductAgreements == 0,
+                    if (missingProductAgreements == 0) "$productsCount produkter sendt inn"
+                    else "$missingProductAgreements avtaler mangler fortsatt produktopplysninger"
                 ) else null
             ).filterNotNull(),
             contactName = contactName,
@@ -165,15 +186,15 @@ internal class OnboardingRepository(
         val email = input.contactEmail.trim().lowercase(Locale.ROOT)
         val phone = input.contactPhone?.trim()
 
-        require(name.length in 2..100) { "Contact name must be between 2 and 100 characters" }
-        require(email.contains("@") && email.contains(".")) { "Enter a valid email address" }
+        require(name.length in 2..100) { "Navnet på kontaktpersonen må være mellom 2 og 100 tegn" }
+        require(email.contains("@") && email.contains(".")) { "Oppgi en gyldig e-postadresse" }
 
         return database.write { db ->
             val statusRow = queryStatusRow(db, supplierId)
             val currentStatus = statusRow?.get("status")?.let { OnboardingStatus.valueOf(it as String) }
                 ?: OnboardingStatus.INVITED
             require(currentStatus in editableStatuses) {
-                "Supplier profile cannot be changed while onboarding is ${currentStatus.name.lowercase(Locale.ROOT)}"
+                "Leverandørprofilen kan ikke endres mens registreringen har status ${currentStatus.nb}"
             }
 
             val nextStatus = if (currentStatus == OnboardingStatus.INVITED || currentStatus == OnboardingStatus.PROFILE_PENDING) {
@@ -221,7 +242,7 @@ internal class OnboardingRepository(
                 "SELECT name, org_number FROM suppliers WHERE id = ?",
                 listOf(supplierId)
             ) { row -> row.getString("name") to row.getString("org_number") }.firstOrNull()
-                ?: ("Unknown Supplier" to "000000000")
+                ?: ("Ukjent leverandør" to "000000000")
 
             SupplierProfileResponse(
                 supplierId = supplierId,
@@ -242,22 +263,22 @@ internal class OnboardingRepository(
     fun submitOnboarding(supplierId: String, now: Instant): OnboardingStatusResponse {
         return database.write { db ->
             val row = queryStatusRow(db, supplierId)
-                ?: throw IllegalArgumentException("Onboarding profile not found for supplier $supplierId")
+                ?: throw IllegalArgumentException("Fant ikke registreringsprofil for leverandør $supplierId")
 
             val currentStatus = OnboardingStatus.valueOf(row["status"] as String)
             require(
                 currentStatus == OnboardingStatus.DATA_DRAFT ||
                     currentStatus == OnboardingStatus.REVISION_REQUIRED
-            ) { "Cannot submit onboarding when current status is $currentStatus" }
+            ) { "Kan ikke sende inn registreringen når gjeldende status er $currentStatus" }
 
             val contactName = row["contact_name"] as? String
             val contactEmail = row["contact_email"] as? String
             require(!contactName.isNullOrBlank() && !contactEmail.isNullOrBlank()) {
-                "Sustainability contact name and email are mandatory before submission"
+                "Navn og e-post for bærekraftskontakt er påkrevd før innsending"
             }
             val current = statusResponse(db, supplierId)
             require(current.canSubmit) {
-                "Complete the required onboarding steps before submission"
+                "Fullfør de påkrevde registreringstrinnene før innsending"
             }
 
             val ts = formatTimestamp(now)
@@ -290,10 +311,10 @@ internal class OnboardingRepository(
 
         return database.write { db ->
             val row = queryStatusRow(db, supplierId)
-                ?: throw IllegalArgumentException("Onboarding profile not found for supplier $supplierId")
+                ?: throw IllegalArgumentException("Fant ikke registreringsprofil for leverandør $supplierId")
             val currentStatus = OnboardingStatus.valueOf(row["status"] as String)
             require(currentStatus == OnboardingStatus.SUBMITTED || currentStatus == OnboardingStatus.UNDER_REVIEW) {
-                "Cannot review onboarding when current status is $currentStatus"
+                "Kan ikke vurdere registreringen når gjeldende status er $currentStatus"
             }
             database.update(
                 db,
@@ -332,10 +353,11 @@ internal class OnboardingRepository(
         fileBytes: ByteArray,
         now: Instant
     ): PreparedBatch {
-        database.read { db -> requireEditableSupplier(db, supplierId) }
+        // Energy (every quarter) and vehicles (new vehicles come into use) stay open after onboarding is submitted; products do not.
+        if (entityType != BatchEntityType.ENERGY && entityType != BatchEntityType.VEHICLES) database.read { db -> requireEditableSupplier(db, supplierId) }
         val allowedAgreements = requiredAgreementIds(supplierId, entityType)
         require(allowedAgreements.isNotEmpty()) {
-            "Your administrator has not requested ${entityType.name.lowercase(Locale.ROOT)} information"
+            "Administratoren din har ikke bedt om informasjon om ${entityType.nb}"
         }
         val parseResult = CsvStreamParser.parseAndValidate(
             inputStream = fileBytes.inputStream(),
@@ -376,11 +398,48 @@ internal class OnboardingRepository(
         val prepared = prepareBatch(supplierId, entityType, fileName, fileBytes, now)
         val parse = prepared.parse
         if (entityType != BatchEntityType.VEHICLES || parse.errors.isNotEmpty()) return finishBatch(prepared, parse)
-        val filled = VehicleRegistryFill.fillFromRegistry(parse.rows, registry, now)
-        return finishBatch(prepared, parse.copy(rows = filled.rows, errors = filled.errors))
+        val filled = VehicleRegistryFill.fillFromRegistry(parse.rows, registry, now, approvedFuel(supplierId))
+        return finishBatch(prepared, parse.copy(rows = filled.rows, errors = filled.errors), filled.warnings)
     }
 
-    private fun finishBatch(prepared: PreparedBatch, parseResult: CsvStreamParser.ParsedCsvResult): CsvPreviewResponse {
+    /** Energy rows overwrite a stored report for the same location and quarter, so say which ones before the import. */
+    private fun energyNotices(rows: List<Map<String, String>>): List<String> = implausibleGooNotices(rows) + replacedEnergyNotices(rows)
+
+    /** Guarantees of origin can only cover energy that was used, so more GoO than total energy is worth a second look. */
+    private fun implausibleGooNotices(rows: List<Map<String, String>>): List<String> = rows.mapNotNull { row ->
+        fun kwh(key: String) = row[key]?.toDoubleOrNull() ?: 0.0
+        val total = listOf("electricity_kwh", "district_heating_kwh", "biogas_kwh", "fossil_fuel_kwh", "self_produced_solar_kwh").sumOf(::kwh)
+        val goo = kwh("goo_covered_kwh")
+        if (goo > total && total > 0) "${row["facility_location_code"]} ${row["reporting_year"]} Q${row["reporting_quarter"] ?: 4}: opprinnelsesgarantier (GoO) (${goo.toLong()} kWh) er høyere enn total energi som er oppgitt (${total.toLong()} kWh). Kontroller tallene." else null
+    }
+
+    private fun replacedEnergyNotices(rows: List<Map<String, String>>): List<String> = database.read { db ->
+        rows.mapNotNull { row ->
+            val agreementId = row["agreement_id"] ?: return@mapNotNull null
+            val location = row["facility_location_code"] ?: return@mapNotNull null
+            val year = row["reporting_year"]?.toIntOrNull() ?: return@mapNotNull null
+            val quarter = row["reporting_quarter"]?.toIntOrNull() ?: 4
+            val exists = database.query(
+                db,
+                "SELECT 1 FROM facility_energy WHERE agreement_id = ? AND location_code = ? AND reporting_year = ? AND reporting_quarter = ?",
+                listOf(agreementId, location, year, quarter)
+            ) { 1 }.isNotEmpty()
+            if (exists) "$location $year Q$quarter har allerede en rapport. Import erstatter alle verdiene, inkludert sol, varmepumpe og GoO." else null
+        }
+    }
+
+    /** Fuel already stored for the supplier's approved vehicles (verified when the admin added them), so uploads of these never need a registry call. */
+    private fun approvedFuel(supplierId: String): Map<String, FilledFuel?> = database.read { db ->
+        database.query(db, """SELECT v.registration_number,
+                (SELECT group_concat(f.fuel_technology) FROM svv_snapshot_fuels f WHERE f.snapshot_id = s.id) AS codes, s.vehicle_category
+            FROM vehicle_usages v JOIN agreements a ON a.id = v.agreement_id
+            LEFT JOIN svv_snapshots s ON s.id = (SELECT id FROM svv_snapshots WHERE registration_number = v.registration_number ORDER BY fetched_at DESC, id DESC LIMIT 1)
+            WHERE a.supplier_id = ? AND v.listed = 1 AND v.planned = 0""", listOf(supplierId)) { row ->
+            row.getString("registration_number") to VehicleRegistryFill.fuelFromCodes(row.getString("codes")?.split(',').orEmpty(), row.getString("vehicle_category"))
+        }.toMap()
+    }
+
+    private fun finishBatch(prepared: PreparedBatch, parseResult: CsvStreamParser.ParsedCsvResult, warnings: List<String> = emptyList()): CsvPreviewResponse {
         val supplierId = prepared.supplierId
         val entityType = prepared.entityType
         val fileName = prepared.fileName
@@ -439,32 +498,58 @@ internal class OnboardingRepository(
             errorRows = errorRowsCount,
             canCommit = canCommit,
             errors = parseResult.errors,
-            previewRows = parseResult.rows.take(10)
+            warnings = warnings,
+            previewRows = parseResult.rows.take(10),
+            notices = if (entityType == BatchEntityType.ENERGY) energyNotices(parseResult.rows) else emptyList()
         )
+    }
+
+    /** Plates of a previewed batch that Statens vegvesen could not be asked about (over the preview limit, or the service was down). */
+    fun unverifiedPlates(batchId: String): List<String> = batchCache[batchId]?.rows.orEmpty()
+        .filter { it["registry_status"] == "NOT_CHECKED" && !it["registration_number"].isNullOrBlank() }
+        .map { it["registration_number"]!!.trim().uppercase(Locale.ROOT) }.distinct()
+
+    /** Runs after the import is confirmed: stores the registry data, or why there is none (e.g. NOT_FOUND), per plate. */
+    suspend fun verifyAfterUpload(plates: List<String>, registry: VehicleRegistryLookup) {
+        for (plate in plates) {
+            val (snapshot, problem) = registry.checkForList(VehicleEntryInput(plate))
+            database.write { db ->
+                if (snapshot != null) {
+                    database.insertRegistrySnapshot(db, snapshot)
+                    // Rows imported while the registry was unreachable have no fuel yet: fill it in from what the registry lists.
+                    VehicleRegistryFill.fuelFrom(snapshot.data)?.let { fuel ->
+                        database.update(db, "vehicle_usage_details",
+                            mapOf("fuel_technology" to fuel.fuelTechnologyCode, "is_hybrid" to if (fuel.isHybrid) 1 else 0, "vehicle_category" to fuel.vehicleCategory),
+                            "fuel_technology = '' AND usage_id IN (SELECT id FROM vehicle_usages WHERE registration_number = ?)", listOf(plate))
+                    }
+                }
+                database.update(db, "vehicle_usages", mapOf("registry_problem" to problem), "registration_number = ?", listOf(plate))
+            }
+        }
     }
 
     fun confirmBatch(batchId: String, supplierId: String, now: Instant, byRole: String? = null): CsvConfirmResponse {
         val cached = batchCache[batchId]?.takeIf { it.cachedAt.plus(batchTtl) > now }
-            ?: throw IllegalArgumentException("Batch preview expired or not found. Please upload the CSV again.")
+            ?: throw IllegalArgumentException("Forhåndsvisningen er utløpt eller ble ikke funnet. Last opp CSV-filen på nytt.")
 
-        require(cached.supplierId == supplierId) { "Batch does not belong to your organization" }
+        require(cached.supplierId == supplierId) { "Importen tilhører ikke organisasjonen din" }
 
         val ts = formatTimestamp(now)
 
         database.write { db ->
-            requireEditableSupplier(db, supplierId)
+            if (cached.entityType != BatchEntityType.ENERGY && cached.entityType != BatchEntityType.VEHICLES) requireEditableSupplier(db, supplierId)
             val batchStatus = database.query(
                 db,
                 "SELECT status FROM upload_batches WHERE id = ? AND supplier_id = ?",
                 listOf(batchId, supplierId)
             ) { it.getString("status") }.firstOrNull()
-            require(batchStatus == BatchStatus.PREVIEWED.name) { "Batch has already been confirmed or is no longer available" }
+            require(batchStatus == BatchStatus.PREVIEWED.name) { "Importen er allerede bekreftet eller er ikke lenger tilgjengelig" }
 
             val requestedAgreementIds = queryRequiredAgreementIds(db, supplierId, cached.entityType)
             require(requestedAgreementIds.isNotEmpty() && cached.rows.all { row ->
                 row["agreement_id"]?.let(requestedAgreementIds::contains) == true
             }) {
-                "One or more agreements are no longer active or do not request this information type"
+                "En eller flere avtaler er ikke lenger aktive eller ber ikke om denne informasjonstypen"
             }
 
             when (cached.entityType) {
@@ -493,7 +578,7 @@ internal class OnboardingRepository(
             batchId = batchId,
             entityType = cached.entityType,
             importedRows = cached.rows.size,
-            message = "Successfully imported ${cached.rows.size} ${if (cached.rows.size == 1) "record" else "records"}."
+            message = "Importerte ${cached.rows.size} ${if (cached.rows.size == 1) "post" else "poster"}."
         )
     }
 
@@ -522,13 +607,14 @@ internal class OnboardingRepository(
                         "registration_number" to regNumber,
                         "agreement_id" to agreementId,
                         "planned" to if (isPlanned) 1 else 0,
-                        "listed" to 1,
+                        "listed" to 0, // only the admin's approved list sets listed
                         "created_at" to timestamp,
                         "updated_at" to timestamp
                     )
                 )
             } else {
-                database.update(db, "vehicle_usages", mapOf("listed" to 1, "updated_at" to timestamp), "id = ?", listOf(usageId))
+                // Re-reporting a truck never changes the approved list: only the admin sets listed.
+                database.update(db, "vehicle_usages", mapOf("updated_at" to timestamp), "id = ?", listOf(usageId))
             }
 
             val coverage = r["full_contract_coverage"]!!.trim().equals("TRUE", ignoreCase = true) ||
@@ -549,7 +635,9 @@ internal class OnboardingRepository(
                 listOf(usageId)
             ) { it.getInt(1) }.isNotEmpty()
             if (hasDetails) {
-                database.update(db, "vehicle_usage_details", detailValues, "usage_id = ?", listOf(usageId))
+                // A row without a fuel (registry unavailable) must not wipe the fuel stored from an earlier report.
+                val values = if (detailValues["fuel_technology"] == "") detailValues - "fuel_technology" - "is_hybrid" - "vehicle_category" else detailValues
+                database.update(db, "vehicle_usage_details", values, "usage_id = ?", listOf(usageId))
             } else {
                 database.insert(
                     db,
@@ -566,14 +654,16 @@ internal class OnboardingRepository(
             val agreementId = r["agreement_id"]!!.trim()
             val locationCode = r["facility_location_code"]!!.trim()
             val year = r["reporting_year"]!!.trim().toInt()
+            val quarter = r["reporting_quarter"]!!.trim().toInt()
 
             // Delete existing reading for composite key to ensure idempotent replace
             db.prepareStatement(
-                "DELETE FROM facility_energy WHERE agreement_id = ? AND location_code = ? AND reporting_year = ?"
+                "DELETE FROM facility_energy WHERE agreement_id = ? AND location_code = ? AND reporting_year = ? AND reporting_quarter = ?"
             ).use { stmt ->
                 stmt.setString(1, agreementId)
                 stmt.setString(2, locationCode)
                 stmt.setInt(3, year)
+                stmt.setInt(4, quarter)
                 stmt.executeUpdate()
             }
 
@@ -589,12 +679,14 @@ internal class OnboardingRepository(
                     "workshop_area_sqm" to r["workshop_area_sqm"]?.toDoubleOrNull(),
                     "other_area_sqm" to r["other_area_sqm"]?.toDoubleOrNull(),
                     "reporting_year" to year,
+                    "reporting_quarter" to quarter,
                     "electricity_kwh" to (r["electricity_kwh"]?.toDoubleOrNull() ?: 0.0),
                     "district_heating_kwh" to (r["district_heating_kwh"]?.toDoubleOrNull() ?: 0.0),
                     "biogas_kwh" to (r["biogas_kwh"]?.toDoubleOrNull() ?: 0.0),
                     "fossil_fuel_kwh" to (r["fossil_fuel_kwh"]?.toDoubleOrNull() ?: 0.0),
                     "self_produced_solar_kwh" to (r["self_produced_solar_kwh"]?.toDoubleOrNull() ?: 0.0),
                     "self_produced_heatpump_kwh" to (r["self_produced_heatpump_kwh"]?.toDoubleOrNull() ?: 0.0),
+                    "goo_covered_kwh" to (r["goo_covered_kwh"]?.toDoubleOrNull() ?: 0.0),
                     "notes" to r["notes"]?.trim(),
                     "created_at" to timestamp,
                     "updated_at" to timestamp
@@ -685,7 +777,8 @@ internal class OnboardingRepository(
     fun getSupplierVehicles(supplierId: String): List<SupplierVehicleSummary> {
         return database.read { db ->
             val sql = """
-                SELECT v.registration_number, v.agreement_id, v.planned, v.listed,
+                SELECT v.registration_number, v.agreement_id, v.planned, v.listed, d.updated_at AS details_at, v.exception_approved, v.exception_note,
+                       CASE WHEN EXISTS (SELECT 1 FROM svv_snapshots s WHERE s.registration_number = v.registration_number) THEN NULL ELSE v.registry_problem END AS registry_problem,
                        d.fuel_technology, d.is_hybrid, d.full_contract_coverage,
                        d.start_year_week, d.end_year_week, d.attachment_reference, d.notes,
                        COALESCE(d.vehicle_category, (SELECT s.vehicle_category FROM svv_snapshots s
@@ -703,6 +796,10 @@ internal class OnboardingRepository(
                     agreementId = row.getString("agreement_id"),
                     planned = row.getInt("planned") == 1,
                     listed = row.getInt("listed") == 1,
+                    uploaded = row.getObject("details_at") != null,
+                    exceptionApproved = row.getInt("exception_approved") == 1,
+                    exceptionNote = row.getString("exception_note"),
+                    registryProblem = row.getString("registry_problem"),
                     fuelTechnology = row.getString("fuel_technology"),
                     isHybrid = row.getObject("is_hybrid")?.let { row.getInt("is_hybrid") == 1 },
                     vehicleCategory = row.getString("vehicle_category"),
@@ -725,7 +822,7 @@ internal class OnboardingRepository(
                 FROM facility_energy fe
                 JOIN agreements a ON fe.agreement_id = a.id
                 WHERE a.supplier_id = ?
-                ORDER BY fe.reporting_year DESC, fe.location_code
+                ORDER BY fe.reporting_year DESC, fe.reporting_quarter DESC, fe.location_code
             """.trimIndent()
             database.query(db, sql, listOf(supplierId)) { row ->
                 FacilityEnergyRecord(
@@ -737,12 +834,14 @@ internal class OnboardingRepository(
                     workshopAreaSqm = row.getObject("workshop_area_sqm")?.let { (it as Number).toDouble() },
                     otherAreaSqm = row.getObject("other_area_sqm")?.let { (it as Number).toDouble() },
                     reportingYear = row.getInt("reporting_year"),
+                    reportingQuarter = row.getInt("reporting_quarter"),
                     electricityKwh = row.getDouble("electricity_kwh"),
                     districtHeatingKwh = row.getDouble("district_heating_kwh"),
                     biogasKwh = row.getDouble("biogas_kwh"),
                     fossilFuelKwh = row.getDouble("fossil_fuel_kwh"),
                     selfProducedSolarKwh = row.getDouble("self_produced_solar_kwh"),
                     selfProducedHeatpumpKwh = row.getDouble("self_produced_heatpump_kwh"),
+                    gooCoveredKwh = row.getDouble("goo_covered_kwh"),
                     notes = row.getString("notes"),
                     createdAt = row.getString("created_at"),
                     updatedAt = row.getString("updated_at")
@@ -750,6 +849,170 @@ internal class OnboardingRepository(
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Energy oversight (admin): commitments, per-contract compliance, evidence
+    // -------------------------------------------------------------------------
+
+    /** Every active agreement that requires energy reporting, assessed for [year]. */
+    fun getEnergySummaries(year: Int, currentYear: Int): List<EnergyContractSummary> = database.read { db ->
+        val commitments = database.query(db, "SELECT * FROM agreement_energy_commitments") {
+            it.getString("agreement_id") to EnergyCommitment(it.getDouble("min_self_produced_kwh"), it.getDouble("min_goo_kwh"))
+        }.toMap()
+        val rowsByAgreement = database.query(db, "SELECT * FROM facility_energy WHERE reporting_year = ?", listOf(year)) { it.toEnergyRow() }
+            .groupBy { it.agreementId }
+        val evidenceByAgreement = database.query(
+            db,
+            "SELECT id, agreement_id, reporting_year, reporting_quarter, file_name, content_type, size_bytes, uploaded_at FROM energy_evidence WHERE reporting_year = ? ORDER BY uploaded_at DESC",
+            listOf(year)
+        ) {
+            it.getString("agreement_id") to EnergyEvidenceInfo(
+                it.getString("id"), it.getInt("reporting_year"), it.getInt("reporting_quarter"),
+                it.getString("file_name"), it.getString("content_type"), it.getLong("size_bytes"), it.getString("uploaded_at")
+            )
+        }.groupBy({ it.first }, { it.second })
+
+        database.query(
+            db,
+            """SELECT a.id, a.saksnr, s.id AS supplier_id, s.name, s.org_number
+               FROM agreements a JOIN suppliers s ON a.supplier_id = s.id
+               WHERE a.requires_energy = 1 AND a.active = 1 AND s.active = 1
+                 AND ((CAST(substr(a.start_date, 1, 4) AS INTEGER) <= ? AND CAST(substr(a.end_date, 1, 4) AS INTEGER) >= ?)
+                      OR EXISTS (SELECT 1 FROM facility_energy f WHERE f.agreement_id = a.id AND f.reporting_year = ?))
+               ORDER BY s.name, a.id""",
+            listOf(year, year, year)
+        ) { row ->
+            val agreementId = row.getString("id")
+            val rows = rowsByAgreement[agreementId].orEmpty()
+            val quarterTotals = rows.groupBy { it.quarter }.map { (quarter, quarterRows) ->
+                EnergyQuarterTotal(quarter, quarterRows.sumOf { it.selfProducedKwh }, quarterRows.sumOf { it.gooCoveredKwh }, quarterRows.sumOf { it.consumedKwh })
+            }.sortedBy { it.quarter }
+            val commitment = commitments[agreementId]
+            val assessment = assessEnergy(commitment, quarterTotals, year, currentYear)
+            val consumed = quarterTotals.sumOf { it.consumedKwh }
+            val self = quarterTotals.sumOf { it.selfProducedKwh }
+            // Area is the same every quarter, so count each location once.
+            val area = rows.groupBy { it.locationCode }.values.sumOf { locationRows -> locationRows.maxOf { it.areaSqm } }
+            EnergyContractSummary(
+                agreementId = agreementId,
+                supplierId = row.getString("supplier_id"),
+                supplierName = row.getString("name"),
+                orgNumber = row.getString("org_number"),
+                saksnr = row.getString("saksnr"),
+                year = year,
+                commitment = commitment,
+                status = assessment.status,
+                reportedQuarters = quarterTotals.map { it.quarter },
+                selfProducedKwh = self,
+                gooCoveredKwh = quarterTotals.sumOf { it.gooCoveredKwh },
+                consumedKwh = consumed,
+                selfProducedDeviationKwh = assessment.selfProducedDeviationKwh,
+                gooDeviationKwh = assessment.gooDeviationKwh,
+                projectedSelfProducedKwh = assessment.projectedSelfProducedKwh,
+                projectedGooKwh = assessment.projectedGooKwh,
+                selfProducedSharePercent = if (consumed > 0) self / consumed * 100 else null,
+                kwhPerSqm = if (area > 0) consumed / area else null,
+                quarterTotals = quarterTotals,
+                facilities = rows.sortedWith(compareBy({ it.locationCode }, { it.quarter })).map {
+                    EnergyFacilityQuarter(it.locationCode, it.address, it.quarter, it.areaSqm, it.consumedKwh, it.selfProducedKwh, it.gooCoveredKwh)
+                },
+                evidence = evidenceByAgreement[agreementId].orEmpty(),
+            )
+        }
+    }
+
+    fun setEnergyCommitment(agreementId: String, input: EnergyCommitmentInput, now: Instant) {
+        require(input.minSelfProducedKwh.isFinite() && input.minSelfProducedKwh in 0.0..MAX_ENERGY_COMMITMENT_KWH) {
+            "minSelfProducedKwh må være mellom 0 og 10 000 000 000 kWh"
+        }
+        require(input.minGooKwh.isFinite() && input.minGooKwh in 0.0..MAX_ENERGY_COMMITMENT_KWH) {
+            "minGooKwh må være mellom 0 og 10 000 000 000 kWh"
+        }
+        database.write { db ->
+            require(database.query(db, "SELECT 1 FROM agreements WHERE id = ?", listOf(agreementId)) { 1 }.isNotEmpty()) { "Unknown agreement" }
+            db.prepareStatement(
+                """INSERT INTO agreement_energy_commitments (agreement_id, min_self_produced_kwh, min_goo_kwh, updated_at) VALUES (?, ?, ?, ?)
+                   ON CONFLICT(agreement_id) DO UPDATE SET min_self_produced_kwh = excluded.min_self_produced_kwh,
+                   min_goo_kwh = excluded.min_goo_kwh, updated_at = excluded.updated_at"""
+            ).use {
+                it.setString(1, agreementId); it.setDouble(2, input.minSelfProducedKwh); it.setDouble(3, input.minGooKwh)
+                it.setString(4, formatTimestamp(now)); it.executeUpdate()
+            }
+        }
+    }
+
+    fun addEnergyEvidence(
+        supplierId: String, agreementId: String, year: Int, quarter: Int,
+        fileName: String, contentType: String, bytes: ByteArray, now: Instant,
+    ): EnergyEvidenceInfo {
+        require(quarter in 1..4) { "quarter må være 1–4" }
+        require(year in 2020..2030) { "year må være mellom 2020 og 2030" }
+        return database.write { db ->
+            // The agreement must belong to the supplier, so one supplier cannot attach files to another's contract.
+            require(
+                database.query(db, "SELECT 1 FROM agreements WHERE id = ? AND supplier_id = ? AND requires_energy = 1", listOf(agreementId, supplierId)) { 1 }.isNotEmpty()
+            ) { "Avtalen krever ikke energirapportering for denne leverandøren" }
+            val id = "evd-" + UUID.randomUUID()
+            database.insert(
+                db, "energy_evidence",
+                mapOf(
+                    "id" to id, "agreement_id" to agreementId, "reporting_year" to year, "reporting_quarter" to quarter,
+                    "file_name" to fileName, "content_type" to contentType, "size_bytes" to bytes.size.toLong(),
+                    "data" to bytes, "uploaded_at" to formatTimestamp(now)
+                )
+            )
+            EnergyEvidenceInfo(id, year, quarter, fileName, contentType, bytes.size.toLong(), formatTimestamp(now))
+        }
+    }
+
+    fun getSupplierEnergyEvidence(supplierId: String): List<EnergyEvidenceInfo> = database.read { db ->
+        database.query(
+            db,
+            """SELECT e.id, e.reporting_year, e.reporting_quarter, e.file_name, e.content_type, e.size_bytes, e.uploaded_at
+               FROM energy_evidence e JOIN agreements a ON e.agreement_id = a.id WHERE a.supplier_id = ?
+               ORDER BY e.uploaded_at DESC""",
+            listOf(supplierId)
+        ) {
+            EnergyEvidenceInfo(it.getString("id"), it.getInt("reporting_year"), it.getInt("reporting_quarter"), it.getString("file_name"),
+                it.getString("content_type"), it.getLong("size_bytes"), it.getString("uploaded_at"))
+        }
+    }
+
+    /** The file, or null. A supplier only gets its own files; [supplierId] null means an admin. */
+    fun getEnergyEvidenceFile(id: String, supplierId: String?): Pair<EnergyEvidenceInfo, ByteArray>? = database.read { db ->
+        database.query(
+            db,
+            """SELECT e.*, a.supplier_id FROM energy_evidence e JOIN agreements a ON e.agreement_id = a.id WHERE e.id = ?""",
+            listOf(id)
+        ) {
+            if (supplierId != null && it.getString("supplier_id") != supplierId) return@query null
+            EnergyEvidenceInfo(it.getString("id"), it.getInt("reporting_year"), it.getInt("reporting_quarter"), it.getString("file_name"),
+                it.getString("content_type"), it.getLong("size_bytes"), it.getString("uploaded_at")) to it.getBytes("data")
+        }.firstOrNull()
+    }
+
+    fun deleteEnergyEvidence(id: String, supplierId: String): Boolean = database.write { db ->
+        db.prepareStatement(
+            "DELETE FROM energy_evidence WHERE id = ? AND agreement_id IN (SELECT id FROM agreements WHERE supplier_id = ?)"
+        ).use { it.setString(1, id); it.setString(2, supplierId); it.executeUpdate() > 0 }
+    }
+
+    private class EnergyRow(
+        val agreementId: String, val locationCode: String, val address: String, val quarter: Int,
+        val areaSqm: Double, val consumedKwh: Double, val selfProducedKwh: Double, val gooCoveredKwh: Double,
+    )
+
+    // Total energy follows the tender sheet: electricity + district heating (+ biogas, fossil) + own solar.
+    // Heat pump output is already inside purchased electricity, so it counts as self-produced but not as extra consumption.
+    private fun ResultSet.toEnergyRow() = EnergyRow(
+        agreementId = getString("agreement_id"), locationCode = getString("location_code"), address = getString("address"),
+        quarter = getInt("reporting_quarter"),
+        areaSqm = getDouble("storage_area_sqm") + getDouble("workshop_area_sqm") + getDouble("other_area_sqm"),
+        consumedKwh = getDouble("electricity_kwh") + getDouble("district_heating_kwh") + getDouble("biogas_kwh") +
+            getDouble("fossil_fuel_kwh") + getDouble("self_produced_solar_kwh"),
+        selfProducedKwh = getDouble("self_produced_solar_kwh") + getDouble("self_produced_heatpump_kwh"),
+        gooCoveredKwh = getDouble("goo_covered_kwh"),
+    )
 
     fun getSupplierProducts(supplierId: String): List<ContractProductRecord> {
         return database.read { db ->
@@ -786,7 +1049,7 @@ internal class OnboardingRepository(
                 "SELECT name, org_number FROM suppliers WHERE id = ?",
                 listOf(supplierId)
             ) { row -> row.getString("name") to row.getString("org_number") }.firstOrNull()
-                ?: ("Unknown Supplier" to "000000000")
+                ?: ("Ukjent leverandør" to "000000000")
 
             val status = queryStatusRow(db, supplierId)?.get("status")?.let {
                 OnboardingStatus.valueOf(it as String)
@@ -864,7 +1127,7 @@ internal class OnboardingRepository(
         val status = queryStatusRow(db, supplierId)?.get("status")?.let { OnboardingStatus.valueOf(it as String) }
             ?: OnboardingStatus.INVITED
         require(status in editableStatuses) {
-            "Supplier data cannot be changed while onboarding is ${status.name.lowercase(Locale.ROOT)}"
+            "Leverandørdata kan ikke endres mens registreringen har status ${status.nb}"
         }
     }
 
@@ -913,10 +1176,11 @@ internal class OnboardingRepository(
 
     private fun countAgreementRecords(db: Connection, table: String, agreementId: String): Int {
         require(table in setOf("vehicle_usages", "facility_energy", "contract_products"))
-        val listedClause = if (table == "vehicle_usages") " AND listed = 1" else ""
+        // Vehicles count once the supplier has uploaded details; the admin's approved list alone does not.
+        val uploadedClause = if (table == "vehicle_usages") " AND id IN (SELECT usage_id FROM vehicle_usage_details)" else ""
         return database.query(
             db,
-            "SELECT COUNT(*) FROM $table WHERE agreement_id = ?$listedClause",
+            "SELECT COUNT(*) FROM $table WHERE agreement_id = ?$uploadedClause",
             listOf(agreementId)
         ) { it.getInt(1) }.single()
     }
@@ -932,7 +1196,8 @@ internal class OnboardingRepository(
         val sql = """
             SELECT COUNT(*) FROM vehicle_usages v
             JOIN agreements a ON v.agreement_id = a.id
-            WHERE a.supplier_id = ? AND v.listed = 1
+            JOIN vehicle_usage_details d ON d.usage_id = v.id
+            WHERE a.supplier_id = ?
         """.trimIndent()
         return database.query(db, sql, listOf(supplierId)) { it.getInt(1) }.firstOrNull() ?: 0
     }

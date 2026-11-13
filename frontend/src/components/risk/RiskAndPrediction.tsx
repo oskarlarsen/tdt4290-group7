@@ -80,7 +80,7 @@ export default function RiskAndPrediction() {
   }
 
   if (isError || !rows) {
-    return <div className="text-sm text-red-700">Couldn't load the risk outlook. Try again.</div>;
+    return <div className="text-sm text-red-700">Kunne ikke laste risikoutsikten. Prøv igjen.</div>;
   }
 
   const selectedRow = allRows.find((r) => r.contract.id === selectedId) ?? null;
@@ -90,18 +90,18 @@ export default function RiskAndPrediction() {
     if (filteredRows.length === 0) return;
     const csv = toCsv(
       filteredRows.map((row) => ({
-        Supplier: row.contract.supplierName,
-        "Org ID": row.contract.supplierOrgId,
-        Contract: row.contract.contractName,
-        "Risk priority": RISK_PRIORITY_INFO[row.priority].label,
-        "Primary risk driver": row.primary?.title ?? "",
-        "Driver detail": row.primary?.detail ?? "",
-        Indicators: row.indicators.length,
-        "Next projected breach": row.nextProjected?.date ?? "",
-        "Days until": row.nextProjected?.daysUntil ?? "",
+        Leverandør: row.contract.supplierName,
+        "Org.nr.": row.contract.supplierOrgId,
+        Avtale: row.contract.contractName,
+        "Risikoprioritet": RISK_PRIORITY_INFO[row.priority].label,
+        "Hovedrisikofaktor": row.primary?.title ?? "",
+        "Detaljer om risikofaktor": row.primary?.detail ?? "",
+        Indikatorer: row.indicators.length,
+        "Neste predikerte brudd": row.nextProjected?.date ?? "",
+        "Dager til": row.nextProjected?.daysUntil ?? "",
       }))
     );
-    downloadCsv(`risk-outlook-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`risikoutsikt-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
   return (
@@ -110,11 +110,11 @@ export default function RiskAndPrediction() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="font-headline text-2xl font-semibold leading-tight tracking-[-0.04em] text-[#0f172a]">
-              Risk &amp; Breach Prediction
+              Risiko og prediksjon
             </h1>
             <p className="mt-1.5 max-w-[680px] text-sm leading-6 text-[#5c6773]">
-              Early-warning overview of active deviations and upcoming certificate lapses across
-              contracted suppliers, ranked by the customer's risk priority order.
+              Tidlig varsling om aktive avvik og kommende sertifikatutløp hos
+              leverandører med avtale, rangert etter kundens risikoprioritet.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 pt-1">
@@ -124,14 +124,14 @@ export default function RiskAndPrediction() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
-              Export (CSV)
+              Eksporter (CSV)
             </button>
             <button
               onClick={() => setIsRunInfoOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
               <Play className="h-3.5 w-3.5" />
-              Run prediction check
+              Kjør prediksjonssjekk
             </button>
           </div>
         </div>
@@ -139,41 +139,41 @@ export default function RiskAndPrediction() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label="High-priority contracts"
+          label="Avtaler med høy prioritet"
           value={counts.high}
           valueClassName="!text-xl"
-          note={counts.high > 0 ? "Vehicle deviations or energy breaches" : "None currently"}
+          note={counts.high > 0 ? "Kjøretøyavvik eller energibrudd" : "Ingen for øyeblikket"}
           noteTone={counts.high > 0 ? "danger" : "success"}
           inlineNote
           icon={<AlertTriangle className="h-4 w-4" />}
           iconClassName="bg-rose-100 text-red-700"
         />
         <KpiCard
-          label="Medium-priority contracts"
+          label="Avtaler med middels prioritet"
           value={counts.medium}
           valueClassName="!text-xl"
-          note={counts.medium > 0 ? "Expired certificates, minor deviations, missing data" : "None currently"}
+          note={counts.medium > 0 ? "Utløpte sertifikater, mindre avvik, manglende data" : "Ingen for øyeblikket"}
           inlineNote
           icon={<ShieldAlert className="h-4 w-4" />}
           iconClassName="bg-amber-100 text-amber-700"
         />
         <KpiCard
-          label="Contracts with upcoming certificate lapses"
+          label="Avtaler med kommende sertifikatutløp"
           value={summary.predictedContracts}
           valueClassName="!text-xl"
-          note={`${summary.predictedIndicators} certificate${summary.predictedIndicators === 1 ? "" : "s"} expiring within ${CERTIFICATE_THRESHOLDS.yellowDays} days`}
+          note={`${summary.predictedIndicators} ${summary.predictedIndicators === 1 ? "sertifikat" : "sertifikater"} utløper innen ${CERTIFICATE_THRESHOLDS.yellowDays} dager`}
           inlineNote
           icon={<Clock3 className="h-4 w-4" />}
           iconClassName="bg-amber-100 text-orange-700"
         />
         <KpiCard
-          label="Earliest upcoming certificate lapse"
+          label="Tidligste kommende sertifikatutløp"
           value={earliest && earliest.indicator.daysUntil !== null ? formatDaysValue(earliest.indicator.daysUntil) : "—"}
           valueClassName="!text-xl"
           note={
             earliest
               ? `${earliest.row.contract.supplierName} · ${earliest.indicator.title}`
-              : "No upcoming expiries"
+              : "Ingen kommende utløp"
           }
           inlineNote
           icon={<CalendarClock className="h-4 w-4" />}
@@ -188,24 +188,24 @@ export default function RiskAndPrediction() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search supplier, contract, or risk driver…"
+              placeholder="Søk etter leverandør, avtale eller risikofaktor…"
               className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
           <label className="flex shrink-0 items-center gap-2 text-xs text-neutral-600">
-            <span className="font-medium text-neutral-700">Risk priority:</span>
+            <span className="font-medium text-neutral-700">Risikoprioritet:</span>
             <div className="relative">
               <select
                 value={priorityFilter}
                 onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}
-                aria-label="Filter risk outlook by priority"
+                aria-label="Filtrer risikoutsikt etter prioritet"
                 className="appearance-none rounded-md border border-neutral-200 bg-white px-2 py-1 pr-7 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
               >
-                <option value="all">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-                <option value="none">No indicators</option>
+                <option value="all">Alle</option>
+                <option value="high">Høy</option>
+                <option value="medium">Middels</option>
+                <option value="low">Lav</option>
+                <option value="none">Ingen indikatorer</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-500" />
             </div>
@@ -216,7 +216,7 @@ export default function RiskAndPrediction() {
           rows={pagedRows}
           onSelect={(row) => setSelectedId(row.contract.id)}
           emptyMessage={
-            allRows.length === 0 ? "No contracts available." : "No contracts match the current filters."
+            allRows.length === 0 ? "Ingen avtaler tilgjengelig." : "Ingen avtaler samsvarer med filtrene."
           }
         />
 
@@ -225,7 +225,7 @@ export default function RiskAndPrediction() {
           totalPages={totalPages}
           totalItems={filteredRows.length}
           pageSize={PAGE_SIZE}
-          itemLabel="contract"
+          itemLabel="avtale"
           onPageChange={setPage}
         />
       </section>
@@ -237,8 +237,8 @@ export default function RiskAndPrediction() {
 
       <NotConnectedDialog
         open={isRunInfoOpen}
-        title="Run prediction check"
-        message="Running a prediction check isn't available yet. The indicators on this page are calculated live in your browser from the fictional vehicle, certificate and energy records. There is no prediction model, historical dataset or backend job to run."
+        title="Kjør prediksjonssjekk"
+        message="Indikatorene på denne siden beregnes på nytt fra lagrede kjøretøysjekker, utløpsdatoer for sertifikater og energirapporter hver gang siden lastes, så det er ingenting å kjøre. En statistisk prediksjonsmodell er ikke med i denne versjonen."
         onClose={() => setIsRunInfoOpen(false)}
       />
     </div>

@@ -95,7 +95,7 @@ class FleetRoutesTest {
         return repo.fleet.saveAgreement(null, AgreementInput(supplier.id, "2026-01-01", "2027-12-31", allowance, saksnr = "2024/1234"), null, actor, now)
     }
 
-    @Test fun addingRequiresLiveRegistrySuccessAndPersistsSnapshotWithoutCreatingACheck() = testApplication {
+    @Test fun addingPersistsSnapshotAndRunsTheDeviationCheckAutomatically() = testApplication {
         val repo = repository(); val agreement = agreement(repo); var calls = 0
         var outcome: RegistryLookup = RegistryLookup.Failed(LookupOutcome.NOT_FOUND)
         application { module(repo, VehicleRegistryClient { calls++; outcome }) }
@@ -103,15 +103,14 @@ class FleetRoutesTest {
         suspend fun add() = admin.post("/api/vehicle-fleet/agreements/${agreement.id}/vehicles") {
             contentType(ContentType.Application.Json); setBody("""{"registrationNumber":"ab 12345"}""")
         }
-        val before = repo.fleet.overview()
-        for (failure in listOf(LookupOutcome.NOT_FOUND, LookupOutcome.TEMPORARILY_UNAVAILABLE, LookupOutcome.ACCESS_DENIED,
-            LookupOutcome.QUOTA_EXHAUSTED, LookupOutcome.INVALID_RESPONSE, LookupOutcome.NOT_CONFIGURED)) {
+        // Being on the list approves the vehicle, so a failed lookup still adds it, just without registry details.
+        for (failure in listOf(LookupOutcome.NOT_FOUND, LookupOutcome.TEMPORARILY_UNAVAILABLE)) {
             outcome = RegistryLookup.Failed(failure)
-            val response = add()
-            assertEquals(if (failure == LookupOutcome.NOT_FOUND) HttpStatusCode.BadRequest else HttpStatusCode.ServiceUnavailable, response.status)
-            assertTrue(response.bodyAsText().contains("Statens vegvesen"))
-            assertEquals(before, repo.fleet.overview())
-            assertNull(repo.vehicleDetails("AB12345"))
+            assertEquals(HttpStatusCode.Created, add().status)
+            assertNull(repo.vehicleDetails("AB12345")!!.latestSnapshot)
+            val vehicle = repo.fleet.overview().vehicles.single()
+            assertEquals(if (failure == LookupOutcome.NOT_FOUND) "NOT_FOUND" else "UNAVAILABLE", vehicle.registryProblem)
+            repo.fleet.removeVehicle(vehicle.registrationNumber, vehicle.updatedAt, ChangeActor("test", "Test"), java.time.Instant.now())
         }
         val data = RegistryVehicleData("AB12345", make = "Test", euroClass = RegistryCode("6"),
             lastApprovedInspectionDate = "2025-02-01", nextInspectionDueDate = "2027-02-01")
@@ -119,13 +118,9 @@ class FleetRoutesTest {
         assertEquals(HttpStatusCode.Created, add().status)
         val details = repo.vehicleDetails("AB12345")!!
         assertEquals(data, details.latestSnapshot!!.data)
-        assertTrue(details.tripRows.isEmpty()); assertNull(details.latestCheck)
-        assertEquals(7, calls)
-        // A previously cached success cannot bypass a failed live lookup when re-adding.
-        repo.fleet.removeVehicle("AB12345", details.vehicle.updatedAt, ChangeActor("test", "Test"), java.time.Instant.now())
-        outcome = RegistryLookup.Failed(LookupOutcome.TEMPORARILY_UNAVAILABLE)
-        assertEquals(HttpStatusCode.ServiceUnavailable, add().status)
-        assertFalse(repo.vehicleDetails("AB12345")!!.vehicle.listed)
+        assertTrue(details.tripRows.isEmpty()); assertNotNull(details.latestCheck)
+        // Each failed add looks the plate up twice (the add, then the automatic check); the successful one reuses its fresh snapshot.
+        assertEquals(5, calls)
     }
 
     @Test fun failedReplacementKeepsOriginalAndPlannedEntrySkipsLookup() = testApplication {
@@ -142,8 +137,8 @@ class FleetRoutesTest {
             contentType(ContentType.Application.Json)
             setBody("""{"replacement":{"registrationNumber":"CD12345"},"expectedUpdatedAt":"${planned.updatedAt}"}""")
         }
-        assertEquals(HttpStatusCode.BadRequest, failed.status)
-        assertEquals(before, repo.fleet.overview()); assertNull(repo.vehicleDetails("CD12345")); assertEquals(1, calls)
+        assertEquals(HttpStatusCode.OK, failed.status)
+        assertTrue(repo.fleet.overview().vehicles.single { it.registrationNumber == "CD12345" }.listed); assertNull(repo.vehicleDetails("CD12345")!!.latestSnapshot); assertEquals(1, calls)
     }
 
     @Test fun capacityIsRecheckedAfterRemoteLookupAndFailureDoesNotSaveSnapshot() = testApplication {

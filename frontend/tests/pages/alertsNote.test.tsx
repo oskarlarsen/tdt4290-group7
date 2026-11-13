@@ -34,23 +34,23 @@ function createAlertWithNote() {
       <MemoryRouter><Alerts /></MemoryRouter>
     </QueryClientProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: /Create/ }));
-  fireEvent.change(screen.getByLabelText(/Alert title/), { target: { value: "Follow up" } });
-  fireEvent.change(screen.getByLabelText(/^Supplier/), { target: { value: "supplier-1" } });
-  fireEvent.change(screen.getByLabelText(/^Risk category/), { target: { value: "VEHICLE_COMPLIANCE" } });
-  fireEvent.change(screen.getByLabelText(/^Risk \*/), { target: { value: "medium" } });
-  fireEvent.change(screen.getByLabelText(/^Alert Type/), { target: { value: "CONFIRMED_DEVIATION" } });
-  fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: "Check the vehicles" } });
-  fireEvent.click(screen.getByRole("checkbox", { name: "Save a note to self" }));
-  fireEvent.change(screen.getByLabelText(/^Note to self/), { target: { value: "Call Monday" } });
-  fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
+  fireEvent.click(screen.getByRole("button", { name: /Opprett manuelt varsel/ }));
+  fireEvent.change(screen.getByLabelText(/Tittel på varsel/), { target: { value: "Follow up" } });
+  fireEvent.change(screen.getByLabelText(/^Leverandør/), { target: { value: "supplier-1" } });
+  fireEvent.change(screen.getByLabelText(/^Risikokategori/), { target: { value: "VEHICLE_COMPLIANCE" } });
+  fireEvent.change(screen.getByLabelText(/^Risiko \*/), { target: { value: "medium" } });
+  fireEvent.change(screen.getByLabelText(/^Varseltype/), { target: { value: "CONFIRMED_DEVIATION" } });
+  fireEvent.change(screen.getByLabelText(/^Beskrivelse/), { target: { value: "Check the vehicles" } });
+  fireEvent.click(screen.getByRole("checkbox", { name: "Lagre et notat til meg selv" }));
+  fireEvent.change(screen.getByLabelText(/^Notat til meg selv/), { target: { value: "Call Monday" } });
+  fireEvent.click(screen.getByRole("button", { name: "Opprett varsel" }));
 }
 
 describe("creating a manual alert with a note to self", () => {
   it("saves a SELF note linked to the new alert", async () => {
     vi.mocked(notesApi.addSupplierNote).mockResolvedValue({} as never);
     createAlertWithNote();
-    expect(await screen.findByText("Manual alert created successfully")).toBeTruthy();
+    expect(await screen.findByText("Manuelt varsel opprettet")).toBeTruthy();
     expect(notesApi.addSupplierNote).toHaveBeenCalledWith(
       "supplier-1", { id: "admin-1", name: "Admin" }, { text: "Call Monday", visibility: "SELF", alertId: "new-alert" },
     );
@@ -59,7 +59,7 @@ describe("creating a manual alert with a note to self", () => {
   it("keeps the alert and says so when only the note fails", async () => {
     vi.mocked(notesApi.addSupplierNote).mockRejectedValue(new Error("boom"));
     createAlertWithNote();
-    expect(await screen.findByText(/Alert saved, note not saved/)).toBeTruthy();
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: /Create Manual Alert/ })).toBeNull());
+    expect(await screen.findByText(/Varselet er lagret, men notatet ble ikke lagret/)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /opprett manuelt varsel/i })).toBeNull());
   });
 });

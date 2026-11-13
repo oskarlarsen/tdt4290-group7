@@ -24,43 +24,43 @@ function mount(source: RecentAlert["source"], onEdit?: (id: string, changes: unk
 describe("editing an alert in the drawer", () => {
   it("offers editing for manual alerts only", () => {
     mount("AUTOMATIC", vi.fn());
-    expect(screen.queryByRole("button", { name: "Edit alert" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rediger varsel" })).toBeNull();
     cleanup();
     mount("MANUAL");
-    expect(screen.queryByRole("button", { name: "Edit alert" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rediger varsel" })).toBeNull();
     cleanup();
     mount("MANUAL", vi.fn());
-    expect(screen.getByRole("button", { name: "Edit alert" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Rediger varsel" })).toBeTruthy();
   });
 
   it("saves the trimmed changes, starting from the current values", async () => {
     const onEdit = vi.fn().mockResolvedValue(undefined);
     mount("MANUAL", onEdit);
-    fireEvent.click(screen.getByRole("button", { name: "Edit alert" }));
-    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Original title");
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "  New title " } });
-    fireEvent.change(screen.getByLabelText("Risk"), { target: { value: "high" } });
-    fireEvent.change(screen.getByLabelText(/Due date/), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rediger varsel" }));
+    expect((screen.getByLabelText("Tittel") as HTMLInputElement).value).toBe("Original title");
+    fireEvent.change(screen.getByLabelText("Tittel"), { target: { value: "  New title " } });
+    fireEvent.change(screen.getByLabelText("Risiko"), { target: { value: "high" } });
+    fireEvent.change(screen.getByLabelText(/Frist/), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lagre endringer" }));
     await waitFor(() => expect(onEdit).toHaveBeenCalledWith("a1", { title: "New title", description: "Original text", severity: "high", dueDate: "" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Lagre endringer" })).toBeNull());
   });
 
   it("keeps the form open and shows the server's reason when saving fails", async () => {
     mount("MANUAL", vi.fn().mockRejectedValue(new Error("Alert title must be between 1 and 200 characters")));
-    fireEvent.click(screen.getByRole("button", { name: "Edit alert" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rediger varsel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lagre endringer" }));
     expect(await screen.findByText("Alert title must be between 1 and 200 characters")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Lagre endringer" })).toBeTruthy();
   });
 
   it("refuses an empty title without calling the server", async () => {
     const onEdit = vi.fn();
     mount("MANUAL", onEdit);
-    fireEvent.click(screen.getByRole("button", { name: "Edit alert" }));
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "   " } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByText("Title and description are required.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Rediger varsel" }));
+    fireEvent.change(screen.getByLabelText("Tittel"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Lagre endringer" }));
+    expect(await screen.findByText("Tittel og beskrivelse må fylles ut.")).toBeTruthy();
     expect(onEdit).not.toHaveBeenCalled();
   });
 });
@@ -75,6 +75,6 @@ describe("mock alert editing", () => {
     expect(updated).toMatchObject({ title: "Edited", severity: "high", description: "d" });
     expect(updated.dueDate).toBeUndefined();
     expect(getAllAlerts().find((a) => a.id === created.id)?.title).toBe("Edited");
-    expect(() => updateManualAlert("alert-1", { title: "x" })).toThrow(/cannot be edited/);
+    expect(() => updateManualAlert("alert-1", { title: "x" })).toThrow(/kan ikke redigeres/);
   });
 });

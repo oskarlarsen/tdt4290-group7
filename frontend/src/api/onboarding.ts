@@ -13,7 +13,14 @@ export type SupplierVehicle = {
   registrationNumber: string;
   agreementId: string | null;
   planned: boolean;
+  /** On the admin's approved list. */
   listed: boolean;
+  /** The supplier has reported this vehicle as used. */
+  uploaded: boolean;
+  /** Not on the list, but the admin approved it as a one-off exception. */
+  exceptionApproved?: boolean;
+  exceptionNote?: string | null;
+  registryProblem?: string | null;
   fuelTechnology: string | null;
   isHybrid: boolean | null;
   /** Registry category such as N2 (from the upload lookup), the source of the weight range. */
@@ -35,12 +42,14 @@ export type SupplierEnergyRecord = {
   workshopAreaSqm: number | null;
   otherAreaSqm: number | null;
   reportingYear: number;
+  reportingQuarter: number;
   electricityKwh: number;
   districtHeatingKwh: number;
   biogasKwh: number;
   fossilFuelKwh: number;
   selfProducedSolarKwh: number;
   selfProducedHeatpumpKwh: number;
+  gooCoveredKwh: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -109,6 +118,36 @@ export function getSupplierVehicles(supplierId?: string) {
 export function getSupplierEnergy(supplierId?: string) {
   const query = supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : "";
   return apiFetch<SupplierEnergyRecord[]>(`/supplier/energy${query}`);
+}
+
+export type SupplierEnergyEvidence = {
+  id: string;
+  reportingYear: number;
+  reportingQuarter: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+};
+
+export const MAX_ENERGY_EVIDENCE_BYTES = 10 * 1024 * 1024;
+export const ENERGY_EVIDENCE_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "csv", "xlsx"];
+
+export function getSupplierEnergyEvidence() {
+  return apiFetch<SupplierEnergyEvidence[]>("/onboarding/energy/evidence");
+}
+
+export function uploadSupplierEnergyEvidence(input: { agreementId: string; year: number; quarter: number; file: File }) {
+  const body = new FormData();
+  body.append("agreementId", input.agreementId);
+  body.append("year", String(input.year));
+  body.append("quarter", String(input.quarter));
+  body.append("file", input.file);
+  return apiFetch<SupplierEnergyEvidence>("/onboarding/energy/evidence", { method: "POST", body });
+}
+
+export function deleteSupplierEnergyEvidence(id: string) {
+  return apiFetch<void>(`/onboarding/energy/evidence/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function getSupplierProducts(supplierId?: string) {

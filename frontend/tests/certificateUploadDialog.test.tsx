@@ -35,7 +35,7 @@ describe("certificate upload dialog", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Supplier and contract"), {
+    fireEvent.change(screen.getByLabelText("Leverandør og avtale"), {
       target: { value: "Example Transport AS (NO 123 456 789 MVA) — Example transport contract" },
     });
     fireEvent.change(document.querySelector('input[type="file"]')!, {
@@ -66,12 +66,12 @@ describe("certificate upload dialog", () => {
     const options = Array.from(document.querySelectorAll("#certificate-agreements option")).map((option) => option.getAttribute("value"));
     expect(options).toEqual(["Nordvik AS (111) — 2024/1 — Skolerute", "Sørli AS (222) — 2025/2 — Avfall"]);
 
-    fireEvent.change(screen.getByLabelText("Supplier and contract"), { target: { value: "Nordvik" } });
+    fireEvent.change(screen.getByLabelText("Leverandør og avtale"), { target: { value: "Nordvik" } });
     fireEvent.change(document.querySelector('input[type="file"]')!, {
       target: { files: [new File(["demo"], "certificate.pdf", { type: "application/pdf" })] },
     });
     fireEvent.submit(screen.getByRole("dialog"));
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Pick one of the suggestions to continue.")).toBeTruthy();
+    expect(screen.getByText("Velg et av forslagene for å fortsette.")).toBeTruthy();
   });
 });

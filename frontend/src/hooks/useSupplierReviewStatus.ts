@@ -20,7 +20,7 @@ export function useSupplierReviewStatus() {
       await queryClient.invalidateQueries({ queryKey: ["supplier-review-statuses"] });
     },
     onError: (error) =>
-      setErrorMessage(error instanceof Error ? error.message : "Could not save supplier review status"),
+      setErrorMessage(error instanceof Error ? error.message : "Kunne ikke lagre vurderingsstatus for leverandøren"),
   });
 
   return {

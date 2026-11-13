@@ -28,7 +28,7 @@ describe("certificate risk linkage", () => {
     };
 
     const [row] = buildRiskOutlook(
-      { contracts: [contract], certificates: [certificate], energy: { requirements: [], records: [] } },
+      { contracts: [contract], certificates: [certificate], energy: [] },
       new Date("2026-10-30T12:00:00Z"),
     );
 
@@ -37,7 +37,7 @@ describe("certificate risk linkage", () => {
       expect.objectContaining({
         category: "certificate",
         kind: "active",
-        title: "ISO 14001 expired",
+        title: "ISO 14001 utløpt",
       }),
     );
   });

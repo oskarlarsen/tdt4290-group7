@@ -6,7 +6,7 @@ const MOCK_USERS: Record<string, { password: string; user: AuthUser }> = {
     password: "admin123",
     user: {
       id: "admin-1",
-      name: "Hansen (Environmental Advisor)",
+      name: "Hansen (miljørådgiver)",
       email: "admin@kommune.no",
       role: "ADMIN",
     },
@@ -40,7 +40,7 @@ export async function mockLogin({ email, password }: LoginRequest): Promise<Logi
 
   const entry = MOCK_USERS[email.toLowerCase()];
   if (!entry || entry.password !== password) {
-    throw new Error("Invalid email/username or password");
+    throw new Error("Ugyldig e-post/brukernavn eller passord");
   }
 
   sessionStorage.setItem(MOCK_SESSION_KEY, email.toLowerCase());
@@ -52,7 +52,7 @@ export async function mockLogin({ email, password }: LoginRequest): Promise<Logi
 
 export async function mockGetCurrentUser(): Promise<AuthUser> {
   const user = userFromSession();
-  if (!user) throw new Error("No session");
+  if (!user) throw new Error("Ingen økt");
   return user;
 }
 

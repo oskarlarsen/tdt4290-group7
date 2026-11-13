@@ -10,7 +10,7 @@ const supplier = (id: string, risk: string, issueCategories: string[] = []) => (
 });
 const summary = {
   topRiskSuppliers: [supplier("hi", "high", ["VEHICLE_DEVIATION", "CERTIFICATE_EXPIRY"]), supplier("med", "medium", ["VEHICLE_DEVIATION"]), supplier("ok", "compliant"), supplier("none", "unassessed")],
-  riskClassification: { high: { count: 1, percent: 25 }, medium: { count: 1, percent: 25 }, compliant: { count: 1, percent: 25 }, unassessed: { count: 1, percent: 25 } },
+  riskClassification: { high: { count: 1, percent: 25 }, medium: { count: 1, percent: 25 }, low: { count: 0, percent: 0 }, compliant: { count: 1, percent: 25 }, unassessed: { count: 1, percent: 25 } },
   kpis: {}, recentAlerts: [],
 };
 
@@ -42,7 +42,7 @@ describe("admin suppliers page risk filter", () => {
     expect(screen.getAllByText("Supplier hi").length).toBeGreaterThan(0);
     expect(screen.queryByText("Supplier med")).toBeNull();
     expect(screen.queryByText("Supplier ok")).toBeNull();
-    expect((screen.getByLabelText("Filter suppliers by risk level") as HTMLSelectElement).value).toBe("high");
+    expect((screen.getByLabelText("Filtrer leverandører etter risikonivå") as HTMLSelectElement).value).toBe("high");
   });
 
   it("treats an unknown risk value as All", () => {
@@ -51,9 +51,19 @@ describe("admin suppliers page risk filter", () => {
     expect(screen.getAllByText("Supplier med").length).toBeGreaterThan(0);
   });
 
+  it("filters the list when a risk card is pressed and clears it when pressed again", () => {
+    mount("/admin/suppliers");
+    const card = screen.getByRole("button", { name: /HØY RISIKO/ });
+    fireEvent.click(card);
+    expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers?risk=high");
+    expect(card.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(card);
+    expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers");
+  });
+
   it("keeps the URL in step with the filter", () => {
     mount("/admin/suppliers?risk=high");
-    const select = screen.getByLabelText("Filter suppliers by risk level");
+    const select = screen.getByLabelText("Filtrer leverandører etter risikonivå");
     fireEvent.change(select, { target: { value: "unassessed" } });
     expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers?risk=unassessed");
     fireEvent.change(select, { target: { value: "all" } });
@@ -80,7 +90,7 @@ describe("admin suppliers page issue filter", () => {
     mount("/admin/suppliers?issue=vehicle&risk=medium");
     expect(screen.queryByText("Supplier hi")).toBeNull();
     expect(screen.getAllByText("Supplier med").length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText("Filter suppliers by issue category"), { target: { value: "all" } });
+    fireEvent.change(screen.getByLabelText("Filtrer leverandører etter problemkategori"), { target: { value: "all" } });
     expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers?risk=medium");
   });
 });
@@ -91,13 +101,13 @@ describe("supplier summary and details windows", () => {
     HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
     mount("/admin/suppliers?supplierId=hi");
 
-    fireEvent.click(screen.getByRole("button", { name: "Details" }));
-    expect(screen.getByRole("dialog", { name: "Details for Supplier hi" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Detaljer" }));
+    expect(screen.getByRole("dialog", { name: "Detaljer for Supplier hi" })).toBeTruthy();
     // The side panel is gone while the large window is open, so Escape cannot close both.
-    expect(screen.queryByRole("button", { name: "Details" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Detaljer" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Close Details for Supplier hi" }));
-    expect(screen.queryByRole("dialog", { name: "Details for Supplier hi" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Details" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Lukk Detaljer for Supplier hi" }));
+    expect(screen.queryByRole("dialog", { name: "Detaljer for Supplier hi" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Detaljer" })).toBeTruthy();
   });
 });

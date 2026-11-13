@@ -6,7 +6,7 @@ export function RoleRedirect() {
   const { user, isInitializing } = useAuth();
 
   if (isInitializing) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading…</div>;
+    return <div className="min-h-screen flex items-center justify-center text-gray-500">Laster…</div>;
   }
 
   if (!user) return <Navigate to="/login" replace />;

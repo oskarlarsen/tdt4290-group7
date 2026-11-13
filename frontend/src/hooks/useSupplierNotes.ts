@@ -18,7 +18,7 @@ export function useAddSupplierNote(supplierId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (note: NewSupplierNote) =>
-      notesApi.addSupplierNote(supplierId!, { id: user?.id ?? "", name: user?.name ?? "Unknown admin" }, note),
+      notesApi.addSupplierNote(supplierId!, { id: user?.id ?? "", name: user?.name ?? "Ukjent administrator" }, note),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["supplier-notes", supplierId] }),
   });
 }

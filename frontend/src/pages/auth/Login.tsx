@@ -10,7 +10,7 @@ const MIN_PASSWORD_LENGTH = 12;
 const LOGIN_EMAIL_PLACEHOLDER =
   import.meta.env.VITE_USE_MOCK_AUTH === "true"
     ? "admin@kommune.no"
-    : "name@example.com";
+    : "navn@eksempel.no";
 
 export default function Login() {
   const { user, login, status, error: authError } = useAuth();
@@ -44,7 +44,7 @@ export default function Login() {
     setAuthErrorHidden(false);
 
     if (!email.trim() || !password) {
-      setFormError("Enter your email or username and password");
+      setFormError("Oppgi e-post eller brukernavn og passord");
       return;
     }
 
@@ -68,12 +68,12 @@ export default function Login() {
     setAuthErrorHidden(true);
 
     if (!value) {
-      setFormError("Enter your email address first, then select Forgot password");
+      setFormError("Oppgi e-postadressen din først, og velg deretter Glemt passord");
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setFormError("Please enter a valid email address to reset your password");
+      setFormError("Oppgi en gyldig e-postadresse for å tilbakestille passordet");
       return;
     }
 
@@ -82,11 +82,11 @@ export default function Login() {
     try {
       await requestPasswordReset(value);
       setResetMessage(
-        "If that account exists, we've sent password reset instructions"
+        "Hvis kontoen finnes, er det klargjort en tilbakestillingskode. E-postutsending er ikke satt opp ennå, så be administratoren din om koden."
       );
       setResetRequested(true)
     } catch {
-      setFormError("Couldn't send reset instructions right now. Please try again!");
+      setFormError("Kunne ikke sende instruksjoner for tilbakestilling akkurat nå. Prøv igjen!");
     }
   }
 
@@ -95,7 +95,7 @@ export default function Login() {
       setFormError(null);
 
       if (!resetToken.trim() || newPassword.length < MIN_PASSWORD_LENGTH) {
-        setFormError(`Enter the reset code and a new password of at least ${MIN_PASSWORD_LENGTH} characters.`);
+        setFormError(`Oppgi tilbakestillingskoden og et nytt passord på minst ${MIN_PASSWORD_LENGTH} tegn.`);
         return;
       }
 
@@ -105,13 +105,13 @@ export default function Login() {
       setResetRequested(false);
       setResetToken("");
       setNewPassword("");
-      setResetMessage("Password updated, Sign in with your new password");
+      setResetMessage("Passordet er oppdatert. Logg inn med det nye passordet");
     } catch (err) {
       // 400s carry a user-facing reason (password rule or bad/expired code)
       setFormError(
         err instanceof ApiError && err.status === 400
           ? err.message
-          : "Couldn't reset your password right now. Please try again!"
+          : "Kunne ikke tilbakestille passordet akkurat nå. Prøv igjen!"
       );
     } finally {
       setResetLoading(false);
@@ -132,25 +132,25 @@ export default function Login() {
 
         {/* Title */}
         <h1 className="text-center text-xl font-bold text-gray-900 leading-snug">
-          Environmental Monitoring &amp; Contract Compliance
+          Miljøoppfølging dashbord
         </h1>
         <p className="text-center text-sm font-normal text-gray-500 mt-1 mb-7">
-          Municipal Environmental Monitoring System
+          Kommunalt system for miljøoppfølging
         </p>
 
         {resetRequested ? (
             <form onSubmit={handleResetPassword} noValidate>
               <h2 className="text-center text-base font-semibold text-gray-900 mb-1">
-                Reset your password
+                Tilbakestill passordet ditt
               </h2>
               <p className="text-center text-xs font-normal text-gray-500 mb-5">
-                Enter the reset code you received and choose a new password (minimum {MIN_PASSWORD_LENGTH} characters).
+                Oppgi tilbakestillingskoden du fikk og velg et nytt passord (minst {MIN_PASSWORD_LENGTH} tegn).
               </p>
 
               {/* Reset code */}
               <div className="mb-4">
                 <label htmlFor="reset-code" className="block text-sm font-medium text-gray-800 mb-1.5">
-                  Reset code
+                  Tilbakestillingskode
                 </label>
                 <div className="relative">
                   <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -160,7 +160,7 @@ export default function Login() {
                       autoComplete="one-time-code"
                       value={resetToken}
                       onChange={(e) => setResetToken(e.target.value)}
-                      placeholder="Paste the reset code"
+                      placeholder="Lim inn tilbakestillingskoden"
                       disabled={resetLoading}
                       className="w-full rounded-lg border border-gray-200 pl-10 pr-3 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
                   />
@@ -170,7 +170,7 @@ export default function Login() {
               {/* New password */}
               <div className="mb-4">
                 <label htmlFor="new-password" className="block text-sm font-medium text-gray-800 mb-1.5">
-                  New password
+                  Nytt passord
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -180,14 +180,14 @@ export default function Login() {
                       autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                      placeholder={`Minst ${MIN_PASSWORD_LENGTH} tegn`}
                       disabled={resetLoading}
                       className="w-full rounded-lg border border-gray-200 pl-10 pr-10 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
                   />
                   <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-label={showPassword ? "Skjul passord" : "Vis passord"}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -212,15 +212,15 @@ export default function Login() {
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-900 hover:bg-primary-700 text-white font-semibold py-2.5 text-sm transition-colors disabled:opacity-70"
               >
                 {resetLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {resetLoading ? "Updating…" : "Update password"}
+                {resetLoading ? "Oppdaterer…" : "Oppdater passord"}
               </button>
 
               <button
                   type="button"
-                  onClick={() => setResetRequested(false)}
+                  onClick={() => { setResetRequested(false); setFormError(null); setResetMessage(null); setPassword(""); setAuthErrorHidden(true); }}
                   className="mt-3 w-full text-center text-sm font-medium text-secondary-700 hover:text-secondary-700"
               >
-                Back to sign in
+                Tilbake til innlogging
               </button>
             </form>
         ) : (
@@ -228,7 +228,7 @@ export default function Login() {
               {/* Email / Username */}
               <div className="mb-1">
                 <label htmlFor="email" className="block text-sm font-medium text-gray-800 mb-1.5">
-                  Email or Username
+                  E-post eller brukernavn
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -245,20 +245,20 @@ export default function Login() {
                 </div>
               </div>
               <p className="text-xs font-normal text-gray-500 mb-5">
-                Single sign-in for municipal advisors &amp; registered suppliers
+                Felles innlogging for kommunale rådgivere og registrerte leverandører
               </p>
 
               {/* Password */}
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-800">
-                  Password
+                  Passord
                 </label>
                 <button
                     type="button"
                     onClick={handleForgotPassword}
                     className="text-sm font-medium text-secondary-700 hover:text-secondary-700"
                 >
-                  Forgot password?
+                  Glemt passord?
                 </button>
               </div>
               <div className="relative mb-4">
@@ -269,14 +269,14 @@ export default function Login() {
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
+                    placeholder="Passordet ditt"
                     disabled={isLoading}
                     className="w-full rounded-lg border border-gray-200 pl-10 pr-10 py-2.5 text-sm font-normal text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-700/30 focus:border-primary-700 disabled:bg-gray-50"
                 />
                 <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? "Skjul passord" : "Vis passord"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -291,7 +291,7 @@ export default function Login() {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 rounded border-gray-300 text-primary-700 focus:ring-primary-700/30"
                 />
-                <span className="text-sm font-normal text-gray-700">Remember this workstation for 30 days</span>
+                <span className="text-sm font-normal text-gray-700">Husk denne arbeidsstasjonen i 30 dager</span>
               </label>
 
               {(displayError || resetMessage) && (
@@ -312,7 +312,7 @@ export default function Login() {
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-900 hover:bg-primary-700 text-white font-semibold py-2.5 text-sm transition-colors disabled:opacity-70"
               >
                 {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isLoading ? "Signing in…" : "Sign in"}
+                {isLoading ? "Logger inn…" : "Logg inn"}
               </button>
             </form>
         )}
@@ -321,10 +321,10 @@ export default function Login() {
         <div className="mt-6 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3 flex gap-2">
           <Info className="h-4 w-4 text-secondary-700 shrink-0 mt-0.5" />
           <p className="text-xs text-gray-500 leading-relaxed">
-            <span className="font-medium text-gray-700">Automatic RBAC Destination: </span>
-            Your authorized role (<span className="font-semibold">Admin</span> or{" "}
-            <span className="font-semibold">Supplier</span>) is authenticated server-side. You
-            will be redirected directly to your designated compliance workspace.
+            <span className="font-medium text-gray-700">Hvor du havner etter innlogging: </span>
+            Rollen din (<span className="font-semibold">Administrator</span> eller{" "}
+            <span className="font-semibold">Leverandør</span>) verifiseres på serveren. Du
+            sendes direkte videre til ditt arbeidsområde.
           </p>
         </div>
       </div>

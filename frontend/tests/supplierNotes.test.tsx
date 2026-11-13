@@ -38,10 +38,10 @@ describe("supplier notes in the drawer", () => {
     vi.spyOn(notesApi, "getSupplierNotes").mockResolvedValue([note("n1", "INTERNAL", "Shared"), note("n2", "SELF", "Mine")]);
     mountDrawer();
     expect(await screen.findByText("Shared")).toBeTruthy();
-    // Each label appears once as a choice and once as a tag on a note.
-    expect(screen.getAllByText("Internal note")).toHaveLength(2);
-    expect(screen.getAllByText("Note to self")).toHaveLength(2);
-    expect(screen.getByText("Notes are never shown to the supplier.")).toBeTruthy();
+    // The choices carry a hint ("Internt notat (alle administratorer)"); the exact label appears only as the tag on a note.
+    expect(screen.getAllByText("Internt notat")).toHaveLength(1);
+    expect(screen.getAllByText("Notat til meg selv")).toHaveLength(1);
+    expect(screen.getByText("Leverandøren ser ikke dette notatet.")).toBeTruthy();
   });
 
   it("saves a note to self by default and an internal note when chosen first", async () => {
@@ -49,15 +49,15 @@ describe("supplier notes in the drawer", () => {
     const add = vi.spyOn(notesApi, "addSupplierNote").mockResolvedValue(note("n3", "SELF", "x"));
     mountDrawer();
 
-    const box = await screen.findByPlaceholderText("Add a note about this supplier…");
+    const box = await screen.findByPlaceholderText("Legg til et notat om denne leverandøren…");
     fireEvent.change(box, { target: { value: "  First  " } });
-    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Legg til notat" }));
     await waitFor(() => expect(add).toHaveBeenCalledTimes(1));
     expect(add.mock.calls[0][2]).toEqual({ text: "First", visibility: "SELF" });
 
-    fireEvent.click(screen.getByRole("radio", { name: "Internal note" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Internt notat (alle administratorer)" }));
     fireEvent.change(box, { target: { value: "Second" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Legg til notat" }));
     await waitFor(() => expect(add).toHaveBeenCalledTimes(2));
     expect(add.mock.calls[1][2]).toEqual({ text: "Second", visibility: "INTERNAL" });
   });
@@ -69,36 +69,36 @@ describe("manual alert dialog note to self", () => {
     HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(<CreateManualAlertDialog open suppliers={[supplier]} onClose={vi.fn()} onCreate={onCreate} />);
-    fireEvent.change(screen.getByLabelText(/Alert title/), { target: { value: "Follow up" } });
-    fireEvent.change(screen.getByLabelText(/^Supplier/), { target: { value: supplier.id } });
-    fireEvent.change(screen.getByLabelText(/^Risk category/), { target: { value: "VEHICLE_COMPLIANCE" } });
-    fireEvent.change(screen.getByLabelText(/^Risk \*/), { target: { value: "medium" } });
-    fireEvent.change(screen.getByLabelText(/^Alert Type/), { target: { value: "CONFIRMED_DEVIATION" } });
-    fireEvent.change(screen.getByLabelText(/^Description/), { target: { value: "Check the vehicles" } });
+    fireEvent.change(screen.getByLabelText(/Tittel på varsel/), { target: { value: "Follow up" } });
+    fireEvent.change(screen.getByLabelText(/^Leverandør/), { target: { value: supplier.id } });
+    fireEvent.change(screen.getByLabelText(/^Risikokategori/), { target: { value: "VEHICLE_COMPLIANCE" } });
+    fireEvent.change(screen.getByLabelText(/^Risiko \*/), { target: { value: "medium" } });
+    fireEvent.change(screen.getByLabelText(/^Varseltype/), { target: { value: "CONFIRMED_DEVIATION" } });
+    fireEvent.change(screen.getByLabelText(/^Beskrivelse/), { target: { value: "Check the vehicles" } });
     return onCreate;
   }
 
   it("passes the note along only when the box is ticked", async () => {
     const onCreate = fillAlert();
-    fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
+    fireEvent.click(screen.getByRole("button", { name: "Opprett varsel" }));
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
     expect(onCreate.mock.calls[0][1]).toBeUndefined();
   });
 
   it("sends the trimmed note when the box is ticked", async () => {
     const onCreate = fillAlert();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Save a note to self" }));
-    fireEvent.change(screen.getByLabelText(/^Note to self/), { target: { value: "  Call on Monday " } });
-    fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Lagre et notat til meg selv" }));
+    fireEvent.change(screen.getByLabelText(/^Notat til meg selv/), { target: { value: "  Call on Monday " } });
+    fireEvent.click(screen.getByRole("button", { name: "Opprett varsel" }));
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
     expect(onCreate.mock.calls[0][1]).toBe("Call on Monday");
   });
 
   it("asks for the note text when the box is ticked but empty", async () => {
     const onCreate = fillAlert();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Save a note to self" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create alert" }));
-    expect(await screen.findByText(/Write the note, or untick/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Lagre et notat til meg selv" }));
+    fireEvent.click(screen.getByRole("button", { name: "Opprett varsel" }));
+    expect(await screen.findByText(/Skriv notatet, eller fjern haken/)).toBeTruthy();
     expect(onCreate).not.toHaveBeenCalled();
   });
 });

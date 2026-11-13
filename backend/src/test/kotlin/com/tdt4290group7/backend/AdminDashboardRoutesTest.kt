@@ -4,6 +4,7 @@ import com.tdt4290group7.backend.admin.AdminInsightsRepository
 import com.tdt4290group7.backend.certificates.Certificate
 import com.tdt4290group7.backend.certificates.CertificateRepository
 import com.tdt4290group7.backend.certificates.CertificateStatus
+import com.tdt4290group7.backend.onboarding.EnergyCommitmentInput
 import com.tdt4290group7.backend.vehicles.AgreementInput
 import com.tdt4290group7.backend.vehicles.ChangeActor
 import com.tdt4290group7.backend.vehicles.SupplierInput
@@ -35,6 +36,28 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AdminDashboardRoutesTest {
+    @Test
+    fun certificateWithoutAnExpiryDateIsMediumRiskWithAnAlert() = testApplication {
+        val vehicles = VehicleRepository(databasePath("fleet"))
+        val certificateRepository = CertificateRepository(databasePath("certificates"))
+        val insights = AdminInsightsRepository(databasePath("insights"))
+        val actor = ChangeActor("admin", "Administrator")
+        val supplier = vehicles.fleet.saveSupplier(null, SupplierInput("Undated AS", "223456789"), actor, Instant.now())
+        val agreement = vehicles.fleet.saveAgreement(
+            null, AgreementInput(supplier.id, "2026-01-01", "2027-12-31", 2, "Undated", saksnr = "2024/9999"), null, actor, Instant.now(),
+        )
+        certificateRepository.add(Certificate("undated", supplier.name, "ISO 14001", null, null, "undated.pdf", CertificateStatus.EXPIRED, agreement.id))
+        application { module(vehicles, null, certificateRepository = certificateRepository, adminInsightsRepository = insights) }
+        val admin = adminClient()
+
+        val summary = Json.parseToJsonElement(admin.get("/api/admin/dashboard/summary").bodyAsText()).jsonObject
+        val listed = summary.getValue("topRiskSuppliers").jsonArray.single().jsonObject
+        assertEquals("medium", listed.getValue("risk").jsonPrimitive.content)
+        assertEquals(4, listed.getValue("riskScore").jsonPrimitive.int)
+        val alerts = Json.parseToJsonElement(admin.get("/api/admin/alerts").bodyAsText()).jsonArray.map { it.jsonObject }
+        assertEquals(listOf("MISSING_DOCUMENTATION"), alerts.map { it.getValue("findingType").jsonPrimitive.content })
+    }
+
     @Test
     fun persistedDashboardAndAlertWorkflowAreRestrictedToAdministrators() = testApplication {
         val vehicles = VehicleRepository(databasePath("fleet"))
@@ -109,14 +132,15 @@ class AdminDashboardRoutesTest {
         assertEquals(1, kpis.getValue("expiredCertificates").jsonPrimitive.int)
         assertEquals(1, kpis.getValue("certificatesExpiringWithin90Days").jsonPrimitive.int)
         assertEquals(2, kpis.getValue("activeAlerts").jsonPrimitive.int)
-        assertEquals(1, body.getValue("riskClassification").jsonObject.getValue("high").jsonObject.getValue("count").jsonPrimitive.int)
+        // An expired certificate is medium priority (the customer's risk ranking); only vehicle and energy deviations are high.
+        assertEquals(1, body.getValue("riskClassification").jsonObject.getValue("medium").jsonObject.getValue("count").jsonPrimitive.int)
         val classification = body.getValue("riskClassification").jsonObject
         // The four risk rows cover every active supplier, including those not assessed.
         assertEquals(
             kpis.getValue("totalSuppliers").jsonPrimitive.int,
-            listOf("high", "medium", "compliant", "unassessed").sumOf { classification.getValue(it).jsonObject.getValue("count").jsonPrimitive.int },
+            listOf("high", "medium", "low", "compliant", "unassessed").sumOf { classification.getValue(it).jsonObject.getValue("count").jsonPrimitive.int },
         )
-        assertEquals(100, classification.getValue("high").jsonObject.getValue("percent").jsonPrimitive.int)
+        assertEquals(100, classification.getValue("medium").jsonObject.getValue("percent").jsonPrimitive.int)
         assertEquals(0, classification.getValue("unassessed").jsonObject.getValue("count").jsonPrimitive.int)
         val listedSupplier = body.getValue("topRiskSuppliers").jsonArray.single().jsonObject
         assertEquals("2024/1234 — Municipal transport", listedSupplier.getValue("primaryContract").jsonPrimitive.content)
@@ -172,9 +196,9 @@ class AdminDashboardRoutesTest {
 
         val alerts = Json.parseToJsonElement(admin.get("/api/admin/alerts").bodyAsText()).jsonArray.map { it.jsonObject }
         val bySeverity = alerts.groupBy { it.getValue("severity").jsonPrimitive.content }
-        // 200 and 365 days left: low. 60 days left: medium. 366 days, and a type that is not long lead at 200 days: none.
-        assertEquals(2, bySeverity.getValue("low").size)
-        assertEquals(1, bySeverity.getValue("medium").size)
+        // Not yet expired is always low priority: 200, 365 and 60 days left. 366 days, and a type that is not long lead at 200 days: none.
+        assertEquals(3, bySeverity.getValue("low").size)
+        assertEquals(null, bySeverity["medium"])
         assertEquals(3, alerts.size)
         assertTrue(alerts.filter { it.getValue("severity").jsonPrimitive.content == "low" }.all { it.getValue("category").jsonPrimitive.content == "CERTIFICATES" })
 
@@ -182,9 +206,9 @@ class AdminDashboardRoutesTest {
         val kpis = summary.getValue("kpis").jsonObject
         assertEquals(3, kpis.getValue("activeAlerts").jsonPrimitive.int)
         val counts = kpis.getValue("alertsBySeverity").jsonObject
-        assertEquals(listOf(0, 1, 2), listOf("high", "medium", "low").map { counts.getValue(it).jsonPrimitive.int })
-        // Low alerts are early warnings: they do not make a supplier medium or high risk.
-        assertEquals("medium", summary.getValue("topRiskSuppliers").jsonArray.single().jsonObject.getValue("risk").jsonPrimitive.content)
+        assertEquals(listOf(0, 0, 3), listOf("high", "medium", "low").map { counts.getValue(it).jsonPrimitive.int })
+        // A certificate predicted to expire within 180 days is low priority.
+        assertEquals("low", summary.getValue("topRiskSuppliers").jsonArray.single().jsonObject.getValue("risk").jsonPrimitive.content)
     }
 
     @Test
@@ -338,11 +362,11 @@ class AdminDashboardRoutesTest {
 
         val titles = feed(supplierA).map { it.getValue("title").jsonPrimitive.content }.toSet()
         // The automatic certificate alert is visible too; the legacy manual one and another supplier's are not.
-        assertEquals(setOf("Visible manual", "About certificates", "Certificate expires in 10 days"), titles)
+        assertEquals(setOf("Visible manual", "About certificates", "Sertifikat utløper om 10 dager"), titles)
         // Safe shape: nothing the admin keeps to themselves.
         val shape = feed(supplierA).first { it.getValue("title").jsonPrimitive.content == "Visible manual" }
         assertEquals(setOf("id", "title", "description", "severity", "category", "dueDate", "status", "createdAt"), shape.keys)
-        assertEquals(setOf("About certificates", "Certificate expires in 10 days"), feed(supplierA, "?category=CERTIFICATES").map { it.getValue("title").jsonPrimitive.content }.toSet())
+        assertEquals(setOf("About certificates", "Sertifikat utløper om 10 dager"), feed(supplierA, "?category=CERTIFICATES").map { it.getValue("title").jsonPrimitive.content }.toSet())
         assertEquals(setOf("Someone else's"), feed(outsider).map { it.getValue("title").jsonPrimitive.content }.toSet())
 
         // Admin workflow steps are not shown: only open or resolved.
@@ -411,7 +435,7 @@ class AdminDashboardRoutesTest {
         // Validation and unknown suppliers.
         assertEquals(HttpStatusCode.BadRequest, post("""{"text":"   "}""").status)
         assertEquals(HttpStatusCode.BadRequest, post("""{"text":"${"x".repeat(2001)}"}""").status)
-        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"SUPPLIER"}""").status)
+        assertEquals(HttpStatusCode.BadRequest, post("""{"text":"hi","visibility":"PUBLIC"}""").status)
         assertEquals(HttpStatusCode.NotFound, admin.post("/api/admin/suppliers/unknown/notes") {
             contentType(ContentType.Application.Json); setBody("""{"text":"hi"}""")
         }.status)
@@ -434,6 +458,49 @@ class AdminDashboardRoutesTest {
 
         assertEquals(listOf("for all admins", "private to A"), insights.notesFor("s1", "admin-a").map { it.text })
         assertEquals(listOf("for all admins"), insights.notesFor("s1", "admin-b").map { it.text })
+    }
+
+    @Test
+    fun dashboardAssessesThisYearsEnergyCommitments() = testApplication {
+        val vehicles = VehicleRepository(databasePath("energy-fleet"))
+        val actor = ChangeActor("admin", "Administrator")
+        val year = LocalDate.now(ZoneId.of("Europe/Oslo")).year
+        fun supplierWithEnergy(name: String, org: String, selfKwh: Double): String {
+            val supplier = vehicles.fleet.saveSupplier(null, SupplierInput(name, org), actor, Instant.now())
+            val agreement = vehicles.fleet.saveAgreement(
+                null,
+                AgreementInput(supplier.id, "$year-01-01", "${year + 1}-12-31", 0, "Energy agreement", requiresVehicles = false, requiresEnergy = true, saksnr = "2026/0001"),
+                null, actor, Instant.now(),
+            )
+            vehicles.onboarding.setEnergyCommitment(agreement.id, EnergyCommitmentInput(1000.0, 0.0), Instant.now())
+            // A Q4 report closes the year, so the result is Compliant or Non-compliant rather than a projection.
+            vehicles.database.write { db ->
+                vehicles.database.insert(
+                    db, "facility_energy",
+                    mapOf(
+                        "id" to "nrg-${UUID.randomUUID()}", "agreement_id" to agreement.id, "location_code" to "LOC-1", "address" to "Addr",
+                        "reporting_year" to year, "reporting_quarter" to 4, "electricity_kwh" to 1000.0, "district_heating_kwh" to 0.0,
+                        "self_produced_solar_kwh" to selfKwh, "self_produced_heatpump_kwh" to 0.0, "goo_covered_kwh" to 0.0,
+                        "created_at" to "$year-12-31T00:00:00Z", "updated_at" to "$year-12-31T00:00:00Z",
+                    )
+                )
+            }
+            return supplier.id
+        }
+        val short = supplierWithEnergy("Short Energy AS", "111111111", 200.0)
+        val fine = supplierWithEnergy("Fine Energy AS", "222222222", 1500.0)
+        application {
+            module(vehicles, null, certificateRepository = CertificateRepository(databasePath("energy-certs")), adminInsightsRepository = AdminInsightsRepository(databasePath("energy-insights")))
+        }
+
+        val body = Json.parseToJsonElement(adminClient().get("/api/admin/dashboard/summary").bodyAsText()).jsonObject
+        assertEquals(1, body.getValue("issueCategoryBreakdown").jsonObject.getValue("energyDeviation").jsonPrimitive.int)
+        val suppliers = body.getValue("topRiskSuppliers").jsonArray.map { it.jsonObject }.associateBy { it.getValue("id").jsonPrimitive.content }
+        assertEquals("high", suppliers.getValue(short).getValue("risk").jsonPrimitive.content)
+        assertEquals(listOf("ENERGY_DEVIATION"), suppliers.getValue(short).getValue("issueCategories").jsonArray.map { it.jsonPrimitive.content })
+        assertTrue(suppliers.getValue(short).getValue("mainIssue").jsonPrimitive.content.contains("energiforpliktelsen er ikke oppfylt"))
+        assertEquals("compliant", suppliers.getValue(fine).getValue("risk").jsonPrimitive.content)
+        assertEquals(emptyList(), suppliers.getValue(fine).getValue("issueCategories").jsonArray.toList())
     }
 
     private fun databasePath(name: String) = Path.of("build", "test-data", "dashboard-$name-${UUID.randomUUID()}.db")

@@ -15,7 +15,7 @@ export function buildSupplierPortfolioSummary(
       if (supplier.risk !== "unassessed") counts[supplier.risk] += 1;
       return counts;
     },
-    { high: 0, medium: 0, compliant: 0 }
+    { high: 0, medium: 0, low: 0, compliant: 0 }
   );
 
   const monitoredSuppliers = modeledSuppliers.length + unmodeledSuppliers.totalSuppliers;
@@ -30,6 +30,7 @@ export function buildSupplierPortfolioSummary(
 
   const riskClassification: RiskClassification = {
     compliant: { count: compliantCount, percent: percent(compliantCount) },
+    low: { count: 0, percent: 0 },
     medium: { count: mediumCount, percent: percent(mediumCount) },
     high: { count: highCount, percent: percent(highCount) },
     unassessed: { count: unassessedCount, percent: percent(unassessedCount) },

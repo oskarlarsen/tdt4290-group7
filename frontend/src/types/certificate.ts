@@ -14,8 +14,8 @@ export const CERTIFICATE_STANDARD_LABELS: Record<CertificateStandard, string> = 
   emas: "EMAS",
   "gront-punkt-norge": "Grønt Punkt Norge",
   retura: "Retura",
-  "eco-driving-course": "Eco-driving course",
-  unknown: "Unrecognized certificate",
+  "eco-driving-course": "Kurs i økonomisk kjøring",
+  unknown: "Ikke gjenkjent sertifikat",
 };
 
 // Certificates belong to contracts. A null validUntil means required documentation is missing;
@@ -96,7 +96,7 @@ export function getCertificateStatus(
       group: "critical-expired",
       daysRemaining: null,
       tone: "red",
-      label: "Documentation missing",
+      label: "Dokumentasjon mangler",
       rank: 0,
     };
   }
@@ -105,27 +105,27 @@ export function getCertificateStatus(
   const { criticalDays, orangeDays, yellowDays } = CERTIFICATE_THRESHOLDS;
 
   if (days < 0) {
-    return { status: "expired", group: "critical-expired", daysRemaining: days, tone: "red", label: "Expired", rank: 0 };
+    return { status: "expired", group: "critical-expired", daysRemaining: days, tone: "red", label: "Utløpt", rank: 0 };
   }
   if (days <= criticalDays) {
     // Colour follows the customer's scheme (orange within 3 months); "critical" is
     // the reference's extra label for the last 30 days.
-    return { status: "critical", group: "critical-expired", daysRemaining: days, tone: "orange", label: `Critical (${days}d left)`, rank: 1 };
+    return { status: "critical", group: "critical-expired", daysRemaining: days, tone: "orange", label: `Kritisk (${days} d igjen)`, rank: 1 };
   }
   if (days <= orangeDays) {
-    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "orange", label: `Expiring (${days}d)`, rank: 2 };
+    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "orange", label: `Utløper (${days} d)`, rank: 2 };
   }
   if (days <= yellowDays) {
-    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "yellow", label: `Expiring (${days}d)`, rank: 2 };
+    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "yellow", label: `Utløper (${days} d)`, rank: 2 };
   }
   if (cert.standard && LONG_LEAD_STANDARDS.includes(cert.standard) && days <= LONG_LEAD_WARNING_DAYS) {
-    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "yellow", label: `Renew soon (${days}d)`, rank: 2 };
+    return { status: "expiring", group: "expiring-soon", daysRemaining: days, tone: "yellow", label: `Forny snart (${days} d)`, rank: 2 };
   }
-  return { status: "valid", group: "valid", daysRemaining: days, tone: "tertiary", label: "Valid", rank: 3 };
+  return { status: "valid", group: "valid", daysRemaining: days, tone: "tertiary", label: "Gyldig", rank: 3 };
 }
 
 export function formatCertificateDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
+  return new Date(iso).toLocaleDateString("nb-NO", {
     day: "numeric",
     month: "short",
     year: "numeric",

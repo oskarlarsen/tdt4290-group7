@@ -10,42 +10,44 @@ import { ALERT_CATEGORIES } from "../../types/dashboard";
 import type { AlertCategory } from "../../types/dashboard";
 
 const CATEGORY_LABELS: Record<AlertCategory, string> = {
-  ENVIRONMENTAL_COMPLIANCE: "Environmental compliance",
-  ENERGY_FUEL: "Energy & fuel",
-  VEHICLE_COMPLIANCE: "Vehicle compliance",
-  CERTIFICATES: "Certificates",
+  ENVIRONMENTAL_COMPLIANCE: "Miljøoppfølging",
+  ENERGY_FUEL: "Energi",
+  VEHICLE_COMPLIANCE: "Kjøretøyoppfølging",
+  CERTIFICATES: "Sertifikater",
 };
 
 const DASHBOARD_STATUSES = new Set(["SUBMITTED", "UNDER_REVIEW", "APPROVED"]);
 
 const STATUS_LABELS: Record<OnboardingStatusResponse["status"], string> = {
-  INVITED: "Invited",
-  PROFILE_PENDING: "Profile pending",
-  DATA_DRAFT: "In progress",
-  VALIDATING: "Validating",
-  SUBMITTED: "Submitted",
-  UNDER_REVIEW: "Under review",
-  APPROVED: "Approved",
-  REVISION_REQUIRED: "Changes requested",
+  INVITED: "Invitert",
+  PROFILE_PENDING: "Profil venter",
+  DATA_DRAFT: "Pågår",
+  VALIDATING: "Validerer",
+  SUBMITTED: "Innsendt",
+  UNDER_REVIEW: "Under vurdering",
+  APPROVED: "Godkjent",
+  REVISION_REQUIRED: "Endringer ønskes",
 };
 
 function Metric({
   label,
   value,
   icon: Icon,
+  to,
 }: {
   label: string;
   value: number;
   icon: typeof Building2;
+  to: string;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-card">
+    <Link to={to} className="block rounded-xl border border-neutral-100 bg-white p-4 shadow-card transition-colors hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
       <div className="flex items-center justify-between text-sm text-neutral-500">
         <span>{label}</span>
         <Icon className="h-4 w-4 text-primary-700" aria-hidden="true" />
       </div>
       <p className="mt-2 text-2xl font-semibold text-neutral-900">{value}</p>
-    </div>
+    </Link>
   );
 }
 
@@ -68,7 +70,7 @@ export default function Dashboard() {
         setOverview(nextOverview);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "Couldn't load your supplier dashboard.");
+        if (active) setError(cause instanceof Error ? cause.message : "Kunne ikke laste leverandørdashbordet.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -82,7 +84,7 @@ export default function Dashboard() {
     return (
       <div role="status" className="flex min-h-64 items-center justify-center text-neutral-500">
         <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
-        <span className="sr-only">Loading supplier dashboard…</span>
+        <span className="sr-only">Laster leverandørdashbord…</span>
       </div>
     );
   }
@@ -94,7 +96,7 @@ export default function Dashboard() {
   if (error || !status || !overview) {
     return (
       <section role="alert" className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">
-        {error ?? "Couldn't load your supplier dashboard. Please try again."}
+        {error ?? "Kunne ikke laste leverandørdashbordet. Prøv igjen."}
       </section>
     );
   }
@@ -110,9 +112,9 @@ export default function Dashboard() {
       <section className="rounded-2xl bg-primary-900 px-6 py-7 text-white sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-primary-100">Supplier portal</p>
+            <p className="text-sm text-primary-100">Leverandørportal</p>
             <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{overview.supplierName}</h1>
-            <p className="mt-1 text-sm text-primary-100">Organization number {overview.orgNumber}</p>
+            <p className="mt-1 text-sm text-primary-100">Organisasjonsnummer {overview.orgNumber}</p>
           </div>
           <span className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium">
             {STATUS_LABELS[status.status]}
@@ -120,26 +122,26 @@ export default function Dashboard() {
         </div>
         {status.reviewerNotes && (
           <p className="mt-5 rounded-lg bg-white/10 px-4 py-3 text-sm">
-            <span className="font-semibold">Reviewer feedback: </span>{status.reviewerNotes}
+            <span className="font-semibold">Tilbakemelding fra saksbehandler: </span>{status.reviewerNotes}
           </p>
         )}
       </section>
 
-      <section aria-label="Supplier overview" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Metric icon={Building2} label="Agreements" value={overview.agreements.length} />
-        <Metric icon={Truck} label="Vehicles" value={overview.totalVehicles} />
-        <Metric icon={BadgeCheck} label="Certificates" value={overview.totalCertificates} />
-        <Metric icon={Zap} label="Energy reports" value={overview.totalEnergyRecords} />
-        <Metric icon={Package} label="Products" value={overview.totalProducts} />
+      <section aria-label="Leverandøroversikt" className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Metric icon={Building2} label="Avtaler" value={overview.agreements.length} to="/supplier/contracts" />
+        <Metric icon={Truck} label="Kjøretøy" value={overview.totalVehicles} to="/supplier/vehicles" />
+        <Metric icon={BadgeCheck} label="Sertifikater" value={overview.totalCertificates} to="/supplier/certificates" />
+        <Metric icon={Zap} label="Energirapporter" value={overview.totalEnergyRecords} to="/supplier/energy" />
+        <Metric icon={Package} label="Produkter" value={overview.totalProducts} to="/supplier/compliance" />
       </section>
 
-      <section aria-label="Open issues" className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
+      <section aria-label="Åpne saker" className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">
         <div className="mb-4 flex items-center gap-2">
           <Bell className="h-5 w-5 text-primary-700" aria-hidden="true" />
-          <h2 className="text-lg font-semibold text-neutral-900">Open issues</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">Åpne saker</h2>
         </div>
         {alerts.isError ? (
-          <p className="text-sm text-neutral-500">Couldn't load your issues. Open My Alerts to try again.</p>
+          <p className="text-sm text-neutral-500">Kunne ikke laste sakene dine. Åpne Mine varsler for å prøve igjen.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {ALERT_CATEGORIES.map((category) => {
@@ -164,13 +166,13 @@ export default function Dashboard() {
         <div className="mb-4 flex items-center gap-2">
           <ClipboardList className="h-5 w-5 text-primary-700" aria-hidden="true" />
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">My agreements</h2>
-            <p className="text-sm text-neutral-500">Agreements and reporting data linked to your organization.</p>
+            <h2 className="text-lg font-semibold text-neutral-900">Mine avtaler</h2>
+            <p className="text-sm text-neutral-500">Avtaler og rapporteringsdata knyttet til organisasjonen din.</p>
           </div>
         </div>
         {overview.agreements.length === 0 ? (
           <p className="rounded-lg border border-dashed border-neutral-200 p-5 text-center text-sm text-neutral-500">
-            No agreements have been added to your organization yet. Contact your municipal administrator if you expect one here.
+            Ingen avtaler er lagt til organisasjonen din ennå. Kontakt kommuneadministratoren hvis du forventer å se en her.
           </p>
         ) : (
           <ul className="divide-y divide-neutral-100">
@@ -183,9 +185,9 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div className="text-right text-sm text-neutral-600">
-                  <p>{agreement.active ? "Active" : "Inactive"}</p>
+                  <p>{agreement.active ? "Aktiv" : "Inaktiv"}</p>
                   <p className="text-xs text-neutral-500">
-                    {agreement.activeVehiclesCount} / {agreement.allowedVehicles} vehicles
+                    {agreement.activeVehiclesCount} / {agreement.allowedVehicles} kjøretøy
                   </p>
                 </div>
               </li>

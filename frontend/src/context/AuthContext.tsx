@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function handleSessionExpired() {
       setUser(null);
       setStatus("unauthenticated");
-      setError("Your session has expired. Please sign in again.");
+      setError("Økten din har utløpt. Logg inn på nytt.");
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
@@ -97,8 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         err instanceof ApiError && err.status === 429
           ? err.message
           : err instanceof Error
-            ? "Couldn't sign in. Check your email/username and password and try again."
-            : "Something went wrong. Please try again."
+            ? "Kunne ikke logge inn. Sjekk e-post/brukernavn og passord og prøv igjen."
+            : "Noe gikk galt. Prøv igjen."
       );
       throw err;
     }

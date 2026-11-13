@@ -42,7 +42,7 @@ export function NotConnectedDialog({
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Lukk"
             className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
           >
             <X className="h-4 w-4" />
@@ -53,7 +53,7 @@ export function NotConnectedDialog({
             onClick={onClose}
             className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
           >
-            Close
+            Lukk
           </button>
         </div>
       </div>

@@ -38,13 +38,13 @@ describe("supplier energy entry form", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Agreement"), { target: { value: "agreement-energy-1" } });
-    fireEvent.change(screen.getByLabelText("Facility or location code"), { target: { value: "DEPOT-01" } });
-    fireEvent.change(screen.getByLabelText("Facility address"), { target: { value: "Kongens gate 1, 7011 Trondheim" } });
-    fireEvent.change(screen.getByLabelText("Electricity (kWh)"), { target: { value: "15000" } });
-    fireEvent.change(screen.getByLabelText("District heating (kWh)"), { target: { value: "25000" } });
+    fireEvent.change(screen.getByLabelText("Avtale"), { target: { value: "agreement-energy-1" } });
+    fireEvent.change(screen.getByLabelText("Anleggs- eller lokasjonskode"), { target: { value: "DEPOT-01" } });
+    fireEvent.change(screen.getByLabelText("Anleggsadresse"), { target: { value: "Kongens gate 1, 7011 Trondheim" } });
+    fireEvent.change(screen.getByLabelText("Strøm (kWh)"), { target: { value: "15000" } });
+    fireEvent.change(screen.getByLabelText("Fjernvarme (kWh)"), { target: { value: "25000" } });
 
-    const reviewButton = screen.getByRole("button", { name: "Review energy details" });
+    const reviewButton = screen.getByRole("button", { name: "Gjennomgå energiopplysninger" });
     expect((reviewButton as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(reviewButton);
@@ -65,17 +65,17 @@ describe("supplier energy entry form", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add another facility" }));
-    expect(screen.getByText("Facility 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Legg til nytt anlegg" }));
+    expect(screen.getByText("Anlegg 2")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove facility 2" }));
-    expect(screen.queryByText("Facility 2")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Fjern anlegg 2" }));
+    expect(screen.queryByText("Anlegg 2")).toBeNull();
   });
 
   it("shows the CSV upload instead of the form in CSV mode", () => {
     const onPreview = vi.fn();
     render(<SupplierEnergyEntryForm agreements={agreements} working={false} onPreview={onPreview} onChange={vi.fn()} mode="csv" />);
-    expect(screen.getByRole("button", { name: /Download CSV template/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Last ned CSV-mal/ })).toBeTruthy();
     const file = new File(["a;b"], "energy.csv", { type: "text/csv" });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
     expect(onPreview).toHaveBeenCalledWith(file);

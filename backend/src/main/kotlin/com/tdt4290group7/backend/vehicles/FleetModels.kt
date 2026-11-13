@@ -34,9 +34,9 @@ data class FleetAgreement(val id: String, val supplierId: String, val startDate:
     val requiresVehicles: Boolean = true, val requiresEnergy: Boolean = false, val requiresProducts: Boolean = false,
     val saksnr: String? = null)
 
-/** Display name for an agreement: "saksnr — note", falling back to "Saksnr missing" for agreements created before saksnr existed. */
+/** Display name for an agreement: "saksnr — note", falling back to "Saksnr mangler" for agreements created before saksnr existed. */
 fun agreementLabel(saksnr: String?, note: String): String {
-    val number = saksnr?.trim()?.takeIf(String::isNotEmpty) ?: "Saksnr missing"
+    val number = saksnr?.trim()?.takeIf(String::isNotEmpty) ?: "Saksnr mangler"
     val text = note.trim()
     return if (text.isEmpty()) number else "$number — $text"
 }
@@ -49,13 +49,25 @@ data class VehicleEntryInput(val registrationNumber: String? = null, val planned
 
 internal fun VehicleEntryInput.validatedRegistrationNumber(): String? {
     if (planned) {
-        require(registrationNumber.isNullOrBlank()) { "Planned identifiers are generated automatically" }
+        require(registrationNumber.isNullOrBlank()) { "Planlagte identifikatorer genereres automatisk" }
         return null
     }
-    return normalizeRegistrationNumber(requireNotNull(registrationNumber) { "Enter the registration number" }).also {
-        require(it.matches(Regex("[A-Z]{2}[1-9][0-9]{3,4}"))) { "Enter a valid registration number" }
+    return normalizeRegistrationNumber(requireNotNull(registrationNumber) { "Skriv inn registreringsnummeret" }).also {
+        require(it.matches(Regex("[A-Z]{2}[1-9][0-9]{3,4}"))) { "Skriv inn et gyldig registreringsnummer" }
     }
 }
+
+@Serializable
+data class ExceptionRequest(val note: String? = null)
+
+@Serializable
+data class BulkVehicleRequest(val registrationNumbers: List<String>)
+
+@Serializable
+data class BulkVehicleFailure(val registrationNumber: String, val reason: String)
+
+@Serializable
+data class BulkVehicleResult(val added: List<String>, val failed: List<BulkVehicleFailure>)
 
 @Serializable
 data class VehicleChangeRequest(val expectedUpdatedAt: String)

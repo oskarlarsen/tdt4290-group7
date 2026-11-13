@@ -12,9 +12,9 @@ object PasswordPolicy {
 
     /** A user-facing reason [password] is not acceptable, or null if it is. */
     fun violation(password: String): String? = when {
-        password.length < MIN_LENGTH -> "New password must be at least $MIN_LENGTH characters."
-        exceedsBcryptLimit(password) -> "New password is too long."
-        password.isBlank() -> "New password can't be only spaces."
+        password.length < MIN_LENGTH -> "Det nye passordet må være minst $MIN_LENGTH tegn."
+        exceedsBcryptLimit(password) -> "Det nye passordet er for langt."
+        password.isBlank() -> "Det nye passordet kan ikke bare bestå av mellomrom."
         else -> null
     }
 

@@ -12,7 +12,7 @@ import { DashboardExportButton } from "../src/components/ui/QuickActions";
 
 const data = {
   kpis: { totalSuppliers: 1, highRiskSuppliers: 0, activeAlerts: 0, complianceRatePercent: 0, assessedSuppliers: 0, activeAgreements: 0, listedVehicles: 0, certificatesTracked: 0 },
-  riskClassification: { high: { count: 0, percent: 0 }, medium: { count: 0, percent: 0 }, compliant: { count: 0, percent: 0 }, unassessed: { count: 1, percent: 100 } },
+  riskClassification: { high: { count: 0, percent: 0 }, medium: { count: 0, percent: 0 }, low: { count: 0, percent: 0 }, compliant: { count: 0, percent: 0 }, unassessed: { count: 1, percent: 100 } },
   topRiskSuppliers: [],
 } as unknown as DashboardSummary;
 
@@ -22,19 +22,19 @@ describe("overview export button", () => {
   it("fetches every alert, then downloads one semicolon sheet", async () => {
     getAlerts.mockResolvedValue([]);
     render(<DashboardExportButton data={data} />);
-    fireEvent.click(screen.getByRole("button", { name: "Export overview report" }));
+    fireEvent.click(screen.getByRole("button", { name: "Eksporter oversiktsrapport" }));
     await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
     const [filename, csv] = downloadCsv.mock.calls[0] as [string, string];
-    expect(filename).toMatch(/^overview-report-\d{4}-\d{2}-\d{2}\.csv$/);
-    expect(csv.startsWith("﻿Section;Supplier;Name;")).toBe(true);
-    expect(await screen.findByText("Downloaded")).toBeTruthy();
+    expect(filename).toMatch(/^oversiktsrapport-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(csv.startsWith("﻿Seksjon;Leverandør;Navn;")).toBe(true);
+    expect(await screen.findByText("Lastet ned")).toBeTruthy();
   });
 
   it("downloads nothing and says so when the alerts cannot be fetched", async () => {
     getAlerts.mockRejectedValue(new Error("offline"));
     render(<DashboardExportButton data={data} />);
-    fireEvent.click(screen.getByRole("button", { name: "Export overview report" }));
-    expect(await screen.findByText("Could not prepare the export. Try again.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Eksporter oversiktsrapport" }));
+    expect(await screen.findByText("Kunne ikke forberede eksporten. Prøv igjen.")).toBeTruthy();
     expect(downloadCsv).not.toHaveBeenCalled();
   });
 

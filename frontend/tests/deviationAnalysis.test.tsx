@@ -15,15 +15,15 @@ const finding = (code: string): DeviationFinding => ({ code, priority: "MODERATE
 describe("saved deviation fact comparisons", () => {
   it("explains NOx in comparable units with the actual calculation inputs", () => {
     const analysis = analyzeDeviation(finding("NOX_MISMATCH"), check);
-    expect(analysis.comparison.rows[0]).toEqual({ label: "NOx rate", left: "30 mg/km", right: "40 mg/km" });
-    expect(analysis.inputs).toEqual([["Supplier total NOx", "18 g"], ["NOx-registered distance", "600 km"]]);
+    expect(analysis.comparison.rows[0]).toEqual({ label: "NOx-verdi", left: "30 mg/km", right: "40 mg/km" });
+    expect(analysis.inputs).toEqual([["Leverandørens samlede NOx", "18 g"], ["NOx-registrert distanse", "600 km"]]);
     expect(analysis.comparison.rightLabel).toContain("WLTP");
-    expect(analysis.note).toContain("grams × 1000 ÷");
+    expect(analysis.note).toContain("gram NOx × 1000 ÷");
   });
   it("shows body styles as labels and codes rather than unexplained mismatch names", () => {
     const analysis = analyzeDeviation(finding("BODY_TYPE_MISMATCH"), check);
-    expect(analysis.comparison.rows[0]).toEqual({ label: "Body style", left: "AA - Sedan", right: "AB - Hatchback" });
-    expect(analysis.explanation).toContain("separate from the technical vehicle category");
+    expect(analysis.comparison.rows[0]).toEqual({ label: "Karosseritype", left: "AA - Sedan", right: "AB - Kombikupé" });
+    expect(analysis.explanation).toContain("noe annet enn teknisk kjøretøykategori");
   });
   it("shows original CO2 precision separately from comparison rounding", () => {
     const changed = { ...check, tripRows: [{ ...row, data: { ...row.data, co2GramsPerKm: "120.49" } }] };
@@ -34,25 +34,25 @@ describe("saved deviation fact comparisons", () => {
   });
   it("calculates consumption from saved liters and total distance", () => {
     const analysis = analyzeDeviation(finding("CONSUMPTION_MISMATCH"), check);
-    expect(analysis.comparison.rows[0]).toEqual({ label: "Average fuel consumption", left: "8 L/100km", right: "8 L/100km" });
-    expect(analysis.inputs).toEqual([["Total fuel consumed", "48 L"], ["Total distance", "600 km"]]);
+    expect(analysis.comparison.rows[0]).toEqual({ label: "Gjennomsnittlig drivstofforbruk", left: "8 L/100km", right: "8 L/100km" });
+    expect(analysis.inputs).toEqual([["Totalt drivstofforbruk", "48 L"], ["Total distanse", "600 km"]]);
   });
   it("does not substitute zero or another method for missing references", () => {
     const absent = { ...finding("NOX_MISMATCH"), measurementIndex: 100 };
-    expect(analyzeDeviation(absent, check).comparison.rows[0].right).toContain("Not available");
+    expect(analyzeDeviation(absent, check).comparison.rows[0].right).toContain("Ikke tilgjengelig");
     expect(exactRatio("18", "0", 1000n)).toBeNull();
   });
   it("explains a zero NOx denominator with the conflicting calculation facts", () => {
     const zeroDistance = { ...check, tripRows: [{ ...row, data: { ...row.data, totalKmNoxRegistered: "0" } }] };
     const analysis = analyzeDeviation(finding("UNABLE_TO_VERIFY"), zeroDistance);
-    expect(analysis.comparison.rightLabel).toBe("Calculation requirement");
-    expect(analysis.comparison.rows[0]).toEqual({ label: "NOx-registered distance", left: "0 km", right: "Greater than 0 km to calculate mg/km" });
-    expect(analysis.note).toContain("not be substituted with zero");
+    expect(analysis.comparison.rightLabel).toBe("Krav til beregningen");
+    expect(analysis.comparison.rows[0]).toEqual({ label: "NOx-registrert distanse", left: "0 km", right: "Større enn 0 km for å beregne mg/km" });
+    expect(analysis.note).toContain("skal ikke erstattes med null");
   });
   it("keeps inapplicable supplier CO2 distinct from missing registry data", () => {
     const electric = { ...check, tripRows: [{ ...row, data: { ...row.data, fuelTechnology: "5" as const, co2Registered: false, co2GramsPerKm: null } }] };
     const analysis = analyzeDeviation(finding("CO2_CLASSIFICATION_MISMATCH"), electric);
-    expect(analysis.comparison.rows.find(r => r.label.startsWith("CO₂"))?.left).toBe("Not applicable");
+    expect(analysis.comparison.rows.find(r => r.label.startsWith("CO₂"))?.left).toBe("Ikke relevant");
   });
   it("uses exact integer arithmetic and avoids double rounding", () => {
     expect(exactRatio("9007199254740993", "1", 1n, 0)).toBe("9007199254740993");
@@ -65,20 +65,20 @@ describe("saved deviation fact comparisons", () => {
   });
   it("compares reporting periods with the saved agreement evidence", () => {
     const analysis = analyzeDeviation(finding("AGREEMENT_PERIOD_NOT_COVERED"), check);
-    expect(analysis.comparison.rows[0]).toEqual({ label: "Period", left: "01.01.2026 to 31.01.2026", right: "No agreement linked" });
+    expect(analysis.comparison.rows[0]).toEqual({ label: "Periode", left: "1. jan. 2026 til 31. jan. 2026", right: "Ingen avtale koblet" });
   });
   it("renders a keyboard-operable fact expander with source labels and readable units", () => {
     const html = renderToStaticMarkup(<DeviationFacts finding={finding("NOX_MISMATCH")} check={check} />);
-    expect(html).toContain("<details"); expect(html).toContain("See compared values");
-    expect(html).toContain("Supplier statistics (calculated)"); expect(html).toContain("Statens vegvesen (WLTP)");
+    expect(html).toContain("<details"); expect(html).toContain("Se sammenlignede verdier");
+    expect(html).toContain("Leverandørens statistikk (beregnet)"); expect(html).toContain("Statens vegvesen (WLTP)");
     expect(html).toContain("30 mg/km"); expect(html).toContain("40 mg/km");
     expect(html).toContain("18 g"); expect(html).toContain("600 km");
   });
   it("identifies the comparison source without exposing priority controls by default", () => {
     const populated = { ...check, findings: [finding("NOX_MISMATCH")] };
     const html = renderToStaticMarkup(<DeviationList check={populated} />);
-    expect(html).toContain("Compared with Statens vegvesen");
-    expect(html).toContain("NOx rates do not match"); expect(html).toContain("See compared values");
+    expect(html).toContain("Sammenlignet med Statens vegvesen");
+    expect(html).toContain("NOx-verdiene samsvarer ikke"); expect(html).toContain("Se sammenlignede verdier");
     expect(html).not.toContain("Deviation priority");
   });
 });

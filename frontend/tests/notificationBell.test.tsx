@@ -25,7 +25,7 @@ describe("notification bell", () => {
     auth.role = "SUPPLIER";
     render(<MemoryRouter initialEntries={["/supplier/dashboard"]}><NotificationBell /><Where /></MemoryRouter>);
     expect(screen.getByText("1")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    fireEvent.click(screen.getByRole("button", { name: "Varslinger" }));
     fireEvent.click(screen.getByText("Vehicle deregistered"));
     expect(mark).toHaveBeenCalledWith("n1");
     expect(screen.getByTestId("where").textContent).toBe("/supplier/alerts");
@@ -34,7 +34,7 @@ describe("notification bell", () => {
   it("sends an admin to the supplier the notification concerns", () => {
     auth.role = "ADMIN";
     render(<MemoryRouter initialEntries={["/admin/dashboard"]}><NotificationBell /><Where /></MemoryRouter>);
-    fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    fireEvent.click(screen.getByRole("button", { name: "Varslinger" }));
     fireEvent.click(screen.getByText("Vehicle deregistered"));
     expect(screen.getByTestId("where").textContent).toBe("/admin/suppliers/s1");
   });

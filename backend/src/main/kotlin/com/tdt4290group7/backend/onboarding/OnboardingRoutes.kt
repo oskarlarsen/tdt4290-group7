@@ -36,6 +36,8 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.core.readBytes
+import io.ktor.server.application.application
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.Locale
 
@@ -43,11 +45,11 @@ internal suspend fun ApplicationCall.supplierOrAdminUser(repository: OnboardingR
     val id = principal<JWTPrincipal>()?.payload?.let(JwtConfig::userId)
     val user = id?.let(UserRepository::findById)
     if (user == null) {
-        respond(HttpStatusCode.Unauthorized, ApiError("Authentication required"))
+        respond(HttpStatusCode.Unauthorized, ApiError("Autentisering er påkrevd"))
         return null
     }
     if (user.role == Role.SUPPLIER && !repository.isSupplierActive(user.supplierId.orEmpty())) {
-        respond(HttpStatusCode.Forbidden, ApiError("Supplier organization is no longer active"))
+        respond(HttpStatusCode.Forbidden, ApiError("Leverandørorganisasjonen er ikke lenger aktiv"))
         return null
     }
     return user
@@ -60,13 +62,13 @@ internal suspend fun ApplicationCall.resolveSupplierId(user: User): String? {
             return queryId.trim()
         }
         // If not specified, return default admin view or prompt
-        respond(HttpStatusCode.BadRequest, ApiError("Administrator must specify ?supplierId=<id> to access tenant data"))
+        respond(HttpStatusCode.BadRequest, ApiError("Administrator må oppgi ?supplierId=<id> for å få tilgang til leverandørdata"))
         return null
     }
 
     val sid = user.supplierId
     if (sid.isNullOrBlank()) {
-        respond(HttpStatusCode.Forbidden, ApiError("User account is not linked to any supplier organization"))
+        respond(HttpStatusCode.Forbidden, ApiError("Brukerkontoen er ikke knyttet til noen leverandørorganisasjon"))
         return null
     }
     return sid
@@ -90,13 +92,13 @@ internal fun Route.onboardingRoutes(
             val input = try {
                 call.receive<SupplierProfileInput>()
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid profile data"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldige profildata"))
                 return@post
             }
             try {
                 call.respond(repository.updateProfile(supplierId, input, Instant.now()))
             } catch (e: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid profile input"))
+                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Ugyldig profilinndata"))
             }
         }
 
@@ -107,12 +109,12 @@ internal fun Route.onboardingRoutes(
             val entityType = try {
                 BatchEntityType.valueOf(entityStr ?: "")
             } catch (_: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid entity type. Use 'vehicles', 'energy', or 'products'"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig enhetstype. Bruk «vehicles», «energy» eller «products»"))
                 return@get
             }
 
             if (repository.requiredAgreementIds(supplierId, entityType).isEmpty()) {
-                call.respond(HttpStatusCode.Forbidden, ApiError("Your administrator has not requested this information type"))
+                call.respond(HttpStatusCode.Forbidden, ApiError("Administratoren din har ikke bedt om denne informasjonstypen"))
                 return@get
             }
             val templateCsv = CsvStreamParser.generateTemplate(entityType)
@@ -135,7 +137,7 @@ internal fun Route.onboardingRoutes(
             val entityType = try {
                 BatchEntityType.valueOf(entityStr ?: "")
             } catch (_: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid entity type. Use 'vehicles', 'energy', or 'products'"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig enhetstype. Bruk «vehicles», «energy» eller «products»"))
                 return@post
             }
 
@@ -153,7 +155,7 @@ internal fun Route.onboardingRoutes(
 
             val uploadedBytes = fileBytes
             if (uploadedBytes == null || uploadedBytes.isEmpty()) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("No CSV file uploaded in multipart request"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Ingen CSV-fil er lastet opp i forespørselen"))
                 return@post
             }
 
@@ -168,7 +170,7 @@ internal fun Route.onboardingRoutes(
                 )
                 call.respond(preview)
             } catch (e: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Invalid CSV upload"))
+                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Ugyldig CSV-opplasting"))
             }
         }.apply {
             install(RequestBodyLimit) {
@@ -182,15 +184,18 @@ internal fun Route.onboardingRoutes(
             val request = try {
                 call.receive<CsvConfirmRequest>()
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid request JSON"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig JSON i forespørselen"))
                 return@post
             }
 
+            val unverified = if (registry != null) repository.unverifiedPlates(request.batchId) else emptyList()
             try {
                 val response = repository.confirmBatch(request.batchId, supplierId, Instant.now(), byRole = user.role.name)
+                // Plates the registry could not be asked about during the preview are checked afterwards, in the background.
+                if (registry != null && unverified.isNotEmpty()) call.application.launch { runCatching { repository.verifyAfterUpload(unverified, registry) } }
                 call.respond(response)
             } catch (e: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Failed to confirm batch"))
+                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Kunne ikke bekrefte importen"))
             }
         }
 
@@ -200,7 +205,7 @@ internal fun Route.onboardingRoutes(
             try {
                 call.respond(repository.submitOnboarding(supplierId, Instant.now()))
             } catch (e: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Cannot submit onboarding"))
+                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Kan ikke sende inn registreringen"))
             }
         }
     }
@@ -210,19 +215,19 @@ internal fun Route.onboardingRoutes(
             val actor = call.adminActor() ?: return@post
             val targetSupplierId = call.parameters["supplierId"]
             if (targetSupplierId.isNullOrBlank()) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("supplierId required in URL path"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("supplierId er påkrevd i URL-stien"))
                 return@post
             }
             val request = try {
                 call.receive<AdminReviewRequest>()
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, ApiError("Invalid review request JSON"))
+                call.respond(HttpStatusCode.BadRequest, ApiError("Ugyldig JSON i vurderingsforespørselen"))
                 return@post
             }
             try {
                 call.respond(repository.reviewOnboarding(targetSupplierId, request, Instant.now()))
             } catch (e: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Failed to process review"))
+                call.respond(HttpStatusCode.BadRequest, ApiError(e.message ?: "Kunne ikke behandle vurderingen"))
             }
         }
     }

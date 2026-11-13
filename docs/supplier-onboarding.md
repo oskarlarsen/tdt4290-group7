@@ -99,18 +99,28 @@ CREATE TABLE IF NOT EXISTS facility_energy (
     workshop_area_sqm REAL CHECK (workshop_area_sqm IS NULL OR workshop_area_sqm >= 0),
     other_area_sqm REAL CHECK (other_area_sqm IS NULL OR other_area_sqm >= 0),
     reporting_year INTEGER NOT NULL CHECK (reporting_year BETWEEN 2020 AND 2030),
+    reporting_quarter INTEGER NOT NULL DEFAULT 4 CHECK (reporting_quarter BETWEEN 1 AND 4),
     electricity_kwh REAL NOT NULL CHECK (electricity_kwh >= 0),
     district_heating_kwh REAL NOT NULL CHECK (district_heating_kwh >= 0),
     biogas_kwh REAL DEFAULT 0.0 CHECK (biogas_kwh >= 0),
     fossil_fuel_kwh REAL DEFAULT 0.0 CHECK (fossil_fuel_kwh >= 0),
     self_produced_solar_kwh REAL DEFAULT 0.0 CHECK (self_produced_solar_kwh >= 0),
     self_produced_heatpump_kwh REAL DEFAULT 0.0 CHECK (self_produced_heatpump_kwh >= 0),
+    goo_covered_kwh REAL NOT NULL DEFAULT 0.0 CHECK (goo_covered_kwh >= 0),
     notes TEXT,
     created_at TEXT NOT NULL CHECK (julianday(created_at) IS NOT NULL AND substr(created_at, -1) = 'Z'),
     updated_at TEXT NOT NULL CHECK (julianday(updated_at) IS NOT NULL AND substr(updated_at, -1) = 'Z'),
-    UNIQUE (agreement_id, location_code, reporting_year)
+    UNIQUE (agreement_id, location_code, reporting_year, reporting_quarter)
 ) STRICT;
 ```
+
+Reports are quarterly. Rows written before quarters existed are migrated to Q4 when the database is opened. `goo_covered_kwh` is the energy covered by guarantees of origin (opprinnelsesgarantier). Total energy used is electricity + district heating + biogas + fossil + own solar; heat pump output is already part of purchased electricity, so it counts as self-produced but is not added again.
+
+### `agreement_energy_commitments`
+What an agreement promises per year, set by an administrator: `min_self_produced_kwh` (self-produced renewable energy) and `min_goo_kwh` (energy covered by guarantees of origin).
+
+### `energy_evidence`
+Meter exports and solar dashboard screenshots a supplier attaches to a quarter's report. The file is stored in the `data` blob (PDF, PNG, JPG, CSV or XLSX, at most 10 MB; the type is taken from the file extension).
 
 ### `contract_products`
 Persists delivered goods and accredited eco-labels (Svanemerket, Möbelfakta, etc.):
@@ -155,6 +165,11 @@ All endpoints require authentication via JWT cookie (`auth_token`).
 | `GET` | `/api/supplier/agreements` | SUPPLIER, ADMIN | Returns framework agreements assigned to the authenticated supplier. |
 | `GET` | `/api/supplier/vehicles` | SUPPLIER, ADMIN | Lists vehicles registered under the supplier's agreements. |
 | `GET` | `/api/supplier/energy` | SUPPLIER, ADMIN | Lists facility energy records for the supplier's agreements. |
+| `GET` | `/api/admin/energy?year=` | ADMIN | Per energy-reporting agreement: commitment, delivered kWh, projected deviation, status (`COMPLIANT`, `AT_RISK`, `NON_COMPLIANT`, `MISSING_DATA`, `NO_COMMITMENT`), per-quarter and per-location figures and attached evidence. A year is closed once Q4 is reported or the year has passed; an open year is projected straight-line from the latest reported quarter. |
+| `PUT` | `/api/admin/energy/{agreementId}/commitment` | ADMIN | Sets `minSelfProducedKwh` and `minGooKwh` for an agreement. |
+| `GET` | `/api/admin/energy/evidence/{id}` | ADMIN | Downloads an evidence file. |
+| `GET`, `POST` | `/api/onboarding/energy/evidence` | SUPPLIER, ADMIN | Lists, or uploads (multipart: `agreementId`, `year`, `quarter`, `file`) evidence files for the supplier's own agreements. |
+| `GET`, `DELETE` | `/api/onboarding/energy/evidence/{id}` | SUPPLIER, ADMIN | Downloads or removes one of the supplier's own evidence files. |
 | `GET` | `/api/supplier/products` | SUPPLIER, ADMIN | Lists catalog goods and eco-labels for the supplier's agreements. |
 | `GET` | `/api/supplier/certificates` | SUPPLIER, ADMIN | Lists uploaded environmental certificates linked to the supplier's contracts. |
 

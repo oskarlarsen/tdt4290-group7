@@ -29,6 +29,20 @@ object CertificateTypes {
         return flatA.isNotEmpty() && flatA != "unknown" && flatA == flatten(b)
     }
 
+    /** The name shown in the Norwegian interface; stored types stay as parsed so matching keeps working. */
+    fun displayName(certificateType: String): String =
+        when {
+            flatten(certificateType.replace("ø", "o")).contains("kursiokonomiskkjoring") -> "Kurs i økonomisk kjøring"
+            flatten(certificateType) == "unknown" -> "Ikke gjenkjent"
+            else -> certificateType
+        }
+
+    /** How a sentence refers to the document: the course is "Kurs i økonomisk kjøring", the others are "<type>-sertifikatet". */
+    fun subject(certificateType: String): String {
+        val name = displayName(certificateType)
+        return if (name == "Kurs i økonomisk kjøring") name else "$name-sertifikatet"
+    }
+
     private fun flatten(type: String) = type.lowercase().filter { it.isLetterOrDigit() }
 
     /** How many days before expiry the first alert is raised. */

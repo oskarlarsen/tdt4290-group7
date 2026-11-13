@@ -12,7 +12,7 @@ import org.sqlite.SQLiteException
 private val sharedFileTables = setOf("users", "supplier_invitations", "access_invitations", "certificates", "admin_alerts",
     "notifications", "admin_insights_metadata", "supplier_notes", "supplier_review_statuses")
 
-internal class VehicleStorageBusyException(cause: SQLiteException) : RuntimeException("Vehicle database is busy", cause)
+internal class VehicleStorageBusyException(cause: SQLiteException) : RuntimeException("Kjøretøydatabasen er opptatt", cause)
 
 internal class VehicleDatabase(path: Path) {
     private val databaseUrl: String
@@ -43,11 +43,11 @@ internal class VehicleDatabase(path: Path) {
      */
     private fun copyListingsToUsages(db: Connection) {
         db.createStatement().use {
-            it.executeUpdate("""INSERT OR IGNORE INTO vehicle_usages (id, registration_number, agreement_id, planned, listed, created_at, updated_at)
-                SELECT registration_number || '|' || agreement_id, registration_number, agreement_id, planned, listed, created_at, updated_at
+            it.executeUpdate("""INSERT OR IGNORE INTO vehicle_usages (id, registration_number, agreement_id, planned, listed, exception_approved, exception_note, registry_problem, created_at, updated_at)
+                SELECT registration_number || '|' || agreement_id, registration_number, agreement_id, planned, listed, exception_approved, exception_note, registry_problem, created_at, updated_at
                 FROM vehicles WHERE agreement_id IS NOT NULL""")
-            it.executeUpdate("""INSERT OR IGNORE INTO change_vehicle_usages (change_id, phase, id, registration_number, agreement_id, planned, listed, created_at, updated_at)
-                SELECT change_id, phase, registration_number || '|' || agreement_id, registration_number, agreement_id, planned, listed, created_at, updated_at
+            it.executeUpdate("""INSERT OR IGNORE INTO change_vehicle_usages (change_id, phase, id, registration_number, agreement_id, planned, listed, exception_approved, exception_note, registry_problem, created_at, updated_at)
+                SELECT change_id, phase, registration_number || '|' || agreement_id, registration_number, agreement_id, planned, listed, exception_approved, exception_note, registry_problem, created_at, updated_at
                 FROM change_vehicles WHERE agreement_id IS NOT NULL""")
         }
     }
@@ -69,6 +69,12 @@ internal class VehicleDatabase(path: Path) {
             "vehicle_checks" to listOf("agreement_saksnr TEXT"),
             // The category (and so the weight class) Statens vegvesen gave when the fuel was filled in at upload.
             "vehicle_contract_details" to listOf("vehicle_category TEXT"),
+            // An admin accepted this unlisted vehicle as a one-off exception; kept on the listing (vehicle_usages) so Change history can undo it.
+            "vehicle_usages" to listOf("exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1))", "exception_note TEXT", "registry_problem TEXT"),
+            "change_vehicle_usages" to listOf("exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1))", "exception_note TEXT", "registry_problem TEXT"),
+            // Older databases from before the per-agreement listing keep these on the frozen vehicles columns.
+            "vehicles" to listOf("exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1))", "exception_note TEXT", "registry_problem TEXT"),
+            "change_vehicles" to listOf("exception_approved INTEGER NOT NULL DEFAULT 0 CHECK(exception_approved IN (0,1))", "exception_note TEXT", "registry_problem TEXT"),
             // Who confirmed an upload (SUPPLIER, or ADMIN acting for the supplier), for "last updated".
             "upload_batches" to listOf("committed_by_role TEXT")
         )

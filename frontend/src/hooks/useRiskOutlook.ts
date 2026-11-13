@@ -3,13 +3,14 @@ import { useCertificates } from "./useCertificates";
 import { useContracts } from "./useContracts";
 import { useEnergy } from "./useEnergy";
 import { buildRiskOutlook } from "../types/riskOutlook";
+import { currentReportingYear } from "../types/energy";
 
 // Reuses existing queries to keep risk data consistent across pages.
 // TODO: Replace with GET /admin/risk-outlook when the backend is ready.
 export function useRiskOutlook() {
   const contracts = useContracts();
   const certificates = useCertificates();
-  const energy = useEnergy();
+  const energy = useEnergy(currentReportingYear());
 
   const rows = useMemo(
     () =>

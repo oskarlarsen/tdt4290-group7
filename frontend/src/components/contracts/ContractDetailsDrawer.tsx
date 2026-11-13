@@ -13,6 +13,13 @@ type Props = {
   onClose: () => void;
 };
 
+const STATUS_LABELS = {
+  Expired: "Utløpt",
+  "Expiring soon": "Utløper snart",
+  Upcoming: "Kommende",
+  Active: "Aktiv",
+} as const;
+
 const STATUS_CLASSES = {
   Expired: "bg-red-100 text-red-700",
   "Expiring soon": "bg-amber-100 text-amber-800",
@@ -39,7 +46,7 @@ export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
   }, [isOpen, onClose]);
 
   const requested = agreement
-    ? [agreement.requiresVehicles && "Vehicles", agreement.requiresEnergy && "Energy", agreement.requiresProducts && "Products"].filter(Boolean).join(", ")
+    ? [agreement.requiresVehicles && "Kjøretøy", agreement.requiresEnergy && "Energi", agreement.requiresProducts && "Produkter"].filter(Boolean).join(", ")
     : "";
   const status = agreement ? getAgreementStatus(agreement) : null;
 
@@ -57,7 +64,7 @@ export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
         inert={!isOpen}
         role="dialog"
         aria-modal="true"
-        aria-label={agreement ? `${agreementLabel(agreement)} details` : undefined}
+        aria-label={agreement ? `Detaljer for ${agreementLabel(agreement)}` : undefined}
         aria-hidden={!isOpen}
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${isOpen ? "translate-x-0" : "translate-x-full"}`}
       >
@@ -72,7 +79,7 @@ export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
               </div>
               <button
                 onClick={onClose}
-                aria-label="Close"
+                aria-label="Lukk"
                 className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
@@ -80,24 +87,24 @@ export function ContractDetailsDrawer({ agreement, supplier, onClose }: Props) {
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Agreement">
-                <Field label="Saksnr" value={agreement.saksnr?.trim() || "Saksnr missing"} />
-                {agreement.note.trim() && <Field label="Note" value={agreement.note.trim()} />}
-                <Field label="Status" value={status} />
-                <Field label="Start date" value={formatDate(agreement.startDate)} />
-                <Field label="End date" value={formatDate(agreement.endDate)} />
-                <Field label="Maximum vehicles" value={String(agreement.allowedVehicles)} />
-                <Field label="Information from supplier" value={requested || "None"} />
+              <Section title="Avtale">
+                <Field label="Saksnr" value={agreement.saksnr?.trim() || "Saksnr mangler"} />
+                {agreement.note.trim() && <Field label="Notat" value={agreement.note.trim()} />}
+                <Field label="Status" value={STATUS_LABELS[status]} />
+                <Field label="Startdato" value={formatDate(agreement.startDate)} />
+                <Field label="Sluttdato" value={formatDate(agreement.endDate)} />
+                <Field label="Maks. antall kjøretøy" value={String(agreement.allowedVehicles)} />
+                <Field label="Informasjon fra leverandør" value={requested || "Ingen"} />
               </Section>
 
-              <Section title="Linked supplier">
-                <Field label="Supplier" value={supplier.name} />
-                <Field label="Org ID" value={supplier.orgNumber} />
+              <Section title="Tilknyttet leverandør">
+                <Field label="Leverandør" value={supplier.name} />
+                <Field label="Org.nr." value={supplier.orgNumber} />
                 <button
                   onClick={() => navigate(`/admin/suppliers?supplierId=${supplier.id}`)}
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-secondary-700 hover:text-secondary-800"
                 >
-                  View linked supplier
+                  Vis tilknyttet leverandør
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </button>
               </Section>

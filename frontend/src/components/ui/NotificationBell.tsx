@@ -47,7 +47,7 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="relative flex h-7 w-8 shrink-0 items-center justify-center rounded-full p-0 text-neutral-500 hover:bg-neutral-50"
-        aria-label="Notifications"
+        aria-label="Varslinger"
       >
         <Bell className="h-5 w-4 shrink-0" />
         {unreadCount > 0 && (
@@ -60,13 +60,13 @@ export function NotificationBell() {
       {open && (
         <div className="absolute right-0 z-10 mt-2 w-80 rounded-lg border border-neutral-100 bg-white shadow-card">
           <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
-            <span className="text-xs font-mono uppercase tracking-wide text-neutral-500">Notifications</span>
+            <span className="text-xs font-mono uppercase tracking-wide text-neutral-500">Varslinger</span>
             {unreadCount > 0 && (
               <button
                 onClick={() => markAllAsRead.mutate()}
                 className="text-xs font-medium text-secondary-700 hover:text-secondary-800"
               >
-                Mark all as read
+                Merk alle som lest
               </button>
             )}
           </div>
@@ -75,7 +75,7 @@ export function NotificationBell() {
             {notifications.length === 0 && (
               <div className="flex items-center gap-2 px-3 py-4 text-sm text-neutral-500">
                 <CheckCircle2 className="h-4 w-4 text-tertiary-600" />
-                You're all caught up. No new notifications.
+                Du er à jour. Ingen nye varslinger.
               </div>
             )}
             {notifications.map((n) => (

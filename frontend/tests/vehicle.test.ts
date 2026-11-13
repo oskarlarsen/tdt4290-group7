@@ -4,7 +4,7 @@ import { fuelGroups, categoryGroup, INAPPLICABLE_EMISSION_FIELDS } from "../src/
 import type { CheckSummary } from "../src/types/vehicle";
 
 const values: Record<string, string> = {
-  registrationNumber: "ab-12345", periodStart: "2026-01-01", periodEnd: "2026-01-31",
+  registrationNumber: "ab-12345", agreementId: "agreement-1", periodStart: "2026-01-01", periodEnd: "2026-01-31",
   fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic make", model: "Synthetic model",
   co2Registered: "false", ...Object.fromEntries(DECIMAL_FIELDS.map(([key]) => [key, "0"])),
 };
@@ -41,9 +41,9 @@ describe("vehicle input and safe status presentation", () => {
   it("clearly separates saved statistics from incomplete or failed automatic verification", () => {
     const check: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", lookupOutcome: "NOT_CONFIGURED", dataSource: "UNAVAILABLE", deviations: ["NOT_ON_AGREEMENT_LIST"] };
     const result = { createdAt: "synthetic", rowCount: 1, distinctVehicleCount: 1, rows: [], checks: [{ registrationNumber: "AB12345", check }] };
-    expect(statisticsSaveMessage(result, "AB12345")).toContain("Statens vegvesen verification incomplete");
+    expect(statisticsSaveMessage(result, "AB12345")).toContain("Verifisering mot Statens vegvesen er ufullstendig");
     expect(statisticsSaveMessage({ ...result, checks: [{ registrationNumber: "AB12345", error: "Saved; retry check only" }] }, "AB12345")).toBe("Saved; retry check only");
-    expect(statisticsSaveMessage({ ...result, checks: [] }, "AB12345")).toContain("do not resubmit");
+    expect(statisticsSaveMessage({ ...result, checks: [] }, "AB12345")).toContain("ikke send statistikken på nytt");
   });
   it("preserves exact numeric literals and omitted values when posting a single row", () => {
     const body = statisticsBody({ ...values, co2GramsPerKm: "123.456789012345678", totalTripKm: "000.00", co2Registered: "false", comment: 'text with \"co2GramsPerKm\":999' });
@@ -103,11 +103,15 @@ describe("vehicle input and safe status presentation", () => {
   });
   it("never labels stale or unavailable verification as a clean result", () => {
     const base: CheckSummary = { id: "synthetic", checkedAt: "2026-01-01T00:00:00Z", lookupOutcome: "FOUND", dataSource: "CACHE", deviations: [] };
-    expect(checkLabel(null)).toBe("Not checked");
-    expect(checkLabel({ ...base, dataSource: "UNAVAILABLE" })).toBe("Verification incomplete");
-    expect(checkLabel({ ...base, dataSource: "STALE_CACHE" })).toBe("Stale verification");
-    expect(checkLabel({ ...base, lookupOutcome: "NOT_FOUND" })).toBe("Verification incomplete");
-    expect(checkLabel({ ...base, deviations: ["DEREGISTERED"] })).toBe("1 recorded deviation");
-    expect(checkLabel(base)).toBe("No recorded deviations");
+    expect(checkLabel(null)).toBe("Ikke kontrollert");
+    expect(checkLabel({ ...base, dataSource: "UNAVAILABLE" })).toBe("Verifisering ufullstendig");
+    expect(checkLabel({ ...base, dataSource: "STALE_CACHE" })).toBe("Utdatert verifisering");
+    expect(checkLabel({ ...base, lookupOutcome: "NOT_FOUND" })).toBe("Verifisering ufullstendig");
+    expect(checkLabel({ ...base, deviations: ["DEREGISTERED"] })).toBe("1 registrert avvik");
+    expect(checkLabel(base)).toBe("Ingen registrerte avvik");
+  });
+  it("sends the chosen agreement and refuses to save without one", () => {
+    expect(JSON.parse(statisticsBody(values)).agreementId).toBe("agreement-1");
+    expect(() => statisticsBody({ ...values, agreementId: "" })).toThrow("Velg hvilken avtale");
   });
 });

@@ -28,10 +28,10 @@ type AlertView = "all" | AlertSeverity;
 type StatusFilter = "ALL" | "UNRESOLVED" | AlertStatus;
 
 const FILTERS: { value: AlertView; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "all", label: "Alle" },
+  { value: "high", label: "Høy" },
+  { value: "medium", label: "Middels" },
+  { value: "low", label: "Lav" },
 ];
 
 const SEVERITY_RANK: Record<AlertSeverity, number> = { high: 0, medium: 1, low: 2 };
@@ -123,7 +123,7 @@ export default function Alerts() {
       });
       setDeleteErrors((current) => ({
         ...current,
-        [id]: error instanceof Error ? error.message : "Could not archive the alert.",
+        [id]: error instanceof Error ? error.message : "Kunne ikke arkivere varselet.",
       }));
     } finally {
       finalizingDeleteIds.current.delete(id);
@@ -218,8 +218,8 @@ export default function Alerts() {
   const currentPage = Math.min(page, totalPages);
   const pagedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const emptyMessage = rows.length === 0
-    ? "No alert records available"
-    : "No alerts match the current filters";
+    ? "Ingen varsler tilgjengelig"
+    : "Ingen varsler samsvarer med filtrene";
 
   if (alertsLoading) {
     return (
@@ -230,7 +230,7 @@ export default function Alerts() {
   }
 
   if (alertsError || !alerts) {
-    return <div className="text-sm text-red-700">Couldn't load alerts. Try again.</div>;
+    return <div className="text-sm text-red-700">Kunne ikke laste varsler. Prøv igjen.</div>;
   }
 
   // The drawer reads from all rows so status changes do not close it.
@@ -250,13 +250,13 @@ export default function Alerts() {
         onSuccess: () =>
           setStatusFeedback({
             alertId: id,
-            message: `Status updated to ${ALERT_STATUS_LABELS[status]}.`,
+            message: `Status oppdatert til ${ALERT_STATUS_LABELS[status]}.`,
             isError: false,
           }),
         onError: (error) =>
           setStatusFeedback({
             alertId: id,
-            message: error instanceof Error ? error.message : "Could not update alert status",
+            message: error instanceof Error ? error.message : "Kunne ikke oppdatere varselstatus",
             isError: true,
           }),
       }
@@ -291,7 +291,7 @@ export default function Alerts() {
     let noteSaved = true;
     if (noteToSelf) {
       try {
-        await addSupplierNote(input.supplierId, { id: user?.id ?? "", name: user?.name ?? "Unknown admin" }, {
+        await addSupplierNote(input.supplierId, { id: user?.id ?? "", name: user?.name ?? "Ukjent administrator" }, {
           text: noteToSelf,
           visibility: "SELF",
           alertId: createdAlert.id,
@@ -307,7 +307,7 @@ export default function Alerts() {
     setPage(1);
     setCreatedAlertIdToReveal(createdAlert.id);
     setCreateSuccessMessage(
-      noteSaved ? "Manual alert created successfully" : "Alert saved, note not saved. Add the note from the supplier's page."
+      noteSaved ? "Manuelt varsel opprettet" : "Varselet er lagret, men notatet ble ikke lagret. Legg til notatet fra leverandørsiden."
     );
   }
 
@@ -315,20 +315,20 @@ export default function Alerts() {
     if (filteredRows.length === 0) return;
     const csv = toCsv(
       filteredRows.map(({ alert, contract, supplier }) => ({
-        Risk: ALERT_SEVERITY_LABELS[alert.severity],
-        "Created On": alert.createdAt ? formatAlertCreatedDate(alert.createdAt) : "",
-        Description: alert.description,
-        Finding: alert.findingType ?? "",
-        "Affected item": alert.affectedItem?.name ?? "",
-        Reason: alert.reason ?? "",
-        Alert: alert.title,
-        Supplier: contract?.supplierName ?? supplier?.displayName ?? "",
-        "Org ID": contract?.supplierOrgId ?? supplier?.orgId ?? "",
-        Contract: contract?.contractName ?? supplier?.primaryContract ?? "",
+        Risiko: ALERT_SEVERITY_LABELS[alert.severity],
+        "Opprettet": alert.createdAt ? formatAlertCreatedDate(alert.createdAt) : "",
+        Beskrivelse: alert.description,
+        Funn: alert.findingType ?? "",
+        "Berørt element": alert.affectedItem?.name ?? "",
+        Årsak: alert.reason ?? "",
+        Varsel: alert.title,
+        Leverandør: contract?.supplierName ?? supplier?.displayName ?? "",
+        "Org.nr.": contract?.supplierOrgId ?? supplier?.orgId ?? "",
+        Avtale: contract?.contractName ?? supplier?.primaryContract ?? "",
         Status: ALERT_STATUS_LABELS[alert.status],
       }))
     );
-    downloadCsv(`alerts-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`varsler-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
 
   return (
@@ -337,13 +337,13 @@ export default function Alerts() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">
-              Compliance / Alerts
+              Oppfølging / Varsler
             </div>
             <h1 className="mt-2 font-headline text-2xl font-semibold leading-tight tracking-[-0.04em] text-[#0f172a]">
-              Compliance Alerts
+              Varslinger
             </h1>
             <p className="mt-1.5 max-w-170 text-sm leading-6 text-[#5c6773]">
-              Compliance workflow alerts across monitored suppliers, tracked from open through resolution.
+              Varsler i oppfølgingsarbeidet for overvåkede leverandører, fra åpent varsel til løsning.
             </p>
           </div>
 
@@ -354,7 +354,7 @@ export default function Alerts() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
-              Export (CSV)
+              Eksporter (CSV)
             </button>
             <button
               onClick={() => {
@@ -364,7 +364,7 @@ export default function Alerts() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
               <Plus className="h-3.5 w-3.5" />
-              Create manual alert
+              Opprett manuelt varsel
             </button>
           </div>
         </div>
@@ -372,49 +372,49 @@ export default function Alerts() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard
-          label="Unresolved alerts"
+          label="Uløste varsler"
           value={counts.unresolved}
-          sublabel="with full records"
+          sublabel="med fullstendige poster"
           note={
             portfolioUnresolved !== undefined
-              ? `${portfolioUnresolved} portfolio-wide (Dashboard)`
+              ? `${portfolioUnresolved} for hele porteføljen (Dashbord)`
               : counts.unresolved > 0
-                ? "Unresolved records currently visible"
-                : "No unresolved records"
+                ? "Uløste poster som vises nå"
+                : "Ingen uløste poster"
           }
           icon={<Bell className="h-4 w-4" />}
           iconClassName="bg-primary-100 text-primary-900"
         />
         <KpiCard
-          label="High Risk"
+          label="Høy risiko"
           value={counts.high}
-          sublabel="unresolved follow-up"
-          note={counts.high > 0 ? "Needs immediate attention" : "None currently"}
+          sublabel="uløst oppfølging"
+          note={counts.high > 0 ? "Krever umiddelbar oppfølging" : "Ingen for øyeblikket"}
           noteTone={counts.high > 0 ? "danger" : "success"}
           icon={<AlertTriangle className="h-4 w-4" />}
           iconClassName="bg-red-100 text-red-700"
         />
         <KpiCard
-          label="Medium Risk"
+          label="Middels risiko"
           value={counts.medium}
-          sublabel="unresolved follow-up"
-          note={counts.medium > 0 ? "Needs follow-up soon" : "None currently"}
+          sublabel="uløst oppfølging"
+          note={counts.medium > 0 ? "Krever oppfølging snart" : "Ingen for øyeblikket"}
           icon={<Clock3 className="h-4 w-4" />}
           iconClassName="bg-amber-100 text-amber-700"
         />
         <KpiCard
-          label="Low Risk"
+          label="Lav risiko"
           value={counts.low}
-          sublabel="unresolved follow-up"
-          note={counts.low > 0 ? "Review when convenient" : "None currently"}
+          sublabel="uløst oppfølging"
+          note={counts.low > 0 ? "Gjennomgå når det passer" : "Ingen for øyeblikket"}
           icon={<Clock3 className="h-4 w-4" />}
           iconClassName="bg-neutral-100 text-neutral-600"
         />
         <KpiCard
-          label="Resolved"
+          label="Løst"
           value={counts.resolved}
-          sublabel="with full records"
-          note={counts.resolved > 0 ? "No further action currently required" : "No resolved alerts"}
+          sublabel="med fullstendige poster"
+          note={counts.resolved > 0 ? "Ingen ytterligere tiltak nødvendig nå" : "Ingen løste varsler"}
           icon={<CheckCircle2 className="h-4 w-4" />}
           iconClassName="bg-tertiary-100 text-tertiary-700"
         />
@@ -427,14 +427,14 @@ export default function Alerts() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search alert, supplier, or contract…"
+              placeholder="Søk etter varsel, leverandør eller avtale…"
               className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-1.5 pl-9 pr-3 text-xs text-neutral-700 placeholder:text-neutral-500 outline-none focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs text-neutral-600">
               <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
-              <span className="font-medium text-neutral-700">Show archived</span>
+              <span className="font-medium text-neutral-700">Vis arkiverte</span>
             </label>
             <label className="flex items-center gap-2 text-xs text-neutral-600">
               <span className="font-medium text-neutral-700">Status:</span>
@@ -450,27 +450,27 @@ export default function Alerts() {
                   }
                 }}
                 className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-                aria-label="Filter alerts by status"
+                aria-label="Filtrer varsler etter status"
               >
-                <option value="ALL">All statuses</option>
-                <option value="UNRESOLVED">Unresolved</option>
+                <option value="ALL">Alle statuser</option>
+                <option value="UNRESOLVED">Uløste</option>
                 {ALERT_STATUSES.map((status) => (
                   <option key={status} value={status}>{ALERT_STATUS_LABELS[status]}</option>
                 ))}
               </select>
             </label>
             <label className="flex items-center gap-2 text-xs text-neutral-600">
-              <span className="font-medium text-neutral-700">Risk:</span>
+              <span className="font-medium text-neutral-700">Risiko:</span>
               <span className="relative inline-flex">
                 <select
                   value={view}
                   onChange={(event) => setView(event.target.value as AlertView)}
                   className="appearance-none rounded-md border border-neutral-200 bg-white py-1 pl-2 pr-7 text-xs font-medium text-neutral-700 outline-none transition-colors focus:border-primary-900 focus:ring-2 focus:ring-primary-900/10"
-                  aria-label="Filter alerts by risk"
+                  aria-label="Filtrer varsler etter risiko"
                 >
                   {FILTERS.map((filter) => (
                     <option key={filter.value} value={filter.value}>
-                      {filter.value === "all" ? "All" : filter.label}
+                      {filter.label}
                     </option>
                   ))}
                 </select>
@@ -496,7 +496,7 @@ export default function Alerts() {
           totalPages={totalPages}
           totalItems={filteredRows.length}
           pageSize={PAGE_SIZE}
-          itemLabel="alert"
+          itemLabel="varsel"
           onPageChange={setPage}
         />
       </section>
@@ -523,7 +523,7 @@ export default function Alerts() {
           {createSuccessMessage}
           <button
             type="button"
-            aria-label="Dismiss success message"
+            aria-label="Lukk melding"
             onClick={() => setCreateSuccessMessage("")}
             className="ml-3 font-semibold text-tertiary-300 hover:text-tertiary-200"
           >
@@ -534,7 +534,7 @@ export default function Alerts() {
 
       <div className="fixed bottom-6 right-6 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
         {Object.entries(pendingDeletes).map(([id, pending]) => {
-          const alertTitle = alerts.find((alert) => alert.id === id)?.title ?? "Alert";
+          const alertTitle = alerts.find((alert) => alert.id === id)?.title ?? "Varsel";
           return (
             <AlertDeleteUndoNotice
               key={id}
@@ -555,7 +555,7 @@ export default function Alerts() {
             <span>{message}</span>
             <button
               type="button"
-              aria-label="Dismiss delete error"
+              aria-label="Lukk feilmelding"
               onClick={() =>
                 setDeleteErrors((current) => {
                   const { [id]: _removed, ...remaining } = current;
@@ -616,10 +616,10 @@ function AlertDeleteUndoNotice({
       className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-card"
     >
       <span className="min-w-0 truncate">
-        {isDeleting ? "Archiving alert…" : `Alert archived: ${title}`}
+        {isDeleting ? "Arkiverer varsel…" : `Varsel arkivert: ${title}`}
       </span>
       {isDeleting ? (
-        <span className="shrink-0 text-neutral-500">Please wait</span>
+        <span className="shrink-0 text-neutral-500">Vent litt</span>
       ) : (
         <button
           type="button"
@@ -627,7 +627,7 @@ function AlertDeleteUndoNotice({
           disabled={secondsRemaining === 0}
           className="shrink-0 font-semibold text-tertiary-300 hover:text-tertiary-200 disabled:opacity-50"
         >
-          Undo ({secondsRemaining}s)
+          Angre ({secondsRemaining}s)
         </button>
       )}
     </div>

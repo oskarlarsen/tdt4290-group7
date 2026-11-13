@@ -47,14 +47,14 @@ describe("agreement vehicle actions", () => {
   it("offers a registration-pending switch without requiring technical vehicle details", () => {
     const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><VehicleEntryForm agreementId="agreement" onClose={() => {}} onSaved={() => {}} /></QueryClientProvider>);
     expect(html).toContain('role="switch"'); expect(html).toContain('aria-checked="false"');
-    expect(html).toContain("Registration pending");
-    expect(html).toContain("Reserves one vehicle place until the registration number is available.");
-    expect(html).not.toContain("Fuel"); expect(html).not.toContain("Vehicle category");
+    expect(html).toContain("Registrering venter");
+    expect(html).toContain("Reserverer én kjøretøyplass til registreringsnummeret er tilgjengelig.");
+    expect(html).not.toContain("Drivstoff"); expect(html).not.toContain("Kjøretøykategori");
   });
-  it("formats dates in Norwegian order and counts the inclusive agreement period", () => {
-    expect(vehicleDate("2026-10-20")).toBe("20.10.2026");
-    expect(agreementDuration("2026-01-01", "2026-01-31")).toBe("31 days");
-    expect(agreementDuration("2028-02-28", "2028-03-01")).toBe("3 days");
+  it("formats dates as day, short month, year and counts the inclusive agreement period", () => {
+    expect(vehicleDate("2026-10-20")).toBe("20. okt. 2026");
+    expect(agreementDuration("2026-01-01", "2026-01-31")).toBe("31 dager");
+    expect(agreementDuration("2028-02-28", "2028-03-01")).toBe("3 dager");
     expect(agreementDuration("2026-02-30", "2026-03-01")).toBe("");
   });
 });

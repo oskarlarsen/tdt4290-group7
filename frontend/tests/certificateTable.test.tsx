@@ -37,17 +37,17 @@ describe("certificate table", () => {
 
     expect(screen.getByText("Example Transport AS")).toBeTruthy();
     expect(screen.getByText("ISO 14001")).toBeTruthy();
-    expect(screen.getByText("Not linked")).toBeTruthy();
-    expect(screen.getByText("Valid")).toBeTruthy();
+    expect(screen.getByText("Ikke tilknyttet")).toBeTruthy();
+    expect(screen.getByText("Gyldig")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "View details" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit Example Transport AS" }));
-    fireEvent.click(screen.getByRole("button", { name: "Archive Example Transport AS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vis detaljer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rediger Example Transport AS" }));
+    fireEvent.click(screen.getByRole("button", { name: "Arkiver Example Transport AS" }));
 
     expect(onSelect).toHaveBeenCalledWith({ certificate, contract: undefined });
     expect(onEdit).toHaveBeenCalledWith(certificate);
     expect(onArchive).toHaveBeenCalledWith(certificate);
-    expect(screen.queryByRole("button", { name: /^Delete/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Slett/ })).toBeNull();
   });
 
   it("offers Restore instead of Archive for an archived certificate", () => {
@@ -56,8 +56,8 @@ describe("certificate table", () => {
     const archived = { ...certificate, archivedAt: "2026-10-01T10:00:00Z" };
     render(<CertificateTable rows={[{ certificate: archived }]} onSelect={vi.fn()} onEdit={vi.fn()} onArchive={onArchive} onRestore={onRestore} />);
 
-    expect(screen.queryByRole("button", { name: "Archive Example Transport AS" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Restore Example Transport AS" }));
+    expect(screen.queryByRole("button", { name: "Arkiver Example Transport AS" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Gjenopprett Example Transport AS" }));
     expect(onRestore).toHaveBeenCalledWith(archived);
     expect(onArchive).not.toHaveBeenCalled();
   });
@@ -72,7 +72,7 @@ describe("certificate table", () => {
       />,
     );
 
-    const buttons = screen.getAllByRole("button", { name: /^Renew/ });
+    const buttons = screen.getAllByRole("button", { name: /^Forny/ });
     expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0]);
     expect(onRenew).toHaveBeenCalledWith(expired);

@@ -18,7 +18,7 @@ export function AlertsTable({
   onSelect,
   onArchive,
   onRestore,
-  emptyMessage = "No alerts to show",
+  emptyMessage = "Ingen varsler å vise",
 }: {
   rows: AlertRow[];
   onSelect: (row: AlertRow) => void;
@@ -35,13 +35,13 @@ export function AlertsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-mono uppercase tracking-wide text-neutral-500">
-            <th scope="col" className="pb-2 pr-3 font-medium">Description</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Supplier</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Contract</th>
-            <th scope="col" className="pb-2 pr-3 font-medium">Risk</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Beskrivelse</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Leverandør</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Avtale</th>
+            <th scope="col" className="pb-2 pr-3 font-medium">Risiko</th>
             <th scope="col" className="pb-2 pr-3 font-medium">Status</th>
-            <th scope="col" className="whitespace-nowrap pb-2 pr-3 font-medium">Created On</th>
-            <th scope="col" className="pb-2 font-medium">Action</th>
+            <th scope="col" className="whitespace-nowrap pb-2 pr-3 font-medium">Opprettet</th>
+            <th scope="col" className="pb-2 font-medium">Handling</th>
           </tr>
         </thead>
         <tbody>
@@ -54,7 +54,7 @@ export function AlertsTable({
                   <div className="text-xs text-neutral-500">{alert.description}</div>
                   {alert.findingType && (
                     <div className="mt-1 flex flex-wrap items-center gap-1">
-                      <span className="text-xs text-neutral-500">Alert Type:</span>
+                      <span className="text-xs text-neutral-500">Varseltype:</span>
                       <AlertFindingBadge findingType={alert.findingType} />
                     </div>
                   )}
@@ -70,16 +70,16 @@ export function AlertsTable({
                       </div>
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-500">Not available</span>
+                    <span className="text-xs text-neutral-500">Ikke tilgjengelig</span>
                   )}
                 </td>
-                <td className="py-3 pr-3">
+                <td className="max-w-[14rem] break-words py-3 pr-6">
                   {contract || supplier ? (
                     <span className="text-xs text-neutral-700">
                       {contract?.contractName ?? supplier?.primaryContract}
                     </span>
                   ) : (
-                    <span className="text-xs text-neutral-500">Not available</span>
+                    <span className="text-xs text-neutral-500">Ikke tilgjengelig</span>
                   )}
                 </td>
                 <td className="whitespace-nowrap py-3 pr-3">
@@ -94,28 +94,28 @@ export function AlertsTable({
                 <td className="py-3">
                   <button
                     onClick={() => onSelect(row)}
-                    aria-label={`View details for ${alert.title}`}
+                    aria-label={`Vis detaljer for ${alert.title}`}
                     className="whitespace-nowrap rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
                   >
-                    View details
+                    Vis detaljer
                   </button>
                   {alert.archivedAt ? (
                     <button
                       onClick={() => onRestore(row)}
-                      aria-label={`Restore ${alert.title}`}
+                      aria-label={`Gjenopprett ${alert.title}`}
                       className="mt-1 inline-flex h-7 w-[95px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                     >
                       <ArchiveRestore className="h-3 w-3" />
-                      Restore
+                      Gjenopprett
                     </button>
                   ) : (
                     <button
                       onClick={() => onArchive(row)}
-                      aria-label={`Archive ${alert.title}`}
+                      aria-label={`Arkiver ${alert.title}`}
                       className="mt-1 inline-flex h-7 w-[95px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                     >
                       <Archive className="h-3 w-3" />
-                      Archive
+                      Arkiver
                     </button>
                   )}
                 </td>

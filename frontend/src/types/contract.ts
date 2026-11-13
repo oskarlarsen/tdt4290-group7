@@ -24,10 +24,11 @@ export type DerivedContract = {
 };
 
 const COMPLIANCE_LABELS: Record<SupplierRisk, string> = {
-  unassessed: "Not yet assessed",
-  compliant: "Compliant",
-  medium: "Under review",
-  high: "Non-compliant",
+  unassessed: "Ikke vurdert",
+  compliant: "Ingen avvik",
+  medium: "Under vurdering",
+  low: "Overvåkes",
+  high: "Avvik",
 };
 
 // Pure relabeling of the real `risk` field for contract-facing

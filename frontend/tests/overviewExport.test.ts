@@ -43,7 +43,7 @@ const summary = {
     activeAgreements: 3, listedVehicles: 9, certificatesTracked: 4,
   },
   riskClassification: {
-    high: { count: 1, percent: 33 }, medium: { count: 0, percent: 0 }, compliant: { count: 1, percent: 33 }, unassessed: { count: 1, percent: 33 },
+    high: { count: 1, percent: 33 }, medium: { count: 0, percent: 0 }, low: { count: 0, percent: 0 }, compliant: { count: 1, percent: 33 }, unassessed: { count: 1, percent: 33 },
   },
   topRiskSuppliers: [
     supplier("1", "high", { issueCategories: ["VEHICLE_DEVIATION", "CERTIFICATE_EXPIRY"], onboardingStatus: "UNDER_REVIEW" }),
@@ -60,35 +60,35 @@ describe("buildOverviewRows", () => {
     alert("a4", { supplierId: undefined }),
   ];
   const rows = buildOverviewRows(summary, alerts);
-  const section = (name: string) => rows.filter((row) => row.Section === name);
+  const section = (name: string) => rows.filter((row) => row.Seksjon === name);
 
   it("lists the metrics first, including suppliers not assessed", () => {
-    expect(rows[0]).toEqual({ Section: "Metric", Name: "Active suppliers", Value: 3 });
-    expect(section("Metric").find((row) => row.Name === "Suppliers not assessed")?.Value).toBe(1);
-    expect(rows.findIndex((row) => row.Section !== "Metric")).toBe(section("Metric").length);
+    expect(rows[0]).toEqual({ Seksjon: "Nøkkeltall", Navn: "Aktive leverandører", Verdi: 3 });
+    expect(section("Nøkkeltall").find((row) => row.Navn === "Leverandører ikke vurdert")?.Verdi).toBe(1);
+    expect(rows.findIndex((row) => row.Seksjon !== "Nøkkeltall")).toBe(section("Nøkkeltall").length);
   });
 
   it("lists each high-risk supplier with its agreement and every issue category", () => {
-    expect(section("High-risk supplier")).toEqual([{
-      Section: "High-risk supplier", Supplier: "Supplier 1", Agreement: "2024/1 — Route", "Risk / Severity": "High",
-      Status: "under review", Category: "Vehicle deviation, Certificate expiry", Detail: "Issue 1",
+    expect(section("Leverandør med høy risiko")).toEqual([{
+      Seksjon: "Leverandør med høy risiko", Leverandør: "Supplier 1", Avtale: "2024/1 — Route", "Risiko / alvorlighet": "Høy",
+      Status: "Under vurdering", Kategori: "Kjøretøyavvik, Sertifikatutløp", Detaljer: "Issue 1",
     }]);
   });
 
   it("lists unresolved alerts only, with the supplier and agreement they belong to", () => {
-    const listed = section("Unresolved alert");
-    expect(listed.map((row) => row.Name)).toEqual(["Alert a1", "Alert a2", "Alert a4"]);
-    expect(listed[0]).toMatchObject({ Supplier: "Supplier 1", Agreement: "2024/1 — Route", "Risk / Severity": "High", Status: "Open", Category: "Vehicle compliance", "Due date": "2026-12-01" });
-    expect(listed[2].Supplier).toBeUndefined();
+    const listed = section("Uløst varsel");
+    expect(listed.map((row) => row.Navn)).toEqual(["Alert a1", "Alert a2", "Alert a4"]);
+    expect(listed[0]).toMatchObject({ Leverandør: "Supplier 1", Avtale: "2024/1 — Route", "Risiko / alvorlighet": "Høy", Status: "Åpen", Kategori: "Kjøretøyoppfølging", Frist: "2026-12-01" });
+    expect(listed[2].Leverandør).toBeUndefined();
   });
 
   it("lists unresolved vehicle alerts again as deviations", () => {
-    expect(section("Deviation").map((row) => row.Name)).toEqual(["Alert a1", "Alert a4"]);
+    expect(section("Avvik").map((row) => row.Navn)).toEqual(["Alert a1", "Alert a4"]);
   });
 
   it("puts the sections in order and only uses the report columns", () => {
-    const order = rows.map((row) => row.Section).filter((name, index, all) => all.indexOf(name) === index);
-    expect(order).toEqual(["Metric", "High-risk supplier", "Unresolved alert", "Deviation"]);
+    const order = rows.map((row) => row.Seksjon).filter((name, index, all) => all.indexOf(name) === index);
+    expect(order).toEqual(["Nøkkeltall", "Leverandør med høy risiko", "Uløst varsel", "Avvik"]);
     for (const row of rows) for (const key of Object.keys(row)) expect(OVERVIEW_COLUMNS).toContain(key);
   });
 });

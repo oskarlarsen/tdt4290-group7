@@ -15,8 +15,9 @@ export type AlertSource = "MANUAL" | "AUTOMATIC";
 export type AlertFindingType =
   | "CONFIRMED_DEVIATION"
   | "MISSING_DOCUMENTATION"
-  | "UPCOMING_EXPIRY";
-export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "FUEL_DEVIATION";
+  | "UPCOMING_EXPIRY"
+  | "PREDICTED_DEVIATION";
+export type SupplierIssueCategory = "VEHICLE_DEVIATION" | "CERTIFICATE_EXPIRY" | "ENERGY_DEVIATION";
 export type SupplierRisk = RiskCategory | "unassessed";
 export type SupplierOnboardingStatus =
   | "INVITED"
@@ -77,6 +78,7 @@ export type DashboardKpis = {
 export type RiskClassification = {
   compliant: { count: number; percent: number };
   medium: { count: number; percent: number };
+  low: { count: number; percent: number };
   high: { count: number; percent: number };
   // Suppliers with no stored vehicle check or dated certificate. Percentages are of all suppliers.
   unassessed: { count: number; percent: number };
@@ -102,6 +104,8 @@ export type TopRiskSupplier = {
   email?: string;
   primaryContract: string;
   risk: SupplierRisk;
+  /** Total of the finding priorities: 10 per high, 4 per medium, 1 per low. The risk level comes from this total. */
+  riskScore?: number;
   mainIssue: string;
   // Set the issue only for high/medium-risk suppliers
   issueCategory?: SupplierIssueCategory;
@@ -120,6 +124,7 @@ export type TopRiskSupplier = {
   energyRecordCount?: number;
   productCount?: number;
   registeredAccountCount?: number;
+  pendingInvitationCount?: number;
   lastActiveAt?: string | null;
   lastUpdatedAt?: string | null;
   /** SUPPLIER, or ADMIN when an admin made the change for the supplier; null when unknown. */
@@ -170,13 +175,13 @@ export type NewManualAlertInput = {
 export type IssueCategoryBreakdown = {
   vehicleDeviation: number;
   certificateExpiry: number;
-  fuelDeviation: number | null;
+  energyDeviation: number;
   // Counts use suppliers with persisted assessment evidence.
   modeledSupplierCount: number;
 };
 
-// SELF notes are seen only by their author; INTERNAL notes by every admin. Suppliers never see notes.
-export type NoteVisibility = "SELF" | "INTERNAL";
+// SELF notes are seen only by their author; INTERNAL notes by every admin; SUPPLIER notes by every admin and the supplier.
+export type NoteVisibility = "SELF" | "INTERNAL" | "SUPPLIER";
 
 export type SupplierNote = {
   id: string;

@@ -72,18 +72,42 @@ internal val onboardingSchemaStatements = listOf(
         workshop_area_sqm REAL CHECK (workshop_area_sqm IS NULL OR workshop_area_sqm >= 0),
         other_area_sqm REAL CHECK (other_area_sqm IS NULL OR other_area_sqm >= 0),
         reporting_year INTEGER NOT NULL CHECK (reporting_year BETWEEN 2020 AND 2030),
+        reporting_quarter INTEGER NOT NULL DEFAULT 4 CHECK (reporting_quarter BETWEEN 1 AND 4),
         electricity_kwh REAL NOT NULL CHECK (electricity_kwh >= 0),
         district_heating_kwh REAL NOT NULL CHECK (district_heating_kwh >= 0),
         biogas_kwh REAL DEFAULT 0.0 CHECK (biogas_kwh >= 0),
         fossil_fuel_kwh REAL DEFAULT 0.0 CHECK (fossil_fuel_kwh >= 0),
         self_produced_solar_kwh REAL DEFAULT 0.0 CHECK (self_produced_solar_kwh >= 0),
         self_produced_heatpump_kwh REAL DEFAULT 0.0 CHECK (self_produced_heatpump_kwh >= 0),
+        goo_covered_kwh REAL NOT NULL DEFAULT 0.0 CHECK (goo_covered_kwh >= 0),
         notes TEXT,
         created_at TEXT NOT NULL CHECK (julianday(created_at) IS NOT NULL AND substr(created_at, -1) = 'Z'),
         updated_at TEXT NOT NULL CHECK (julianday(updated_at) IS NOT NULL AND substr(updated_at, -1) = 'Z'),
-        UNIQUE (agreement_id, location_code, reporting_year)
+        UNIQUE (agreement_id, location_code, reporting_year, reporting_quarter)
     ) STRICT""",
     "CREATE INDEX IF NOT EXISTS idx_facility_energy_agreement ON facility_energy(agreement_id, reporting_year)",
+
+    // What the contract promises: minimum self-produced renewable kWh and minimum kWh covered by guarantees of origin (GoO), per year.
+    """CREATE TABLE IF NOT EXISTS agreement_energy_commitments (
+        agreement_id TEXT PRIMARY KEY REFERENCES agreements(id),
+        min_self_produced_kwh REAL NOT NULL CHECK (min_self_produced_kwh >= 0),
+        min_goo_kwh REAL NOT NULL CHECK (min_goo_kwh >= 0),
+        updated_at TEXT NOT NULL
+    ) STRICT""",
+
+    // Meter exports and Solar-Log screenshots a supplier attaches to a quarter's report. Stored as blobs, capped in the route.
+    """CREATE TABLE IF NOT EXISTS energy_evidence (
+        id TEXT PRIMARY KEY,
+        agreement_id TEXT NOT NULL REFERENCES agreements(id),
+        reporting_year INTEGER NOT NULL,
+        reporting_quarter INTEGER NOT NULL CHECK (reporting_quarter BETWEEN 1 AND 4),
+        file_name TEXT NOT NULL,
+        content_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        data BLOB NOT NULL,
+        uploaded_at TEXT NOT NULL
+    ) STRICT""",
+    "CREATE INDEX IF NOT EXISTS idx_energy_evidence_agreement ON energy_evidence(agreement_id, reporting_year, reporting_quarter)",
 
     """CREATE TABLE IF NOT EXISTS contract_products (
         id TEXT PRIMARY KEY,

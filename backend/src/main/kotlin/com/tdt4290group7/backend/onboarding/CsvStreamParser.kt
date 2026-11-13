@@ -43,12 +43,14 @@ object CsvStreamParser {
         "workshop_area_sqm",
         "other_area_sqm",
         "reporting_year",
+        "reporting_quarter",
         "electricity_kwh",
         "district_heating_kwh",
         "biogas_kwh",
         "fossil_fuel_kwh",
         "self_produced_solar_kwh",
         "self_produced_heatpump_kwh",
+        "goo_covered_kwh",
         "notes"
     )
 
@@ -96,7 +98,7 @@ object CsvStreamParser {
             return ParsedCsvResult(
                 headers = emptyList(),
                 rows = emptyList(),
-                errors = listOf(CsvCellError(1, "FILE", "The uploaded CSV file is empty")),
+                errors = listOf(CsvCellError(1, "FILE", "Den opplastede CSV-filen er tom")),
                 totalRows = 0
             )
         }
@@ -120,14 +122,14 @@ object CsvStreamParser {
                 CsvCellError(
                     row = 1,
                     column = "HEADER",
-                    message = "Missing expected headers: ${missingHeaders.joinToString(", ")}"
+                    message = "Mangler forventede kolonneoverskrifter: ${missingHeaders.joinToString(", ")}"
                 )
             )
             return ParsedCsvResult(headers = parsedHeaderCells, rows = emptyList(), errors = errors, totalRows = totalRows)
         }
 
         val rows = mutableListOf<Map<String, String>>()
-        val seenEnergyKeys = mutableSetOf<Triple<String, String, String>>()
+        val seenEnergyKeys = mutableSetOf<List<String>>()
         val seenProductKeys = mutableSetOf<Pair<String, String>>()
 
         for (i in 1 until rawLines.size) {
@@ -139,7 +141,7 @@ object CsvStreamParser {
                     CsvCellError(
                         row = rowNum,
                         column = "STRUCTURE",
-                        message = "Row has ${cells.size} columns, expected ${parsedHeaderCells.size}"
+                        message = "Raden har ${cells.size} kolonner, forventet ${parsedHeaderCells.size}"
                     )
                 )
                 continue
@@ -155,7 +157,7 @@ object CsvStreamParser {
                         CsvCellError(
                             row = rowNum,
                             column = col,
-                            message = "Potential formula injection: value must not start with '=', '+', '-', '@' or tabs",
+                            message = "Mulig formelinjeksjon: verdien kan ikke starte med «=», «+», «-», «@» eller tabulator",
                             value = rawVal
                         )
                     )
@@ -165,13 +167,13 @@ object CsvStreamParser {
             // 2. Validate tenant agreement_id ownership
             val agreementId = rowMap["agreement_id"]?.trim() ?: ""
             if (agreementId.isEmpty()) {
-                errors.add(CsvCellError(rowNum, "agreement_id", "agreement_id cannot be blank"))
+                errors.add(CsvCellError(rowNum, "agreement_id", "agreement_id kan ikke være tom"))
             } else if (!allowedAgreementIds.contains(agreementId)) {
                 errors.add(
                     CsvCellError(
                         row = rowNum,
                         column = "agreement_id",
-                        message = "Agreement '$agreementId' does not exist or does not belong to your organization",
+                        message = "Avtalen «$agreementId» finnes ikke eller tilhører ikke organisasjonen din",
                         value = agreementId
                     )
                 )
@@ -187,14 +189,15 @@ object CsvStreamParser {
             when (entityType) {
                 BatchEntityType.VEHICLES -> Unit
                 BatchEntityType.ENERGY -> {
-                    val key = Triple(
+                    val key = listOf(
                         rowMap["agreement_id"]?.trim().orEmpty(),
                         rowMap["facility_location_code"]?.trim().orEmpty(),
-                        rowMap["reporting_year"]?.trim().orEmpty()
+                        rowMap["reporting_year"]?.trim().orEmpty(),
+                        rowMap["reporting_quarter"]?.trim().orEmpty()
                     )
-                    if (key.toList().all { it.isNotEmpty() } && !seenEnergyKeys.add(key)) {
+                    if (key.all { it.isNotEmpty() } && !seenEnergyKeys.add(key)) {
                         errors.add(
-                            CsvCellError(rowNum, "facility_location_code", "Duplicate energy record for this agreement, facility, and reporting year")
+                            CsvCellError(rowNum, "facility_location_code", "Duplisert energiregistrering for ${key[1]} i ${key[2]} Q${key[3]} på denne avtalen")
                         )
                     }
                 }
@@ -202,7 +205,7 @@ object CsvStreamParser {
                     val key = rowMap["agreement_id"]?.trim().orEmpty() to
                         rowMap["product_code"]?.trim().orEmpty()
                     if (key.first.isNotEmpty() && key.second.isNotEmpty() && !seenProductKeys.add(key)) {
-                        errors.add(CsvCellError(rowNum, "product_code", "Duplicate product code for this agreement"))
+                        errors.add(CsvCellError(rowNum, "product_code", "Duplisert produktkode for denne avtalen"))
                     }
                 }
             }
@@ -224,35 +227,35 @@ object CsvStreamParser {
         val isPlanned = isPlannedStr == "TRUE" || isPlannedStr == "1"
 
         if (isPlannedStr != "TRUE" && isPlannedStr != "FALSE" && isPlannedStr != "1" && isPlannedStr != "0") {
-            errors.add(CsvCellError(row, "is_planned", "is_planned must be TRUE or FALSE", rowMap["is_planned"]))
+            errors.add(CsvCellError(row, "is_planned", "is_planned må være TRUE eller FALSE", rowMap["is_planned"]))
         }
 
         val regNumber = rowMap["registration_number"]?.trim()?.uppercase(Locale.ROOT) ?: ""
         if (isPlanned) {
             if (regNumber.isNotEmpty()) {
-                errors.add(CsvCellError(row, "registration_number", "Planned vehicles must leave registration_number empty", regNumber))
+                errors.add(CsvCellError(row, "registration_number", "Planlagte kjøretøy må la registration_number stå tom", regNumber))
             }
         } else {
             if (regNumber.isEmpty()) {
-                errors.add(CsvCellError(row, "registration_number", "registration_number is required when is_planned is FALSE"))
+                errors.add(CsvCellError(row, "registration_number", "registration_number er påkrevd når is_planned er FALSE"))
             } else if (!regNumber.matches(REGISTRATION_NUMBER_REGEX)) {
-                errors.add(CsvCellError(row, "registration_number", "Invalid Norwegian registration number format (e.g. AB12345)", regNumber))
+                errors.add(CsvCellError(row, "registration_number", "Ugyldig norsk registreringsnummer (f.eks. AB12345)", regNumber))
             }
         }
 
         // A registered vehicle's fuel is looked up at preview. A planned vehicle has no plate to look up, so it needs one.
         val fuel = rowMap["fuel_technology"]?.trim() ?: ""
         if (fuel.isEmpty() && isPlanned) {
-            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology is required for planned vehicles: they have no registration number to look up"))
+            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology er påkrevd for planlagte kjøretøy: de har ikke registreringsnummer å slå opp"))
         }
         if (fuel.isNotEmpty() && FuelTechnology.entries.none { it.code == fuel }) {
-            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology must be a Statens vegvesen fuel code, for example 2 for Diesel", fuel))
+            errors.add(CsvCellError(row, "fuel_technology", "fuel_technology må være en drivstoffkode fra Statens vegvesen, for eksempel 2 for diesel", fuel))
         }
 
         val fullCoverageStr = rowMap["full_contract_coverage"]?.trim()?.uppercase(Locale.ROOT)
         val fullCoverage = fullCoverageStr == "TRUE" || fullCoverageStr == "1"
         if (fullCoverageStr != "TRUE" && fullCoverageStr != "FALSE" && fullCoverageStr != "1" && fullCoverageStr != "0") {
-            errors.add(CsvCellError(row, "full_contract_coverage", "full_contract_coverage must be TRUE or FALSE", rowMap["full_contract_coverage"]))
+            errors.add(CsvCellError(row, "full_contract_coverage", "full_contract_coverage må være TRUE eller FALSE", rowMap["full_contract_coverage"]))
         }
 
         if (!fullCoverage) {
@@ -260,13 +263,13 @@ object CsvStreamParser {
             val endWeek = rowMap["end_year_week"]?.trim() ?: ""
 
             if (startWeek.isEmpty() || !startWeek.matches(YEAR_WEEK_REGEX)) {
-                errors.add(CsvCellError(row, "start_year_week", "start_year_week is required when full_contract_coverage is FALSE (format: YYYY-Www)", startWeek))
+                errors.add(CsvCellError(row, "start_year_week", "start_year_week er påkrevd når full_contract_coverage er FALSE (format: ÅÅÅÅ-Uuu)", startWeek))
             }
             if (endWeek.isEmpty() || !endWeek.matches(YEAR_WEEK_REGEX)) {
-                errors.add(CsvCellError(row, "end_year_week", "end_year_week is required when full_contract_coverage is FALSE (format: YYYY-Www)", endWeek))
+                errors.add(CsvCellError(row, "end_year_week", "end_year_week er påkrevd når full_contract_coverage er FALSE (format: ÅÅÅÅ-Uuu)", endWeek))
             }
             if (startWeek.isNotEmpty() && endWeek.isNotEmpty() && startWeek > endWeek) {
-                errors.add(CsvCellError(row, "end_year_week", "end_year_week must not be earlier than start_year_week", endWeek))
+                errors.add(CsvCellError(row, "end_year_week", "end_year_week kan ikke være tidligere enn start_year_week", endWeek))
             }
         }
     }
@@ -278,33 +281,38 @@ object CsvStreamParser {
     ) {
         val location = rowMap["facility_location_code"]?.trim() ?: ""
         if (location.isEmpty()) {
-            errors.add(CsvCellError(row, "facility_location_code", "facility_location_code cannot be blank"))
+            errors.add(CsvCellError(row, "facility_location_code", "facility_location_code kan ikke være tom"))
         }
 
         val address = rowMap["facility_address"]?.trim() ?: ""
         if (address.isEmpty()) {
-            errors.add(CsvCellError(row, "facility_address", "facility_address cannot be blank"))
+            errors.add(CsvCellError(row, "facility_address", "facility_address kan ikke være tom"))
         }
 
         val yearStr = rowMap["reporting_year"]?.trim() ?: ""
         val year = yearStr.toIntOrNull()
         if (year == null || year !in 2020..2030) {
-            errors.add(CsvCellError(row, "reporting_year", "reporting_year must be an integer between 2020 and 2030", yearStr))
+            errors.add(CsvCellError(row, "reporting_year", "reporting_year må være et heltall mellom 2020 og 2030", yearStr))
+        }
+
+        val quarterStr = rowMap["reporting_quarter"]?.trim() ?: ""
+        if (quarterStr.toIntOrNull() !in 1..4) {
+            errors.add(CsvCellError(row, "reporting_quarter", "reporting_quarter må være 1, 2, 3 eller 4", quarterStr))
         }
 
         val decimalCols = listOf(
             "electricity_kwh", "district_heating_kwh", "biogas_kwh", "fossil_fuel_kwh",
-            "self_produced_solar_kwh", "self_produced_heatpump_kwh"
+            "self_produced_solar_kwh", "self_produced_heatpump_kwh", "goo_covered_kwh"
         ) + listOf("storage_area_sqm", "workshop_area_sqm", "other_area_sqm")
         for (col in decimalCols) {
             val raw = rowMap[col]?.trim() ?: ""
             if (raw.isNotEmpty()) {
                 val d = raw.toDoubleOrNull()
                 if (d == null || !d.isFinite() || d < 0.0) {
-                    errors.add(CsvCellError(row, col, "$col must be a positive decimal number (use dot as separator)", raw))
+                    errors.add(CsvCellError(row, col, "$col må være et positivt desimaltall (bruk punktum som skilletegn)", raw))
                 }
             } else if (col == "electricity_kwh" || col == "district_heating_kwh") {
-                errors.add(CsvCellError(row, col, "$col is required"))
+                errors.add(CsvCellError(row, col, "$col er påkrevd"))
             }
         }
     }
@@ -316,12 +324,12 @@ object CsvStreamParser {
     ) {
         val pCode = rowMap["product_code"]?.trim() ?: ""
         if (pCode.isEmpty()) {
-            errors.add(CsvCellError(row, "product_code", "product_code cannot be blank"))
+            errors.add(CsvCellError(row, "product_code", "product_code kan ikke være tom"))
         }
 
         val pName = rowMap["product_name"]?.trim() ?: ""
         if (pName.isEmpty()) {
-            errors.add(CsvCellError(row, "product_name", "product_name cannot be blank"))
+            errors.add(CsvCellError(row, "product_name", "product_name kan ikke være tom"))
         }
 
         val categoryStr = rowMap["product_category"]?.trim()?.uppercase(Locale.ROOT) ?: ""
@@ -331,7 +339,7 @@ object CsvStreamParser {
                 CsvCellError(
                     row = row,
                     column = "product_category",
-                    message = "Invalid product category. Allowed: ${ProductCategory.entries.joinToString()}",
+                    message = "Ugyldig produktkategori. Tillatt: ${ProductCategory.entries.joinToString()}",
                     value = categoryStr
                 )
             )
@@ -344,20 +352,20 @@ object CsvStreamParser {
                 CsvCellError(
                     row = row,
                     column = "ecolabel_standard",
-                    message = "Invalid ecolabel standard. Allowed: ${EcolabelStandard.entries.joinToString()}",
+                    message = "Ugyldig miljømerkestandard. Tillatt: ${EcolabelStandard.entries.joinToString()}",
                     value = ecoStr
                 )
             )
         } else if (ecoStr != EcolabelStandard.NONE.name) {
             val lic = rowMap["license_number"]?.trim() ?: ""
             if (lic.isEmpty()) {
-                errors.add(CsvCellError(row, "license_number", "license_number is required when ecolabel_standard is not NONE"))
+                errors.add(CsvCellError(row, "license_number", "license_number er påkrevd når ecolabel_standard ikke er NONE"))
             }
         }
 
         val unit = rowMap["unit_of_measure"]?.trim()?.uppercase(Locale.ROOT) ?: ""
         if (unit !in setOf("PCS", "KG", "LITRE")) {
-            errors.add(CsvCellError(row, "unit_of_measure", "unit_of_measure must be PCS, KG, or LITRE", unit))
+            errors.add(CsvCellError(row, "unit_of_measure", "unit_of_measure må være PCS, KG eller LITRE", unit))
         }
         validateBoolean(row, "is_repaired_or_reused", rowMap["is_repaired_or_reused"], errors)
     }
@@ -370,7 +378,7 @@ object CsvStreamParser {
     ) {
         val value = raw?.trim()?.uppercase(Locale.ROOT)
         if (value !in setOf("TRUE", "FALSE", "1", "0")) {
-            errors.add(CsvCellError(row, column, "$column must be TRUE or FALSE", raw))
+            errors.add(CsvCellError(row, column, "$column må være TRUE eller FALSE", raw))
         }
     }
 

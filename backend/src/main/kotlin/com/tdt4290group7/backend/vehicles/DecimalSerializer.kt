@@ -18,16 +18,16 @@ object DecimalSerializer : KSerializer<BigDecimal> {
 
     override fun deserialize(decoder: Decoder): BigDecimal {
         val element = (decoder as? JsonDecoder)?.decodeJsonElement() as? JsonPrimitive
-            ?: throw SerializationException("Expected a JSON number")
+            ?: throw SerializationException("Forventet et JSON-tall")
         if (element.isString || element.content.length > 80 ||
             !element.content.matches(Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
-        ) throw SerializationException("Expected a JSON number")
+        ) throw SerializationException("Forventet et JSON-tall")
         return try {
             BigDecimal(element.content).also { decimalParts(it) }
         } catch (_: IllegalArgumentException) {
-            throw SerializationException("Number must be non-negative and fit the supported decimal range")
+            throw SerializationException("Tallet kan ikke være negativt og må ligge innenfor det støttede desimalområdet")
         } catch (_: ArithmeticException) {
-            throw SerializationException("Number must fit the supported decimal range")
+            throw SerializationException("Tallet må ligge innenfor det støttede desimalområdet")
         }
     }
 
@@ -42,14 +42,14 @@ data class DecimalParts(val unscaled: Long, val scale: Int)
 
 /** At most 18 fractional places after removing insignificant zeroes; 64-bit coefficient. */
 fun decimalParts(value: BigDecimal): DecimalParts {
-    require(value.signum() >= 0) { "Measurements must be non-negative" }
+    require(value.signum() >= 0) { "Målinger kan ikke være negative" }
     val normalized = value.stripTrailingZeros()
-    require(normalized.scale() in -18..18) { "Measurements support at most 18 fractional places" }
+    require(normalized.scale() in -18..18) { "Målinger støtter høyst 18 desimaler" }
     val stored = if (normalized.scale() < 0) normalized.setScale(0) else normalized
     val unscaled = try {
         stored.unscaledValue().longValueExact()
     } catch (_: ArithmeticException) {
-        throw IllegalArgumentException("Measurement exceeds the supported 64-bit decimal range")
+        throw IllegalArgumentException("Målingen er utenfor det støttede 64-bits desimalområdet")
     }
     return DecimalParts(unscaled, stored.scale())
 }

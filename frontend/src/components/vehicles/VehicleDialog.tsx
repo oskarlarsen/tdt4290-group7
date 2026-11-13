@@ -23,7 +23,7 @@ export function VehicleDialog({ title, children, onClose, busy = false, wide = f
     className={`fixed z-50 overflow-y-auto overscroll-contain border border-neutral-100 bg-white p-0 text-neutral-800 shadow-card backdrop:bg-neutral-900/30 ${wide ? "inset-0 m-auto h-[calc(100dvh_-_3rem)] max-h-[calc(100dvh_-_3rem)] w-[calc(100%_-_2rem)] max-w-5xl rounded-xl" : "inset-0 m-auto h-fit max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl rounded-xl"}`}>
     <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-neutral-100 bg-white px-4 py-4 sm:px-5">
       <h2 className="font-headline text-lg font-semibold text-neutral-900">{title}</h2>
-      <button type="button" onClick={onClose} disabled={busy} aria-label={`Close ${title}`} className="shrink-0 rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"><X className="h-4 w-4" /></button>
+      <button type="button" onClick={onClose} disabled={busy} aria-label={`Lukk ${title}`} className="shrink-0 rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700/30 disabled:cursor-not-allowed disabled:opacity-50"><X className="h-4 w-4" /></button>
     </header>
     <div className="p-4 sm:p-5">{children}</div>
   </dialog>;
@@ -37,8 +37,8 @@ export function ErrorNotice({ error }: { error: unknown }) {
 export function Paging({ page, total, pageSize, onChange }: { page: number; total: number; pageSize: number; onChange: (page: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
-    <span>{total} record{total === 1 ? "" : "s"} · <span className="font-mono">Page {page} of {pages}</span></span>
-    <div className="flex gap-1.5"><button type="button" className={buttonClass} disabled={page <= 1} onClick={() => onChange(page - 1)}><ChevronLeft className="h-3.5 w-3.5" />Previous</button>
-      <button type="button" className={buttonClass} disabled={page >= pages} onClick={() => onChange(page + 1)}>Next<ChevronRight className="h-3.5 w-3.5" /></button></div>
+    <span>{total} {total === 1 ? "oppføring" : "oppføringer"} · <span className="font-mono">Side {page} av {pages}</span></span>
+    <div className="flex gap-1.5"><button type="button" className={buttonClass} disabled={page <= 1} onClick={() => onChange(page - 1)}><ChevronLeft className="h-3.5 w-3.5" />Forrige</button>
+      <button type="button" className={buttonClass} disabled={page >= pages} onClick={() => onChange(page + 1)}>Neste<ChevronRight className="h-3.5 w-3.5" /></button></div>
   </div>;
 }

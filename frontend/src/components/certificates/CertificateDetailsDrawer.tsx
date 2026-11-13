@@ -16,14 +16,14 @@ function describeStatus(info: CertificateStatusInfo): string {
   const days = info.daysRemaining ?? 0;
   switch (info.status) {
     case "missing-documentation":
-      return "Required by the contract, but no certificate documentation has been submitted.";
+      return "Kreves av avtalen, men ingen sertifikatdokumentasjon er levert.";
     case "expired":
-      return `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago.`;
+      return `Utløp for ${Math.abs(days)} ${Math.abs(days) === 1 ? "dag" : "dager"} siden.`;
     case "critical":
     case "expiring":
-      return days === 0 ? "Expires today." : `Expires in ${days} day${days === 1 ? "" : "s"}.`;
+      return days === 0 ? "Utløper i dag." : `Utløper om ${days} ${days === 1 ? "dag" : "dager"}.`;
     case "valid":
-      return `Valid for another ${days} days.`;
+      return `Gyldig i ${days} dager til.`;
   }
 }
 
@@ -70,7 +70,7 @@ export function CertificateDetailsDrawer({
         inert={!isOpen}
         role="dialog"
         aria-modal="true"
-        aria-label={certificate ? `${CERTIFICATE_STANDARD_LABELS[certificate.standard]} details` : undefined}
+        aria-label={certificate ? `Detaljer for ${CERTIFICATE_STANDARD_LABELS[certificate.standard]}` : undefined}
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
@@ -88,7 +88,7 @@ export function CertificateDetailsDrawer({
               </div>
               <button
                 onClick={onClose}
-                aria-label="Close"
+                aria-label="Lukk"
                 className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
@@ -96,49 +96,49 @@ export function CertificateDetailsDrawer({
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Certificate">
+              <Section title="Sertifikat">
                 <Field label="Standard" value={CERTIFICATE_STANDARD_LABELS[certificate.standard]} />
-                <Field label="Certificate no." value={certificate.certificateNumber ?? "No certificate on file"} />
+                <Field label="Sertifikatnr." value={certificate.certificateNumber ?? "Ingen nummer registrert"} />
                 <Field
-                  label="Valid until"
-                  value={certificate.validUntil ? formatCertificateDate(certificate.validUntil) : "Not submitted"}
+                  label="Gyldig til"
+                  value={certificate.validUntil ? formatCertificateDate(certificate.validUntil) : "Ikke levert"}
                 />
                 {certificate.issueDate && (
-                  <Field label="Issued" value={formatCertificateDate(certificate.issueDate)} />
+                  <Field label="Utstedt" value={formatCertificateDate(certificate.issueDate)} />
                 )}
-                {certificate.sourceFile && <Field label="Source file" value={certificate.sourceFile} />}
+                {certificate.sourceFile && <Field label="Kildefil" value={certificate.sourceFile} />}
               </Section>
 
               <Section title="Status">
                 <p className="text-sm text-neutral-700">{describeStatus(info)}</p>
                 <p className="mt-1 text-xs text-neutral-500">
-                  Calculated from the valid-until date. Provisional thresholds: critical within{" "}
-                  {CERTIFICATE_THRESHOLDS.criticalDays} days, expiring within{" "}
-                  {CERTIFICATE_THRESHOLDS.yellowDays} days.
+                  Beregnet ut fra gyldig-til-datoen. Midlertidige terskler: kritisk innen{" "}
+                  {CERTIFICATE_THRESHOLDS.criticalDays} dager, utløper innen{" "}
+                  {CERTIFICATE_THRESHOLDS.yellowDays} dager.
                 </p>
               </Section>
 
-              <Section title="Contract & supplier">
+              <Section title="Avtale og leverandør">
                 {contract ? (
                   <>
-                    <Field label="Contract" value={contract.contractName} />
-                    <Field label="Supplier" value={contract.supplierName} />
-                    <Field label="Org ID" value={contract.supplierOrgId} />
+                    <Field label="Avtale" value={contract.contractName} />
+                    <Field label="Leverandør" value={contract.supplierName} />
+                    <Field label="Org.nr." value={contract.supplierOrgId} />
                     <button
                       onClick={() => navigate(`/admin/suppliers?supplierId=${contract.supplierId}`)}
                       className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-secondary-700 hover:text-secondary-800"
                     >
-                      View supplier
+                      Vis leverandør
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </button>
                   </>
                 ) : (
-                  <Field label="Supplier" value={certificate.supplierName ?? "Not recorded"} />
+                  <Field label="Leverandør" value={certificate.supplierName ?? "Ikke registrert"} />
                 )}
               </Section>
 
               <p className="rounded-lg bg-neutral-50 p-2.5 text-xs text-neutral-500">
-                Review extracted details before relying on them as compliance evidence. The original PDF is not retained.
+                Kontroller de uthentede opplysningene før du bruker dem som dokumentasjon. Den opprinnelige PDF-en lagres ikke.
               </p>
             </div>
           </>

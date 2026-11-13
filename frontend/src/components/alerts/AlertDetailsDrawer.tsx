@@ -9,10 +9,10 @@ import { ALERT_CATEGORIES, ALERT_STATUSES } from "../../types/dashboard";
 import type { AlertCategory, AlertContentUpdate, AlertSeverity, AlertStatus } from "../../types/dashboard";
 
 const CATEGORY_LABELS: Record<AlertCategory, string> = {
-  ENVIRONMENTAL_COMPLIANCE: "Environmental Compliance",
-  ENERGY_FUEL: "Energy & Fuel",
-  VEHICLE_COMPLIANCE: "Vehicle Compliance",
-  CERTIFICATES: "Certificates",
+  ENVIRONMENTAL_COMPLIANCE: "Miljøoppfølging",
+  ENERGY_FUEL: "Energi",
+  VEHICLE_COMPLIANCE: "Kjøretøyoppfølging",
+  CERTIFICATES: "Sertifikater",
 };
 
 export function AlertDetailsDrawer({
@@ -58,7 +58,7 @@ export function AlertDetailsDrawer({
   async function saveEdit() {
     if (!row || !onEdit) return;
     if (!draft.title.trim() || !draft.description.trim()) {
-      setEditError("Title and description are required.");
+      setEditError("Tittel og beskrivelse må fylles ut.");
       return;
     }
     setSaving(true);
@@ -72,7 +72,7 @@ export function AlertDetailsDrawer({
       });
       setEditing(false);
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : "Could not save the alert.");
+      setEditError(error instanceof Error ? error.message : "Kunne ikke lagre varselet.");
     } finally {
       setSaving(false);
     }
@@ -95,10 +95,10 @@ export function AlertDetailsDrawer({
   const contract = row?.contract;
   const supplier = row?.supplier;
   const statusDescriptions: Record<AlertStatus, string> = {
-    OPEN: "A new alert that no one has started handling.",
-    IN_PROGRESS: "Someone has started working on this alert.",
-    UNDER_REVIEW: "The reported deviation is being investigated or verified.",
-    RESOLVED: "The issue has been addressed and no further action is currently required.",
+    OPEN: "Et nytt varsel som ingen har begynt å behandle.",
+    IN_PROGRESS: "Noen har begynt å arbeide med dette varselet.",
+    UNDER_REVIEW: "Det rapporterte avviket undersøkes eller verifiseres.",
+    RESOLVED: "Saken er håndtert, og ingen ytterligere tiltak er nødvendig nå.",
   };
 
   return (
@@ -116,7 +116,7 @@ export function AlertDetailsDrawer({
         inert={!isOpen}
         role="dialog"
         aria-modal="true"
-        aria-label={alert ? `${alert.title} details` : undefined}
+        aria-label={alert ? `Detaljer for ${alert.title}` : undefined}
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-neutral-100 bg-white shadow-card transition-transform duration-200 sm:max-w-md ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
@@ -133,7 +133,7 @@ export function AlertDetailsDrawer({
               </div>
               <button
                 onClick={onClose}
-                aria-label="Close"
+                aria-label="Lukk"
                 className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
@@ -141,26 +141,26 @@ export function AlertDetailsDrawer({
             </div>
 
             <div className="flex-1 space-y-5 p-4">
-              <Section title="Alert">
-                <Field label="Risk" value={ALERT_SEVERITY_LABELS[alert.severity]} />
-                <Field label="Created On" value={formatAlertCreatedDate(alert.createdAt)} />
+              <Section title="Varsel">
+                <Field label="Risiko" value={ALERT_SEVERITY_LABELS[alert.severity]} />
+                <Field label="Opprettet" value={formatAlertCreatedDate(alert.createdAt)} />
                 <Field label="Status" value={ALERT_STATUS_LABELS[alert.status]} />
-                <Field label="Source" value={alert.source === "MANUAL" ? "Manual" : "Automatic"} />
-                {alert.category && <Field label="Risk category" value={CATEGORY_LABELS[alert.category]} />}
-                {alert.dueDate && <Field label="Due Date" value={formatAlertCreatedDate(alert.dueDate)} />}
+                <Field label="Kilde" value={alert.source === "MANUAL" ? "Manuell" : "Automatisk"} />
+                {alert.category && <Field label="Risikokategori" value={CATEGORY_LABELS[alert.category]} />}
+                {alert.dueDate && <Field label="Frist" value={formatAlertCreatedDate(alert.dueDate)} />}
               </Section>
 
-              <Section title="Summary">
+              <Section title="Sammendrag">
                 {alert.findingType && (
                   <div className="mb-2 flex flex-wrap items-center gap-1">
-                    <span className="text-xs text-neutral-500">Alert Type:</span>
+                    <span className="text-xs text-neutral-500">Varseltype:</span>
                     <AlertFindingBadge findingType={alert.findingType} />
                   </div>
                 )}
                 {editing ? (
                   <div className="space-y-2">
                     <label className="block text-xs font-medium text-neutral-700">
-                      Title
+                      Tittel
                       <input
                         value={draft.title}
                         maxLength={200}
@@ -169,7 +169,7 @@ export function AlertDetailsDrawer({
                       />
                     </label>
                     <label className="block text-xs font-medium text-neutral-700">
-                      Description
+                      Beskrivelse
                       <textarea
                         value={draft.description}
                         rows={4}
@@ -179,7 +179,7 @@ export function AlertDetailsDrawer({
                       />
                     </label>
                     <label className="block text-xs font-medium text-neutral-700">
-                      Risk
+                      Risiko
                       <select
                         value={draft.severity}
                         onChange={(event) => setDraft({ ...draft, severity: event.target.value as AlertSeverity })}
@@ -191,7 +191,7 @@ export function AlertDetailsDrawer({
                       </select>
                     </label>
                     <label className="block text-xs font-medium text-neutral-700">
-                      Due date (optional)
+                      Frist (valgfritt)
                       <input
                         type="date"
                         value={draft.dueDate}
@@ -207,7 +207,7 @@ export function AlertDetailsDrawer({
                         disabled={saving}
                         className="rounded-lg bg-primary-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
                       >
-                        {saving ? "Saving…" : "Save changes"}
+                        {saving ? "Lagrer…" : "Lagre endringer"}
                       </button>
                       <button
                         type="button"
@@ -215,7 +215,7 @@ export function AlertDetailsDrawer({
                         disabled={saving}
                         className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
                       >
-                        Cancel
+                        Avbryt
                       </button>
                     </div>
                   </div>
@@ -228,58 +228,58 @@ export function AlertDetailsDrawer({
                         onClick={startEditing}
                         className="mt-2 text-xs font-medium text-secondary-700 hover:text-secondary-800"
                       >
-                        Edit alert
+                        Rediger varsel
                       </button>
                     )}
                   </>
                 )}
                 {alert.findingType === "MISSING_DOCUMENTATION" && (
                   <p className="mt-2 text-xs leading-5 text-neutral-500">
-                    Required evidence has not been submitted. Missing documentation alone does not
-                    confirm a contractual violation.
+                    Påkrevd dokumentasjon er ikke levert. Manglende dokumentasjon alene
+                    bekrefter ikke et avtalebrudd.
                   </p>
                 )}
               </Section>
 
-              <Section title="Supplier & contract">
+              <Section title="Leverandør og avtale">
                 <Field
-                  label="Supplier"
-                  value={contract?.supplierName ?? supplier?.displayName ?? "Not available"}
+                  label="Leverandør"
+                  value={contract?.supplierName ?? supplier?.displayName ?? "Ikke tilgjengelig"}
                 />
                 <Field
-                  label="Contract"
+                  label="Avtale"
                   value={
                     contract?.contractName ??
                     (supplier?.primaryContract !== "Not assigned" ? supplier?.primaryContract : undefined) ??
-                    "Not available"
+                    "Ikke tilgjengelig"
                   }
                 />
                 {(contract || supplier) && (
                   <>
-                    <Field label="Org ID" value={contract?.supplierOrgId ?? supplier?.orgId ?? "Not available"} />
+                    <Field label="Org.nr." value={contract?.supplierOrgId ?? supplier?.orgId ?? "Ikke tilgjengelig"} />
                     <button
                       onClick={() => navigate(`/admin/suppliers?supplierId=${contract?.supplierId ?? supplier?.id}`)}
                       className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-secondary-700 hover:text-secondary-800"
                     >
-                      View supplier
+                      Vis leverandør
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </button>
                   </>
                 )}
               </Section>
 
-              <Section title="Affected item & reason">
+              <Section title="Berørt element og årsak">
                 <Field
-                  label={alert.affectedItem?.type ?? "Affected item"}
-                  value={alert.affectedItem?.name ?? "Not available"}
+                  label={alert.affectedItem?.type ?? "Berørt element"}
+                  value={alert.affectedItem?.name ?? "Ikke tilgjengelig"}
                 />
                 <Field
-                  label="Reason"
-                  value={alert.reason ?? "No reason recorded"}
+                  label="Årsak"
+                  value={alert.reason ?? "Ingen årsak registrert"}
                 />
               </Section>
 
-              <Section title="Workflow">
+              <Section title="Arbeidsflyt">
                 <label className="block text-xs font-medium text-neutral-700" htmlFor="alert-status">
                   Status
                 </label>
@@ -302,7 +302,7 @@ export function AlertDetailsDrawer({
                   ))}
                 </select>
                 <p className="mt-2 text-xs leading-5 text-neutral-500">
-                  {isBusy ? "Saving status…" : statusDescriptions[alert.status]}
+                  {isBusy ? "Lagrer status…" : statusDescriptions[alert.status]}
                 </p>
                 {statusMessage && (
                   <p

@@ -21,38 +21,59 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         val column = row.metaData.getColumnName(it)
         // Keep flag comparisons and audit states independent of getObject's numeric wrapper type.
         column to when (column) {
-            "active", "listed", "planned" -> row.getInt(it)
+            "active", "listed", "planned", "exception_approved" -> row.getInt(it)
             else -> row.getObject(it)
         }
     }
 
     fun overview(): FleetOverview = database.read { db ->
+        val reported = database.query(db, "SELECT usage_id FROM vehicle_usage_details") { it.getString(1) }.toSet()
+        val checked = database.query(db, "SELECT DISTINCT registration_number FROM svv_snapshots") { it.getString(1) }.toSet()
         FleetOverview(rows(db, "suppliers", "active = 1 ORDER BY name COLLATE NOCASE").map(::supplier),
             rows(db, "agreements", "active = 1 ORDER BY start_date DESC").map(::agreement),
-            rows(db, "vehicle_usages", "1=1 ORDER BY registration_number, agreement_id").map(::vehicle), changes(db, 1))
+            rows(db, "vehicle_usages", "1=1 ORDER BY registration_number, agreement_id").map(::vehicle).map {
+                it.copy(reported = usageId(it.registrationNumber, it.agreementId ?: "") in reported, registryChecked = it.planned || it.registrationNumber in checked,
+                    registryProblem = if (it.registrationNumber in checked) null else it.registryProblem)
+            }, changes(db, 1))
+    }
+
+    /**
+     * Admin accepts a reported vehicle that is not on the approved list; the list itself is unchanged.
+     * Kept on the truck's listing under one agreement ([agreementId] picks it when the truck is under several), so Change history can undo it.
+     */
+    fun approveException(plate: String, note: String?, actor: ChangeActor, now: Instant, agreementId: String? = null) = change(actor, now, null, "Approved exception for $plate") { writer ->
+        val previous = usage(writer.db, plate, agreementId) ?: throw FleetConflictException("Vehicle not found; reload the page")
+        val reported = database.query(writer.db, "SELECT 1 FROM vehicle_usage_details WHERE usage_id = ?", listOf(previous["id"])) { it.getInt(1) }.isNotEmpty()
+        if (!reported) throw FleetConflictException("The supplier has not reported this vehicle")
+        if (previous["listed"] == 1) throw FleetConflictException("This vehicle is already on the approved list")
+        if (previous["exception_approved"] == 1) throw FleetConflictException("This exception is already approved")
+        val trimmed = note?.trim()?.ifEmpty { null }
+        if (trimmed != null && trimmed.length > 500) throw FleetConflictException("The note can be at most 500 characters")
+        writer.agreementId = previous["agreement_id"] as String?
+        writer.save("vehicle_usages", previous + ("exception_approved" to 1) + ("exception_note" to trimmed))
     }
 
     fun history(page: Int): List<FleetChange> {
-        require(page in 1..1_000_000) { "Invalid history page" }
+        require(page in 1..1_000_000) { "Ugyldig historikkside" }
         return database.read { changes(it, page) }
     }
 
     fun saveSupplier(id: String?, input: SupplierInput, actor: ChangeActor, now: Instant, expectedUpdatedAt: String? = null): FleetSupplier {
         val name = input.name.trim()
         val org = input.orgNumber.replace(Regex("\\s"), "")
-        require(name.length in 1..200) { "Enter the supplier name" }
-        require(org.matches(Regex("[0-9]{9}"))) { "Enter a nine-digit organization number" }
-        return change(actor, now, null, if (id == null) "Added supplier $name" else "Updated supplier $name") { writer ->
+        require(name.length in 1..200) { "Skriv inn leverandørnavn" }
+        require(org.matches(Regex("[0-9]{9}"))) { "Skriv inn et organisasjonsnummer på ni siffer" }
+        return change(actor, now, null, if (id == null) "La til leverandør $name" else "Oppdaterte leverandør $name") { writer ->
             val supplierId = id ?: UUID.randomUUID().toString()
             if (id != null) expect(requireActive(writer.db, "suppliers", id), expectedUpdatedAt)
             if (id == null) rows(writer.db, "suppliers", "org_number = ? AND active = 0", listOf(org)).firstOrNull()?.let {
                 throw ArchivedSupplierMatchException(archivedMatch(writer.db, it))
             }
             if (rows(writer.db, "suppliers", "org_number = ? AND id != ?", listOf(org, supplierId)).isNotEmpty())
-                throw FleetConflictException("This organization number already belongs to a supplier")
+                throw FleetConflictException("Dette organisasjonsnummeret tilhører allerede en leverandør")
             // Same name as an archived supplier but another number (maybe a typo): ask once. The admin can say "no, a new one".
             if (id == null && !input.confirmNewSupplier) rows(writer.db, "suppliers", "active = 0 AND lower(name) = lower(?)", listOf(name)).firstOrNull()?.let {
-                throw ArchivedSupplierMatchException(archivedMatch(writer.db, it, "ARCHIVED_SUPPLIER_NAME_MATCH", "An archived supplier has the same name"))
+                throw ArchivedSupplierMatchException(archivedMatch(writer.db, it, "ARCHIVED_SUPPLIER_NAME_MATCH", "En arkivert leverandør har samme navn"))
             }
             val result = mapOf("id" to supplierId, "name" to name, "org_number" to org,
                 "updated_at" to now.storageTimestamp(), "active" to 1)
@@ -75,10 +96,10 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
     }
 
     fun removeSupplier(id: String, expectedUpdatedAt: String, actor: ChangeActor, now: Instant) =
-        change(actor, now, null, "Removed supplier") { writer ->
+        change(actor, now, null, "Fjernet leverandør") { writer ->
             val previous = requireActive(writer.db, "suppliers", id)
             expect(previous, expectedUpdatedAt)
-            writer.description = "Removed supplier ${previous["name"]}"
+            writer.description = "Fjernet leverandør ${previous["name"]}"
             rows(writer.db, "agreements", "supplier_id = ? AND active = 1", listOf(id)).forEach { agreement ->
                 val agreementId = agreement["id"] as String
                 rows(writer.db, "vehicle_usages", "agreement_id = ? AND listed = 1", listOf(agreementId)).forEach {
@@ -125,20 +146,20 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
 
     fun saveAgreement(id: String?, input: AgreementInput, expectedUpdatedAt: String?, actor: ChangeActor, now: Instant): FleetAgreement {
         val start = date(input.startDate); val end = date(input.endDate)
-        require(start <= end) { "End date must be on or after start date" }
-        require(input.allowedVehicles in 0..10000) { "Vehicle allowance must be between 0 and 10000" }
-        require(input.note.length <= 4000) { "Note must be at most 4000 characters" }
-        require(input.saksnr.trim().length in 1..50) { "Enter the saksnr (case number), up to 50 characters" }
+        require(start <= end) { "Sluttdato må være lik eller senere enn startdato" }
+        require(input.allowedVehicles in 0..10000) { "Antall tillatte kjøretøy må være mellom 0 og 10000" }
+        require(input.note.length <= 4000) { "Notatet kan ha høyst 4000 tegn" }
+        require(input.saksnr.trim().length in 1..50) { "Skriv inn saksnummer (Saksnr), opptil 50 tegn" }
         require(input.requiresVehicles || input.requiresEnergy || input.requiresProducts) {
-            "Select at least one type of supplier information to collect"
+            "Velg minst én type leverandøropplysninger som skal samles inn"
         }
-        return change(actor, now, id, if (id == null) "Created agreement" else "Updated agreement") { writer ->
+        return change(actor, now, id, if (id == null) "Opprettet avtale" else "Oppdaterte avtale") { writer ->
             requireActive(writer.db, "suppliers", input.supplierId)
             val agreementId = id ?: UUID.randomUUID().toString()
             if (id != null) {
                 val previous = requireActive(writer.db, "agreements", id)
                 expect(previous, expectedUpdatedAt)
-                require(previous["supplier_id"] == input.supplierId) { "An agreement cannot be moved to another supplier" }
+                require(previous["supplier_id"] == input.supplierId) { "En avtale kan ikke flyttes til en annen leverandør" }
             }
             val result = mapOf("id" to agreementId, "supplier_id" to input.supplierId,
                 "start_date" to input.startDate, "end_date" to input.endDate,
@@ -156,7 +177,7 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
     }
 
     fun removeAgreement(id: String, expectedUpdatedAt: String, actor: ChangeActor, now: Instant) =
-        change(actor, now, id, "Removed agreement") { writer ->
+        change(actor, now, id, "Fjernet avtale") { writer ->
             val previous = requireActive(writer.db, "agreements", id)
             expect(previous, expectedUpdatedAt)
             rows(writer.db, "vehicle_usages", "agreement_id = ? AND listed = 1", listOf(id)).forEach {
@@ -165,14 +186,14 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             writer.save("agreements", previous + ("active" to 0))
         }
 
-    fun addVehicle(agreementId: String, input: VehicleEntryInput, actor: ChangeActor, now: Instant, snapshot: RegistrySnapshot? = null): Vehicle =
-        change(actor, now, agreementId, "Added vehicle") { writer ->
+    fun addVehicle(agreementId: String, input: VehicleEntryInput, actor: ChangeActor, now: Instant, snapshot: RegistrySnapshot? = null, registryProblem: String? = null): Vehicle =
+        change(actor, now, agreementId, "La til kjøretøy") { writer ->
             val agreement = requireActive(writer.db, "agreements", agreementId)
             val count = database.query(writer.db, "SELECT count(*) FROM vehicle_usages WHERE agreement_id = ? AND listed = 1", listOf(agreementId)) { it.getInt(1) }.single()
-            if (count >= (agreement["allowed_vehicles"] as Number).toInt()) throw FleetConflictException("Vehicle allowance reached")
-            val result = addEntry(writer, agreementId, input, now)
+            if (count >= (agreement["allowed_vehicles"] as Number).toInt()) throw FleetConflictException("Grensen for antall kjøretøy er nådd")
+            val result = addEntry(writer, agreementId, input, now, registryProblem)
             saveVerifiedSnapshot(writer.db, result, snapshot)
-            writer.description = "Added ${result.registrationNumber}"
+            writer.description = if (input.planned) "La til et planlagt kjøretøy" else "La til ${result.registrationNumber}"
             result
         }
 
@@ -185,31 +206,31 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
             writer.save("vehicle_usages", previous + ("listed" to 0))
         }
 
-    fun replaceVehicle(plate: String, request: ReplacementRequest, actor: ChangeActor, now: Instant, snapshot: RegistrySnapshot? = null, agreementId: String? = null): Vehicle =
-        change(actor, now, null, "Replaced $plate") { writer ->
+    fun replaceVehicle(plate: String, request: ReplacementRequest, actor: ChangeActor, now: Instant, snapshot: RegistrySnapshot? = null, registryProblem: String? = null, agreementId: String? = null): Vehicle =
+        change(actor, now, null, "Erstattet $plate") { writer ->
             val previous = requireListed(writer.db, plate, agreementId)
             expect(previous, request.expectedUpdatedAt)
             val usageAgreementId = previous["agreement_id"] as String
             requireActive(writer.db, "agreements", usageAgreementId)
             writer.agreementId = usageAgreementId
-            val next = addEntry(writer, usageAgreementId, request.replacement, now)
+            val next = addEntry(writer, usageAgreementId, request.replacement, now, registryProblem)
             saveVerifiedSnapshot(writer.db, next, snapshot)
             writer.save("vehicle_usages", previous + ("listed" to 0))
             writer.description = if ((previous["planned"] as Number).toInt() == 1 && !next.planned)
-                "Registered ${next.registrationNumber} for $plate" else "Replaced $plate with ${next.registrationNumber}"
+                "Registrerte ${next.registrationNumber} for $plate" else "Erstattet $plate med ${next.registrationNumber}"
             next
         }
 
-    private fun addEntry(writer: Writer, agreementId: String, input: VehicleEntryInput, now: Instant): Vehicle {
+    private fun addEntry(writer: Writer, agreementId: String, input: VehicleEntryInput, now: Instant, registryProblem: String? = null): Vehicle {
         val plate = input.validatedRegistrationNumber()
             ?: "PLAN" + UUID.randomUUID().toString().replace("-", "").take(12).uppercase()
         val usageId = usageId(plate, agreementId)
         val previous = row(writer.db, "vehicle_usages", usageId)
         // The same truck may be listed under other agreements, also another supplier's; only this agreement's own listing counts.
-        if (previous != null && (previous["listed"] as Number).toInt() == 1) throw FleetConflictException("This vehicle is already listed under this agreement")
+        if (previous != null && (previous["listed"] as Number).toInt() == 1) throw FleetConflictException("Dette kjøretøyet er allerede på listen under denne avtalen")
         ensureTruck(writer.db, plate, input.planned, now)
         val next = mapOf("id" to usageId, "registration_number" to plate, "agreement_id" to agreementId,
-            "planned" to if (input.planned) 1 else 0, "listed" to 1,
+            "planned" to if (input.planned) 1 else 0, "listed" to 1, "registry_problem" to registryProblem,
             "created_at" to (previous?.get("created_at") ?: now.storageTimestamp()), "updated_at" to now.storageTimestamp())
         writer.save("vehicle_usages", next)
         return vehicle(next)
@@ -217,15 +238,15 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
 
     private fun saveVerifiedSnapshot(db: Connection, vehicle: Vehicle, snapshot: RegistrySnapshot?) {
         if (snapshot == null) return
-        require(!vehicle.planned && snapshot.registrationNumber == vehicle.registrationNumber) { "Snapshot vehicle mismatch" }
+        require(!vehicle.planned && snapshot.registrationNumber == vehicle.registrationNumber) { "Registerutdraget tilhører et annet kjøretøy" }
         database.insertRegistrySnapshot(db, snapshot)
     }
 
     fun undo(id: String, actor: ChangeActor, now: Instant) = database.write { db ->
         val original = database.query(db, "SELECT * FROM fleet_changes WHERE id = ?", listOf(id), ::values).firstOrNull()
-            ?: throw FleetConflictException("Change not found")
-        if (!canUndo(db, original)) throw FleetConflictException("This change cannot be undone after subsequent changes; reload history")
-        val writer = Writer(db, now, original["agreement_id"] as String?, "Undid: ${original["description"]}")
+            ?: throw FleetConflictException("Fant ikke endringen")
+        if (!canUndo(db, original)) throw FleetConflictException("Denne endringen kan ikke angres etter senere endringer; last historikken på nytt")
+        val writer = Writer(db, now, original["agreement_id"] as String?, "Angret: ${original["description"]}")
         tables.forEach { table ->
             states(db, table, id, "BEFORE").forEach { writer.save(table, it) }
         }
@@ -330,19 +351,19 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
     }
 
     private fun requireActive(db: Connection, table: String, id: String) = row(db, table, id)
-        ?.takeIf { it["active"] == 1 } ?: throw FleetConflictException("Record no longer available; reload the page")
+        ?.takeIf { it["active"] == 1 } ?: throw FleetConflictException("Oppføringen er ikke lenger tilgjengelig; last siden på nytt")
     /** The listed listing of [plate]; with several agreements the caller must say which one. */
     private fun requireListed(db: Connection, plate: String, agreementId: String? = null): Map<String, Any?> {
         val listed = rows(db, "vehicle_usages", "registration_number = ? AND listed = 1" + (if (agreementId != null) " AND agreement_id = ?" else ""), listOfNotNull(plate, agreementId))
-        require(listed.size <= 1) { "$plate is listed under several agreements; say which one" }
-        return listed.singleOrNull() ?: throw FleetConflictException("Vehicle is no longer listed; reload the page")
+        require(listed.size <= 1) { "$plate står på flere avtaler; si hvilken" }
+        return listed.singleOrNull() ?: throw FleetConflictException("Kjøretøyet er ikke lenger på listen; last siden på nytt")
     }
     private fun expect(previous: Map<String, Any?>, expected: String?) {
-        if (expected == null || previous["updated_at"] != expected) throw FleetConflictException("This record changed; reload before editing")
+        if (expected == null || previous["updated_at"] != expected) throw FleetConflictException("Oppføringen er endret; last siden på nytt før du redigerer")
     }
     private fun date(value: String): LocalDate {
-        require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Enter a valid date" }
-        return try { LocalDate.parse(value) } catch (_: Exception) { throw IllegalArgumentException("Enter a valid date") }
+        require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) { "Skriv inn en gyldig dato" }
+        return try { LocalDate.parse(value) } catch (_: Exception) { throw IllegalArgumentException("Skriv inn en gyldig dato") }
     }
     private fun supplier(row: Map<String, Any?>) = FleetSupplier(row["id"] as String, row["name"] as String, row["org_number"] as String,
         row["active"] == 1, row["updated_at"] as String)
@@ -354,5 +375,6 @@ class FleetRepository internal constructor(private val database: VehicleDatabase
         (row["requires_products"] as Number).toInt() == 1,
         row["saksnr"] as String?)
     private fun vehicle(row: Map<String, Any?>) = Vehicle(row["registration_number"] as String, row["created_at"] as String,
-        row["agreement_id"] as String?, row["planned"] == 1, row["listed"] == 1, row["updated_at"] as String)
+        row["agreement_id"] as String?, row["planned"] == 1, row["listed"] == 1, row["updated_at"] as String,
+        exceptionApproved = row["exception_approved"] == 1, exceptionNote = row["exception_note"] as String?, registryProblem = row["registry_problem"] as String?)
 }
