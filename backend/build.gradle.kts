@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.plugin.serialization)
     alias(libs.plugins.ktor)
     application
+    jacoco
 }
 
 group = "com.tdt4290group7"
@@ -67,4 +68,13 @@ tasks.test {
     environment("SEED_ADMIN_PASSWORD", "test-only-admin-password")
     // Auth tests use isolated SQLite stores and never touch local application data.
     environment("DATABASE_PATH", layout.buildDirectory.file("test-data/default-app.db").get().asFile.absolutePath)
+}
+
+// Line coverage report: ./gradlew test jacocoTestReport, then open build/reports/jacoco/test/html/index.html.
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
 }

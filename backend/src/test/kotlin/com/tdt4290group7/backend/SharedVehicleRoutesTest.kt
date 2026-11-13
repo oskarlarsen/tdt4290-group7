@@ -1,5 +1,6 @@
 package com.tdt4290group7.backend
 
+import com.tdt4290group7.backend.admin.AdminInsightsRepository
 import com.tdt4290group7.backend.vehicles.AgreementInput
 import com.tdt4290group7.backend.vehicles.ChangeActor
 import com.tdt4290group7.backend.vehicles.SupplierInput
@@ -86,14 +87,16 @@ class SharedVehicleRoutesTest {
 
     @Test
     fun aVehicleAlertGoesOnlyToTheSupplierWhoseAgreementWasChecked() = testApplication {
-        val repo = VehicleRepository(Path.of("build", "test-data", "shared-alerts-${UUID.randomUUID()}.db"))
+        val path = Path.of("build", "test-data", "shared-alerts-${UUID.randomUUID()}.db")
+        val repo = VehicleRepository(path)
         val first = repo.fleet.saveSupplier(null, SupplierInput("First Supplier AS", "200000001"), actor, Instant.now())
         val second = repo.fleet.saveSupplier(null, SupplierInput("Second Supplier AS", "200000002"), actor, Instant.now())
         val firstAgreement = repo.fleet.saveAgreement(null, AgreementInput(first.id, "2026-01-01", "2099-12-31", 5, saksnr = "A/1"), null, actor, Instant.now())
         val secondAgreement = repo.fleet.saveAgreement(null, AgreementInput(second.id, "2026-01-01", "2099-12-31", 5, saksnr = "B/1"), null, actor, Instant.now())
         repo.fleet.addVehicle(firstAgreement.id, VehicleEntryInput("CD12345"), actor, Instant.now())
         repo.fleet.addVehicle(secondAgreement.id, VehicleEntryInput("CD12345"), actor, Instant.now())
-        application { module(repo, null) }
+        // Its own alert store: the default one is a shared file that keeps alerts from earlier runs.
+        application { module(repo, null, adminInsightsRepository = AdminInsightsRepository(path)) }
         val admin = adminClient()
         assertEquals(HttpStatusCode.Created, admin.post("/api/vehicle-checks") {
             contentType(ContentType.Application.Json); setBody("""{"registrationNumber":"CD12345","agreementId":"${firstAgreement.id}"}""")
