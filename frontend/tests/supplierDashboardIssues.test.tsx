@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 const alerts = vi.hoisted(() => ({ data: [] as unknown[] }));
@@ -30,10 +30,11 @@ describe("supplier dashboard issue tiles", () => {
     ];
     render(<MemoryRouter><Dashboard /></MemoryRouter>);
 
-    const certificates = await waitFor(() => screen.getByRole("link", { name: /Sertifikater/ }));
+    const issues = await waitFor(() => within(screen.getByRole("region", { name: "Åpne saker" })));
+    const certificates = issues.getByRole("link", { name: /Sertifikater/ });
     expect(certificates.textContent).toContain("2");
     expect(certificates.getAttribute("href")).toBe("/supplier/alerts?category=CERTIFICATES");
-    expect(screen.getByRole("link", { name: /Energi/ }).textContent).toContain("1");
-    expect(screen.getByRole("link", { name: /Kjøretøyoppfølging/ }).textContent).toContain("0");
+    expect(issues.getByRole("link", { name: /Energi/ }).textContent).toContain("1");
+    expect(issues.getByRole("link", { name: /Kjøretøyoppfølging/ }).textContent).toContain("0");
   });
 });

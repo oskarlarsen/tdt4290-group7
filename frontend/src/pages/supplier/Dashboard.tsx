@@ -33,19 +33,21 @@ function Metric({
   label,
   value,
   icon: Icon,
+  to,
 }: {
   label: string;
   value: number;
   icon: typeof Building2;
+  to: string;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-100 bg-white p-4 shadow-card">
+    <Link to={to} className="block rounded-xl border border-neutral-100 bg-white p-4 shadow-card transition-colors hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
       <div className="flex items-center justify-between text-sm text-neutral-500">
         <span>{label}</span>
         <Icon className="h-4 w-4 text-primary-700" aria-hidden="true" />
       </div>
       <p className="mt-2 text-2xl font-semibold text-neutral-900">{value}</p>
-    </div>
+    </Link>
   );
 }
 
@@ -126,11 +128,11 @@ export default function Dashboard() {
       </section>
 
       <section aria-label="Leverandøroversikt" className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Metric icon={Building2} label="Avtaler" value={overview.agreements.length} />
-        <Metric icon={Truck} label="Kjøretøy" value={overview.totalVehicles} />
-        <Metric icon={BadgeCheck} label="Sertifikater" value={overview.totalCertificates} />
-        <Metric icon={Zap} label="Energirapporter" value={overview.totalEnergyRecords} />
-        <Metric icon={Package} label="Produkter" value={overview.totalProducts} />
+        <Metric icon={Building2} label="Avtaler" value={overview.agreements.length} to="/supplier/contracts" />
+        <Metric icon={Truck} label="Kjøretøy" value={overview.totalVehicles} to="/supplier/vehicles" />
+        <Metric icon={BadgeCheck} label="Sertifikater" value={overview.totalCertificates} to="/supplier/certificates" />
+        <Metric icon={Zap} label="Energirapporter" value={overview.totalEnergyRecords} to="/supplier/energy" />
+        <Metric icon={Package} label="Produkter" value={overview.totalProducts} to="/supplier/compliance" />
       </section>
 
       <section aria-label="Åpne saker" className="rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:p-6">

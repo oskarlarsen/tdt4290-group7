@@ -381,6 +381,27 @@ export default function Onboarding() {
         </div>
       </section>
 
+      <section className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div>
+          <h2 className="font-semibold text-neutral-900">Klar til å sende inn?</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Nødvendig informasjon kontrolleres av serveren før den sendes til kommunal vurdering.
+          </p>
+          {!status.canSubmit && status.requiredEntities.length === 0 && (
+            <p className="mt-2 text-sm text-amber-700">Be administratoren din tildele informasjonen som kreves under avtalen.</p>
+          )}
+        </div>
+        <button
+          type="button"
+          disabled={working || !status.canSubmit}
+          onClick={handleSubmit}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {working ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Send inn registreringen
+        </button>
+      </section>
+
       {error && (
         <div data-onboarding-banner role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -518,7 +539,7 @@ export default function Onboarding() {
             </p>
             {entity === "vehicles" && (
               <p className="mt-1 text-sm text-neutral-500">
-                Only add vehicles you have actually used. Your approved list is already registered; vehicles that are not on it are checked with Statens vegvesen.
+                Legg bare til kjøretøy du faktisk har brukt. Den godkjente listen din er allerede registrert; kjøretøy som ikke står på den, kontrolleres mot Statens vegvesen.
               </p>
             )}
           </div>
@@ -788,27 +809,6 @@ export default function Onboarding() {
             )}
           </div>
         )}
-      </section>
-
-      <section className="flex flex-col gap-4 rounded-xl border border-neutral-100 bg-white p-5 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div>
-          <h2 className="font-semibold text-neutral-900">Klar til å sende inn?</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Nødvendig informasjon kontrolleres av serveren før den sendes til kommunal vurdering.
-          </p>
-          {!status.canSubmit && status.requiredEntities.length === 0 && (
-            <p className="mt-2 text-sm text-amber-700">Be administratoren din tildele informasjonen som kreves under avtalen.</p>
-          )}
-        </div>
-        <button
-          type="button"
-          disabled={working || !status.canSubmit}
-          onClick={handleSubmit}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {working ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Send inn registreringen
-        </button>
       </section>
     </div>
   );
