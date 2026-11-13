@@ -19,3 +19,6 @@ bin/
 .idea/
 *.iml
 debug.log
+
+# Test coverage reports
+coverage/
