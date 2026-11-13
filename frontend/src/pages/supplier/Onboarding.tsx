@@ -305,11 +305,12 @@ export default function Onboarding() {
     status?.status === "UNDER_REVIEW" ||
     status?.status === "APPROVED";
 
-  // Energy is reported every quarter, so its form stays open after the onboarding has been submitted.
-  const energyStaysOpen = locked && !!status?.requiredEntities.includes("ENERGY");
+  // Energy is reported every quarter and vehicles can be added again, so those forms stay open after submitting.
+  const reportableAfterSubmit = ENTITY_OPTIONS.filter((option) => (option.value === "energy" || option.value === "vehicles") && status?.requiredEntities.includes(ENTITY_API_VALUES[option.value]));
+  const energyStaysOpen = locked && reportableAfterSubmit.length > 0;
   useEffect(() => {
-    if (energyStaysOpen && entity !== "energy") setEntity("energy");
-  }, [energyStaysOpen, entity]);
+    if (energyStaysOpen && !reportableAfterSubmit.some((option) => option.value === entity)) setEntity(reportableAfterSubmit[0].value);
+  }, [energyStaysOpen, entity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -558,7 +559,7 @@ export default function Onboarding() {
           <div className="mt-5 space-y-5">
             {energyStaysOpen && (
               <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-                Registreringen din er {STATUS_LABELS[status.status].toLowerCase()}. Kjøretøy og produkter er låst, men du kan fortsette å rapportere energi hvert kvartal.
+                Registreringen din er {STATUS_LABELS[status.status].toLowerCase()}. Produkter er låst, men du kan fortsette å rapportere kjøretøy og energi.
               </p>
             )}
             <div className="max-w-xs">
@@ -576,7 +577,7 @@ export default function Onboarding() {
                   className="mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm"
                 >
                   {ENTITY_OPTIONS.filter((option) =>
-                    status.requiredEntities.includes(ENTITY_API_VALUES[option.value]) && (!energyStaysOpen || option.value === "energy"),
+                    status.requiredEntities.includes(ENTITY_API_VALUES[option.value]) && (!energyStaysOpen || option.value === "energy" || option.value === "vehicles"),
                   ).map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}

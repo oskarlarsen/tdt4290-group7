@@ -55,7 +55,9 @@ fun TripRowInput.estimateCo2Kg(): BigDecimal? =
     co2GramsPerKm?.let { totalTripKm.multiply(it).movePointLeft(3).stripTrailingZeros() }
 
 @Serializable
-data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>)
+data class AppendTripRowsRequest(val sourceName: String? = null, val rows: List<TripRowInput>,
+    /** Which agreement the automatic check after saving judges the truck by. */
+    val agreementId: String? = null)
 
 @Serializable
 data class StoredTripRow(

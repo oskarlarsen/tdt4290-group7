@@ -93,7 +93,8 @@ export function statisticsBody(values: Record<string, string>): string {
   }
   if (!["true", "false"].includes(values.co2Registered)) throw new Error("Velg om kjøretøyet er registrert som CO₂-utslipp.");
   row.push(`"co2Registered":${values.co2Registered === "true"}`);
-  return `{"sourceName":${JSON.stringify(values.sourceName?.trim() || null)},"rows":[{${row.join(",")}}]}`;
+  if (!values.agreementId) throw new Error("Velg hvilken avtale dataene gjelder.");
+  return `{"sourceName":${JSON.stringify(values.sourceName?.trim() || null)},"agreementId":${JSON.stringify(values.agreementId)},"rows":[{${row.join(",")}}]}`;
 }
 
 export function checkLabel(check?: CheckSummary | null): string {

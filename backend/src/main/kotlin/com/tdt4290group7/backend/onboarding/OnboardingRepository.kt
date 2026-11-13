@@ -353,8 +353,8 @@ internal class OnboardingRepository(
         fileBytes: ByteArray,
         now: Instant
     ): PreparedBatch {
-        // Energy is a quarterly duty, so it stays open after onboarding is submitted; vehicles and products do not.
-        if (entityType != BatchEntityType.ENERGY) database.read { db -> requireEditableSupplier(db, supplierId) }
+        // Energy (every quarter) and vehicles (new vehicles come into use) stay open after onboarding is submitted; products do not.
+        if (entityType != BatchEntityType.ENERGY && entityType != BatchEntityType.VEHICLES) database.read { db -> requireEditableSupplier(db, supplierId) }
         val allowedAgreements = requiredAgreementIds(supplierId, entityType)
         require(allowedAgreements.isNotEmpty()) {
             "Administratoren din har ikke bedt om informasjon om ${entityType.nb}"
@@ -537,7 +537,7 @@ internal class OnboardingRepository(
         val ts = formatTimestamp(now)
 
         database.write { db ->
-            if (cached.entityType != BatchEntityType.ENERGY) requireEditableSupplier(db, supplierId)
+            if (cached.entityType != BatchEntityType.ENERGY && cached.entityType != BatchEntityType.VEHICLES) requireEditableSupplier(db, supplierId)
             val batchStatus = database.query(
                 db,
                 "SELECT status FROM upload_batches WHERE id = ? AND supplier_id = ?",

@@ -69,6 +69,6 @@ export function VehicleDetails({ plate, agreementId, onClose }: { plate: string;
         </div>
       </div>}
     </VehicleDialog>
-    {addingStatistics && data && <StatisticsForm plate={plate} existingRows={data.tripRows} onClose={() => setAddingStatistics(false)} onSaved={(_, message) => { setAddingStatistics(false); setNotice(message); void refresh(); }} />}
+    {addingStatistics && data && <StatisticsForm plate={plate} agreementId={agreementId ?? data.agreement?.agreement.id} existingRows={data.tripRows} onClose={() => setAddingStatistics(false)} onSaved={(_, message) => { setAddingStatistics(false); setNotice(message); void refresh(); }} />}
   </>;
 }

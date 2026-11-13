@@ -129,7 +129,7 @@ fun Application.configureRouting(
                 )
                 val results = response.rows.map { it.registrationNumber }.distinct().map { plate ->
                     try {
-                        val checked = checks.check(VehicleCheckRequest(plate))
+                        val checked = checks.check(VehicleCheckRequest(plate, agreementId = request.agreementId))
                         StatisticsCheckResult(plate, checked.summary())
                     } catch (cause: CancellationException) {
                         throw cause

@@ -9,6 +9,8 @@ import { CatalogSelect, RegistrationNumberInput } from "./VehicleInputs";
 import { BODY_TYPES, FUEL_TECHNOLOGIES, VEHICLE_CATEGORIES, isTrailer, selectedCode, usesLitres, emissionsNotApplicable, INAPPLICABLE_EMISSION_FIELDS, statisticNotApplicable } from "../../utils/vehicleCatalog";
 
 import { ConfirmAction } from "./ConfirmAction";
+import { useFleet } from "../../hooks/useVehicles";
+import { agreementLabel } from "../../utils/agreementLabel";
 
 const statisticHelp: Record<string, string> = {
   co2GramsPerKm: "Oppgi verdien leverandøren har rapportert. Målinger fra Statens vegvesen hentes separat for sammenligning.",
@@ -16,7 +18,7 @@ const statisticHelp: Record<string, string> = {
 };
 const emissionsHelp = "Ikke relevant etter rapporteringsreglene for elektriske eller hydrogendrevne kjøretøy.";
 
-type Props = { plate?: string; onClose: () => void; onSaved: (plate: string, message: string) => void };
+type Props = { plate?: string; agreementId?: string | null; onClose: () => void; onSaved: (plate: string, message: string) => void };
 
 async function existingVehicle(plate: string) {
   try { return await api.getVehicle(plate); } catch (cause) {
@@ -25,14 +27,16 @@ async function existingVehicle(plate: string) {
   }
 }
 
-export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: Props & { existingRows?: TripRow[] }) {
-  const [values, setValues] = useState<Record<string, string>>({ registrationNumber: plate ?? "", periodStart: "", periodEnd: "", co2Registered: "" });
+export function StatisticsForm({ plate, agreementId, existingRows = [], onClose, onSaved }: Props & { existingRows?: TripRow[] }) {
+  const [values, setValues] = useState<Record<string, string>>({ registrationNumber: plate ?? "", agreementId: agreementId ?? "", periodStart: "", periodEnd: "", co2Registered: "" });
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<unknown>();
   const [overlapAccepted, setOverlapAccepted] = useState(false);
   const [rows, setRows] = useState(existingRows);
   const [preparing, setPreparing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const fleet = useFleet().data;
+  const supplierName = (id: string) => fleet?.suppliers.find(s => s.id === id)?.name ?? "";
   const save = useMutation({ mutationFn: api.appendStatistics, retry: false });
   const busy = preparing || save.isPending;
   const overlapping = rows.some(row => values.periodStart && values.periodEnd && row.data.periodStart <= values.periodEnd && row.data.periodEnd >= values.periodStart);
@@ -78,6 +82,10 @@ export function StatisticsForm({ plate, existingRows = [], onClose, onSaved }: P
     <form onSubmit={submit} onInvalidCapture={event => { const disclosure = (event.target as HTMLElement).closest("details"); if (disclosure) disclosure.open = true; }} className="space-y-5">
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <Field label="Registreringsnummer"><RegistrationNumberInput autoFocus readOnly={!!plate} value={values.registrationNumber} onChange={value => change("registrationNumber", value)} /></Field>
+        <div className="sm:col-span-2"><Field label="Avtale"><select required className={inputClass} value={values.agreementId} onChange={e => change("agreementId", e.target.value)}>
+          <option value="" disabled>Velg avtale</option>
+          {fleet?.agreements.filter(a => a.active).map(a => <option key={a.id} value={a.id}>{supplierName(a.supplierId)} · {agreementLabel(a)}</option>)}
+        </select></Field></div>
         <Field label="Drivstoff"><CatalogSelect catalog={FUEL_TECHNOLOGIES} value={values.fuelTechnology ?? ""} disabled={isTrailer(values.vehicleCategory ?? "")} notApplicable={isTrailer(values.vehicleCategory ?? "")} onChange={value => change("fuelTechnology", value)} /></Field>
         <Field label="Start på rapporteringsperiode"><input type="date" required className={inputClass} value={values.periodStart} onChange={e => change("periodStart", e.target.value)} /></Field>
         <Field label="Slutt på rapporteringsperiode"><input type="date" required min={values.periodStart || undefined} className={inputClass} value={values.periodEnd} onChange={e => change("periodEnd", e.target.value)} /></Field>

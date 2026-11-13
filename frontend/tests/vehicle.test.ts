@@ -4,7 +4,7 @@ import { fuelGroups, categoryGroup, INAPPLICABLE_EMISSION_FIELDS } from "../src/
 import type { CheckSummary } from "../src/types/vehicle";
 
 const values: Record<string, string> = {
-  registrationNumber: "ab-12345", periodStart: "2026-01-01", periodEnd: "2026-01-31",
+  registrationNumber: "ab-12345", agreementId: "agreement-1", periodStart: "2026-01-01", periodEnd: "2026-01-31",
   fuelTechnology: "2", vehicleCategory: "M1", bodyType: "AA", make: "Synthetic make", model: "Synthetic model",
   co2Registered: "false", ...Object.fromEntries(DECIMAL_FIELDS.map(([key]) => [key, "0"])),
 };
@@ -109,5 +109,9 @@ describe("vehicle input and safe status presentation", () => {
     expect(checkLabel({ ...base, lookupOutcome: "NOT_FOUND" })).toBe("Verifisering ufullstendig");
     expect(checkLabel({ ...base, deviations: ["DEREGISTERED"] })).toBe("1 registrert avvik");
     expect(checkLabel(base)).toBe("Ingen registrerte avvik");
+  });
+  it("sends the chosen agreement and refuses to save without one", () => {
+    expect(JSON.parse(statisticsBody(values)).agreementId).toBe("agreement-1");
+    expect(() => statisticsBody({ ...values, agreementId: "" })).toThrow("Velg hvilken avtale");
   });
 });
